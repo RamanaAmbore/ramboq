@@ -385,7 +385,7 @@ def generate_milestone_section():
     key_list, val_list = get_profile(section_name)
 
     categories = get_labels(section_name)
-    milestones = [f' {x['milestone']}' for x in val_list]
+    milestones = [f" {x['milestone']}" for x in val_list]
     categories = [f'  {x} ' for x in categories]
     y1 = [1.3] * len(categories)
     y2 = [word_width(milestone, .3, .19) for milestone in milestones]
