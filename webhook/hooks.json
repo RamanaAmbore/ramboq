@@ -1,0 +1,17 @@
+[
+  {
+    "id": "deploy",
+    "execute-command": "/opt/ramboq/webhook/deploy.sh",
+    "command-working-directory": "/opt/ramboq",
+    "trigger-rule": {
+      "match": {
+        "type": "value",
+        "value": "push",
+        "parameter": {
+          "source": "header",
+          "name": "X-GitHub-Event"
+        }
+      }
+    }
+  }
+]
