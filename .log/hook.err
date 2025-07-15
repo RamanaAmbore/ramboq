@@ -15,3 +15,15 @@
 [webhook] 2025/07/15 13:39:06 [7c1f0b] ramboq-deploy got matched
 [webhook] 2025/07/15 13:39:06 [7c1f0b] error evaluating hook: no source for value retrieval
 [webhook] 2025/07/15 13:39:06 [7c1f0b] 500 | 43 B | 10.538421ms | ramboq.com | POST /hooks/ramboq-deploy
+[webhook] 2025/07/15 13:52:00 [197f52] incoming HTTP POST request from 127.0.0.1:46118
+[webhook] 2025/07/15 13:52:00 [197f52] ramboq-deploy got matched
+[webhook] 2025/07/15 13:52:00 [197f52] error evaluating hook: no source for value retrieval
+[webhook] 2025/07/15 13:52:00 [197f52] 500 | 43 B | 1.177916ms | ramboq.com | POST /hooks/ramboq-deploy
+[webhook] 2025/07/15 17:00:43 caught terminated signal; exiting
+[webhook] 2025/07/15 17:00:43 version 2.8.0 starting
+[webhook] 2025/07/15 17:00:43 setting up os signal watcher
+[webhook] 2025/07/15 17:00:43 attempting to load hooks from /opt/ramboq/webhook/hooks.json
+[webhook] 2025/07/15 17:00:43 os signal watcher ready
+[webhook] 2025/07/15 17:00:43 found 1 hook(s) in file
+[webhook] 2025/07/15 17:00:43 	loaded: ramboq-deploy
+[webhook] 2025/07/15 17:00:43 serving hooks on http://0.0.0.0:9001/hooks/{id}
