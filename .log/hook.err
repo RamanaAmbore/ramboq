@@ -1,0 +1,13 @@
+[webhook] 2025/07/15 11:07:13 version 2.8.0 starting
+[webhook] 2025/07/15 11:07:13 setting up os signal watcher
+[webhook] 2025/07/15 11:07:13 attempting to load hooks from /opt/ramboq/webhook/hooks.json
+[webhook] 2025/07/15 11:07:13 os signal watcher ready
+[webhook] 2025/07/15 11:07:13 found 1 hook(s) in file
+[webhook] 2025/07/15 11:07:13 	loaded: ramboq-deploy
+[webhook] 2025/07/15 11:07:13 serving hooks on http://0.0.0.0:9001/hooks/{id}
+[webhook] 2025/07/15 11:10:42 [78225d] incoming HTTP GET request from 127.0.0.1:54840
+[webhook] 2025/07/15 11:10:42 [78225d] ramboq-deploy got matched
+[webhook] 2025/07/15 11:10:42 [78225d] error parsing body payload due to unsupported content type header: 
+[webhook] 2025/07/15 11:10:42 [78225d] parameter node not found: X-Github-Event
+[webhook] 2025/07/15 11:10:42 [78225d] ramboq-deploy got matched, but didn't get triggered because the trigger rules were not satisfied
+[webhook] 2025/07/15 11:10:42 [78225d] 200 | 30 B | 4.024946ms | www.ramboq.com | GET /hooks/ramboq-deploy

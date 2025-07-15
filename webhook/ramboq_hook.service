@@ -1,0 +1,14 @@
+[Unit]
+Description=Webhook Listener for ramboq.com
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/webhook -hooks /opt/ramboq/webhook/hooks.json -port 9001 -verbose
+StandardOutput=append:/opt/ramboq/.log/hook.log
+StandardError=append:/opt/ramboq/.log/hook.err
+Restart=always
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
