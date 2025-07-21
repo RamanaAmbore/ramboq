@@ -2,18 +2,22 @@
 
 LOG="/opt/ramboq/.log/hook_debug.log"
 TS=$(date '+%Y-%m-%d %H:%M:%S')
+export HOME=/var/www
+
 
 {
   echo "[$TS] Webhook triggered"
   echo "[$TS] Current environment: $(env | grep GITHUB || echo 'No GitHub headers found')"
   echo "[$TS] Executing deploy steps..."
 
+  echo "Running as: $(whoami)" >> "$LOG"
+
   cd /opt/ramboq || { echo "[$TS] Failed to cd into /opt/ramboq"; exit 1; }
 
   # Check if .git exists
   if [ -d .git ]; then
   # Use repo-level config so it doesn't rely on global write access
-    git config --file .git/config --add safe.directory /opt/ramboq
+    git --git-dir=/opt/ramboq/.git --work-tree=/opt/ramboq config --add safe.directory /opt/ramboq
 
     # Pull the latest code
     git --git-dir=.git --work-tree=. pull origin main

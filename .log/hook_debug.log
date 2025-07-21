@@ -1,0 +1,49 @@
+[2025-07-21 05:41:33] Webhook triggered
+[2025-07-21 05:41:33] Current environment: HTTP_X_GITHUB_EVENT=push
+[2025-07-21 05:41:33] Executing deploy steps...
+Running as: www-data
+From github.com:RamanaAmbore/ramboq
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+Requirement already satisfied: streamlit in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 1)) (1.46.1)
+Requirement already satisfied: pyyaml in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 2)) (6.0.2)
+Requirement already satisfied: plotly in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 3)) (6.2.0)
+Requirement already satisfied: streamlit-scroll-navigation in ./venv/lib/python3.13/site-packages (from -r requirements.txt (line 4)) (1.2.1)
+Requirement already satisfied: altair<6,>=4.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (5.5.0)
+Requirement already satisfied: blinker<2,>=1.5.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (1.9.0)
+Requirement already satisfied: cachetools<7,>=4.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (6.1.0)
+Requirement already satisfied: click<9,>=7.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (8.2.1)
+Requirement already satisfied: numpy<3,>=1.23 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (2.3.1)
+Requirement already satisfied: packaging<26,>=20 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (25.0)
+Requirement already satisfied: pandas<3,>=1.4.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (2.3.1)
+Requirement already satisfied: pillow<12,>=7.1.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (11.3.0)
+Requirement already satisfied: protobuf<7,>=3.20 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (6.31.1)
+Requirement already satisfied: pyarrow>=7.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (20.0.0)
+Requirement already satisfied: requests<3,>=2.27 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (2.32.4)
+Requirement already satisfied: tenacity<10,>=8.1.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (9.1.2)
+Requirement already satisfied: toml<2,>=0.10.1 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (0.10.2)
+Requirement already satisfied: typing-extensions<5,>=4.4.0 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (4.14.1)
+Requirement already satisfied: watchdog<7,>=2.1.5 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (6.0.0)
+Requirement already satisfied: gitpython!=3.1.19,<4,>=3.0.7 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (3.1.44)
+Requirement already satisfied: pydeck<1,>=0.8.0b4 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (0.9.1)
+Requirement already satisfied: tornado!=6.5.0,<7,>=6.0.3 in ./venv/lib/python3.13/site-packages (from streamlit->-r requirements.txt (line 1)) (6.5.1)
+Requirement already satisfied: narwhals>=1.15.1 in ./venv/lib/python3.13/site-packages (from plotly->-r requirements.txt (line 3)) (1.46.0)
+Requirement already satisfied: jinja2 in ./venv/lib/python3.13/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (3.1.6)
+Requirement already satisfied: jsonschema>=3.0 in ./venv/lib/python3.13/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (4.24.0)
+Requirement already satisfied: gitdb<5,>=4.0.1 in ./venv/lib/python3.13/site-packages (from gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r requirements.txt (line 1)) (4.0.12)
+Requirement already satisfied: python-dateutil>=2.8.2 in ./venv/lib/python3.13/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: pytz>=2020.1 in ./venv/lib/python3.13/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt (line 1)) (2025.2)
+Requirement already satisfied: tzdata>=2022.7 in ./venv/lib/python3.13/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt (line 1)) (2025.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./venv/lib/python3.13/site-packages (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1)) (3.4.2)
+Requirement already satisfied: idna<4,>=2.5 in ./venv/lib/python3.13/site-packages (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1)) (3.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in ./venv/lib/python3.13/site-packages (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1)) (2.5.0)
+Requirement already satisfied: certifi>=2017.4.17 in ./venv/lib/python3.13/site-packages (from requests<3,>=2.27->streamlit->-r requirements.txt (line 1)) (2025.7.14)
+Requirement already satisfied: smmap<6,>=3.0.1 in ./venv/lib/python3.13/site-packages (from gitdb<5,>=4.0.1->gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r requirements.txt (line 1)) (5.0.2)
+Requirement already satisfied: MarkupSafe>=2.0 in ./venv/lib/python3.13/site-packages (from jinja2->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (3.0.2)
+Requirement already satisfied: attrs>=22.2.0 in ./venv/lib/python3.13/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (25.3.0)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in ./venv/lib/python3.13/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (2025.4.1)
+Requirement already satisfied: referencing>=0.28.4 in ./venv/lib/python3.13/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (0.36.2)
+Requirement already satisfied: rpds-py>=0.7.1 in ./venv/lib/python3.13/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (0.26.0)
+Requirement already satisfied: six>=1.5 in ./venv/lib/python3.13/site-packages (from python-dateutil>=2.8.2->pandas<3,>=1.4.0->streamlit->-r requirements.txt (line 1)) (1.17.0)
+[2025-07-21 05:41:33] Attempting to restart ramboq.service...
+[2025-07-21 05:41:33] Deployment complete
