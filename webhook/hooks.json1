@@ -1,0 +1,53 @@
+[
+  {
+    "id": "ramboq-deploy",
+    "execute-command": "/opt/ramboq/webhook/deploy.sh",
+    "command-working-directory": "/opt/ramboq",
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "push",
+            "parameter": {
+              "source": "header",
+              "name": "X-GitHub-Event"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "refs/heads/main",
+            "parameter": {
+              "source": "payload",
+              "name": "ref"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "ramboq",
+            "parameter": {
+              "source": "payload",
+              "name": "repository.name"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "payload-hash-sha256",
+            "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b"
+          }
+        }
+      ]
+    }
+  },
+  {
+  "id": "log-incoming",
+  "execute-command": "/opt/ramboq/webhook/log-request.sh",
+  "command-working-directory": "/opt/ramboq",
+  "include-command-output-in-response": true
+}
+]
