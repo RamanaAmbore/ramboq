@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/streamlit_resume.iml" filepath="$PROJECT_DIR$/.idea/streamlit_resume.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/ramboq.iml" filepath="$PROJECT_DIR$/.idea/ramboq.iml" />
     </modules>
   </component>
 </project>
