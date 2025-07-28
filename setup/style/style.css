@@ -42,6 +42,7 @@ margin-left:20px;}
   background-color: var(--header-footer-bg);
   border-top: var(--header-footer-border);
   padding: 0.1rem 0;
+  gap:0px;
   position: fixed;
   bottom: 0;
   z-index: 50;
@@ -50,13 +51,13 @@ margin-left:20px;}
   text-align: center;
 }
 
-.st-key-footer-desktop {
+#footer-desktop {
   display: block;
   font-size: 0.8rem;
   text-align: center;
 }
 
-.st-key-footer-mobile {
+#footer-mobile {
   display: none;
   font-size: 0.75rem;
   text-align: center;
@@ -76,10 +77,10 @@ margin-left:20px;}
 
 
 @media screen and (max-width: 768px) {
-  .st-key-footer-desktop {
+  #footer-desktop {
     display: none;
   }
-  .st-key-footer-mobile {
+  #footer-mobile {
     display: block;
   }
   .st-key-navbar-desktop {

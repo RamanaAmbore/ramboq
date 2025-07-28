@@ -6,8 +6,10 @@ from PIL import Image  # PIL module for image handling
 
 # Import custom components and functions from the src directory
 from src.components import markdown, set_png_as_page_bg  # Functions for setting background and styling
+from src.footer import footer
+from src.header import header
 from src.logger import log_setup  # Custom logging setup
-from src.sections import main_page  # Functions to generate sections of the profile page
+from src.page_router import route
 from src.utils import css_style, get_path  # Utility functions for styling, accessing profile data, and image paths
 
 
@@ -29,7 +31,7 @@ def initial_setup():
     )
 
     # Apply CSS styling to the page content
-    markdown(css_style)
+    markdown(css_style,css=True)
 
     # Set the background image for the page
     # set_png_as_page_bg('background.png')
@@ -39,7 +41,11 @@ def initial_setup():
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
 
-    main_page()
+    header()
+
+    route()
+
+    footer()
 
     # Generate the sidebar section
     # generate_sidebar_section()

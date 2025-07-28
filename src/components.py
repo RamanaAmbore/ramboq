@@ -20,13 +20,6 @@ def set_png_as_page_bg(png_file, icon=False):
     return
 
 
-# Function to render Markdown text with optional styling
-def markdown(text, style_tag=True):
-    if style_tag:
-        text = f'<style>{text}</style>'  # Wrap text in <style> tag for styling
-    st.markdown(f'{text}', unsafe_allow_html=True)  # Render styled Markdown
-
-
 # Wrapper function for streamlit's container element to support function calls within it
 def container(*args, **kwargs):
     function = args[0]  # The function to be executed within the container
@@ -38,6 +31,33 @@ def container(*args, **kwargs):
             return function(*args, **kwargs)  # Return function inside container
 
     return function(*args, **kwargs)  # Return function without container
+
+# # Function to render Markdown text with optional styling
+# def markdown(text, style_tag=True):
+#     if style_tag:
+#         text = f'<style>{text}</style>'  # Wrap text in <style> tag for styling
+#     st.markdown(f'{text}', unsafe_allow_html=True)  # Render styled Markdown
+
+# Wrapper function for streamlit's container element to support function calls within it
+def markdown(html_block, **kwargs):
+    style =""
+    if 'css' in kwargs and kwargs['css']:
+        return st.markdown(f"<style>{html_block}</style>" , unsafe_allow_html=True)
+    if 'style' in kwargs:
+        style = kwargs.pop('style')  # Unique key for container
+    if 'class' in kwargs:
+        class_name = kwargs.pop('class')
+        style = f"class='{class_name}'"
+    if 'key' in kwargs:
+        id = kwargs.pop('key')
+        style = f"{style} id='{id}'"
+
+    tag = kwargs.pop('tag') if 'tag' in kwargs else 'div'
+
+    html_block = f"<{tag} {style}> {html_block};</{tag}>"
+
+    return st.markdown(html_block, unsafe_allow_html=True, **kwargs )  # Return function without container
+
 
 
 # Function to display a section heading with an optional icon and styling

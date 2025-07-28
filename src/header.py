@@ -1,20 +1,15 @@
-# Import necessary modules and components
-
 import streamlit as st
 
-# Import custom components and functions from src directory
 from src.components import container
 from src.utils import get_path
 
 
-def main_page():
+def header():
     # Initialize session state
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
-
     if "nav" not in st.session_state:
         st.session_state.nav = "About"
-
     nav_labels = ["About", "Market", "Performance", "Update", "Contact", "Login"]
     nav_list_width = [1, 1, 1.1, 1, 1, 1]
 
@@ -22,9 +17,7 @@ def main_page():
         st.session_state.logged_in = not st.session_state.logged_in
 
     # --- Layout: Logo | Nav/Menu ---
-
-    logo_col,  menu_col = st.columns([1.5, 6], gap="small", vertical_alignment="center")
-
+    logo_col, menu_col = st.columns([1.5, 6], gap="small", vertical_alignment="center")
     with st.container(key='nav-container'):
         with logo_col:
             container(
@@ -51,8 +44,8 @@ def main_page():
 
             # Desktop navbar (visible on large screens)
             with nav_col:
-                with st.container():
-                    st.markdown("<div class='navbar-desktop'>", unsafe_allow_html=True)
+                with st.container(key='navbar-desktop'):
+
                     nav_labels = nav_labels[:-1] + ["Logout" if st.session_state.logged_in else "Login"]
                     nav_cols = st.columns(len(nav_labels), gap="small")
 
@@ -65,13 +58,9 @@ def main_page():
                                 else:
                                     st.session_state.nav = label
 
-                            st.markdown(f"<div style='{btn_style(label)}'>{label}</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-
             # Mobile popover menu (visible on small screens)
             with mobile_col:
-                with st.container():
-                    st.markdown("<div class='mobile-popover'>", unsafe_allow_html=True)
+                with st.container(key='mobile-popover'):
                     with st.popover("☰", use_container_width=True):
                         for label in nav_labels:
                             if st.button(label, key=f"mobile-{label}"):
@@ -80,53 +69,3 @@ def main_page():
                                     toggle_login()
                                 else:
                                     st.session_state.nav = label
-
-                            st.markdown(f"<div style='{btn_style(label)}'>{label}</div>", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Content with 10px vertical spacing
-    st.markdown("<div>", unsafe_allow_html=True)
-    with st.container():
-        if st.session_state.nav_active == "About":
-            st.write("🏢 Welcome to Ramboq — empowering smarter investments.")
-        elif st.session_state.nav_active == "Market":
-            st.write("📈 Market analysis and live charts.")
-        elif st.session_state.nav_active == "Performance":
-            st.write("🧮 Portfolio breakdown and asset overview.")
-        elif st.session_state.nav_active == "Update":
-            st.write("🧮 Updates coming soon...")
-        elif st.session_state.nav_active == "Contact":
-            st.write("📞 Contact our team or request a demo.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    with st.container(key='footer-container'):
-
-        container(
-            st.markdown,
-            """
-            <p style='font-size:15px;'>
-                © Rambo Quant Investments LLP
-                <span style='color:#007ACC;'> | </span>
-                LLDIN00123456
-                <span style='color:#007ACC;'> | </span>
-                Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results.
-            </p>
-            """,
-            key='footer-desktop',
-            unsafe_allow_html=True
-        )
-
-        container(
-            st.markdown,
-            """
-            <p style='font-size:12px;'>
-                © Rambo Quant Investments LLP
-                <span style='color:#007ACC;'> | </span>
-                LLDIN00123456
-                <span style='color:#007ACC;'> | </span>
-                Markets carry risk.
-            </p>
-            """,
-            key='footer-mobile',
-            unsafe_allow_html=True
-        )
