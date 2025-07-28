@@ -10,7 +10,7 @@ def route():
         elif st.session_state.nav_active == "Market":
             st.write("📈 Market analysis and live charts.")
         elif st.session_state.nav_active == "Performance":
-            st.write("🧮 Portfolio breakdown and asset overview.")
+            st.write("🧮 Performance breakdown and asset overview.")
         elif st.session_state.nav_active == "Update":
             st.write("🧮 Updates coming soon...")
         elif st.session_state.nav_active == "Contact":
