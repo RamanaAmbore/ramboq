@@ -45,8 +45,8 @@ def markdown(html_block, **kwargs):
         return st.markdown(f"<style>{html_block}</style>" , unsafe_allow_html=True)
     if 'style' in kwargs:
         style = kwargs.pop('style')  # Unique key for container
-    if 'class' in kwargs:
-        class_name = kwargs.pop('class')
+    if 'class_name' in kwargs:
+        class_name = kwargs.pop('class_name')
         style = f"class='{class_name}'"
     if 'key' in kwargs:
         id = kwargs.pop('key')
@@ -54,7 +54,7 @@ def markdown(html_block, **kwargs):
 
     tag = kwargs.pop('tag') if 'tag' in kwargs else 'div'
 
-    html_block = f"<{tag} {style}> {html_block};</{tag}>"
+    html_block = f"<{tag} {style}> {html_block}</{tag}>"
 
     return st.markdown(html_block, unsafe_allow_html=True, **kwargs )  # Return function without container
 

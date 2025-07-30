@@ -8,12 +8,9 @@
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 
-.stHorizontalBlock:nth-of-type(2) {
-  background-color: var(--header-footer-bg) !important;
-  border-bottom: var(--header-footer-border) !important;
-  padding-bottom: 15px;
+.stVerticalBlock {
+    gap:0rem;
 }
-
 .block-container {
     min-height: 100vh;
     max-width: 1200px;
@@ -33,8 +30,38 @@ header {visibility: hidden;}
     color: #2c4653 !important;
 }
 
-.st-key-logo-container {
-margin-left:20px;}
+
+.st-key-logo-container, .st-key-logo-container-1 {
+    margin-left:20px;
+}
+
+
+
+.st-key-navbar-container {
+    padding: 15px 15px;
+    margin-bottom: 15px;
+    gap: 0px;
+    border-bottom: 1px solid #ccc;  /* 👇 subtle bottom border */
+    background-color: #f8f8f8;      /* 🎨 light gray background */
+
+    /* ✨ Add subtle 3D shadow */
+    box-shadow: 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Layout visibility control */
+.st-key-navbar-desktop-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.st-key-navbar-mobile-container {
+  display: none;
+  gap: 0rem;
+  padding:0px;
+  margin:0px;
+  border-width:1px;
+}
 
 .st-key-footer-container {
   width: 100%;
@@ -44,6 +71,7 @@ margin-left:20px;}
   padding: 0.1rem 0;
   gap:0px;
   position: fixed;
+  overflow: visible;
   bottom: 0;
   z-index: 50;
   margin: 0;
@@ -51,42 +79,30 @@ margin-left:20px;}
   text-align: center;
 }
 
-#footer-desktop {
+.footer-desktop {
   display: block;
-  font-size: 0.8rem;
   text-align: center;
 }
 
-#footer-mobile {
+.footer-mobile {
   display: none;
-  font-size: 0.75rem;
   text-align: center;
 }
 
-
-/* Layout visibility control */
-.st-key-navbar-desktop {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-.st-key-mobile-popover {
-  display: none;
-}
-
-
-@media screen and (max-width: 768px) {
-  #footer-desktop {
+@media screen and (max-width: 600px) {
+  .footer-desktop {
     display: none;
   }
-  #footer-mobile {
+  .footer-mobile {
     display: block;
   }
-  .st-key-navbar-desktop {
+  .st-key-navbar-desktop-container {
     display: none;
   }
-  .st-key-mobile-popover {
+  .st-key-navbar-mobile-container {
     display: block;
   }
+}
+.bar {
+    color:#007ACC;
 }
