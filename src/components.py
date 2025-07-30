@@ -1,6 +1,6 @@
 import streamlit as st
 
-from src.utils import get_image_bin_file, config, profile
+from src.utils import get_image_bin_file, config, constants
 
 
 # Function to set a PNG image as the page background
@@ -108,14 +108,14 @@ def create_ruler():
 
 # Function to display profile information in a container based on the name
 def write_container(name):
-    profile_section = profile[name]  # Get profile section for the given name
+    profile_section = constants[name]  # Get profile section for the given name
     for key, vals in profile_section.items():
         disp_icon_text(vals['icon'], vals['long label'], vals['link'])  # Display icon and text for each profile item
 
 
 # Function to display profile information in columns
 def write_columns(column_list, name):
-    profile_section = profile[name]  # Get profile section for the given name
+    profile_section = constants[name]  # Get profile section for the given name
     profile_keys = list(profile_section.keys())  # List of profile keys
     size = len(profile_keys) - 1  # Total number of profile items
     profile_vals = list(profile_section.values())  # List of profile values
