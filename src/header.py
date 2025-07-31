@@ -26,13 +26,10 @@ def create_navbar_desktop_container():
                                                          vertical_alignment="center")
 
         with logo_col:
-            container(
-                st.image,
+                st.image(
                 get_path('logo.png'),
                 use_container_width="False",
-                width=300,
-                key='logo_container'
-            )
+                width=300)
 
         with menu_col:
             with st.container(key="nav-buttons"):
@@ -51,7 +48,7 @@ def create_navbar_mobile_container():
 
             with col1:
                         st.image(
-                        get_path('logo7.png'),
+                        get_path('logo.png'),
                         use_container_width="True",
                         width=300,
                         )

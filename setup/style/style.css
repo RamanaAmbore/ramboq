@@ -1,13 +1,13 @@
 :root {
   --font-size-small: 0.8rem;
-  --header-bg: #F5F7FA; /* Whitemist background*/
-  --footer-bg: #F5F7FA33; /* Whitemist background*/
+  --header-bg: #F5F7FA;
+  --footer-bg: #F5F7FA11;
   --header-footer-border: 1px solid #D0D5DD;
   --header-border-top: 2px solid #e87525;
   --main-color: #1e293b;
   --background-color: black;
   --page-bg: white
-  --navbar-bg: #f8f8f8;
+  --navbar-bg: black;
   --font-color: #666
   --bar-color: #007ACC;
   --menulist-bg: #f9f9f9;
@@ -28,14 +28,14 @@ header {visibility: hidden;}
 
   /* Top border gradient via border-image */
   border-top: 2px solid transparent;
-  border-image-source: linear-gradient(to right, yellow, green, red, orange);
+  border-image-source: linear-gradient(to right, green, red, orange);
   border-image-slice: 1;
   border-image-width: 2px;
   border-image-repeat: stretch;
   border-image-outset: 0;
 
   /* Only apply border-image to TOP */
-  border-image: linear-gradient(to right, yellow, green, red, orange) 2 0 0 0 stretch;
+  border-image: linear-gradient(to right, green, red, orange) 2 0 0 0 stretch;
 
   /* Layout */
   min-height: 100vh;
@@ -43,45 +43,21 @@ header {visibility: hidden;}
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--page-bg);
-
   /* Shadow accents */
   box-shadow: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
 }
 
 
-/* --- Navbar Buttons (st-key-navbar) --- */
-.st-key-nav-button-container button  {
-    /* Base styles */
-    border-width: 0px !important;
-    color: var(--header-footer-border) !important;
-}
-
-.st-key-logo-container, .st-key-logo-container-1 {
-    margin-left:20px;
-}
-
 .st-key-navbar-container {
     padding: 15px 15px;
+    margin-bottom: 15px;
     gap: 0px;
     border-bottom: var(--header-footer-border);  /* 👇 subtle bottom border */
-    background-color: var(--navbar-bg);      /* 🎨 light gray background */
     box-shadow: 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-}
-
-/* Layout visibility control */
-.st-key-navbar-desktop-container {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
 }
 
 .st-key-navbar-mobile-container {
   display: none;
-  gap: .5rem;
-  padding:0px;
-  margin:0px;
-  border-width:1px;
-  max-width: 360px;
 }
 
 .st-key-footer-container {
@@ -127,16 +103,21 @@ background-color: var(--footer-bg);
   }
 }
 
-.bar {
-    color:var(--bar-color);
-}
-
 /* Target all Streamlit buttons */
 .st-key-nav-buttons button {
   background-color: var(--header-footer-bg);
   border: none !important;
   word-break: normal !important;
 }
+
+/* Target all Streamlit buttons */
+.st-key-nav-buttons button:hover {
+  background-color: var(--header-footer-bg);
+  border: none !important;
+  word-break: normal !important;
+}
+
+
 
 .navbar-inline {
     display: flex;
