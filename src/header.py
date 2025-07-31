@@ -33,46 +33,54 @@ def header():
 
 def create_navbar_desktop_container():
     with st.container(key='navbar-desktop-container'):
-        logo_col, _, menu_col, _, login_col = st.columns([1.5, .25, 5, .25, 1], gap="small",
+        logo_col, _, menu_col, _, login_col = st.columns([1.5, .5, 5, .5, 1], gap="small",
                                                          vertical_alignment="center")
 
         with logo_col:
             container(
                 st.image,
                 get_path('logo7.png'),
-                use_container_width="True",
+                use_container_width="False",
                 width=300,
                 key='logo_container'
             )
 
-
         with menu_col:
-            nav_cols = st.columns(len(nav_labels), gap="small")
+            with st.container(key="nav-buttons"):
+                nav_cols = st.columns(len(nav_labels), gap=None, vertical_alignment="center")
 
-            for i, label in enumerate(nav_labels):
-                with nav_cols[i]:
-                    st.button(label, key=f'button-{label}-desktop')
+                for i, label in enumerate(nav_labels):
+                    with nav_cols[i]:
+                        st.button(label, key=f'button-{label}-desktop')
         with login_col:
             st.button("Logout" if st.session_state.logged_in else "Login")
 
 
 def create_navbar_mobile_container():
     with st.container(key='navbar-mobile-container'):
-        # Adjust column proportions for better fit
-        logo_col, menu_col = st.columns([0.65, .35], gap="small",vertical_alignment="center")
+        st.markdown(
+            """
+            <div class="navbar-inline">
+                <div class="logo-box">
+                    <img src='logo7.png' width='200' />
+                </div>
+                <div class="menu-box">
+                    <details>
+                        <summary style="cursor:pointer;">☰</summary>
+                        <div class="menu-list">
+            """,
+            unsafe_allow_html=True
+        )
 
-        with logo_col:
-            container(
-                st.image,
-                get_path('logo7.png'),
-                use_container_width="False",
-                width=200,
-                key='logo_container-1'
-            )
-        with menu_col:
-            # Avoid inner nesting; align popover directly
-            with st.popover("☰"):  # shows inline now
-                nav_list = nav_labels + ['Login']
-                for label in nav_list:
-                    st.button(label, key=f'button-{label}-mobile')
+        for label in nav_labels + ['Login']:
+            st.markdown(f"<button class='nav-button'>{label}</button>", unsafe_allow_html=True)
 
+        st.markdown(
+            """
+                        </div>
+                    </details>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
