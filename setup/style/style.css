@@ -1,7 +1,9 @@
 :root {
   --font-size-small: 0.8rem;
-  --header-footer-bg: #0f172a05; /* Whitemist background*/
-  --header-footer-border: 1px solid #0f172a33;
+  --header-bg: #F5F7FA; /* Whitemist background*/
+  --footer-bg: #F5F7FA33; /* Whitemist background*/
+  --header-footer-border: 1px solid #D0D5DD;
+  --header-border-top: 2px solid #e87525;
   --main-color: #1e293b;
   --background-color: black;
   --page-bg: white
@@ -15,20 +17,37 @@
 header {visibility: hidden;}
 
 .stVerticalBlock {
-    gap:0rem;
+    gap:0px;
 }
 
 .block-container {
-    min-height: 100vh;
-    max-width: 1200px;
-    margin: 0 !important;  /* Center the container */
-    padding: 0 !important;
-    background-color: var(--page-bg); /* Light cyan background */
-    border-left: var(--header-footer-border) !important;
-    border-right: var(--header-footer-border) !important;
-    /* Add subtle shadows to left and right borders */
-    box-shadow: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
+  /* Explicit border styles for other sides */
+  border-left: var(--header-footer-border) !important;
+  border-right: var(--header-footer-border) !important;
+  border-bottom: none;
+
+  /* Top border gradient via border-image */
+  border-top: 2px solid transparent;
+  border-image-source: linear-gradient(to right, yellow, green, red, orange);
+  border-image-slice: 1;
+  border-image-width: 2px;
+  border-image-repeat: stretch;
+  border-image-outset: 0;
+
+  /* Only apply border-image to TOP */
+  border-image: linear-gradient(to right, yellow, green, red, orange) 2 0 0 0 stretch;
+
+  /* Layout */
+  min-height: 100vh;
+  max-width: 1200px;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--page-bg);
+
+  /* Shadow accents */
+  box-shadow: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
 }
+
 
 /* --- Navbar Buttons (st-key-navbar) --- */
 .st-key-nav-button-container button  {
@@ -43,7 +62,6 @@ header {visibility: hidden;}
 
 .st-key-navbar-container {
     padding: 15px 15px;
-    margin-bottom: 15px;
     gap: 0px;
     border-bottom: var(--header-footer-border);  /* 👇 subtle bottom border */
     background-color: var(--navbar-bg);      /* 🎨 light gray background */
@@ -59,16 +77,17 @@ header {visibility: hidden;}
 
 .st-key-navbar-mobile-container {
   display: none;
-  gap: 0rem;
+  gap: .5rem;
   padding:0px;
   margin:0px;
   border-width:1px;
+  max-width: 360px;
 }
 
 .st-key-footer-container {
   width: 100%;
   max-width: 1200px;
-  background-color: var(--header-footer-bg);
+  background-color: var(--footer-bg);
   border-top: var(--header-footer-border);
   box-shadow: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
   padding: 0.1rem 0;
@@ -78,21 +97,22 @@ header {visibility: hidden;}
   bottom: 0;
   z-index: 50;
   margin: 0;
-  color: var(--font-color);
   text-align: center;
 }
 
 .footer-desktop {
+background-color: var(--footer-bg);
   display: block;
   text-align: center;
 }
 
 .footer-mobile {
+background-color: var(--footer-bg);
   display: none;
   text-align: center;
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 480px) {
   .footer-desktop {
     display: none;
   }

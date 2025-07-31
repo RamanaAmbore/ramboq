@@ -6,17 +6,6 @@ from src.utils import get_path
 nav_labels = ["About", "Market", "Performance", "Update", "Contact"]
 
 
-def create_logo(logo_col, key='logo_container'):
-    with logo_col:
-        container(
-            st.image,
-            get_path('logo7.png'),
-            use_container_width="True",
-            width=300,
-            key=key
-        )
-
-
 def header():
     # Initialize session state
     if "logged_in" not in st.session_state:
@@ -39,7 +28,7 @@ def create_navbar_desktop_container():
         with logo_col:
             container(
                 st.image,
-                get_path('logo7.png'),
+                get_path('logo.png'),
                 use_container_width="False",
                 width=300,
                 key='logo_container'
@@ -47,7 +36,7 @@ def create_navbar_desktop_container():
 
         with menu_col:
             with st.container(key="nav-buttons"):
-                nav_cols = st.columns(len(nav_labels), gap=None, vertical_alignment="center")
+                nav_cols = st.columns([1,1,1.2,1.1,1.1], gap=None, vertical_alignment="center")
 
                 for i, label in enumerate(nav_labels):
                     with nav_cols[i]:
@@ -58,29 +47,19 @@ def create_navbar_desktop_container():
 
 def create_navbar_mobile_container():
     with st.container(key='navbar-mobile-container'):
-        st.markdown(
-            """
-            <div class="navbar-inline">
-                <div class="logo-box">
-                    <img src='logo7.png' width='200' />
-                </div>
-                <div class="menu-box">
-                    <details>
-                        <summary style="cursor:pointer;">☰</summary>
-                        <div class="menu-list">
-            """,
-            unsafe_allow_html=True
-        )
+            col1, col2 = st.columns([4, .25],gap=None, vertical_alignment="center")  # Tune proportions
 
-        for label in nav_labels + ['Login']:
-            st.markdown(f"<button class='nav-button'>{label}</button>", unsafe_allow_html=True)
+            with col1:
+                        st.image(
+                        get_path('logo7.png'),
+                        use_container_width="True",
+                        width=300,
+                        )
 
-        st.markdown(
-            """
-                        </div>
-                    </details>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+
+            with col2:
+                    with st.popover("☰", use_container_width=True):
+                        for label in nav_labels + ["Login"]:
+                            st.button(label,key=f'button-{label}-mobile')
+
+
