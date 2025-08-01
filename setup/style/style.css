@@ -1,18 +1,22 @@
 :root {
-  --font-size-small: 0.8rem;
-  --header-bg: #F5F7FA;
-  --footer-bg: #F5F7FA11;
-  --header-footer-border: 1px solid #D0D5DD;
-  --header-border-top: 2px solid #e87525;
+
+  --header-bg: #F3F7F2;
+  --footer-bg: #F3F7F2;
+  
+  --border: 1px solid #D0D5DD;
   --main-color: #1e293b;
   --background-color: black;
-  --page-bg: white
+  --page-bg: #F5F7FA;
   --navbar-bg: black;
   --font-color: #666
   --bar-color: #007ACC;
+  --font-size-small: 0.7rem;
+
   --menulist-bg: #f9f9f9;
   --menulist-border: 1px solid #ddd;
+  --footer-bottom-border: 1px solid orange
 }
+
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 
@@ -21,38 +25,33 @@ header {visibility: hidden;}
 }
 
 .block-container {
-  /* Explicit border styles for other sides */
-  border-left: var(--header-footer-border) !important;
-  border-right: var(--header-footer-border) !important;
-  border-bottom: none;
-
-  /* Top border gradient via border-image */
-  border-top: 2px solid transparent;
-  border-image-source: linear-gradient(to right, green, red, orange);
-  border-image-slice: 1;
-  border-image-width: 2px;
-  border-image-repeat: stretch;
-  border-image-outset: 0;
-
-  /* Only apply border-image to TOP */
-  border-image: linear-gradient(to right, green, red, orange) 2 0 0 0 stretch;
-
-  /* Layout */
+  position: relative;
   min-height: 100vh;
   max-width: 1200px;
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--page-bg);
-  /* Shadow accents */
   box-shadow: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
+}
+
+.block-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px; /* Thickness of the top border */
+  background: linear-gradient(to right, green, red, orange);
+  z-index: 1;
 }
 
 
 .st-key-navbar-container {
-    padding: 15px 15px;
+    padding: 15px 15px 10px 15px;
+    background-color: var(--header-bg);
     margin-bottom: 15px;
     gap: 0px;
-    border-bottom: var(--header-footer-border);  /* 👇 subtle bottom border */
+    border-bottom: var(--border);
     box-shadow: 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
@@ -64,9 +63,9 @@ header {visibility: hidden;}
   width: 100%;
   max-width: 1200px;
   background-color: var(--footer-bg);
-  border-top: var(--header-footer-border);
+  border-top: var(--border);
   box-shadow: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
-  padding: 0.1rem 0;
+  padding: 0.1rem 0rem 0rem 0rem;
   gap:0px;
   position: fixed;
   overflow: visible;
@@ -74,16 +73,17 @@ header {visibility: hidden;}
   z-index: 50;
   margin: 0;
   text-align: center;
+  border-bottom: var(--footer-bottom-border);  /* 👇 subtle bottom border */
 }
 
 .footer-desktop {
-background-color: var(--footer-bg);
+  background-color: var(--footer-bg);
   display: block;
   text-align: center;
 }
 
 .footer-mobile {
-background-color: var(--footer-bg);
+  background-color: var(--footer-bg);
   display: none;
   text-align: center;
 }
@@ -116,8 +116,6 @@ background-color: var(--footer-bg);
   border: none !important;
   word-break: normal !important;
 }
-
-
 
 .navbar-inline {
     display: flex;
