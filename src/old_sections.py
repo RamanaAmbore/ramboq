@@ -32,7 +32,7 @@ def page_layout():
     with st.container(key="nav-container"):
         with logo:
             # Display profile photo
-            container(st.image, get_path('logo7.png'), use_container_width=True, width=300)
+            container(st.image, get_path('logo.png'), use_container_width=True, width=300)
 
         for i, item in enumerate(nav_item_cols):
             with col_list[i]:
