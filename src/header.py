@@ -9,6 +9,10 @@ nav_labels = ["About", "Market", "Performance", "Update", "Contact"]
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
+# Initialize default active button
+if "active_nav" not in st.session_state:
+    st.session_state.active_nav = "Market"
+
 
 def create_logo(logo_width=300):
     st.image(
@@ -40,10 +44,15 @@ def create_navbar_desktop_container():
         with logo_col:
             create_logo()
         with menu_col:
+
             nav_cols = st.columns([1, 1, 1.2, 1.1, 1.1], gap=None, vertical_alignment="center")
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
-                    st.button(label, type="tertiary", key=f'button-{label}-desktop')
+                    if st.session_state.active_nav == label:
+                       st.button(label, type="tertiary", key=f'button-active-desktop',disabled=True)
+                    else:
+                        st.button(label, type="tertiary", key=f'button-{label}-desktop',)
+
         with login_col:
             st.button("Logout" if st.session_state.logged_in else "Login", on_click=toggle_login)
 

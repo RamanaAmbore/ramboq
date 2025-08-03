@@ -1,12 +1,12 @@
 :root {
-  --header-bg: #f3fcff;
-  --footer-bg: #fff6f0;
+  --header-bg: #FCFEFF;
+  --footer-bg: #FAFDFF;
   
-  --header-border: 1px solid #ffe0cc;
-  --footer-border: 1px solid #ffddc7;
+  --header-border: 1px solid #fffcfa;
+  --footer-border: 1px solid #f0f9ff;
   --main-color: #1e293b;
   --background-color: black;
-  --page-bg: #f7fdff;
+  --page-bg: #feffff;
   --navbar-bg: black;
   --font-color: #666
   --bar-color: #007ACC;
@@ -26,7 +26,9 @@ header {visibility: hidden;}
 }
 
 .block-container {
-border-top: 1px solid #ffe8da;
+  border-top: var(--border-header);
+  border-left: var(--border-header);
+  border-right: var(--border-header);
   position: relative;
   min-height: 100vh;
   max-width: 1200px;
@@ -97,14 +99,14 @@ border-top: 1px solid #ffe8da;
   background-color: var(--footer-bg);
   display: block;
   text-align: center;
-  font-size: 0.8rem !important;
+  font-size: 0.9rem !important;
 }
 
 .footer-mobile {
   background-color: var(--footer-bg);
   display: none;
   text-align: center;
-  font-size: 0.7rem !important;
+  font-size: 0.8rem !important;
 }
 
 @media screen and (max-width: 480px) {
@@ -120,4 +122,9 @@ border-top: 1px solid #ffe8da;
   .st-key-navbar-mobile-container {
     display: block;
   }
+}
+
+.st-key-button-active-desktop p {
+  text-shadow:
+    1px 1px 1px rgba(0, 0, 0, 0.6);  /* soft depth */
 }
