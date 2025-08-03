@@ -51,7 +51,7 @@ def create_navbar_desktop_container():
                     if st.session_state.active_nav == label:
                        st.button(label, type="tertiary", key=f'button-active-desktop',disabled=True)
                     else:
-                        st.button(label, type="tertiary", key=f'button-{label}-desktop',)
+                        st.button(label, type="tertiary", key=f'button-{label}-desktop',on_click=set_active_nav,args=(label,))
 
         with login_col:
             st.button("Logout" if st.session_state.logged_in else "Login", on_click=toggle_login)
@@ -80,3 +80,6 @@ def toggle_login():
         st.toast("Logged in!")  # Optional feedback
     else:
         st.toast("Logged out!")
+
+def set_active_nav(label):
+    st.session_state.active_nav = label

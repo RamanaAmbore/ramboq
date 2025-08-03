@@ -125,6 +125,5 @@ header {visibility: hidden;}
 }
 
 .st-key-button-active-desktop p {
-  text-shadow:
-    1px 1px 1px rgba(0, 0, 0, 0.6);  /* soft depth */
+ color: #E66414 !important;
 }
