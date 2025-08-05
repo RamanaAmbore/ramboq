@@ -37,8 +37,8 @@ class CustomDict(dict):
 
 
 # Load profile data from a YAML file
-with open(get_path('profile_data.yaml'), 'r', errors='ignore') as file:
-    profile = yaml.safe_load(file)  # Load YAML file into a Python dictionary
+with open(get_path('constants.yaml'), 'r', errors='ignore') as file:
+    constants = yaml.safe_load(file)  # Load YAML file into a Python dictionary
 
 # Load custom CSS styles for styling the frontend
 with open(get_path("style.css"), "r") as css:
@@ -51,11 +51,6 @@ with open(get_path("resume.pdf"), "rb") as pdf_file:
 # Load additional configuration data from a YAML file
 with open('setup/yaml/config.yaml', 'r') as file:
     config = yaml.safe_load(file)  # Load YAML config file
-    colors = config['colors']
-    dark_colors = config['dark_colors']
-    sidebar_icons = config['sidebar_icons']
-    section_icons = config['section_icons']
-    default_color = config['default_color']
 
 
 @streamlit.cache_resource
@@ -110,7 +105,7 @@ def get_profile(name):
     """
     Retrieve a section from the profile dictionary and return its keys and values.
     """
-    section = profile[name]
+    section = constants[name]
     return list(section.keys()), list(section.values())
 
 
@@ -127,7 +122,7 @@ def get_labels(name, label='label'):
     """
     Get a list of capitalized labels for a given profile section.
     """
-    section = profile[name]
+    section = constants[name]
     return [capitalize(vals[label] if label in vals else key) for key, vals in section.items()]
 
 

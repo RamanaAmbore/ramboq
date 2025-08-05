@@ -1,21 +1,15 @@
-sidebar_icons:
-  summary: list-check
-  technical skills: gear
-  employment: person-workspace
-  projects: folder
-  portfolio: rocket
-  education: trophy
-  certifications: clipboard-check
-  interests: joystick
-section_icons:
-  experience summary: memo
-  technical skills: male-technologist
-  employment: office
-  projects: open_file_folder
-  portfolio: rocket
-  education: school
-  certifications: trophy
-  interests: video_game
+About: |
+    ## About Rambo Quant Investments LLP
+
+    **Invest. Grow. and Compound.**
+    This isn\'t just a philosophy - it\'s the foundation of Rambo Quant Investments LLP.
+    
+    Founded and managed by a FinTech professional with over two decades of real-world investing and trading experience across the U.S. and Indian financial markets, the LLP embodies precision, discipline, and performance. The journey began in 1998 with active involvement in U.S. equities and options, later expanding into Indian markets with the same level of insight and rigor. With a personal portfolio IRR consistently around 25%, the firm reflects a deep understanding of market dynamics and investor psychology.
+    
+    The driving force behind Rambo Quant holds the **Financial Risk Manager (FRM)** certification, a **Post Graduate Diploma from XLRI**, and is a **Level 3 CFA candidate**. Alongside investing, their extensive career in the financial services industry includes deep expertise in settlement, clearing, and systems modernization—experience that fuels the LLP's strategic edge. Having developed sophisticated trading platforms, reengineered legacy applications, and led innovation in data lineage and analytics, every capability is informed by hands-on leadership and forward-thinking execution.
+    
+    Rambo Quant Investments LLP is dedicated to helping partners achieve **superior active returns** through **smart stock selection** and **covered call strategies**. Every decision is grounded in analytics, experience, and a relentless pursuit of **compounding growth**.
+
 colors:
   - '#ffc09f'
   - '#a0ced9'
@@ -59,3 +53,18 @@ dark_colors:
   - "#9cf6f6"
   - "#f08080"
 default_color: "#2f4550"
+default_nav_label: 'About'
+nav_labels:
+  - "About"
+  - "Market"
+  - "Performance"
+  - "Update"
+  - "Contact"
+favicon: favicon.png
+logo: logo.png
+
+
+footer_name: Rambo Quant Investments LLP
+footer_mobile_text2: Markets carry risk.
+footer_desktop_text2: LLDIN00123456
+footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."

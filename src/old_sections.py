@@ -5,10 +5,65 @@ from streamlit_scroll_navigation import scroll_navbar
 
 # Import custom components and functions from src directory
 from src.components import container, write_section_heading, write_columns, write_container, \
-    disp_icon_text
-from src.utils import profile, get_path, get_selected_colors, get_image_bin_file, default_color, get_config, \
+    disp_icon_text, create_ruler
+from src.utils import constants, get_path, get_selected_colors, get_image_bin_file, default_color, get_config, \
     get_profile, colors, get_labels, capitalize, get_darker_colors, word_width, hover_split
 
+
+
+
+import streamlit as st
+
+def page_layout():
+    # Initialize session state
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if "nav" not in st.session_state:
+        st.session_state.nav = "About"
+
+    nav_items = ["About", "Market", "Portfolio", "Blog", "documents", "Contact"]
+
+    def toggle_login():
+        st.session_state.logged_in = not st.session_state.logged_in
+
+    # --- Layout: Logo | Nav Buttons | Login ---
+    logo, _, *navbar, _, login_out = st.columns([1.5, .5, 1,1, 1, 1, 1, 1, 1, .5, 1], gap=None, vertical_alignment="center")
+    with st.container(key="nav-container"):
+        with logo:
+            # Display profile photo
+            container(st.image, get_path('logo.png'), use_container_width=True, width=300)
+
+        for i, item in enumerate(nav_item_cols):
+            with col_list[i]:
+                if st.button(item, key=item):
+                    st.session_state.nav = item
+
+        with login_out:
+            with st.container(key='login-out'):
+                with st.columns(1)[0]:
+                    label = "Logout" if st.session_state.logged_in else "Login"
+                    if st.button(label, key="login-toggle"):
+                        toggle_login()
+
+    # Routing to content section
+    if st.session_state.nav == "About":
+        st.write("🏢 Welcome to Ramboq — empowering smarter investments.")
+    elif st.session_state.nav == "Market":
+        st.write("📈 Market analysis and live charts.")
+    elif st.session_state.nav == "Portfolio":
+        st.write("🧮 Portfolio breakdown and asset overview.")
+    elif st.session_state.nav == "Contact":
+        st.write("📞 Contact our team or request a demo.")
+
+    st.markdown(
+    """
+        <footer class="custom-footer">
+            © Rambo Quant Investments LLP | LLDIN Number: LLDIN00123456 |  Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results.</p>
+        </footer>
+    """,
+    unsafe_allow_html=True
+)
 
 # Function to generate the sidebar section
 def generate_sidebar_section():
@@ -45,9 +100,9 @@ def generate_sidebar_section():
 # Function to generate the profile section
 def generate_profile_section():
     # Display profile name and designation
-    container(st.header, f"{profile['name']}, {profile['name suffix']}", anchor="Summary", key='profile_name')
+    container(st.header, f"{constants['name']}, {constants['name suffix']}", anchor="Summary", key='profile_name')
 
-    container(st.write, f"#### {profile['designation']}", key='profile_designation')
+    container(st.write, f"#### {constants['designation']}", key='profile_designation')
 
     col1, _, col2 = st.columns([2, .1, 10], vertical_alignment="center")
     with col1:
@@ -56,7 +111,7 @@ def generate_profile_section():
                   use_container_width=True, key='profile_photo')
     with col2:
         # Display profile details
-        container(st.write, profile['profile'], key='profile')
+        container(st.write, constants['profile'], key='profile')
         # Contact section
 
     generate_contact_social_section()
@@ -84,7 +139,7 @@ def generate_experience_summary_section():
     write_section_heading(section_name)  # Add section heading
     generate_milestone_section()  # Generate milestone section
 
-    val_list = profile[section_name]
+    val_list = constants[section_name]
     with st.container(key='summary_points'):
         # Display each experience summary point as a list item
         for line in val_list:
@@ -173,7 +228,7 @@ def generate_skills_section():
 def generate_hobbie_section():
     # Generate the "Hobbies" section of the profile
     section_name = 'interests'  # Section identifier
-    section = profile[section_name]  # Load hobbies data from the profile
+    section = constants[section_name]  # Load hobbies data from the profile
     write_section_heading(section_name)  # Add a section heading
     st.write(section['summary'])  # Display summary of hobbies
 
@@ -331,7 +386,7 @@ def generate_employment_section():
 def generate_portfolio_section():
     section_name = 'portfolio'
     write_section_heading(section_name)  # Add section heading for portfolio
-    section = profile[section_name]  # Retrieve portfolio section data
+    section = constants[section_name]  # Retrieve portfolio section data
 
     # Iterate over each portfolio item
     for key, vals in section.items():
@@ -358,7 +413,7 @@ def generate_portfolio_section():
 def generate_project_section():
     section_name = 'projects'
     write_section_heading(section_name)  # Add section heading for projects
-    section = profile[section_name]  # Retrieve projects section data
+    section = constants[section_name]  # Retrieve projects section data
 
     # Iterate over each project
     for key, vals in section.items():

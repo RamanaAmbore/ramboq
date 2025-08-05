@@ -1,20 +1,17 @@
 # Import necessary modules and components
 import logging  # Module for logging events and messages
 
-import streamlit as st  # Streamlit module for building the web app
+import streamlit as st
 from PIL import Image  # PIL module for image handling
 
+from src.body import body
 # Import custom components and functions from the src directory
-from src.components import set_png_as_page_bg, markdown  # Functions for setting background and styling
+from src.components import markdown  # Functions for setting background and styling
+from src.footer import footer
+from src.header import header
 from src.logger import log_setup  # Custom logging setup
-from src.sections import generate_profile_section, generate_skills_section, \
-    generate_education_section, generate_sidebar_section, \
-    generate_certification_section, generate_employment_section, \
-    generate_experience_summary_section, \
-    generate_hobbie_section, generate_portfolio_section, \
-    generate_project_section  # Functions to generate sections of the profile page
-from src.utils import css_style, profile, \
-    get_path  # Utility functions for styling, accessing profile data, and image paths
+from src.utils import css_style, get_path, \
+    config  # Utility functions for styling, accessing profile data, and image paths
 
 
 # Define the initial setup function to configure the Streamlit app
@@ -25,52 +22,40 @@ def initial_setup():
         logging.info('Logging setup')  # Log an informational message
 
     # Load the favicon image from the specified file path
-    favicon = Image.open(get_path("rambo_favicon.ico"))
+    favicon_path = get_path(config['favicon'])
 
     # Set the page configuration for the Streamlit app
     st.set_page_config(
-        page_title=f"{profile['name'].title()}, {profile['name suffix']}'s Profile",  # Set the page title dynamically
-        page_icon=favicon,  # Use the favicon image
-        layout="wide"  # Use a wide layout for the app
+        page_title="Rambo Quant Investments",  # Set the page title dynamically
+        page_icon=favicon_path,  # Use the favicon image
+        layout="centered"  # Use a wide layout for the app
     )
 
     # Apply CSS styling to the page content
-    markdown(css_style)
+    markdown(css_style, css=True)
 
-    # Set the background image for the page
-    set_png_as_page_bg('background.png')
+
+
+def initialize_app_state():
+    # Initialize session state
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    if "first_time" not in st.session_state:
+        st.session_state.first_time = True
+        st.session_state.active_nav = config['default_nav_label']
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
 
-    # Generate the sidebar section
-    generate_sidebar_section()
+    initialize_app_state()
 
-    # Generate the profile section
-    generate_profile_section()
+    nav_container = st.container(key="navbar-container")
+    body_container = st.container(key="body-container")
+    footer_container = st.container(key='footer-container')
 
-    # Generate the experience summary section
-    generate_experience_summary_section()
-
-    # Generate the skills section
-    generate_skills_section()
-
-    # Generate the employment section
-    generate_employment_section()
-
-    # Generate the project section
-    generate_project_section()
-
-    # Generate the portfolio section
-    generate_portfolio_section()
-
-    # Generate the education section
-    generate_education_section()
-
-    # Generate the certification section
-    generate_certification_section()
-
-    # Generate the hobbies section
-    generate_hobbie_section()
+    header(nav_container)
+    body(body_container)
+    footer(footer_container)

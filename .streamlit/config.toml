@@ -1,9 +1,13 @@
 [theme]
-primaryColor="#f15233"
-backgroundColor="#Ffffff"
-secondaryBackgroundColor="#2f4550"
-textColor="#2c4653"
+primaryColor="#2f4f4f"
+backgroundColor="white"
+secondaryBackgroundColor="#FAFEFF"
+textColor="315062"
 font="sans serif"
 
 [server]
 enableStaticServing = true
+runOnSave = true
+
+[client]
+showSidebarNavigation = false
