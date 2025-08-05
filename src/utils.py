@@ -51,11 +51,6 @@ with open(get_path("resume.pdf"), "rb") as pdf_file:
 # Load additional configuration data from a YAML file
 with open('setup/yaml/config.yaml', 'r') as file:
     config = yaml.safe_load(file)  # Load YAML config file
-    colors = config['colors']
-    dark_colors = config['dark_colors']
-    sidebar_icons = config['sidebar_icons']
-    section_icons = config['section_icons']
-    default_color = config['default_color']
 
 
 @streamlit.cache_resource

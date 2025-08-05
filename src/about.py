@@ -1,6 +1,8 @@
 import streamlit as st
 
+from src.utils import config
+
 
 def about(body_container):
     with body_container:
-        st.write("Content for the About page.")
+        st.write(config['About'])

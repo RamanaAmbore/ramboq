@@ -22,8 +22,9 @@
 header {visibility: hidden;}
 
 .stVerticalBlock {
-    gap:0px;
+    gap:0px !important;
 }
+
 
 .block-container {
   border-top: var(--border-header);
@@ -31,7 +32,7 @@ header {visibility: hidden;}
   border-right: var(--border-header);
   position: relative;
   min-height: 100vh;
-  max-width: 1200px;
+  max-width: 1920px;
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--page-bg);
@@ -39,7 +40,7 @@ header {visibility: hidden;}
 }
 .st-key-footer-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1920px;
   background-color: var(--footer-bg);
   border-top: var(--footer-border);
   box-shadow: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
@@ -78,8 +79,6 @@ header {visibility: hidden;}
   z-index: 100;
 }
 
-
-
 .st-key-navbar-container {
     padding: 15px 15px 10px 15px;
     background-color: var(--header-bg);
@@ -91,10 +90,25 @@ header {visibility: hidden;}
 
 .st-key-navbar-mobile-container {
   display: none;
+  margin:0px;
+  padding:0px;
+  gap:0px;
+}
+
+.st-key-navbar-mobile-container .stVerticalBlock,
+.st-key-navbar-mobile-container .stColumn {
+    gap:0px !important;
+    padding-top:0px !important;
+    margin-top:0px !important;
+    padding-bottom:0px !important;
+    margin-bottom:0px !important;
 }
 
 .st-key-body-container {
-    margin: 10px 10px 1rem 10px !important;
+    margin: 10px 200px 1rem 25px !important;
+    color: #2d4959;
+    max-width: 1450px;
+    background: #FCFEFF;
 }
 
 .footer-desktop {
@@ -111,7 +125,7 @@ header {visibility: hidden;}
   font-size: 0.8rem !important;
 }
 
-@media screen and (max-width: 480px) {
+@media screen and (max-width: 736px) {
   .footer-desktop {
     display: none;
   }
@@ -122,12 +136,11 @@ header {visibility: hidden;}
     display: none;
   }
   .st-key-navbar-mobile-container {
-    display: block;
+    display: flex !important;
   }
 }
 
-.st-key-button-active-desktop p {
+.st-key-button-active-desktop p, .st-key-button-active-mobile p {
    color: teal !important;
-
    text-shadow: 0.2px 0.2px 0.2px black;
 }
