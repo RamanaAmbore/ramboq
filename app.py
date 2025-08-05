@@ -1,16 +1,16 @@
 # Import necessary modules and components
 import logging  # Module for logging events and messages
 
-import streamlit as st  # Streamlit module for building the web app
+import streamlit as st
 from PIL import Image  # PIL module for image handling
 
 # Import custom components and functions from the src directory
-from src.components import markdown, set_png_as_page_bg  # Functions for setting background and styling
+from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
-from src.header import header
+from src.header import header, set_active_nav
 from src.logger import log_setup  # Custom logging setup
-from src.page_router import route
-from src.utils import css_style, get_path  # Utility functions for styling, accessing profile data, and image paths
+from src.utils import css_style, get_path, \
+    config  # Utility functions for styling, accessing profile data, and image paths
 
 
 # Define the initial setup function to configure the Streamlit app
@@ -31,48 +31,28 @@ def initial_setup():
     )
 
     # Apply CSS styling to the page content
-    markdown(css_style,css=True)
+    markdown(css_style, css=True)
 
     # Set the background image for the page
     # set_png_as_page_bg('background.png')
+
+
+def initialize_app_state():
+    # Initialize session state
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
 
-    header()
+    initialize_app_state()
 
-    route()
+    nav_container = st.container(key="navbar-container")
+    body_container = st.container(key="body-container")
+    footer_container = st.container(key='footer-container')
 
-    footer()
+    header(nav_container, body_container)
 
-    # Generate the sidebar section
-    # generate_sidebar_section()
-
-    # # Generate the profile section
-    # generate_profile_section()
-    #
-    # # Generate the experience summary section
-    # generate_experience_summary_section()
-    #
-    # # Generate the skills section
-    # generate_skills_section()
-    #
-    # # Generate the employment section
-    # generate_employment_section()
-    #
-    # # Generate the project section
-    # generate_project_section()
-    #
-    # # Generate the portfolio section
-    # generate_portfolio_section()
-    #
-    # # Generate the education section
-    # generate_education_section()
-    #
-    # # Generate the certification section
-    # generate_certification_section()
-    #
-    # # Generate the hobbies section
-    # generate_hobbie_section()
+    footer(footer_container)

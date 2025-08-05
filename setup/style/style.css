@@ -93,7 +93,9 @@ header {visibility: hidden;}
   display: none;
 }
 
-
+.st-key-body-container {
+    margin: 10px 10px 1rem 10px !important;
+}
 
 .footer-desktop {
   background-color: var(--footer-bg);
@@ -125,5 +127,7 @@ header {visibility: hidden;}
 }
 
 .st-key-button-active-desktop p {
- color: #E66414 !important;
+   color: teal !important;
+
+   text-shadow: 0.2px 0.2px 0.2px black;
 }

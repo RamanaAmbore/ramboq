@@ -3,9 +3,9 @@ import streamlit as st
 from src.utils import config
 
 
-def footer():
+def footer(footer_container):
     footer_name = f"© {config['footer_name']}"
-    with st.container(key='footer-container'):
+    with footer_container:
         st.markdown(
             f"""
             <p class="footer-desktop">
