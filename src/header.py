@@ -15,7 +15,7 @@ def header(nav_container):
 
 def create_navbar_desktop_container():
     with st.container(key='navbar-desktop-container'):
-        logo_col, _, menu_col, _, login_col = st.columns([1, .5, 5, .5, 1], gap=None,
+        logo_col, _, menu_col, _, login_col = st.columns([1.5, .5, 5, .5, 1], gap=None,
                                                          vertical_alignment="center", border=False)
 
         with logo_col:

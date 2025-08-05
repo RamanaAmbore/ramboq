@@ -5,6 +5,7 @@ import streamlit as st
 from PIL import Image  # PIL module for image handling
 
 from src.body import body
+from src.components import set_png_as_page_bg, markdown
 # Import custom components and functions from the src directory
 from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
@@ -30,6 +31,10 @@ def initial_setup():
         page_icon=favicon_path,  # Use the favicon image
         layout="centered"  # Use a wide layout for the app
     )
+    # Set the background image for the page
+    # set_png_as_page_bg('bg1.png')
+
+
 
     # Apply CSS styling to the page content
     markdown(css_style, css=True)
