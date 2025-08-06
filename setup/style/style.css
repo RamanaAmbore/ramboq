@@ -1,132 +1,164 @@
 :root {
   /* Layout Colors */
-  --header-footer-bg: #F2FBFF;
-  --footer-bg: #F2FBFF;
-  --page-bg: #FCFEFF;
-  --popover-bg: #F7FDFF;
+  --color-bg-header-footer: #F2FBFF;
+  --color-bg-page: #FCFEFF;
+  --color-bg-popover: #F7FDFF;
+  --color-bg-footer: #F2FBFF;
 
   /* Borders */
-  --header-footer-border: 1px solid lightgray;
-  --orange-border: 1px solid #E66414;
+  --border-header-footer: 1px solid lightgray;
+  --border-accent: 1px solid #E66414;
 
   /* Typography */
-  --font-color: #666;
-  --font-size-small: 0.7rem;
-  --font-size-xsmall: 0.5rem;
-  --body-text-color: #315062;
+  --font-family-base: 'Segoe UI', sans-serif;
+  --font-color-default: #666;
+  --font-color-body: #315062;
+  --font-color-heading: #1E293B;
+  --font-size-xs: 0.5rem;
+  --font-size-sm: 0.7rem;
+  --font-size-md: 0.9rem;
+  --font-size-lg: 1.1rem;
+  --font-size-xl: 1.5rem;
 
-  /* Theme */
-  --main-color: #1E293B;
-  --bar-color: #007ACC;
+  /* Theme Colors */
+  --color-primary: #007ACC;
+  --color-dark: #1E293B;
 
   /* Shadows */
-  --text-shadow-light: 0.2px 0.2px 0.2px gray;
-  --text-shadow-dark: 0.2px 0.2px 0.2px black;
-  --text-shadow-active: 0.5px 0.5px 0.25px #5F9EA0;
-  --text-shadow-heading: .5px .5px .25px #5F9EA0;
-  --box-shadow-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
-  --box-shadow-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
-  --box-shadow-sides: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
+  --shadow-text-light: 0.2px 0.2px 0.2px gray;
+  --shadow-text-dark: 0.2px 0.2px 0.2px black;
+  --shadow-text-active: 0.5px 0.5px 0.25px #5F9EA0;
+  --shadow-text-heading: 0.5px 0.5px 0.25px #5F9EA0;
+  --shadow-box-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-box-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-box-sides: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
+
+  /* Layout */
+  --max-width: 1920px;
 }
 
-#MainMenu {
-  visibility: hidden;
-}
-
+/* 🔒 Hide Streamlit UI Elements */
+#MainMenu,
 header {
   visibility: hidden;
+}
+
+/* 📐 Layout Containers */
+.block-container {
+  position: relative;
+  min-height: 100vh;
+  max-width: var(--max-width);
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--color-bg-page);
+  border-top: var(--border-accent);
+  border-left: var(--border-header-footer);
+  border-right: var(--border-header-footer);
+  text-shadow: var(--shadow-text-light);
 }
 
 .stVerticalBlock {
   gap: 0px !important;
 }
 
-.block-container {
-  text-shadow: var(--text-shadow-light);
-  border-top: var(--orange-border);
-  border-left: var(--header-footer-border);
-  border-right: var(--header-footer-border);
-  position: relative;
-  min-height: 100vh;
-  max-width: var(--max-width);
-  margin: 0 !important;
-  padding: 0 !important;
-  background-color: var(--page-bg);
-}
-
-.st-key-footer-container {
-  width: 100%;
-  max-width: var(--max-width);
-  background-color: var(--header-footer-bg);
-  border-top: var(--header-footer-border);
-  border-bottom: var(--orange-border);
-  box-shadow: var(--box-shadow-top);
-  padding: 0.1rem 0rem 0rem 0rem;
-  gap: 0px;
-  position: fixed;
-  overflow: visible;
-  bottom: 0;
-  z-index: 50;
-  margin: 0;
-  text-align: center;
-}
-
+/* 📦 Navbar */
 .st-key-navbar-container {
-  padding: 15px 15px 10px 15px;
-  background-color: var(--header-footer-bg);
-  margin-bottom: 15px;
-  gap: 0px;
-  border-bottom: var(--header-footer-border);
-  box-shadow: var(--box-shadow-bottom);
-  text-shadow: var(--text-shadow-light);
-  font-size: 0.9rem !important;
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 1rem;
+
+  background-color: var(--color-bg-header-footer);
+  border-bottom: var(--border-header-footer);
+  box-shadow: var(--shadow-box-bottom);
+  text-shadow: var(--shadow-text-light);
+  font-size: var(--font-size-md) !important;
 }
 
 .st-key-navbar-mobile-container {
   display: none;
-  margin: 0px;
-  padding: 0px;
-  gap: 0px;
+  margin: 0;
+  padding: 0;
+  gap: 0;
 }
 
 .st-key-navbar-mobile-container .stVerticalBlock,
 .st-key-navbar-mobile-container .stColumn {
   gap: 0px !important;
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-  padding-bottom: 0px !important;
-  margin-bottom: 0px !important;
+  padding: 0px !important;
+  margin: 0px !important;
 }
 
+/* 📄 Body */
 .st-key-body-container {
-  margin-bottom: 1rem ;
-  color: var(--body-text-color);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 1rem;
+
+  margin-bottom: 1rem;
+  color: var(--font-color-body);
   overflow: scroll;
 }
 
-button[data-testid="stPopoverButton"] {
-  background: var(--popover-bg) !important;
+/* 📍 Footer */
+.st-key-footer-container {
+  flex: 0 0 auto;
+  position: fixed;
+  bottom: 0;
+  z-index: 100;
+
+  width: 100%;
+  max-width: var(--max-width);
+  background-color: var(--color-bg-header-footer);
+  border-top: var(--border-header-footer);
+  border-bottom: var(--border-accent);
+  box-shadow: var(--shadow-box-top);
+  padding: 0.1rem 0 0 0;
+  gap: 0;
+
+  margin: 0;
+  text-align: center;
 }
 
 .footer-desktop {
-  background-color: var(--footer-bg);
+  background-color: var(--color-bg-footer);
   display: block;
   text-align: center;
-  font-size: 0.9rem !important;
+  font-size: var(--font-size-md) !important;
 }
 
 .footer-mobile {
-  background-color: var(--footer-bg);
+  background-color: var(--color-bg-footer);
   display: none;
   text-align: center;
-  font-size: 0.8rem !important;
+  font-size: var(--font-size-sm) !important;
 }
 
+/* 🖱️ Buttons */
+button[data-testid="stPopoverButton"] {
+  background: var(--color-bg-popover) !important;
+}
+
+button p {
+  font-size: var(--font-size-lg) !important;
+  text-shadow: var(--shadow-text-light) !important;
+}
+
+.st-key-button-active-desktop p,
+.st-key-button-active-mobile p {
+  color: black !important;
+  text-shadow: var(--shadow-text-active) !important;
+}
+
+/* 🧠 Headings */
 h1, h2, h3 {
   padding-top: 0px !important;
-  text-shadow: var(--text-shadow-heading) !important;
+  color: var(--font-color-heading);
+  text-shadow: var(--shadow-text-heading) !important;
 }
 
+/* 📱 Responsive Design */
 @media screen and (max-width: 912px) {
   .footer-desktop {
     display: none;
@@ -144,15 +176,3 @@ h1, h2, h3 {
     display: flex !important;
   }
 }
-
-.st-key-button-active-desktop p,
-.st-key-button-active-mobile p {
-  text-shadow: var(--text-shadow-active) !important;
-  color: black !important;
-}
-
-button p {
-  font-size: 1.1rem !important;
-  text-shadow: var(--text-shadow-light) !important;
-}
-
