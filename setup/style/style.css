@@ -67,7 +67,7 @@ header {
   position: sticky;
   top: 0;
   z-index: 100;
-  padding: 1rem;
+  padding: .5rem;
 
   background-color: var(--color-bg-header-footer);
   border-bottom: var(--border-header-footer);
