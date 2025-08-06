@@ -1,25 +1,29 @@
 :root {
   /* Layout Colors */
-  --header-footer-bg: #f2fbff;
-  --page-bg: #fcfeff;
+  --header-footer-bg: #F2FBFF;
+  --footer-bg: #F2FBFF;
+  --page-bg: #FCFEFF;
+  --popover-bg: #F7FDFF;
 
   /* Borders */
   --header-footer-border: 1px solid lightgray;
-  --orange-border: 1px solid #e66414;
+  --orange-border: 1px solid #E66414;
 
   /* Typography */
   --font-color: #666;
   --font-size-small: 0.7rem;
   --font-size-xsmall: 0.5rem;
+  --body-text-color: #315062;
 
   /* Theme */
-  --main-color: #1e293b;
+  --main-color: #1E293B;
   --bar-color: #007ACC;
 
   /* Shadows */
   --text-shadow-light: 0.2px 0.2px 0.2px gray;
   --text-shadow-dark: 0.2px 0.2px 0.2px black;
-  --text-shadow-active: .5px .5px .25px teal;
+  --text-shadow-active: 0.5px 0.5px 0.25px #008B8B;
+  --text-shadow-heading: .5px .5px .25px #008B8B;
   --box-shadow-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
   --box-shadow-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
   --box-shadow-sides: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
@@ -54,7 +58,7 @@ header {
   width: 100%;
   max-width: var(--max-width);
   background-color: var(--header-footer-bg);
-  border-top: var(--footer-border);
+  border-top: var(--header-footer-border);
   border-bottom: var(--orange-border);
   box-shadow: var(--box-shadow-top);
   padding: 0.1rem 0rem 0rem 0rem;
@@ -95,13 +99,13 @@ header {
 }
 
 .st-key-body-container {
-  margin-left: 10px;
-  color: #2d4959;
-  max-width: 95%;
+  margin-bottom: 1rem ;
+  color: var(--body-text-color);
+  overflow: scroll;
 }
 
 button[data-testid="stPopoverButton"] {
-  background: #f7fdff !important;
+  background: var(--popover-bg) !important;
 }
 
 .footer-desktop {
@@ -118,12 +122,12 @@ button[data-testid="stPopoverButton"] {
   font-size: 0.8rem !important;
 }
 
-h1, h2 {
+h1, h2, h3 {
   padding-top: 0px !important;
-  text-shadow: var(--text-shadow-dark) !important;
+  text-shadow: var(--text-shadow-heading) !important;
 }
 
-@media screen and (max-width: 736px) {
+@media screen and (max-width: 912px) {
   .footer-desktop {
     display: none;
   }
@@ -141,7 +145,8 @@ h1, h2 {
   }
 }
 
-.st-key-button-active-desktop p, .st-key-button-active-mobile p {
+.st-key-button-active-desktop p,
+.st-key-button-active-mobile p {
   text-shadow: var(--text-shadow-active) !important;
   color: black !important;
 }
@@ -150,3 +155,4 @@ button p {
   font-size: 1.1rem !important;
   text-shadow: var(--text-shadow-light) !important;
 }
+

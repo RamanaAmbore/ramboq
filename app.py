@@ -34,11 +34,8 @@ def initial_setup():
     # Set the background image for the page
     # set_png_as_page_bg('bg1.png')
 
-
-
     # Apply CSS styling to the page content
     markdown(css_style, css=True)
-
 
 
 def initialize_app_state():

@@ -15,7 +15,7 @@ def header(nav_container):
 
 def create_navbar_desktop_container():
     with st.container(key='navbar-desktop-container'):
-        logo_col, _, menu_col, _, login_col = st.columns([1, .5, 5, .5, 1], gap=None,
+        _, logo_col, _, menu_col, _, login_col = st.columns([.1, 1.1, .5, 5, .5, 1], gap=None,
                                                          vertical_alignment="center", border=False)
 
         with logo_col:
@@ -31,7 +31,8 @@ def create_navbar_desktop_container():
                                   args=(label,))
 
         with login_col:
-            st.button("Logout" if st.session_state.logged_in else "Login", on_click=toggle_login)
+            with st.container(key='login-out'):
+                st.button("Logout" if st.session_state.logged_in else "Login", on_click=toggle_login)
 
 
 def create_navbar_mobile_container():
