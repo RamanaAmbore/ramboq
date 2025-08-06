@@ -37,11 +37,11 @@ class CustomDict(dict):
 
 
 # Load profile data from a YAML file
-with open(get_path('constants.yaml'), 'r', errors='ignore') as file:
+with open(get_path('constants.yaml'), 'r', errors='ignore', encoding='utf-8') as file:
     constants = yaml.safe_load(file)  # Load YAML file into a Python dictionary
 
 # Load custom CSS styles for styling the frontend
-with open(get_path("style.css"), "r") as css:
+with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
     css_style = css.read()  # Read the CSS file into a string
 
 # Read and store a PDF file (resume) in memory for download or display
@@ -49,7 +49,7 @@ with open(get_path("resume.pdf"), "rb") as pdf_file:
     pdf_resume = pdf_file.read()
 
 # Load additional configuration data from a YAML file
-with open('setup/yaml/config.yaml', 'r') as file:
+with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     config = yaml.safe_load(file)  # Load YAML config file
 
 
