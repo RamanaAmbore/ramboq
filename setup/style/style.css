@@ -15,7 +15,7 @@
   --font-color-body: #315062;
   --font-color-heading: #1E293B;
   --font-size-xs: 0.5rem;
-  --font-size-sm: 0.7rem;
+  --font-size-sm: 0.8rem;
   --font-size-md: 0.9rem;
   --font-size-lg: 1.1rem;
   --font-size-xl: 1.5rem;
@@ -95,7 +95,7 @@ header {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 1rem 2rem 1rem .5rem;
-  max-height: 70vh;
+  max-height: 75vh;
 
   margin: 4rem 1rem 1rem 1rem;
   color: var(--font-color-body);
@@ -206,6 +206,6 @@ h1, h2, h3 {
 }
 
 st-key-about-container {
-overflow-y: auto;
-max-height: 90vh;
+    overflow-y: auto;
+    max-height: 75vh;
 }
