@@ -1,59 +1,27 @@
 About: |
     ### About Rambo Quant Investments LLP  
     **Invest. Grow. Compound.**  
-    This isn\'t just a philosophy - it\'s the foundation of **Rambo Quant Investments LLP**.
+    This isn’t just a mantra — it’s our operating DNA.
     
-    Founded and led by a FinTech professional with **25+ years** of hands-on experience in the U.S. and Indian financial markets, Rambo Quant brings together real-world investing, trading, and technology expertise. The journey began in **1998**, with a focus on equities and derivatives — evolving into a structured, analytics-driven investment practice.
+    **Rambo Quant Investments LLP** is led by a FinTech professional with over **25 years** of active investing and trading experience across both **U.S. and Indian markets**. What began in **1998** as a deep dive into equities and derivatives has evolved into a robust, data-driven investment engine focused on performance and precision.
     
-    Backed by a **Post Graduate Certificate in Business Management (PGCBM) from XLRI**, the founder also holds the **FRM designation** and has **cleared CFA Level II**. Their extensive career includes leadership in capital markets infrastructure, clearing systems, and innovation in financial analytics — bringing strategic depth to every decision.
+    The founder brings strong academic and professional credentials with a  
+    **PGCBM from XLRI**,  
+    **Master’s degree in Computer Science**,  
+    **FRM certification**, and  
+    **CFA Level II cleared** —  
+    paired with decades of hands-on experience in capital markets infrastructure, clearing systems, and financial technology innovation.
     
-    With a **personal portfolio IRR of 22%+**, the firm applies proven strategies like **covered calls** and smart **derivatives positioning** to deliver consistent outperformance. Every move is guided by data, risk control, and a disciplined focus on compounding long-term returns.
+    With a **long-term portfolio XIRR of 22%+**, the strategy combines high-conviction stock selection with proven techniques like **covered calls** and intelligent **derivatives positioning**. Every decision is rooted in analytics, risk management, and a disciplined approach to compounding.
     
-    **Rambo Quant Investments LLP** is built for those who seek more than passive investing — it’s for those ready to think ahead, act smart, and grow wealth with conviction.
+    **Rambo Quant** is built for partners who want more than index returns.  
+    It’s for those who seek smart, active investing — grounded in insight, driven by discipline, and focused on building lasting wealth.
+    
+    **Partner with us.**  
+    Email us at **info@ramboq.com** to learn more.
 
-colors:
-  - '#ffc09f'
-  - '#a0ced9'
-  - '#95b8d1'
-  - '#b8e0d2'
-  - '#e8dff5'
-  - '#fcf4dd'
-  - '#ddedea'
-  - '#daeaf6'
-  - '#d1cfe2'
-  - '#9cadce'
-  - '#7ec4cf'
-  - '#e69597'
-  - '#ceb5b7'
-  - '#f6bc66'
-  - '#bde0fe'
-  - '#8dd3c7'
-  - '#ffffb3'
-  - '#bebada'
-  - '#fb8072'
-  - '#80b1d3'
-  - '#fdb462'
-  - '#b3de69'
-  - '#fccde5'
-  - '#d9d9d9'
-dark_colors:
-  - "#2ab7ca"
-  - "#fed766"
-  - "#dec3c3"
-  - "#3da4ab"
-  - "#fe8a71"
-  - "#d0e1f9"
-  - "#c99789"
-  - "#96ceb4"
-  - "#ffefd7"
-  - "#e4dcf1"
-  - "#e0ac69"
-  - "#abc4ff"
-  - "#d1d1d1"
-  - "#809bce"
-  - "#9cf6f6"
-  - "#f08080"
-default_color: "#2f4550"
+
+
 default_nav_label: 'About'
 nav_labels:
   - "About"
@@ -63,8 +31,6 @@ nav_labels:
   - "Contact"
 favicon: favicon.png
 logo: logo.png
-
-
 footer_name: Rambo Quant Investments LLP
 footer_mobile_text2: Markets carry risk.
 footer_desktop_text2: LLDIN00123456
