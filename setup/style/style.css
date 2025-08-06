@@ -22,8 +22,8 @@
   /* Shadows */
   --text-shadow-light: 0.2px 0.2px 0.2px gray;
   --text-shadow-dark: 0.2px 0.2px 0.2px black;
-  --text-shadow-active: 0.5px 0.5px 0.25px #008B8B;
-  --text-shadow-heading: .5px .5px .25px #008B8B;
+  --text-shadow-active: 0.5px 0.5px 0.25px #5F9EA0;
+  --text-shadow-heading: .5px .5px .25px #5F9EA0;
   --box-shadow-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
   --box-shadow-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
   --box-shadow-sides: -4px 0 6px rgba(0, 0, 0, 0.06), 4px 0 6px rgba(0, 0, 0, 0.06);
