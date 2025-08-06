@@ -67,7 +67,8 @@ header {visibility: hidden;}
     gap: 0px;
     border-bottom: var(--header-border);
     box-shadow: 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-    text-shadow: 0.2px 0.2px 0.2px black;
+    text-shadow: 0.2px 0.2px 0.2px rgba(0, 0, 0, 0.1);
+    font-size: .9rem !important;
 }
 
 .st-key-navbar-mobile-container {
@@ -92,6 +93,7 @@ header {visibility: hidden;}
     max-width: 95%;
 
 }
+
 
 .footer-desktop {
   background-color: var(--footer-bg);
