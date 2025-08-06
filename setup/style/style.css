@@ -95,7 +95,7 @@ header {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 1rem 2rem 1rem .5rem;
-  max-height: 75vh;
+  max-height: 70vh;
 
   margin: 4rem 1rem 1rem 1rem;
   color: var(--font-color-body);
@@ -207,5 +207,5 @@ h1, h2, h3 {
 
 st-key-about-container {
     overflow-y: auto;
-    max-height: 75vh;
+    max-height: 70vh;
 }
