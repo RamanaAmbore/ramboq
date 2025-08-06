@@ -15,13 +15,13 @@ def header(nav_container):
 
 def create_navbar_desktop_container():
     with st.container(key='navbar-desktop-container'):
-        logo_col, _, menu_col, _, login_col = st.columns([1.5, .5, 5, .5, 1], gap=None,
+        logo_col, _, menu_col, _, login_col = st.columns([1, .5, 5, .5, 1], gap=None,
                                                          vertical_alignment="center", border=False)
 
         with logo_col:
             st.image(logo, use_container_width="True")
         with menu_col:
-            nav_cols = st.columns([1, 1, 1.2, 1.1, 1.1], gap=None, vertical_alignment="center")
+            nav_cols = st.columns([1.2, 1, 1.2, 1.1, 1.1], gap=None, vertical_alignment="center")
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
                     if st.session_state.active_nav == label:
@@ -36,7 +36,7 @@ def create_navbar_desktop_container():
 
 def create_navbar_mobile_container():
     with st.container(key='navbar-mobile-container'):
-        col1, _, col2 = st.columns([3, 3, 1], gap=None, vertical_alignment="center", border=False)  # Tune proportions
+        col1, _, col2 = st.columns([3, 4, 1], gap=None, vertical_alignment="center", border=False)  # Tune proportions
 
         with col1:
             st.image(logo, use_container_width="True")
