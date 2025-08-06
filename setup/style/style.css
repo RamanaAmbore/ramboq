@@ -94,6 +94,8 @@ header {visibility: hidden;}
 
 }
 
+button [data-testid="stPopoverButton"] {
+background-color: #2f4f4f !important;}
 
 .footer-desktop {
   background-color: var(--footer-bg);
