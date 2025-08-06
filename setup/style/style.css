@@ -1,6 +1,6 @@
 :root {
-  --header-bg: #f5fcff;
-  --footer-bg: #f5fcff;
+  --header-bg: #f2fbff;
+  --footer-bg: #f2fbff;
   --max-width: 1200px;
   --mobile-width: 736px;
   
@@ -30,6 +30,7 @@ header {visibility: hidden;}
 
 
 .block-container {
+    text-shadow: 0.2px 0.2px 0.2px rgba(0, 0, 0, 0.8);
   border-top: var(--orange-border);
   border-left: var(--border-header);
   border-right: var(--border-header);
@@ -89,7 +90,7 @@ header {visibility: hidden;}
     margin-left:10px;
     color: #2d4959;
     max-width: 95%;
-    text-shadow: 0.2px 0.2px 0.2px rgba(0, 0, 0, 0.2);
+
 }
 
 .footer-desktop {
@@ -105,7 +106,7 @@ header {visibility: hidden;}
   text-align: center;
   font-size: 0.8rem !important;
 }
-    h2 {
+    h1, h2 {
         padding-top:0px !important;
     }
 
