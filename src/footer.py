@@ -10,14 +10,14 @@ def footer(footer_container):
             f"""
             <p class="footer-desktop">
                 {footer_name}
-                <span style='color:#ffddc7'> | </span>
+                <span style='color:#E66414'> | </span>
                 {config['footer_desktop_text2']}
-                <span style='color:#ffddc7'> | </span>
+                <span style='color:#E66414'> | </span>
                 {config['footer_desktop_text3']}
             </p>
             <p class="footer-mobile">
                 {footer_name}
-                <span style='color:#ffddc7'> | </span>
+                <span style='color:#E66414'> | </span>
                 {config['footer_mobile_text2']}
             </p>
             """,
