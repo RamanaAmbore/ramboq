@@ -94,9 +94,9 @@ header {
 .st-key-body-container {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 2rem;
+  padding:1rem 2rem 1rem .5rem;
 
-  margin-bottom: 1rem;
+  margin: 4rem 1rem 1rem 1rem;
   color: var(--font-color-body);
   overflow: scroll;
 }
@@ -175,4 +175,27 @@ h1, h2, h3 {
   .st-key-navbar-mobile-container {
     display: flex !important;
   }
+}
+
+/* For tablets and small laptops */
+@media (max-width: 912px) {
+    .st-key-body-container {
+        margin-top:5.5rem;
+    }
+}
+
+
+
+/* For mobile devices */
+@media (max-width: 750px) {
+    .st-key-body-container {
+        margin-top:12rem;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 480px) {
+    .st-key-body-container {
+        margin-top:9rem;
+    }
 }
