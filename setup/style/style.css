@@ -51,7 +51,6 @@ header {
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--color-bg-page);
-  border-top: var(--border-accent);
   border-left: var(--border-header-footer);
   border-right: var(--border-header-footer);
   text-shadow: var(--shadow-text-light);
@@ -69,6 +68,7 @@ header {
   z-index: 100;
   padding: .5rem;
 
+  border-top: var(--border-accent);
   background-color: var(--color-bg-header-footer);
   border-bottom: var(--border-header-footer);
   box-shadow: var(--shadow-box-bottom);
@@ -94,7 +94,7 @@ header {
 .st-key-body-container {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding:1rem 2rem 1rem .5rem;
+  padding: 1rem 2rem 1rem .5rem;
 
   margin: 4rem 1rem 1rem 1rem;
   color: var(--font-color-body);
@@ -179,23 +179,28 @@ h1, h2, h3 {
 
 /* For tablets and small laptops */
 @media (max-width: 912px) {
-    .st-key-body-container {
-        margin-top:5.5rem;
-    }
+  .st-key-body-container {
+    margin-top: 5.5rem;
+  }
 }
-
-
 
 /* For mobile devices */
 @media (max-width: 750px) {
-    .st-key-body-container {
-        margin-top:12rem;
-    }
+  .st-key-body-container {
+    margin-top: 12rem;
+  }
 }
 
 /* For very small screens */
 @media (max-width: 480px) {
-    .st-key-body-container {
-        margin-top:9rem;
-    }
+  .st-key-body-container {
+    margin-top: 10rem;
+  }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+  .st-key-body-container {
+    margin-top: 9rem;
+  }
 }
