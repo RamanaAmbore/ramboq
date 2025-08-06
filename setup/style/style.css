@@ -98,7 +98,6 @@ header {
 
   margin: 4rem 1rem 1rem 1rem;
   color: var(--font-color-body);
-  overflow: scroll;
 }
 
 /* 📍 Footer */
@@ -203,4 +202,9 @@ h1, h2, h3 {
   .st-key-body-container {
     margin-top: 9rem;
   }
+}
+
+st-key-about-container {
+overflow-y: auto;
+max-height: 90vh;
 }
