@@ -64,7 +64,7 @@ header {
 /* 📦 Navbar */
 .st-key-navbar-container {
   flex: 0 0 auto;
-  position: sticky;
+  position: fixed;
   top: 0;
   z-index: 100;
   padding: .5rem;
