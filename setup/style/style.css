@@ -94,7 +94,7 @@ header {
 .st-key-body-container {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 2rem;
 
   margin-bottom: 1rem;
   color: var(--font-color-body);
