@@ -1,6 +1,7 @@
 import streamlit as st
 
 from src.utils import config
+from src.components import container
 from src.utils import get_path
 
 nav_labels = config['nav_labels']
@@ -19,7 +20,7 @@ def create_navbar_desktop_container():
                                                          vertical_alignment="center", border=False)
 
         with logo_col:
-            st.image(logo, use_container_width="True")
+            container(st.image, logo, use_container_width=True, key='logo_desktop')
         with menu_col:
             nav_cols = st.columns([1.2, 1, 1.2, 1.1, 1.1], gap=None, vertical_alignment="center")
             for i, label in enumerate(nav_labels):
@@ -40,7 +41,7 @@ def create_navbar_mobile_container():
         col1, _, col2 = st.columns([3, 4, 1], gap=None, vertical_alignment="center", border=False)  # Tune proportions
 
         with col1:
-            st.image(logo, use_container_width="True")
+            container(st.image, logo, use_container_width=True, key='logo_mobile')
         with col2:
             with st.popover("☰", use_container_width=True):
                 for label in nav_labels + ["Login"]:

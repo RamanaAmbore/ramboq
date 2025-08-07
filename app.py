@@ -34,12 +34,10 @@ def initial_setup():
         layout="centered"  # Use a wide layout for the app
     )
     # Set the background image for the page
-    bin_str = get_image_bin_file('connector2.png')
-    css_style = css_style.replace('background_image', bin_str)
-    bin_str = get_image_bin_file('white_graph1.png')
-    css_style = css_style.replace('background_body_image', bin_str)
-    bin_str = get_image_bin_file('write1.png')
-    css_style = css_style.replace('background_text_image', bin_str)
+    bin_str = get_image_bin_file('nav_image.png')
+    css_style = css_style.replace('nav_image', bin_str)
+    bin_str = get_image_bin_file('body_image.png')
+    css_style = css_style.replace('body_image', bin_str)
 
     # Apply CSS styling to the page content
     markdown(css_style, css=True)

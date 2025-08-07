@@ -1,12 +1,11 @@
 :root {
   /* Layout Colors */
   --color-bg-header-footer: #F2FBFF;
-  --color-bg-page: #fafaf9;
+  --color-bg-page: #f7f7f5;
   --color-bg-footer: #f1f1ee;
 
   /* Borders */
-  --border-header-footer: 1px solid white;
-  --border-accent: 1px solid #E66414;
+  --border-header-footer: 2px solid white;
 
   /* Typography */
   --font-family-base: 'Segoe UI', sans-serif;
@@ -53,10 +52,22 @@ header {
   border-left: var(--border-header-footer);
   border-right: var(--border-header-footer);
   text-shadow: var(--shadow-text-light);
+      background-image:
+
+      url("body_image");
+    background-repeat: no-repeat;
+    background-position: bottom left;
+    background-size: auto;
+
 }
 
 .stVerticalBlock {
   gap: 0px !important;
+}
+
+.st-key-logo_desktop  img, .st-key-logo_mobile  img {
+    border-radius: 4px !important;
+    border: 1px solid #ddedee !important;
 }
 
 /* 📦 Navbar */
@@ -68,10 +79,9 @@ header {
   padding: .5rem;
 
   background-image:
-    linear-gradient(rgba(0, 128, 128, 0.4), rgba(0, 128, 128, 0.4)),
-    url("background_image");
+    linear-gradient(rgba(221, 237, 238, 0.8), rgba(221, 237, 238, 0.8)),
+    url("nav_image");
     background-position: center;
-
 
   border-top: var(--border-accent);
   background-color: var(--color-bg-header-footer);
@@ -106,10 +116,10 @@ header {
   min-height: 70vh;
   /*color: var(--font-color-body); */
 
-  background: #fafaf9;
-
   padding: 1rem;
   margin: 4rem auto 1rem auto;
+
+
 }
 
 /* 📦 About Container */
