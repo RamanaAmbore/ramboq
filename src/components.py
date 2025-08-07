@@ -10,10 +10,7 @@ def set_png_as_page_bg(png_file, icon=False):
     <style>
         .appview-container {{
             background-image: url("{bin_str}");
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-attachment: fixed;
+        background-size: 100% 100%;
         }}
     </style>
     '''

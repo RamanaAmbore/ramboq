@@ -1,11 +1,11 @@
 :root {
   /* Layout Colors */
   --color-bg-header-footer: #F2FBFF;
-  --color-bg-page: #F7FDFF;
-  --color-bg-footer: #F2FBFF;
+  --color-bg-page: #fafaf9;
+  --color-bg-footer: #f1f1ee;
 
   /* Borders */
-  --border-header-footer: 1px solid lightgray;
+  --border-header-footer: 1px solid white;
   --border-accent: 1px solid #E66414;
 
   /* Typography */
@@ -67,6 +67,12 @@ header {
   z-index: 100;
   padding: .5rem;
 
+  background-image:
+    linear-gradient(rgba(0, 128, 128, 0.4), rgba(0, 128, 128, 0.4)),
+    url("background_image");
+    background-position: center;
+
+
   border-top: var(--border-accent);
   background-color: var(--color-bg-header-footer);
   border-bottom: var(--border-header-footer);
@@ -98,8 +104,9 @@ header {
   overflow-y: auto;
   max-height: 70vh;
   min-height: 70vh;
-  color: var(--font-color-body);
-  background: var(--color-bg-page);
+  /*color: var(--font-color-body); */
+
+  background: #fafaf9;
 
   padding: 1rem;
   margin: 4rem auto 1rem auto;
@@ -113,10 +120,9 @@ header {
 
   padding: 1rem;
   border: 1px solid lightgray;
-  border-radius: 8px;
 
-  background-color: var(--color-bg-header-footer);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  /*background-color: var(--color-bg-header-footer);*/
+
 }
 
 /* 📍 Footer */

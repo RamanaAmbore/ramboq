@@ -3,6 +3,7 @@ import logging  # Module for logging events and messages
 
 import streamlit as st
 from PIL import Image  # PIL module for image handling
+from src.utils import get_image_bin_file  # Functions for setting background and styling
 
 from src.body import body
 from src.components import set_png_as_page_bg, markdown
@@ -17,6 +18,7 @@ from src.utils import css_style, get_path, \
 
 # Define the initial setup function to configure the Streamlit app
 def initial_setup():
+    global css_style
     # Initialize the logger in the session state if not already present
     if 'logger' not in st.session_state:
         st.session_state.logger = log_setup()  # Set up the logger
@@ -32,7 +34,12 @@ def initial_setup():
         layout="centered"  # Use a wide layout for the app
     )
     # Set the background image for the page
-    # set_png_as_page_bg('bg1.png')
+    bin_str = get_image_bin_file('connector2.png')
+    css_style = css_style.replace('background_image', bin_str)
+    bin_str = get_image_bin_file('white_graph1.png')
+    css_style = css_style.replace('background_body_image', bin_str)
+    bin_str = get_image_bin_file('write1.png')
+    css_style = css_style.replace('background_text_image', bin_str)
 
     # Apply CSS styling to the page content
     markdown(css_style, css=True)
