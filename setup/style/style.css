@@ -5,7 +5,7 @@
   --color-bg-footer: #f1f1ee;
 
   /* Borders */
-  --border-header-bottom: 3px solid white;
+  --border-header-bottom: 1px solid white;
   --border-footer-top: 1px solid white;
   --border-side: 1px solid gray;
   --border-top-accent: 1px solid #E66414;
@@ -131,7 +131,7 @@ header {
   overflow-y: auto;
 
   padding: 1rem;
-  background: rgba(255, 236, 224, 0.1);
+  background: rgba(255, 236, 224, 0.2);
   border: 1px solid #e8edf0;
   border-radius: 4px;
 }
@@ -190,9 +190,11 @@ button p {
 
 /* 🧠 Headings */
 h1, h2, h3 {
-  padding-top: 0px !important;
+  padding: 0px auto !important;
   color: var(--font-color-heading);
   text-shadow: var(--shadow-text-heading) !important;
+  border-bottom: 1px solid gray;
+  margin-bottom: 15px !important;
 }
 
 /* 📱 Responsive Design */
