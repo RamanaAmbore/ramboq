@@ -1,13 +1,15 @@
 :root {
   /* Layout Colors */
-  --color-bg-header-footer: #F2FBFF;
+  --color-bg-footer: #F2FBFF;
   --color-bg-page: #f7f7f5;
   --color-bg-footer: #f1f1ee;
 
   /* Borders */
-  --border-header-bottom: 1px solid #ffe0cc;
-  --border-header-footer: 1px solid white;
-  --border-accent: 2px solid #FF924d;
+  --border-header-bottom: 3px solid white;
+  --border-footer-top: 1px solid white;
+  --border-side: 1px solid gray;
+  --border-top-accent: 1px solid #E66414;
+  --border-bottom-accent: 2px solid #E66414;
 
   /* Typography */
   --font-family-base: 'Segoe UI', sans-serif;
@@ -51,8 +53,8 @@ header {
   margin: 0 !important;
   padding: 0 !important;
   background-color: var(--color-bg-page);
-  border-left: var(--border-header-footer);
-  border-right: var(--border-header-footer);
+  border-left: var(--border-side);
+  border-right: var(--border-side);
   text-shadow: var(--shadow-text-light);
   background-image: url("body_image");
   background-repeat: no-repeat;
@@ -66,7 +68,7 @@ header {
 
 .st-key-logo_desktop  img, .st-key-logo_mobile  img {
     border-radius: 4px !important;
-    border: 1px solid #ddedee !important;
+    border: 1px solid white !important;
 }
 
 /* 📦 Navbar */
@@ -82,9 +84,10 @@ header {
     url("nav_image");
 
   background-position: center;
-  border-top: var(--border-accent);
-  background-color: var(--color-bg-header-footer);
-  border-bottom: var(--border-header-footer);
+  border-top: var(--border-top-accent);
+  border-bottom: var(--border-header-bottom);
+  border-left: var(--border-side);
+  border-right: var(--border-side);
   box-shadow: var(--shadow-box-bottom);
   text-shadow: var(--shadow-text-light);
   font-size: var(--font-size-md) !important;
@@ -117,6 +120,8 @@ header {
 
   padding: 1rem;
   margin: 4rem auto 1rem auto;
+  border-left: var(--border-side);
+  border-right: var(--border-side);
 }
 
 /* 📦 About Container */
@@ -140,9 +145,11 @@ header {
 
   width: 100%;
   max-width: var(--max-width);
-  background-color: var(--color-bg-header-footer);
+  background-color: var(--color-bg-footer);
   border-top: var(--border-footer-top);
-  border-bottom: var(--border-accent);
+  border-bottom: var(--border-bottom-accent);
+  border-left: var(--border-side);
+  border-right: var(--border-side);
   box-shadow: var(--shadow-box-top);
   padding: 0.1rem 0 0 0;
   gap: 0;
