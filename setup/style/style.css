@@ -5,7 +5,9 @@
   --color-bg-footer: #f1f1ee;
 
   /* Borders */
-  --border-header-footer: 2px solid white;
+  --border-header-bottom: 2px solid #fff2eb;
+  --border-header-footer: 1px solid white;
+  --border-accent: 2px solid #FF924d;
 
   /* Typography */
   --font-family-base: 'Segoe UI', sans-serif;
@@ -52,13 +54,10 @@ header {
   border-left: var(--border-header-footer);
   border-right: var(--border-header-footer);
   text-shadow: var(--shadow-text-light);
-      background-image:
-
-      url("body_image");
-    background-repeat: no-repeat;
-    background-position: bottom left;
-    background-size: auto;
-
+  background-image: url("body_image");
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  background-size: auto;
 }
 
 .stVerticalBlock {
@@ -81,8 +80,8 @@ header {
   background-image:
     linear-gradient(rgba(221, 237, 238, 0.8), rgba(221, 237, 238, 0.8)),
     url("nav_image");
-    background-position: center;
 
+  background-position: center;
   border-top: var(--border-accent);
   background-color: var(--color-bg-header-footer);
   border-bottom: var(--border-header-footer);
@@ -118,8 +117,6 @@ header {
 
   padding: 1rem;
   margin: 4rem auto 1rem auto;
-
-
 }
 
 /* 📦 About Container */
@@ -129,10 +126,9 @@ header {
   overflow-y: auto;
 
   padding: 1rem;
+  background: rgba(255, 242, 235, 0.1);
   border: 1px solid lightgray;
-
-  /*background-color: var(--color-bg-header-footer);*/
-
+  border-radius: 4px;
 }
 
 /* 📍 Footer */
@@ -145,7 +141,7 @@ header {
   width: 100%;
   max-width: var(--max-width);
   background-color: var(--color-bg-header-footer);
-  border-top: var(--border-header-footer);
+  border-top: var(--border-footer-top);
   border-bottom: var(--border-accent);
   box-shadow: var(--shadow-box-top);
   padding: 0.1rem 0 0 0;
