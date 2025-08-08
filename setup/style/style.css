@@ -112,8 +112,6 @@ header {
 }
 
 /* 🖼️ Logo & Popover */
-.st-key-logo_desktop img,
-.st-key-logo_mobile img,
 button[data-testid="stPopoverButton"] {
   background: rgba(247, 245, 245, 0.85) !important;
   border-radius: 4px;
