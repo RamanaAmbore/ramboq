@@ -33,12 +33,12 @@ def create_navbar_desktop_container():
 
         with login_col:
             with st.container(key='login-out'):
-                st.button("Logout" if st.session_state.logged_in else "Login", on_click=toggle_login)
+                st.button("Logout" if st.session_state.logged_in else "Login", type="tertiary", on_click=toggle_login)
 
 
 def create_navbar_mobile_container():
     with st.container(key='navbar-mobile-container'):
-        col1, col2 = st.columns([4, 1], gap=None, vertical_alignment="center", border=False)  # Tune proportions
+        col1, _, col2 = st.columns([1, 10, .2], gap=None, vertical_alignment="center", border=False)  # Tune proportions
 
         with col1:
             container(st.image, logo, use_container_width=True, key='logo_mobile')
