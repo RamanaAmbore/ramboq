@@ -74,6 +74,11 @@ button[data-testid="stPopoverButton"], .st-key-login-out button {
   border:1px solid white;
 }
 
+.st-key-logo_mobile {
+  width: 200px;
+  max-width: 200px;
+  flex-shrink: 0;
+}
 
 /* 📦 Navbar */
 .st-key-navbar-container {
