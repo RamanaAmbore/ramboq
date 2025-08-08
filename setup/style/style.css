@@ -75,14 +75,6 @@ button[data-testid="stPopoverButton"], .st-key-login-out button {
 }
 
 
-.st-key-logo_mobile  img {
-  background: rgba(247, 245, 245, 0.7) !important;
-  border-radius: 4px;
-  border:0px solid transparent;
-}
-
-
-
 /* 📦 Navbar */
 .st-key-navbar-container {
   flex: 0 0 auto;
