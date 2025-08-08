@@ -37,7 +37,8 @@
 
   /* Layout */
   --max-width: 1920px;
-  --max-width-minus-1: 1919px;
+  --max-width-minus: 1918px;
+  --max-width-content: 1200px;
 }
 
 /* 🔒 Hide Streamlit UI Elements */
@@ -72,7 +73,7 @@ header {
   z-index: 100;
   padding: 0.5rem;
   width: 100%;
-  max-width: var(--max-width-minus-1);
+  max-width: var(--max-width-minus);
   background-image:
     linear-gradient(rgba(6, 136, 148, 0.5), rgba(6, 136, 148, 0.5)),
     url("nav_image");
@@ -101,9 +102,13 @@ header {
 /* 📱 Mobile Navbar */
 .st-key-navbar-mobile-container {
   display: none;
-  margin: 0;
-  padding: 0;
-  gap: 0;
+    flex-direction: row;
+
+}
+
+/* 📱 Mobile Navbar */
+.st-key-navbar-mobile-container .stHorizontalBlock {
+  flex-flow:nowrap !important;
 }
 
 /* 🖼️ Logo & Popover */
@@ -117,8 +122,8 @@ button[data-testid="stPopoverButton"] {
 
 .st-key-logo_mobile,
 .st-key-logo_mobile img {
-  width: 150px;
-  max-width: 150px;
+  width: 250px;
+  max-width: 250px;
   flex-shrink: 0;
 }
 
@@ -135,8 +140,8 @@ button[data-testid="stPopoverButton"] {
   justify-content: center;
   align-items: center;
   overflow-y: auto;
-  max-height: 70vh;
-  min-height: 70vh;
+  max-height: 80vh;
+  min-height: 80vh;
   padding: 0rem;
   margin: 4rem auto 1rem auto;
 }
@@ -144,7 +149,7 @@ button[data-testid="stPopoverButton"] {
 /* 📦 About Container */
 .st-key-text-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--max-width-content);
   overflow-y: auto;
   padding: 1rem;
   border: 1px solid white;
@@ -158,7 +163,7 @@ button[data-testid="stPopoverButton"] {
   bottom: 0;
   z-index: 100;
   width: 100%;
-  max-width: var(--max-width-minus-1);
+  max-width: var(--max-width-minus);
   background-color: var(--color-bg-footer);
   border-top: var(--border-footer-top);
   border-bottom: var(--border-bottom-accent);
@@ -216,30 +221,7 @@ h1, h2, h3 {
   .st-key-navbar-mobile-container {
     display: flex !important;
   }
-}
-
-@media (max-width: 912px) {
   .st-key-body-container {
-    margin-top: 5.5rem;
+    margin-top: 4rem;
   }
 }
-
-@media (max-width: 750px) {
-  .st-key-body-container {
-    margin-top: 12rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .st-key-body-container {
-    margin-top: 10rem;
-  }
-}
-
-@media (max-width: 360px) {
-  .st-key-body-container {
-    margin-top: 9rem;
-  }
-}
-
-
