@@ -165,7 +165,6 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   margin-left: 0rem !important;
   margin-right: 0rem !important;
   padding: 0rem !important;
-  background-color: rgba(255, 255, 255, 0.0);
 }
 
 /* 📦 About Container */
@@ -177,7 +176,6 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   margin-bottom: 1rem;
   border: 1px solid white;
   border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.0);
 }
 
 /* 📍 Footer */
