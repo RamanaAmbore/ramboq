@@ -5,8 +5,8 @@
   --color-popover-button: #F2FBFF;
 
   /* Borders */
-  --border-header-bottom: 2px solid white;
-  --border-footer-top: 2px solid white;
+  --border-header-bottom: 1px solid lightgray;
+  --border-footer-top: 1px solid lightgray;
   --border-side: 1px solid white;
   --border-top-accent: 2px solid #E66414;
   --border-bottom-accent: 2px solid #E66414;
@@ -102,6 +102,11 @@ header {
 .st-key-navbar-mobile-container {
   display: none;
   flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem;
+  margin:0rem;
 
 }
 
