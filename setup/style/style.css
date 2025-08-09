@@ -161,7 +161,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   padding: 0rem !important;
 }
 
-/* 📦 About Container */
+/*  About Container */
 .st-key-text-container {
   width: 100%;
   max-width: var(--max-width-content);
@@ -172,7 +172,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 }
 
 
-/* 📍 Footer */
+/*  Footer */
 .st-key-footer-container {
   flex: 0 0 auto;
   position: fixed;
