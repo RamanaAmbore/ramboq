@@ -172,6 +172,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   max-width: var(--max-width-content);
   overflow-y: auto;
   padding: 1rem;
+  margin-bottom: 1rem;
   border: 1px solid white;
   margin-bottom:1rem;
   border-radius: 4px;
