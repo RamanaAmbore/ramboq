@@ -90,6 +90,8 @@ market_prompt: |
     
     Bold all stock prices (e.g., *₹ 1,450.40*) with thin space after symbol - Ensure all key stock/index/ETF mentions have prices in brackets - Use simple markdown-friendly formatting - Avoid promotional tone — keep it informative and concise. Additional rules: Here's the additional prompt instruction - always wrap prices in markdown bold without using any non-breaking or Unicode spaces between the currency symbol and the number. ✅ Use *₹1,450.40* or *$1,234.56* 🚫 Avoid formats like *₹ 1,450.40* (contains thin or non-breaking space which breaks bold formatting). Show India market and stock news first followed by world market and stock news in each section. Double check the numbers like closing and stock prices from multiple sources. Show title in H3 and section names in H4.
     
+    Don't show any emojis or icons in headings.
+    
     Give the markdown code with markdown tags which I can copy paste in code for my website and in markdown format to paste in whatsapp.
     
     
