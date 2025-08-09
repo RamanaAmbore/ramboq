@@ -151,6 +151,7 @@ button[data-testid="stPopoverButton"] {
   background: rgba(247, 245, 245, 0.85) !important;
   border-radius: 4px;
   border: 1px solid white;
+  padding-top: 1rem;
 }
 div[data-testid="stPopoverBody"],
 div[data-testid="stPopoverBody"] stVerticalBlock {
