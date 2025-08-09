@@ -159,11 +159,11 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   flex: 1 1 auto;
   justify-content: center;
   align-items: center;
-  overflow-y: auto;
-  max-height: 80vh;
-  min-height: 80vh;
-  padding: 0rem;
-  margin: 4rem auto 1rem auto;
+  margin-top: 6rem !important;
+  margin-bottom: 2rem !important;
+  margin-left: 0rem !important;
+  margin-right: 0rem !important;
+  padding: 0rem !important;
 }
 
 /* 📦 About Container */
@@ -173,6 +173,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   overflow-y: auto;
   padding: 1rem;
   border: 1px solid white;
+  margin:0;
   border-radius: 4px;
 }
 
