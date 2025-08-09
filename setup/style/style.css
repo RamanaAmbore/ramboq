@@ -208,7 +208,12 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 .st-key-button-active-desktop p,
 .st-key-button-active-mobile p {
   color: black !important;
-  text-shadow: var(--shadow-text-active) !important;
+  border-bottom: 2px solid black;
+}
+
+.st-key-navbar-desktop-container button:hover *,
+.st-key-navbar-mobile-container button:hover * {
+  color: black !important;
 }
 
 /* 🧠 Headings */
