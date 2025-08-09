@@ -82,12 +82,11 @@ header {
   border-bottom: var(--border-header-bottom);
   box-shadow: var(--shadow-box-bottom);
   text-shadow: var(--shadow-text-light);
-  font-size: var(--font-size-md) !important;
+  font-size: var(--font-size-sm) !important;
 }
 
 .st-key-navbar-desktop-container button p {
   color: var(--color-bg-page);
-  font-size: var(--font-size-lg) !important;
   text-shadow: var(--shadow-text-heading) !important;
 }
 
