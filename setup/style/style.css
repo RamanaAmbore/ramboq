@@ -1,14 +1,14 @@
 :root {
   /* Layout Colors */
   --color-bg-page: #f7f7f5;
-  --color-bg-footer: #F1F1EE;
+  --color-bg-footer: #eaeae6;
   --color-popover-button: #F2FBFF;
 
   /* Borders */
-  --border-header-bottom: 1px solid #007a7a;
-  --border-footer-top: 1px solid white;
+  --border-header-bottom: 2px solid white;
+  --border-footer-top: 2px solid white;
   --border-side: 1px solid white;
-  --border-top-accent: 1px solid #E66414;
+  --border-top-accent: 2px solid #E66414;
   --border-bottom-accent: 2px solid #E66414;
 
   /* Typography */
@@ -101,7 +101,7 @@ header {
 /* 📱 Mobile Navbar */
 .st-key-navbar-mobile-container {
   display: none;
-    flex-direction: row;
+  flex-direction: row;
 
 }
 
