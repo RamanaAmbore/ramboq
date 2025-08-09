@@ -38,7 +38,7 @@ def create_navbar_desktop_container():
 
 def create_navbar_mobile_container():
     with st.container(key='navbar-mobile-container'):
-        col1, col2 = st.columns([3, 1], gap=None, vertical_alignment="center", border=False)  # Tune proportions
+        col1, col2 = st.columns([3, 1], gap='small', vertical_alignment="center", border=False)  # Tune proportions
 
         with col1:
             container(st.image, logo, use_container_width=True, key='logo_mobile')
