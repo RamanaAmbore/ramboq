@@ -44,9 +44,6 @@ with open(get_path('constants.yaml'), 'r', errors='ignore', encoding='utf-8') as
 with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
     css_style = css.read()  # Read the CSS file into a string
 
-# Read and store a PDF file (resume) in memory for download or display
-with open(get_path("resume.pdf"), "rb") as pdf_file:
-    pdf_resume = pdf_file.read()
 
 # Load additional configuration data from a YAML file
 with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
