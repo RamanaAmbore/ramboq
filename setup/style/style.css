@@ -121,13 +121,8 @@ header {
 }
 
 /* 📱 Mobile Navbar */
-.stVerticalBlock{
-  background-color: rgba(255, 255, 255, 0.0);
-}
-
-
-/* 📱 Mobile Navbar */
-.st-key-navbar-mobile-container .stVerticalBlock{
+.st-key-navbar-mobile-container .stHorizontalBlock,
+ .st-key-navbar-mobile-container .stVerticalBlock{
   flex-flow:nowrap !important;
   padding: 0rem !important;
   margin:0rem !important;
