@@ -71,7 +71,9 @@ header {
   position: fixed;
   top: 0;
   z-index: 100;
-  padding-bottom: 0.5rem;
+  padding: 0.5rem;
+  margin:0rem;
+
   width: 100%;
   max-width: var(--max-width-minus);
   background-image:
@@ -103,7 +105,7 @@ header {
   display: none;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   width: 100%;
   padding: 0rem !important;
   margin:0rem !important;
@@ -132,13 +134,12 @@ button[data-testid="stPopoverButton"] {
 .st-key-logo_mobile img {
   width: 250px;
   max-width: 250px;
-  flex-shrink: 0;
 }
 
 button[data-testid="stPopoverButton"] {
   width: 50px;
   max-width: 50px;
-  flex-shrink: 1;
+
 }
 
 /* 📄 Body Container */
