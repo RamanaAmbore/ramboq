@@ -1,9 +1,11 @@
 import streamlit as st
 
 from src.utils import config
+from src.components import create_ruler
 
 
 def about(body_container):
     with body_container:
         with st.container(key='text-container'):
             st.write(config['About'])
+            create_ruler()
