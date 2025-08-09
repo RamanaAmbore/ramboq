@@ -58,12 +58,12 @@ header {
   border-left: var(--border-side);
   border-right: var(--border-side);
   text-shadow: var(--shadow-text-light);
-  background-image: url("body_image");
+  /*background-image: url("body_image");
   background-repeat: no-repeat;
   background-position: bottom left;
   background-size: auto;
   box-shadow: var(--shadow-box-sides);
-  background-attachment: fixed;
+  background-attachment: fixed; */
 }
 
 /* 📦 Navbar */
@@ -173,7 +173,9 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   max-width: var(--max-width-content);
   overflow-y: auto;
   padding: 1rem;
+  background-color: white !important;
 }
+
 
 /* 📍 Footer */
 .st-key-footer-container {
