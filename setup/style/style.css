@@ -120,7 +120,7 @@ button[data-testid="stPopoverButton"] {
 .st-key-logo_mobile,
 .st-key-logo_mobile img {
   width: 250px;
-  max-width:  250px;
+  max-width: 250px;
   flex-shrink: 0;
 }
 
