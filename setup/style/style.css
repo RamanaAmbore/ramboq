@@ -154,7 +154,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   flex: 1 1 auto;
   justify-content: center;
   align-items: center;
-  margin-top: 5rem !important;
+  margin-top: 3rem !important;
   margin-bottom: 1rem !important;
   margin-left: 0rem !important;
   margin-right: 0rem !important;
@@ -236,8 +236,5 @@ h1, h2, h3 {
 
   .st-key-navbar-mobile-container {
     display: flex !important;
-  }
-  .st-key-body-container {
-    margin-top: 3rem;
   }
 }
