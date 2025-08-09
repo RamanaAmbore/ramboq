@@ -129,15 +129,11 @@ header {
   max-height: 5rem !important;
 }
 
-
-
 .st-key-logo_mobile,
 .st-key-logo_mobile img {
   width: 250px;
   max-width: 250px;
   flex-shrink: 0;
-}
-.st-key-logo_mobile {
   flex-grow: 1;
 }
 
@@ -155,7 +151,7 @@ button[data-testid="stPopoverButton"] {
   border: 1px solid white;
 }
 div[data-testid="stPopoverBody"],
-div[data-testid="stPopoverBody"] stVerticalBlock {
+div[data-testid="stPopoverBody"] .stVerticalBlock {
     background: var(--color-bg-page);
 }
 
