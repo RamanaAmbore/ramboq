@@ -6,7 +6,7 @@
 
   /* Borders */
   --border-header-bottom: 2px solid #f7f7f5;
-  --border-footer-top: 2px solid #f7f7f5;
+  --border-footer-top: 2px solid lightgray;
   --border-side: 1px solid white;
   --border-top-accent: 2px solid #FF924D;
   --border-bottom-accent: 2px solid #E66414;
