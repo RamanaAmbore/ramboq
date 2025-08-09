@@ -153,6 +153,7 @@ button[data-testid="stPopoverButton"] {
 div[data-testid="stPopoverBody"],
 div[data-testid="stPopoverBody"] .stVerticalBlock {
     background: var(--color-bg-page);
+    gap:0rem;
 }
 
 /* 📄 Body Container */
