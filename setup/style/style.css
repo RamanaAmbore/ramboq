@@ -173,7 +173,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   overflow-y: auto;
   padding: 1rem;
   border: 1px solid white;
-  margin:0;
+  margin-bottom:1rem;
   border-radius: 4px;
 }
 
