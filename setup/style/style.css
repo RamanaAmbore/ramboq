@@ -8,7 +8,7 @@
   --border-header-bottom: 2px solid white;
   --border-footer-top: 2px solid white;
   --border-side: 1px solid white;
-  --border-top-accent: 2px solid #E66414;
+  --border-top-accent: 2px solid #FF924D;
   --border-bottom-accent: 2px solid #E66414;
 
   /* Typography */
@@ -63,6 +63,7 @@ header {
   background-position: bottom left;
   background-size: auto;
   box-shadow: var(--shadow-box-sides);
+  background-attachment: fixed;
 }
 
 /* 📦 Navbar */
@@ -120,8 +121,13 @@ header {
 }
 
 /* 📱 Mobile Navbar */
-.st-key-navbar-mobile-container .stHorizontalBlock,
- .st-key-navbar-mobile-container .stVerticalBlock{
+.stVerticalBlock{
+  background-color: rgba(255, 255, 255, 0.0);
+}
+
+
+/* 📱 Mobile Navbar */
+.st-key-navbar-mobile-container .stVerticalBlock{
   flex-flow:nowrap !important;
   padding: 0rem !important;
   margin:0rem !important;
@@ -164,6 +170,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   margin-left: 0rem !important;
   margin-right: 0rem !important;
   padding: 0rem !important;
+  background-color: rgba(255, 255, 255, 0.0);
 }
 
 /* 📦 About Container */
@@ -175,6 +182,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   margin-bottom: 1rem;
   border: 1px solid white;
   border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.0);
 }
 
 /* 📍 Footer */
