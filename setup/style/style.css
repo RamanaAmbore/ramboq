@@ -29,7 +29,7 @@
   /* Shadows */
   --shadow-text-light: 0.2px 0.2px 0.2px gray;
   --shadow-text-dark: 0.2px 0.2px 0.2px black;
-  --shadow-text-active: 0.5px 0.5px 0.25px #5F9EA0;
+  --shadow-text-active: 1px 1px 5px white;
   --shadow-text-heading: 0.5px 0.5px 0.25px #5F9EA0;
   --shadow-box-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
   --shadow-box-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
@@ -93,10 +93,8 @@ header {
 
 .st-key-navbar-desktop-container button p {
   color: var(--color-bg-page);
-  text-shadow: var(--shadow-text-heading) !important;
+  text-shadow: var(--shadow-text-dark) !important;
 }
-
-
 
 .st-key-login-out button p {
   border: 1px solid white;
@@ -135,6 +133,8 @@ button[data-testid="stPopoverButton"] {
   border-radius: 4px;
   border: 1px solid white;
 }
+div[data-testid="stPopoverBody"] {
+background: var(--color-bg-page);}
 
 .st-key-logo_mobile,
 .st-key-logo_mobile img {
