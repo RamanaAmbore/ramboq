@@ -9,6 +9,13 @@ logo = get_path(config['logo'])
 
 
 def header(nav_container):
+    params = st.query_params
+    parm_label = params.get("page", [None])[0]
+    if params and parm_label in config['nav_labels']:
+        st.session_state.active_nav = parm_label
+
+
+
     with nav_container:
         create_navbar_desktop_container()
         create_navbar_mobile_container()
@@ -73,3 +80,12 @@ def toggle_login():
 
 def set_active_nav(label):
     st.session_state.active_nav = label
+    st.query_params["page"] = label
+
+def validate_parms():
+    params = st.query_params
+
+    # --- Validation ---
+    if params and params.get("page", [None])[0] not in config['nav_labels']:
+        st.session_state.active_nav = config['default_nav_label']
+
