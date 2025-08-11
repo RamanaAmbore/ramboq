@@ -5,8 +5,8 @@
   --color-popover-button: #F2FBFF;
 
   /* Borders */
-  --border-header-bottom: 2px solid #f7f7f5;
-  --border-footer-top: 1px solid lightgray;
+  --border-header-bottom: 2px solid #fef7eb;
+  --border-footer-top: 1px solid #fef7eb;
   --border-side: 1px solid white;
   --border-top-accent: 3px solid #ef9309;
   --border-bottom-accent: 2px solid #ef9309;
