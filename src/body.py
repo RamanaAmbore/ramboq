@@ -10,13 +10,13 @@ from src.update import update
 def body(body_container):
     with body_container:
 
-        if st.session_state.active_nav == "About":
+        if st.session_state.active_nav == "about":
             about(body_container)
-        elif st.session_state.active_nav == "Market":
+        elif st.session_state.active_nav == "market":
             market(body_container)
-        elif st.session_state.active_nav == "Performance":
+        elif st.session_state.active_nav == "performance":
             performance(body_container)
-        elif st.session_state.active_nav == "Update":
+        elif st.session_state.active_nav == "update":
             update(body_container)
-        elif st.session_state.active_nav == "Contact":
+        elif st.session_state.active_nav == "contact":
             contact(body_container)

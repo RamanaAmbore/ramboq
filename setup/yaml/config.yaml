@@ -1,4 +1,4 @@
-About: |
+about: |
     ### About Rambo Quant Investments LLP
 
     **Invest. Grow. Compound.** — not just a mantra, but the core DNA that drives every decision we make.
@@ -10,7 +10,7 @@ About: |
     With a **long-term portfolio XIRR exceeding 22%**, Rambo's approach blends **high-conviction stock picks** with **strategic covered calls** and **intelligent derivatives positioning**. Every move is grounded in deep analytics, rigorous risk management, and an unwavering commitment to the power of compounding.
     
     **Rambo Quant** is not for those content with average, index-like returns. It’s built for partners who demand more — **smarter strategies, sharper execution, and sustainable wealth creation**.
-Market: |
+market: |
     ### 🧾 Market Report — Saturday, August 9, 2025
 
     #### 1. Market Summary
@@ -68,13 +68,13 @@ Market: |
     *Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions.*
 
 
-default_nav_label: 'About'
+default_nav_label: 'about'
 nav_labels:
-  - "About"
-  - "Market"
-  - "Performance"
-  - "Update"
-  - "Contact"
+  - "about"
+  - "market"
+  - "performance"
+  - "update"
+  - "contact"
 favicon: favicon.png
 logo: logo.png
 footer_name: Rambo Quant Investments LLP

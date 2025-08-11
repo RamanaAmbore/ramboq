@@ -19,10 +19,6 @@ from src.utils import css_style, get_path, \
 # Define the initial setup function to configure the Streamlit app
 def initial_setup():
     global css_style
-    # Initialize the logger in the session state if not already present
-    if 'logger' not in st.session_state:
-        st.session_state.logger = log_setup()  # Set up the logger
-        logging.info('Logging setup')  # Log an informational message
 
     # Load the favicon image from the specified file path
     favicon_path = get_path(config['favicon'])
@@ -48,30 +44,30 @@ def initial_setup():
     """, unsafe_allow_html=True)
 
     # Set the background image for the page
-    bin_str = get_image_bin_file('nav_image.png')
-    css_style = css_style.replace('nav_image', bin_str)
-    bin_str = get_image_bin_file('body_image.png')
-    css_style = css_style.replace('body_image', bin_str)
+    if 'css_style' not in st.session_state:
+        bin_str = get_image_bin_file('nav_image.png')
+        st.session_state.css_style = css_style.replace('nav_image', bin_str)
 
     # Apply CSS styling to the page content
-    markdown(css_style, css=True)
+    markdown(st.session_state.css_style, css=True)
 
+    initialize_app_state()
 
 def initialize_app_state():
     # Initialize session state
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-
     if "first_time" not in st.session_state:
-        st.session_state.first_time = True
+        st.session_state.logged_in = False
+        st.session_state.first_time = False
+
         st.session_state.active_nav = config['default_nav_label']
+        st.session_state.logger = log_setup()  # Set up the logger
+        logging.info('Logging setup')  # Log an informational message
+    params = st.query_params
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
-
-    initialize_app_state()
 
     nav_container = st.container(key="navbar-container")
     body_container = st.container(key="body-container")

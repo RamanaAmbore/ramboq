@@ -20,9 +20,9 @@ def page_layout():
         st.session_state.logged_in = False
 
     if "nav" not in st.session_state:
-        st.session_state.nav = "About"
+        st.session_state.nav = "about"
 
-    nav_items = ["About", "Market", "Portfolio", "Blog", "documents", "Contact"]
+    nav_items = ["about", "market", "Portfolio", "Blog", "documents", "contact"]
 
     def toggle_login():
         st.session_state.logged_in = not st.session_state.logged_in
@@ -47,14 +47,14 @@ def page_layout():
                         toggle_login()
 
     # Routing to content section
-    if st.session_state.nav == "About":
+    if st.session_state.nav == "about":
         st.write("🏢 Welcome to Ramboq — empowering smarter investments.")
-    elif st.session_state.nav == "Market":
-        st.write("📈 Market analysis and live charts.")
+    elif st.session_state.nav == "market":
+        st.write("📈 market analysis and live charts.")
     elif st.session_state.nav == "Portfolio":
         st.write("🧮 Portfolio breakdown and asset overview.")
-    elif st.session_state.nav == "Contact":
-        st.write("📞 Contact our team or request a demo.")
+    elif st.session_state.nav == "contact":
+        st.write("📞 contact our team or request a demo.")
 
     st.markdown(
     """
@@ -112,7 +112,7 @@ def generate_profile_section():
     with col2:
         # Display profile details
         container(st.write, constants['profile'], key='profile')
-        # Contact section
+        # contact section
 
     generate_contact_social_section()
 

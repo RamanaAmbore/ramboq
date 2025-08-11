@@ -2,7 +2,7 @@ import streamlit as st
 
 from src.utils import config
 from src.components import container
-from src.utils import get_path
+from src.utils import get_path, capitalize
 
 nav_labels = config['nav_labels']
 logo = get_path(config['logo'])
@@ -26,14 +26,15 @@ def create_navbar_desktop_container():
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
                     if st.session_state.active_nav == label:
-                        st.button(label, type="tertiary", key=f'button-active-desktop', disabled=True)
+                        st.button(capitalize(label), type="tertiary", key=f'button-active-desktop', disabled=True)
                     else:
-                        st.button(label, type="tertiary", key=f'button-{label}-desktop', on_click=run_with_spinner,
+                        st.button(capitalize(label), type="tertiary", key=f'button-{label}-desktop',
+                                  on_click=run_with_spinner,
                                   args=(set_active_nav, label,))
 
         with login_col:
             with st.container(key='login-out'):
-                st.button("Logout" if st.session_state.logged_in else "Login", type="tertiary",
+                st.button(capitalize("logout" if st.session_state.logged_in else "login"), type="tertiary",
                           on_click=run_with_spinner, args=(toggle_login,))
 
 
@@ -45,15 +46,17 @@ def create_navbar_mobile_container():
             container(st.image, logo, use_container_width=True, key='logo_mobile')
         with col2:
             with st.popover("☰", use_container_width=True):
-                for label in nav_labels + ["Login"]:
-                    if label == 'Login':
-                        st.button("Logout" if st.session_state.logged_in else "Login", on_click=run_with_spinner,
+                for label in nav_labels + ["login"]:
+                    if label == 'login':
+                        st.button(capitalize("logout" if st.session_state.logged_in else "login"),
+                                  on_click=run_with_spinner,
                                   args=(toggle_login,),
                                   type="tertiary", key=f'button-{label}-mobile')
                     elif st.session_state.active_nav == label:
-                        st.button(label, type="tertiary", key=f'button-active-mobile', disabled=True)
+                        st.button(capitalize(label), type="tertiary", key=f'button-active-mobile', disabled=True)
                     else:
-                        st.button(label, type="tertiary", key=f'button-{label}-mobile', on_click=run_with_spinner,
+                        st.button(capitalize(label), type="tertiary", key=f'button-{label}-mobile',
+                                  on_click=run_with_spinner,
                                   args=(set_active_nav, label,))
 
 
@@ -62,7 +65,7 @@ def run_with_spinner(callback, *args):
         callback(*args)
 
 
-# Dummy function to simulate login/logout action
+# function to simulate login/logout action
 def toggle_login():
     if True:
         st.session_state.logged_in = not st.session_state.logged_in

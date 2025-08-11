@@ -7,5 +7,5 @@ from src.components import create_ruler
 def about(body_container):
     with body_container:
         with st.container(key='text-container'):
-            st.write(config['About'])
+            st.write(config['about'])
             create_ruler()
