@@ -66,13 +66,126 @@ market: |
     ---
     
     *Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions.*
+faq: |
+  ### Rambo Quant Investments LLP — Frequently Asked Questions (FAQ)
 
+  #### What is Rambo Quant Investments LLP?
+  A Limited Liability Partnership where partners pool capital, managed by *Active Partners* and a *Fund Manager*.  
+  The LLP invests in *growth-oriented equity with covered call and other derivative (F&O) strategies*.  
+  
+  #### Who can become a partner?
+  Any **Indian citizen**, **Non-Resident Indian (NRI)**, or **Overseas Citizen of India (OCI)** meeting the LLP’s eligibility criteria.
+  
+  #### Suitability
+  Ideal for individuals who:
+  - Seek *active, above-average returns*.
+  - Face restrictions on direct equity or derivative investments.
+  - Accept annual redemption cycles and short-term volatility.
+  - Understand equity and derivatives risks.
+  
+  #### Minimum Contribution
+  - Capital contribution amounts are decided by the *Active Partners*.
+  - The first tier carries a *10% profit threshold*.
+  - For every additional tier of contribution, the profit threshold increases by *0.25%*.
+  
+  #### Profit Calculation
+  - Calculated annually on *31 March*.
+  - LLP expenses are deducted at actuals before NAV and profit calculation.
+  - Partners receive threshold return first.
+  - Excess profit split *50:50* between partner and LLP.
+  - LLP share is distributed between Active Partners and the Fund Manager.
+  - Profits are calculated *before tax*; LLP pays taxes before distribution.
+  
+  #### If Profits Are Below Threshold or There Is a Loss
+  - If annual profit is below threshold, the *closing NAV* becomes the new reference NAV for the next year.
+  - If there is a loss, no profit is distributed until NAV recovers to the *last reference NAV*.
+  
+  #### Redemption Rules
+  - Requests only once a year, submitted by *28 February*.
+  - Processed after *31 March* NAV calculation.
+  - No mid-year redemption.
+  - Mid-year contributions can be redeemed only after *31 March* of the following year.
+  
+  #### Post-Redemption NAV
+  After redemption, NAV is recalculated, and allocations for remaining partners are adjusted.
+  
+  #### Succession of Active Partners
+  - Active Partners stepping down must give written notice.
+  - If incapacitated, the partner with the largest capital becomes Active Partner.
+  - They may manage directly, appoint a Fund Manager, or wind down the LLP and distribute NAV.
+  
+  #### Management
+  Fund Manager executes strategies under Active Partners’ oversight.
+  
+  #### Taxation
+  - Profits taxed at LLP level under *current Indian law*; no further tax for partners in India.
+  - Avoids *double taxation*.
+  - For NRIs/OCIs, Indian tax applies; foreign tax rules may also apply per *DTAA*.
+  - Tax laws may change; partners should seek professional advice.
+  
+  #### NAV Calculation
+  - Official NAV: *31 March* annually.
+  - LLP expenses are deducted at actuals before NAV is declared.
+  - Interim NAV for reporting only; not used for profit distribution.
+  
+  #### Strategies
+  Growth-oriented equity with covered call and other derivative (F&O) strategies.  
+  
+  #### Lock-in
+  No fixed lock-in; redemption eligibility tied to *annual cycle*.
+  
+  #### Liability of Partners
+  - Each partner’s liability is *limited to the amount of capital contributed* to the LLP.
+  - Partners are *not personally liable* for the LLP’s debts, obligations, or investment losses beyond their committed capital.
+  - The LLP structure protects personal assets; however, partners remain responsible for their own *tax compliance* in their respective jurisdictions.
+  - Any additional contributions are voluntary and require a formal amendment to the LLP agreement.
+  
+  #### Joining Process
+  - Sign LLP agreement.
+  - Transfer investment.
+  - Mid-year joiners eligible for redemption after *31 March* of the following year.
+  
+  Please reach each out to us at contact@ramboq.com for any additional details.
+  
+nav_flow_title: #### NAV & Profit Distribution Flow
+nav_flow: |
+    flowchart TD
+        A[Capital Contribution by Partners] --> B[Investments in Growth-Oriented Equity + Covered Call + F&O Strategies]
+        B --> C[31 March: Calculate LLP NAV]
+        C --> D[Deduct LLP Expenses at Actuals]
+        D --> E[Calculate Profit Before Tax]
+        E --> F[Compare NAV Growth with Profit Threshold]
+        F -->|Below Threshold| G[Closing NAV Becomes New Reference NAV]
+        F -->|Above Threshold| H[Distribute Threshold Return First]
+        H --> I[Excess Profit Split 50:50 Between Partner & LLP]
+        I --> J[LLP Share Split Between Active Partners & Fund Manager]
+        G --> K[Carry Forward NAV Until Recovery to Reference NAV]
+  
+redemption_flow_title: #### Redemption Flow
+redemption_flow: |
+  flowchart TD
+      A[Partner Decides to Redeem] --> B[Submit Request by 28 Feb]
+      B -->|Missed Deadline| C[Wait Until Next Year's 28 Feb]
+      B -->|On Time| D[Process After 31 March NAV Calculation]
+      D --> E[Adjust NAV Post Redemption]
+      E --> F[Reallocate Remaining Partner Units]
+      F --> G[Capital Transfer to Redeeming Partner]
+
+succession_flow_title: #### Succession Flow
+succession_flow: |
+  flowchart TD
+      A[Active Partner Steps Down or Is Incapacitated] --> B[Written Notice or Incapacity Trigger]
+      B --> C[Identify Partner with Largest Capital Contribution]
+      C --> D[New Active Partner Decides]
+      D -->|Continue| E[Manage LLP Directly or With Fund Manager]
+      D -->|Wind Down| F[Distribute NAV & Profits to All Partners]
 
 default_nav_label: 'about'
 nav_labels:
   - "about"
   - "market"
   - "performance"
+  - "faq"
   - "update"
   - "contact"
 favicon: favicon.png

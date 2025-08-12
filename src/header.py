@@ -22,7 +22,7 @@ def create_navbar_desktop_container():
         with logo_col:
             container(st.image, logo, use_container_width=True, key='logo_desktop')
         with menu_col:
-            nav_cols = st.columns([1.2, 1, 1.2, 1.1, 1.1], gap=None, vertical_alignment="center")
+            nav_cols = st.columns([1.2, 1, 1.2, 0.9, 1.1, 1.1], gap=None, vertical_alignment="center")
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
                     if st.session_state.active_nav == label:

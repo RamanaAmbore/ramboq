@@ -243,3 +243,9 @@ h1, h2, h3 {
     display: flex !important;
   }
 }
+
+pre, pre div {
+    background-color: white !important;  /* or transparent */
+    padding: 10px; /* optional */
+    border-radius: 8px; /* optional rounded corners */
+}
