@@ -22,7 +22,7 @@ def page_layout():
     if "nav" not in st.session_state:
         st.session_state.nav = "about"
 
-    nav_items = ["about", "market", "Portfolio", "Blog", "documents", "contact"]
+    nav_items = ["about", "market", "Portfolio", "Blog", "documents", "Contact"]
 
     def toggle_login():
         st.session_state.logged_in = not st.session_state.logged_in
@@ -53,8 +53,8 @@ def page_layout():
         st.write("📈 market analysis and live charts.")
     elif st.session_state.nav == "Portfolio":
         st.write("🧮 Portfolio breakdown and asset overview.")
-    elif st.session_state.nav == "contact":
-        st.write("📞 contact our team or request a demo.")
+    elif st.session_state.nav == "Contact":
+        st.write("📞 Contact our team or request a demo.")
 
     st.markdown(
     """
@@ -112,7 +112,7 @@ def generate_profile_section():
     with col2:
         # Display profile details
         container(st.write, constants['profile'], key='profile')
-        # contact section
+        # Contact section
 
     generate_contact_social_section()
 

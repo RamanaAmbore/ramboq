@@ -59,10 +59,19 @@ def initialize_app_state():
         st.session_state.logged_in = False
         st.session_state.first_time = False
 
-        st.session_state.active_nav = config['default_nav_label']
+        params = st.query_params
+        parm_label = params.get("page", None)
+
+        if params and parm_label in config['nav_labels']:
+            st.session_state.active_nav = parm_label
+        else:
+            st.session_state.active_nav = config['default_nav_label']
+        # st.session_state.prev_active_nav = st.session_state.active_nav
+        st.query_params["page"] = st.session_state.active_nav
+
         st.session_state.logger = log_setup()  # Set up the logger
         logging.info('Logging setup')  # Log an informational message
-    params = st.query_params
+
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
