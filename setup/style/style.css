@@ -244,3 +244,15 @@ h1, h2, h3 {
   }
 }
 
+/* Normal state */
+a[href^="mailto:"] {
+    color: #ef9309; /* Your desired link color */
+    text-decoration: none; /* Optional: remove underline */
+}
+
+/* On hover */
+a[href^="mailto:"]:hover {
+    color: black; /* Hover color */
+    background-color: #9ad3da ; /* Optional: show underline */
+}
+
