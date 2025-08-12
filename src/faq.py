@@ -10,14 +10,14 @@ def faq(body_container):
         with st.container(key='text-container'):
             st.write(config['faq'])
             st.write(config['nav_flow_title'])
-            mermaid_write(config['nav_flow'], height=800)
+            mermaid_write(config['nav_flow'], height=500)
             st.write(config['redemption_flow_title'])
-            mermaid_write(config['redemption_flow'], height=550)
+            mermaid_write(config['redemption_flow'], height=400)
             st.write(config['succession_flow_title'])
-            mermaid_write(config['succession_flow'], height=450)
+            mermaid_write(config['succession_flow'], height=300)
             create_ruler()
 
-def mermaid_write(mermaid_code, height=800):
+def mermaid_write(mermaid_code, height=500):
     # HTML with Mermaid.js injection
     html = f"""
     <!doctype html>
@@ -27,13 +27,14 @@ def mermaid_write(mermaid_code, height=800):
       <style>
         /* Override ALL Mermaid nodes inside the iframe */
         .mermaid .node rect {{
-          fill: #fffbf5 !important;
+          fill: #fffdfa !important;
           stroke: gray !important;
           stroke-width: 1px !important;
         }}
         .mermaid .node text {{
           fill: #315062 !important;
           font-weight: bold !important;
+          font-size: .9rem !important;
         }}
       </style>
 
