@@ -10,9 +10,9 @@ def faq(body_container):
         with st.container(key='text-container'):
             st.write(config['faq'])
             st.write(config['nav_flow_title'])
-            mermaid_write(config['nav_flow'], height=500)
+            mermaid_write(config['nav_flow'], height=400)
             st.write(config['redemption_flow_title'])
-            mermaid_write(config['redemption_flow'], height=400)
+            mermaid_write(config['redemption_flow'], height=300)
             st.write(config['succession_flow_title'])
             mermaid_write(config['succession_flow'], height=300)
             create_ruler()
