@@ -30,19 +30,6 @@ def initial_setup():
         layout="centered"  # Use a wide layout for the app
     )
 
-    st.markdown("""
-        <head>
-            <meta name="description" content="Rambo Quant Investments LLP – Expert investing and trading strategies in the Indian & US markets.">
-            <meta name="keywords" content="Rambo Quant, investments, trading, finance, Indian stock market, US stocks, ETFs">
-            <meta name="author" content="Rambo Quant Investments LLP">
-            <meta property="og:title" content="Rambo Quant Investments – Invest. Grow. Compound.">
-            <meta property="og:description" content="Expert investing and trading strategies in the Indian & US markets.">
-            <meta property="og:type" content="website">
-            <meta property="og:url" content="https://ramboq.com">
-    		<meta name="google-site-verification" content="google1530c83c859eefaa.html" />
-        </head>
-    """, unsafe_allow_html=True)
-
     # Set the background image for the page
     if 'css_style' not in st.session_state:
         bin_str = get_image_bin_file('nav_image.png')

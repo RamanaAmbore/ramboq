@@ -27,14 +27,14 @@ def mermaid_write(mermaid_code, height=500):
       <style>
         /* Override ALL Mermaid nodes inside the iframe */
         .mermaid .node rect {{
-          fill: #fffdfa !important;
-          stroke: gray !important;
-          stroke-width: 1px !important;
+          fill: #ecf7f8 !important;
+          stroke: lightgray !important;
+          stroke-width: 1px !important; 
         }}
         .mermaid .node text {{
-          fill: #315062 !important;
+          fill: lightgray !important;
           font-weight: bold !important;
-          font-size: .9rem !important;
+          font-size: 0.9rem !important;
         }}
       </style>
 

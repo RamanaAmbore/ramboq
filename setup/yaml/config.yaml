@@ -120,11 +120,13 @@ faq: |
   After redemption, NAV is recalculated, and allocations for remaining partners are adjusted.
   
   #### Succession of Active Partners
-  As the saying goes — hope for the best, but always prepare for the worst. After all, we’re dealing with partners’ hard-earned money, so succession planning is essential.
-  - Active Partners stepping down must give written notice.
-  - If incapacitated, the partner with the largest capital becomes Active Partner.
-  - They may manage directly, appoint a Fund Manager, or wind down the LLP and distribute NAV.
+  > As the saying goes — *hope for the best, but always prepare for the worst*.  
+  > When it comes to partners’ hard-earned money, succession planning isn’t optional — it’s essential.
   
+  - **Active Partner stepping down** must give **at least 1 month’s written notice**, after which the LLP will be wound down and the NAV distributed to all partners.  
+  - **If incapacitated**, the partner with the **largest capital contribution** will assume the role of Active Partner.  
+  - The **new Active Partner** will have up to **1 month** to decide whether to continue operations or wind down the LLP and distribute the NAV.
+    
   #### Management
   Fund Manager executes strategies under Active Partners’ oversight.
   
@@ -184,18 +186,14 @@ redemption_flow: |
       E --> F[Adjust NAV Post Redemption]
       F --> G[Reallocate Remaining Partner Units]
       G --> I[Capital Transfer to Redeeming Partner]
-
-
 succession_flow_title: |
   ### Succession Flow
 succession_flow: |
   flowchart TD
-      A[Active Partner Steps Down or Is Incapacitated] --> B[Written Notice or Incapacity Trigger]
+      A[Active Partner Steps Down or Is Incapacitated] --> B[1-Month Written Notice or Incapacity Trigger]
       B --> C[Identify Partner with Largest Capital Contribution]
-      C --> D[New Active Partner Decides]
-      D -->|Continue| E[Manage LLP Directly or With Fund Manager]
-      D -->|Wind Down| F[Distribute NAV & Profits to All Partners]
-
+      C --> D[New Active Partner Decides Within 1 Month]
+      D -->|Wind Down| F[Distribute NAV & Profits to All Partners]
 default_nav_label: 'about'
 nav_labels:
   - "about"
