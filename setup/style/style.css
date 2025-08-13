@@ -223,7 +223,6 @@ h1, h2, h3 {
   text-shadow: var(--shadow-text-heading) !important;
   border-bottom: 1px solid gray;
   margin-bottom: 15px !important;
-  background-color: #ecf7f8;
 }
 
 /* 📱 Responsive Design */
