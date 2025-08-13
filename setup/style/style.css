@@ -270,15 +270,8 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   border-color:darkgray!important;
 }
 
-.st-key-text-container button p {
-
-  padding: 0px auto;
-}
-
-.st-key-text-container .stColumn {
-
-  min-width: 10rem !important;
-  max-width: 12rem !important;
+.stForm {
+    max-width:1200px;
 }
 
 
