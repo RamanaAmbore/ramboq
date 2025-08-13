@@ -11,13 +11,12 @@ def contact(body_container):
                 email = st.text_input("Email Address *")
                 phone_country = st.selectbox(
                     "Country Code",
-                    isd_codes,
-                    index=isd_codes.index("India (+91)")
+                    isd_codes
                 )
                 phone_number = st.text_input("Phone Number")
                 query = st.text_area("Your Query *", height=150)
 
-                col1, col2 = st.columns(2)
+                col1, col2, _ = st.columns([1,1,15])
                 submit = col1.form_submit_button("Submit")
                 cancel = col2.form_submit_button("Cancel")
 

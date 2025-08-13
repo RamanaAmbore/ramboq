@@ -351,6 +351,16 @@ market_prompt: |
     • SOFI 
 
 isd_codes:
+  - country: India
+    code: "+91"
+  - country: United States
+    code: "+1"
+  - country: United Kingdom
+    code: "+44"
+  - country: Australia
+    code: "+61"
+  - country: United Arab Emirates
+    code: "+971"
   - country: Afghanistan
     code: "+93"
   - country: Albania
@@ -365,8 +375,6 @@ isd_codes:
     code: "+54"
   - country: Armenia
     code: "+374"
-  - country: Australia
-    code: "+61"
   - country: Austria
     code: "+43"
   - country: Azerbaijan
@@ -461,8 +469,7 @@ isd_codes:
     code: "+36"
   - country: Iceland
     code: "+354"
-  - country: India
-    code: "+91"
+
   - country: Indonesia
     code: "+62"
   - country: Iran
@@ -565,12 +572,7 @@ isd_codes:
     code: "+90"
   - country: Ukraine
     code: "+380"
-  - country: United Arab Emirates
-    code: "+971"
-  - country: United Kingdom
-    code: "+44"
-  - country: United States
-    code: "+1"
+
   - country: Uruguay
     code: "+598"
   - country: Venezuela

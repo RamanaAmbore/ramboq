@@ -256,7 +256,7 @@ a[href^="mailto:"]:hover {
     background-color: #9ad3da ; /* Optional: show underline */
 }
 
-input, [data-baseweb="select"], textarea  {
+input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"] > div  {
     background-color: #fafdff!important;
     border-radius: 4px !important;
     border-color: gray !important;
