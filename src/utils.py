@@ -49,6 +49,8 @@ with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
 with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     config = yaml.safe_load(file)  # Load YAML config file
 
+isd_codes = [f"{item['country']} ({item['code']})" for item in config['isd_codes']]
+
 
 @streamlit.cache_resource
 def get_image_bin_file(file):
