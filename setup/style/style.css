@@ -168,7 +168,9 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   overflow-y: auto;
   padding: 1rem;
   background-color: white !important;
+  border-color: 1px solid gray;
   border-radius: 4px;
+
 }
 
 
@@ -261,9 +263,24 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
     border-radius: 4px !important;
     border-color: gray !important;
 }
-div[data-testid="stLayoutWrapper"] {
-    max-width: 1200px;
+
+.st-key-text-container button {
+  background-color: var(--color-popover-button);
+  text-shadow: var(--shadow-text-dark) !important;
+  border-color:darkgray!important;
 }
+
+.st-key-text-container button p {
+
+  padding: 0px auto;
+}
+
+.st-key-text-container .stColumn {
+
+  min-width: 10rem !important;
+  max-width: 12rem !important;
+}
+
 
 
 
