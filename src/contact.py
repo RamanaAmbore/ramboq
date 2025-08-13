@@ -1,6 +1,6 @@
 import streamlit as st
 from src.utils import isd_codes  # YAML-loaded ISD codes
-from src.components import create_ruler
+from src.components import create_ruler_white
 
 def contact(body_container):
     with body_container:
@@ -35,4 +35,5 @@ def contact(body_container):
 
                     if cancel:
                         st.warning("Form submission canceled.")
+            create_ruler_white()
 

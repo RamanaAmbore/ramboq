@@ -103,6 +103,10 @@ def disp_icon_text(icon=None, text=None, link=None, tag=""):
 def create_ruler():
     st.markdown('---', unsafe_allow_html=True)  # Render a horizontal rule using Markdown
 
+# Function to create a horizontal rule (line)
+def create_ruler_white():
+    st.markdown("<hr style='border: 1px solid white;'>", unsafe_allow_html=True)  # Render a horizontal rule using Markdown
+
 
 # Function to display profile information in a container based on the name
 def write_container(name):

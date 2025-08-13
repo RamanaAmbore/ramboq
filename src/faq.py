@@ -1,7 +1,7 @@
 import streamlit as st
 
 from src.utils import config
-from src.components import create_ruler
+from src.components import create_ruler_white
 import streamlit.components.v1 as components
 
 
@@ -15,7 +15,7 @@ def faq(body_container):
             mermaid_write(config['redemption_flow'], height=300)
             st.write(config['succession_flow_title'])
             mermaid_write(config['succession_flow'], height=300)
-            create_ruler()
+            create_ruler_white()
 
 def mermaid_write(mermaid_code, height=500):
     # HTML with Mermaid.js injection
