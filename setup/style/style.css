@@ -260,7 +260,9 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
     background-color: #fafdff!important;
     border-radius: 4px !important;
     border-color: gray !important;
-
+}
+div[data-testid="stLayoutWrapper"] {
+    max-width: 1200px;
 }
 
 
