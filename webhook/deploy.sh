@@ -34,6 +34,9 @@ export HOME=/var/www
     echo "[$TS] Virtualenv not found at venv/bin/activate"
   fi
 
+  cp /opt/ramboq/index.html /opt/ramboq/venv/lib/python3.13/site-packages/streamlit/static/index.html
+  cp /opt/ramboq/setup/images/favicon.png /opt/ramboq/venv/lib/python3.13/site-packages/streamlit/static/favicon.png
+
   # Restart service without sudo, via systemctl user (if applicable)
   echo "[$TS] Attempting to restart ramboq.service..."
   sudo systemctl restart ramboq.service || echo "[$TS] Failed to restart ramboq.service"
