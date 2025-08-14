@@ -5,5 +5,5 @@ from src.components import create_ruler_white
 def contact(body_container):
     with body_container:
         with st.container(key='text-container'):
-            st.markdown("#### Contact Form")
+            st.markdown("### Contact Form")
 
