@@ -10,85 +10,10 @@ about: |
     With a **long-term portfolio XIRR exceeding 22%**, Rambo's approach blends **high-conviction stock picks** with **strategic covered calls** and **intelligent derivatives positioning**. Every move is grounded in deep analytics, rigorous risk management, and an unwavering commitment to the power of compounding.
     
     **Rambo Quant** is not for those content with average, index-like returns. It’s built for partners who demand more — **smarter strategies, sharper execution, and sustainable wealth creation**.
-market: |
-  ### Market Report — Wednesday, August 13, 2025
 
-  #### Market Summary
-  
-  - **India Markets (Closing August 12, 2025, IST):**
-      - **NIFTY 50:** **₹24,487.40** (−0.40%) [close]
-      - **SENSEX:** **₹80,235.59** (−0.46%) [close]
-      - **India VIX:** **12.23** (+0.12%) [close]
-      - **USD/INR:** **₹87.61** [mid-market]
-      - **Gold (spot international):** **$3,345.00**/oz (declined—strong USD)
-      - **Silver (spot international):** **$37.90**/oz (steady)
-      - **Copper (LME cash):** **$4.39**/lb (LME $9,661.50/ton, steady to positive)[11][19]
-  
-  - **World Markets (Closing August 12, 2025, EDT):**
-      - **Dow Jones:** **$44,458.61** (+1.1%) [close]
-      - **NASDAQ:** **$21,681.90** (+1.4%) [close]
-      - **CBOE VIX:** **14.88** (−1.37%) [close]
-  
-  **Market Commentary:**  
-  Local indices slumped—dragged by financials and realty stocks—with defensive buying in IT, auto, and energy. Volatility increased slightly. Rupee held near record lows despite RBI presence, while US indices surged on softer inflation prints, driving global sentiment positively. Commodity prices were generally rangebound; gold dipped as dollar rallied, copper steadied post selloff.
-  
-  ---
-  
-  #### Derivatives
-  
-  - **India:**
-      - **NIFTY August Futures:** **₹24,550** (closed at premium to spot)[1]
-      - **India VIX:** **12.23** (+0.12%) [reflects increased option hedging]
-      - **Events Impacting Derivatives:** Ongoing rollovers ahead of F&O expiry (Aug 28); heavy trading in HAL, Infosys, Reliance stock futures.  
-      - **No major regulatory events reported.**
-  
-  - **USA:**
-      - **S&P 500, Nasdaq, Dow futures:** All saw upticks; boosted by tame CPI print and expectations for rate pause.
-      - **CBOE VIX:** **14.88** (down), signifying less demand for protection[7]
-      - **No sudden volatility events reported.**
-  
-  ---
-  
-  #### Portfolio Highlights
-  
-  Top [Portfolio] stocks with major moves/events:
-  
-  - **ADANIGREEN (Adani Green):**
-      - **₹[Unavailable]** — Reported robust renewable capacity additions; sector sentiment remains strong.
-  - **ADANIPORTS (Adani Ports & SEZ):**
-      - **₹[Unavailable]** — Continued profit growth from logistics; no dividend/split events.
-  - **IRCTC:**
-      - **₹[Unavailable]** — Issued EOI for new digital food aggregator; stock stable, platform expansion ongoing.
-  - **GOLDBEES-E (Gold ETF):**
-      - **₹100,318** (MCX gold contract reference)[10] — Tracking gold, up YoY; mirrored dip due to USD strength.
-  - **SILVERBEES (Silver ETF):**
-      - **₹113,770** (spot reference for ETF)[10] — In line with global silver, slight uptick on day.
-  
-  **Note:** Only portfolio stocks with major events or price moves are listed. No other significant corporate actions reported.
-  
-  ---
-  
-  #### Insights & Outlook
-  
-  - **Market Sentiment:**  
-      - India: Defensive, awaiting F&O expiry and central bank cues. Select buying in autos/IT, profit booking in finance and realty.
-      - US/global: Bullish momentum driven by tame inflation; risk appetite returning.
-  
-  - **Sector Drivers:**  
-      - **Renewables:** Operational additions drive ADANIGREEN, sector allocations strong.
-      - **Logistics:** ADANIPORTS benefits from marine expansion.
-      - **Digital/rail/IT:** IRCTC expansion, stable tech demand.
-      - **Precious metals:** Weak gold, firm silver reflecting global macro swings.
-  
-  - **Watch for Tomorrow:**  
-      - Indian F&O expiries, RBI moves, Q1 results from financial and energy stocks.
-      - US: Producer price data, Fed commentary, tech earnings, continued inflation impact.
-      - Currency/commodities: Rupee moves near *₹88*, gold rangewatch, copper price resilience.
-  
-  ---
-  
-  _Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions._
-contact: ### Contact Form
+contact: |
+  ### Contact Form
+
 faq: |
   ### Rambo Quant Investments LLP — Frequently Asked Questions (FAQ)
 
@@ -585,3 +510,82 @@ isd_codes:
     code: "+260"
   - country: Zimbabwe
     code: "+263"
+market: |
+  ### Market Report — Wednesday, August 13, 2025
+
+  #### Market Summary
+  
+  - **India Markets (Closing August 12, 2025, IST):**
+      - **NIFTY 50:** **₹24,487.40** (−0.40%) [close]
+      - **SENSEX:** **₹80,235.59** (−0.46%) [close]
+      - **India VIX:** **12.23** (+0.12%) [close]
+      - **USD/INR:** **₹87.61** [mid-market]
+      - **Gold (spot international):** **$3,345.00**/oz (declined—strong USD)
+      - **Silver (spot international):** **$37.90**/oz (steady)
+      - **Copper (LME cash):** **$4.39**/lb (LME $9,661.50/ton, steady to positive)[11][19]
+  
+  - **World Markets (Closing August 12, 2025, EDT):**
+      - **Dow Jones:** **$44,458.61** (+1.1%) [close]
+      - **NASDAQ:** **$21,681.90** (+1.4%) [close]
+      - **CBOE VIX:** **14.88** (−1.37%) [close]
+  
+  **Market Commentary:**  
+  Local indices slumped—dragged by financials and realty stocks—with defensive buying in IT, auto, and energy. Volatility increased slightly. Rupee held near record lows despite RBI presence, while US indices surged on softer inflation prints, driving global sentiment positively. Commodity prices were generally rangebound; gold dipped as dollar rallied, copper steadied post selloff.
+  
+  ---
+  
+  #### Derivatives
+  
+  - **India:**
+      - **NIFTY August Futures:** **₹24,550** (closed at premium to spot)[1]
+      - **India VIX:** **12.23** (+0.12%) [reflects increased option hedging]
+      - **Events Impacting Derivatives:** Ongoing rollovers ahead of F&O expiry (Aug 28); heavy trading in HAL, Infosys, Reliance stock futures.  
+      - **No major regulatory events reported.**
+  
+  - **USA:**
+      - **S&P 500, Nasdaq, Dow futures:** All saw upticks; boosted by tame CPI print and expectations for rate pause.
+      - **CBOE VIX:** **14.88** (down), signifying less demand for protection[7]
+      - **No sudden volatility events reported.**
+  
+  ---
+  
+  #### Portfolio Highlights
+  
+  Top [Portfolio] stocks with major moves/events:
+  
+  - **ADANIGREEN (Adani Green):**
+      - **₹[Unavailable]** — Reported robust renewable capacity additions; sector sentiment remains strong.
+  - **ADANIPORTS (Adani Ports & SEZ):**
+      - **₹[Unavailable]** — Continued profit growth from logistics; no dividend/split events.
+  - **IRCTC:**
+      - **₹[Unavailable]** — Issued EOI for new digital food aggregator; stock stable, platform expansion ongoing.
+  - **GOLDBEES-E (Gold ETF):**
+      - **₹100,318** (MCX gold contract reference)[10] — Tracking gold, up YoY; mirrored dip due to USD strength.
+  - **SILVERBEES (Silver ETF):**
+      - **₹113,770** (spot reference for ETF)[10] — In line with global silver, slight uptick on day.
+  
+  **Note:** Only portfolio stocks with major events or price moves are listed. No other significant corporate actions reported.
+  
+  ---
+  
+  #### Insights & Outlook
+  
+  - **Market Sentiment:**  
+      - India: Defensive, awaiting F&O expiry and central bank cues. Select buying in autos/IT, profit booking in finance and realty.
+      - US/global: Bullish momentum driven by tame inflation; risk appetite returning.
+  
+  - **Sector Drivers:**  
+      - **Renewables:** Operational additions drive ADANIGREEN, sector allocations strong.
+      - **Logistics:** ADANIPORTS benefits from marine expansion.
+      - **Digital/rail/IT:** IRCTC expansion, stable tech demand.
+      - **Precious metals:** Weak gold, firm silver reflecting global macro swings.
+  
+  - **Watch for Tomorrow:**  
+      - Indian F&O expiries, RBI moves, Q1 results from financial and energy stocks.
+      - US: Producer price data, Fed commentary, tech earnings, continued inflation impact.
+      - Currency/commodities: Rupee moves near *₹88*, gold rangewatch, copper price resilience.
+  
+  ---
+  
+  _Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions._
+
