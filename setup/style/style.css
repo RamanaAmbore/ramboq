@@ -163,7 +163,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /*  About Container */
 .st-key-text-container {
-  width: 100%;
+  width: 100vw;
   max-width: var(--max-width-content);
   overflow-y: auto;
   padding: 1rem;
@@ -270,9 +270,6 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   border-color:darkgray!important;
 }
 
-.stForm {
-    max-width:1200px;
-}
 
 
 
