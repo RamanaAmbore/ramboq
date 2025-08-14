@@ -5,6 +5,6 @@ from src.utils import config
 def contact(body_container):
     with body_container:
         with st.container(key='text-container'):
-            st.write(config['about'])
+            # st.write(config['about'])
             create_ruler_white()
 
