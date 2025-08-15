@@ -150,6 +150,8 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /* 📄 Body Container */
 .st-key-body-container {
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex: 1 1 auto;
   align-items: center;
@@ -271,6 +273,11 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   text-shadow: var(--shadow-text-dark) !important;
   border-color:darkgray!important;
 }
+
+ h3[data-title='contact-form'] {
+        border-width:0px;
+        padding-bottom:0px;
+    }
 
 
 

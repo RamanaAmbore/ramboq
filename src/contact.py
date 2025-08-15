@@ -5,7 +5,11 @@ from src.utils import config
 def contact(body_container):
     with body_container:
         with st.container(key='text-container'):
-            st.write(config['contact'])
+            # st.write(config['contact'])
+            st.markdown(
+                "<h3 data-title='contact-form' class='contact-form'>Contact Form</h3>",
+                unsafe_allow_html=True
+            )
             with st.form("contact_form", clear_on_submit=True):
                 name = st.text_input("Full Name *", max_chars=100)
                 email = st.text_input("Email Address *")
