@@ -33,11 +33,10 @@
   --shadow-text-heading: 0.5px 0.5px 0.25px #5F9EA0;
   --shadow-box-top: 0 -4px 6px -4px rgba(0, 0, 0, 0.1);
   --shadow-box-bottom: 0 2px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-box-sides: -4px 0 4px rgba(0, 0, 0, 0.1), 4px 0 4px rgba(0, 0, 0, 0.1);
 
   /* Layout */
-  --max-width: 1920px;
-  --max-width-minus: 1918px;
+  --max-width: 1200px;
+  --max-width-minus: 1200px;
   --max-width-content: 1200px;
 }
 
@@ -153,13 +152,14 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 .st-key-body-container {
   display: flex;
   flex: 1 1 auto;
-  justify-content: center;
   align-items: center;
   margin-top: 3rem !important;
   margin-bottom: 1rem !important;
   margin-left: 0rem !important;
   margin-right: 0rem !important;
   padding: 0rem !important;
+  height:100vh;
+  background-color:white;
 }
 
 /*  About Container */
@@ -171,6 +171,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   background-color: white !important;
   border-color: 1px solid gray;
   border-radius: 4px;
+  border-color: 1px solid black;
 
 }
 
