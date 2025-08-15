@@ -163,7 +163,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /*  About Container */
 .st-key-text-container {
-  width: 100vw;
+  width:  100vw;
   max-width: var(--max-width-content);
   overflow-y: auto;
   padding: 1rem;

@@ -25,7 +25,7 @@ def contact(body_container):
                             st.error("Please fill in all mandatory fields (*)")
                         else:
                             selected_code = phone_country.split("(")[-1].strip(")")
-                            full_phone = f"{selected_code} {phone_number}"
+                            full_phone =  f"{selected_code} {phone_number}"
 
                             # Placeholder for email sending logic
                             # send_email("query@ramboq.com", name, email, full_phone, query)
