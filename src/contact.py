@@ -20,10 +20,10 @@ def contact(body_container):
                 phone_number = st.text_input("Phone Number")
                 query = st.text_area("Your Query *", height=150)
 
-                col1, col2 = st.columns([1, 1])
+                col1, col2, _ = st.columns([1, 1, 4], vertical_alignment="center", gap='small')
                 submit = col1.form_submit_button("Submit")
                 cancel = col2.form_submit_button("Cancel")
-                with st.container(key='button_container'):
+                with st.container(key='button-container'):
                     if submit:
                         if not name.strip() or not email.strip() or not query.strip():
                             st.error("Please fill in all mandatory fields (*)")
