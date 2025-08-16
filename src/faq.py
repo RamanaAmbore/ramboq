@@ -15,7 +15,6 @@ def faq(body_container):
             mermaid_write(config['redemption_flow'], height=300)
             st.write(config['succession_flow_title'])
             mermaid_write(config['succession_flow'], height=300)
-            create_ruler_white()
 
 def mermaid_write(mermaid_code, height=500):
     # HTML with Mermaid.js injection

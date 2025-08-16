@@ -37,4 +37,3 @@ def contact(body_container):
 
                 if cancel:
                     st.warning("Form submission canceled.")
-            create_ruler_white()
