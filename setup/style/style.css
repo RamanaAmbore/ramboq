@@ -59,7 +59,7 @@ header {
   border-left: var(--border-side);
   border-right: var(--border-side);
   text-shadow: var(--shadow-text-light);
-  box-shadow: var(--shadow-box-sides);
+
 }
 
 /* 📦 Navbar */
@@ -82,6 +82,7 @@ header {
   box-shadow: var(--shadow-box-bottom);
   text-shadow: var(--shadow-text-light);
   font-size: var(--font-size-sm) !important;
+    box-shadow: var(--shadow-box-sides);
 }
 
 .st-key-navbar-desktop-container  {
@@ -166,6 +167,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   padding: 0rem !important;
   height:100vh;
   background-color:white;
+    box-shadow: var(--shadow-box-sides);
 }
 
 /*  About Container */
@@ -196,6 +198,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   gap: 0;
   margin: 0;
   text-align: center;
+    box-shadow: var(--shadow-box-sides);
 }
 
 .footer-desktop {
