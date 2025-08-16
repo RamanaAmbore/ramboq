@@ -34,8 +34,6 @@ def initial_setup():
     if 'css_style' not in st.session_state:
         bin_str = get_image_bin_file('nav_image.png')
         st.session_state.css_style = css_style.replace('nav_image', bin_str)
-        # bin_str = get_image_bin_file('background_graph.png')
-        # st.session_state.css_style = css_style.replace('body_image', bin_str)
 
     # Apply CSS styling to the page content
     markdown(st.session_state.css_style, css=True)
