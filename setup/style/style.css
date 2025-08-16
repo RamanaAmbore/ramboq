@@ -262,7 +262,9 @@ h1, h2, h3 {
     display: flex !important;
   }
   .st-key-body-container {
-    padding: 0.5rem !important;}
+    padding: 0.5rem !important;
+    padding-top: 1rem !important;
+  }
 }
 
 /* Normal state */
@@ -289,11 +291,6 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   border-color:darkgray!important;
   font-size: .7rem;
 }
-
- h3[data-title='contact-form'] {
-        border-width:0px;
-        padding-bottom:0px;
-    }
 
  .stForm .stHorizontalBlock {
     flex-flow:nowrap;
