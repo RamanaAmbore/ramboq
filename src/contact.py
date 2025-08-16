@@ -20,7 +20,7 @@ def contact(body_container):
                 phone_number = st.text_input("Phone Number")
                 query = st.text_area("Your Query *", height=150)
 
-                col1, col2, _ = st.columns(3, vertical_alignment="center", gap='small',width=300)
+                col1, col2, _ = st.columns(3, vertical_alignment="center", gap=None,width=300)
                 submit = col1.form_submit_button("Submit")
                 cancel = col2.form_submit_button("Cancel")
 
