@@ -261,6 +261,8 @@ h1, h2, h3 {
   .st-key-navbar-mobile-container {
     display: flex !important;
   }
+  .st-key-body-container {
+    padding: 0.5rem !important;}
 }
 
 /* Normal state */
