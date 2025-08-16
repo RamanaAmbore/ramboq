@@ -236,7 +236,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /* 🧠 Headings */
 h1, h2, h3 {
-  padding: 0px auto !important;
+  padding: 0.25rem 0px .50rem !important;
   color: var(--font-color-heading);
   text-shadow: var(--shadow-text-heading) !important;
   border-bottom: 1px solid gray;
