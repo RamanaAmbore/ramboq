@@ -156,7 +156,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 /* 📄 Body Container */
 .st-key-body-container {
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   scrollbar-width: none;
   display: flex;
   flex: 1 1 auto;
@@ -176,7 +176,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   /*width:  100vw;
   max-width: var(--max-width-content);*/
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding: 1rem;
   background: white !important;
   border: 1px solid rgba(49, 80, 98, 0.2);
