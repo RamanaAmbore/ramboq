@@ -1,7 +1,6 @@
 import streamlit as st
-
-from src.utils import config
 from src.components import container
+from src.utils import config
 from src.utils import get_path, capitalize
 
 nav_labels = config['nav_labels']
@@ -22,7 +21,7 @@ def create_navbar_desktop_container():
         with logo_col:
             container(st.image, logo, use_container_width=True, key='logo_desktop')
         with menu_col:
-            nav_cols = st.columns([1.2, 1, 1.2, 0.9, 1.1, 1.1], gap=None, vertical_alignment="center")
+            nav_cols = st.columns([1.2, 1, 1.2, 0.9, 0.9, 1.1], gap=None, vertical_alignment="center")
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
                     if st.session_state.active_nav == label:
@@ -83,10 +82,10 @@ def set_active_nav(label):
         st.session_state.active_nav = label
     st.query_params["page"] = st.session_state.active_nav
 
+
 def validate_parms():
     params = st.query_params
 
     # --- Validation ---
     if params and params.get("page", [None])[0] not in config['nav_labels']:
         st.session_state.active_nav = config['default_nav_label']
-
