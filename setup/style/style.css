@@ -165,7 +165,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   margin-bottom: 0rem !important;
   margin-left: 0rem !important;
   margin-right: 0rem !important;
-  padding: 1rem 1rem 0rem 1rem !important;
+  padding: 1.5rem 1rem 0rem 1rem !important;
   height:100vh;
   background-color:white;
     box-shadow: var(--shadow-box-sides);
@@ -182,13 +182,11 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   border: 1px solid rgba(49, 80, 98, 0.2);
   border-radius: 0.5rem;
   box-sizing:border-box;
-
 }
 
 .st-key-contact-container{
   border:none;
   padding:0rem;
-
 }
 
 /*  Footer */
