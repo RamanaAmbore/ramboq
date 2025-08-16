@@ -190,7 +190,6 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 }
 
-
 /*  Footer */
 .st-key-footer-container {
   flex: 0 0 auto;
@@ -279,7 +278,7 @@ a[href^="mailto:"]:hover {
 }
 
 input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"] > div  {
-    background-color: #fafdff!important;
+    background-color: #fcfeff !important;
     border-radius: 4px !important;
     border-color: gray !important;
 }
@@ -288,12 +287,18 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   background-color: var(--color-popover-button);
   text-shadow: var(--shadow-text-dark) !important;
   border-color:darkgray!important;
+  font-size: .7rem;
 }
 
  h3[data-title='contact-form'] {
         border-width:0px;
         padding-bottom:0px;
     }
+
+ .stForm .stHorizontalBlock {
+    flex-flow:nowrap;
+    padding-right: 2.5rem;
+ }
 
 
 
