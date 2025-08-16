@@ -4,7 +4,7 @@ from src.components import create_ruler_white
 from src.utils import config
 def contact(body_container):
     with body_container:
-        with st.container(key='text-container'):
+        with st.container(key='contact-container'):
             # st.write(config['contact'])
             st.markdown(
                 "<h3 data-title='contact-form' class='contact-form'>Contact Form</h3>",
