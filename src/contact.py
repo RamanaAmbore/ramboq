@@ -7,10 +7,19 @@ from src.utils import config
 from src.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
 
+import random
+import re
+import streamlit as st
+
 def contact(body_container):
     with body_container:
         with st.container(key="contact-container"):
             st.write(config["contact"])
+
+            # --- Simple Captcha Question ---
+            if "captcha_num1" not in st.session_state:
+                st.session_state.captcha_num1 = random.randint(1, 9)
+                st.session_state.captcha_num2 = random.randint(1, 9)
 
             with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
                 name = st.text_input("Full Name *", key="name", max_chars=100)
@@ -20,10 +29,28 @@ def contact(body_container):
                 subject = st.text_input("Subject *", key="subject", max_chars=150)
                 query = st.text_area("Your Query *", key="query", height=150)
 
+                # --- Captcha field ---
+                captcha_answer = st.text_input(
+                    f"Solve to verify: {st.session_state.captcha_num1} + {st.session_state.captcha_num2} = ?",
+                    key="captcha"
+                )
+
                 col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
                 submit = col1.form_submit_button("Submit")
 
                 if submit:
+                    # --- Captcha validation ---
+                    try:
+                        if int(captcha_answer.strip()) != (st.session_state.captcha_num1 + st.session_state.captcha_num2):
+                            st.error("❌ Captcha validation failed. Please try again.")
+                            # regenerate new captcha
+                            st.session_state.captcha_num1 = random.randint(1, 9)
+                            st.session_state.captcha_num2 = random.randint(1, 9)
+                            return
+                    except:
+                        st.error("❌ Please enter a valid number for captcha.")
+                        return
+
                     # --- Ordered validation ---
                     if not name.strip():
                         st.error("⚠️ Full Name is required.")
@@ -59,15 +86,15 @@ def contact(body_container):
                         return
 
                     # --- Send email ---
-                    # with st.spinner("📨 Sending your message..."):
-                    status, msg = send_email(name, email, query, full_phone, subject, test=False)
+                    with st.spinner("📨 Sending your message..."):
+                        status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
                     email_status(status, msg)
 
-                    # if status:
-                    #     st.success("✅ Your message has been sent successfully!")
-                    # else:
-                    #     st.dialog(f"❌ Failed to send your message. {msg}")
+                    # regenerate captcha for next attempt
+                    st.session_state.captcha_num1 = random.randint(1, 9)
+                    st.session_state.captcha_num2 = random.randint(1, 9)
+
 
 @st.dialog("📨 Email Status")
 def email_status(success: bool, msg: str):
