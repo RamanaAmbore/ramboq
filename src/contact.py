@@ -65,8 +65,5 @@ def contact(body_container):
 
                     if status:
                         st.success("✅ Your message has been sent successfully!")
-
-                        st.rerun()  # 🔄 Restart script to refresh cleared state
                     else:
                         st.error(f"❌ Failed to send your message. {msg}")
-                        return
