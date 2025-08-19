@@ -211,7 +211,7 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
 
     # --- Body ---
     body = f"""
-    Thank you very much for contacting us. Here is contact form that we received. We will get back to you as soon as we can. 
+    Thank you for contacting us. Your message has been successfully received, and our team is already reviewing it. We’ll respond to you at the earliest opportunity.
     Name: {name}
     Phone: {phone}
     Email: {to_email}
