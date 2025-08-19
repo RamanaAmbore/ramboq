@@ -207,17 +207,16 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
 
     # --- Subject ---
     subject = f"New Contact Form Submission from {name}" if subject == "" else f"{subject} from {name}"
-    subject = f"Acknowledgement: {subject} on {date.today()}"
+    subject = f"{subject} on {date.today()}"
 
     # --- Body ---
     body = f"""
-    Thank you very much for contacting us. Here is contact form you submitted. We will get back to you as soon as we can. 
+    Thank you very much for contacting us. Here is contact form that we received. We will get back to you as soon as we can. 
     Name: {name}
     Phone: {phone}
     Email: {to_email}
     Subject: {subject}
-    Query:
-    {query}
+    Query: {query}
     """
 
     # --- Build message ---
@@ -225,7 +224,7 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
     msg["From"] = smtp_user
     msg["To"] = to_email.strip()
     msg["Cc"] = smtp_user
-    msg["Subject"] = subject
+    msg["Subject"] = f'Acknowledgement: {subject}'
     msg.attach(MIMEText(body, "plain"))
 
     # Final recipient list for SMTP

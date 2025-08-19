@@ -175,7 +175,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 .st-key-text-container,  .st-key-contact-container{
   /*width:  100vw;
   max-width: var(--max-width-content);*/
-  overflow-y: auto;
+  overflow-y: clip;
   overflow-x: clip;
   padding: 1rem;
   background: white !important;
