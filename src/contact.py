@@ -62,10 +62,12 @@ def contact(body_container):
                     # with st.spinner("📨 Sending your message..."):
                     status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
-                    if status:
-                        st.success("✅ Your message has been sent successfully!")
-                    else:
-                        st.dialog(f"❌ Failed to send your message. {msg}")
+                    email_status(status, msg)
+
+                    # if status:
+                    #     st.success("✅ Your message has been sent successfully!")
+                    # else:
+                    #     st.dialog(f"❌ Failed to send your message. {msg}")
 
 @st.dialog("📨 Email Status")
 def email_status(success: bool, msg: str):
