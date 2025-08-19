@@ -7,6 +7,9 @@ from io import BytesIO
 import streamlit
 import yaml
 from PIL import Image
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
 # Function to get the path of an image file
@@ -48,6 +51,10 @@ with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
 # Load additional configuration data from a YAML file
 with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     config = yaml.safe_load(file)  # Load YAML config file
+
+# Load additional configuration data from a YAML file
+with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+    secrets = yaml.safe_load(file)  # Load YAML config file
 
 isd_codes = [f"{item['country']} ({item['code']})" for item in config['isd_codes']]
 
@@ -186,5 +193,64 @@ def hover_split(text, size=40):
     return lines
 
 
+def send_email(name, to_email, query, phone="", subject="", test=False):
+    """
+    Send email to a single recipient, CC to the smtp_user.
+    - to_email: str (single email address)
+    """
+
+    smtp_server = secrets['smtp_server']
+    smtp_port   = secrets['smtp_port']
+    smtp_user   = secrets['smtp_user']
+    smtp_pass   = secrets['smtp_pass']
+
+    # --- Subject ---
+    subject = f"New Contact Form Submission from {name}" if subject == "" else f"{subject} from {name}"
+
+    # --- Body ---
+    body = f"""
+    Name: {name}
+    Phone: {phone}
+
+    Query:
+    {query}
+    """
+
+    # --- Build message ---
+    msg = MIMEMultipart()
+    msg["From"] = smtp_user
+    msg["To"] = to_email.strip()
+    msg["Cc"] = smtp_user
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    # Final recipient list for SMTP
+    recipients = to_email.strip()
+
+    try:
+        if test:
+            print(msg.as_string())
+            return True, "Test mode only"
+        else:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, recipients, msg.as_string())  # ✅ send to both To & CC
+            return True, ''
+    except Exception as e:
+        err_msg = f"Email send error: {e}"
+        return False, err_msg
 
 
+if __name__ == "__main__":
+    # Test run
+    name = "Rambo"
+    recipients = "ramboquant@gmail.com"
+    phone = "9876543210"
+    query = "Testing multiple recipient email functionality."
+
+    success, msg = send_email(name, recipients, query, phone, subject,  test=True)
+    if success:
+        print("✅ Email sent successfully!")
+    else:
+        print("❌ Failed to send email:", msg)
