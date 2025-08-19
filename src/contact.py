@@ -8,6 +8,7 @@ from src.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
 
 def contact(body_container):
+
     with body_container:
         with st.container(key="contact-container"):
             st.write(config["contact"])
@@ -22,7 +23,6 @@ def contact(body_container):
 
                 col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
                 submit = col1.form_submit_button("Submit")
-                cancel = col2.form_submit_button("Cancel")
 
                 if submit:
                     # --- Ordered validation ---
@@ -66,17 +66,7 @@ def contact(body_container):
                     if status:
                         st.success("✅ Your message has been sent successfully!")
 
-                        # Clear fields only on success
-                        for key in ["name", "email", "phone_number", "subject", "query"]:
-                            st.session_state[key] = ""
-
                         st.rerun()  # 🔄 Restart script to refresh cleared state
                     else:
                         st.error(f"❌ Failed to send your message. {msg}")
                         return
-
-                if cancel:
-                    st.warning("Form submission cancelled.")
-                    # Clear form fields on cancel
-                    for key in ["name", "email", "phone_number", "subject", "query"]:
-                        st.session_state[key] = ""

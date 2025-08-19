@@ -9,7 +9,6 @@ from src.post import post
 
 def body(body_container):
     with body_container:
-
         if st.session_state.active_nav == "about":
             about(body_container)
         elif st.session_state.active_nav == "market":

@@ -66,6 +66,7 @@ if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
 
     nav_container = st.container(key="navbar-container")
+    body_container = st.empty()
     body_container = st.container(key="body-container")
     footer_container = st.container(key='footer-container')
 
