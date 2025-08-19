@@ -1,7 +1,7 @@
 import streamlit as st
 
 
-def login_out():
+def Signin_out():
     st.title("🔐 Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")

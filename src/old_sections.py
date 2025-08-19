@@ -24,11 +24,11 @@ def page_layout():
 
     nav_items = ["about", "market", "Portfolio", "Blog", "documents", "Contact"]
 
-    def toggle_login():
+    def toggle_Signin():
         st.session_state.logged_in = not st.session_state.logged_in
 
     # --- Layout: Logo | Nav Buttons | Login ---
-    logo, _, *navbar, _, login_out = st.columns([1.5, .5, 1,1, 1, 1, 1, 1, 1, .5, 1], gap=None, vertical_alignment="center")
+    logo, _, *navbar, _, Signin_out = st.columns([1.5, .5, 1,1, 1, 1, 1, 1, 1, .5, 1], gap=None, vertical_alignment="center")
     with st.container(key="nav-container"):
         with logo:
             # Display profile photo
@@ -39,12 +39,12 @@ def page_layout():
                 if st.button(item, key=item):
                     st.session_state.nav = item
 
-        with login_out:
-            with st.container(key='login-out'):
+        with Signin_out:
+            with st.container(key='Signin-out'):
                 with st.columns(1)[0]:
                     label = "Logout" if st.session_state.logged_in else "Login"
-                    if st.button(label, key="login-toggle"):
-                        toggle_login()
+                    if st.button(label, key="Signin-toggle"):
+                        toggle_Signin()
 
     # Routing to content section
     if st.session_state.nav == "about":

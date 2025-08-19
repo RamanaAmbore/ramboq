@@ -237,7 +237,7 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
         else:
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
-                server.login(smtp_user, smtp_pass)
+                server.Signin(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, recipients, msg.as_string())  # ✅ send to both To & CC
             return True, ''
     except Exception as e:

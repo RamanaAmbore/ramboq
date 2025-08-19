@@ -94,7 +94,7 @@ header {
   text-shadow: var(--shadow-text-dark) !important;
 }
 
-.st-key-login-out button p {
+.st-key-signin-out button p {
   border: 1px solid white;
   padding: 2px 10px;
   border-radius: 4px;
