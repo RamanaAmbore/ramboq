@@ -2,14 +2,15 @@ import base64
 import functools
 import logging
 import random
+import smtplib
+from datetime import date
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from io import BytesIO
 
 import streamlit
 import yaml
 from PIL import Image
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 
 # Function to get the path of an image file
@@ -46,7 +47,6 @@ with open(get_path('constants.yaml'), 'r', errors='ignore', encoding='utf-8') as
 # Load custom CSS styles for styling the frontend
 with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
     css_style = css.read()  # Read the CSS file into a string
-
 
 # Load additional configuration data from a YAML file
 with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
@@ -176,14 +176,15 @@ def word_width(text, cap_factor=0.28, small_factor=0.17):
             smalls += 1
     return caps * cap_factor + smalls * small_factor
 
+
 @streamlit.cache_resource
 def hover_split(text, size=40):
     lines = []
     line = ''
     for word in text.split():
-        if word.strip() !='':
-            if len(test_line:=f'{line} {word}') < size:
-                line =test_line
+        if word.strip() != '':
+            if len(test_line := f'{line} {word}') < size:
+                line = test_line
             else:
                 lines.append(line)
                 line = word
@@ -200,18 +201,21 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
     """
 
     smtp_server = secrets['smtp_server']
-    smtp_port   = secrets['smtp_port']
-    smtp_user   = secrets['smtp_user']
-    smtp_pass   = secrets['smtp_pass']
+    smtp_port = secrets['smtp_port']
+    smtp_user = secrets['smtp_user']
+    smtp_pass = secrets['smtp_pass']
 
     # --- Subject ---
     subject = f"New Contact Form Submission from {name}" if subject == "" else f"{subject} from {name}"
+    subject = f"Acknowledgement: {subject} on {date.today()}"
 
     # --- Body ---
     body = f"""
+    Thank you very much for contacting us. Here is contact form you submitted. We will get back to you as soon as we can. 
     Name: {name}
     Phone: {phone}
-
+    Email: {to_email}
+    Subject: {subject}
     Query:
     {query}
     """
@@ -249,7 +253,7 @@ if __name__ == "__main__":
     phone = "9876543210"
     query = "Testing multiple recipient email functionality."
 
-    success, msg = send_email(name, recipients, query, phone, subject,  test=True)
+    success, msg = send_email(name, recipients, query, phone, subject, test=True)
     if success:
         print("✅ Email sent successfully!")
     else:

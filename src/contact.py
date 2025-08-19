@@ -8,7 +8,6 @@ from src.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
 
 def contact(body_container):
-
     with body_container:
         with st.container(key="contact-container"):
             st.write(config["contact"])
@@ -60,10 +59,20 @@ def contact(body_container):
                         return
 
                     # --- Send email ---
-                    with st.spinner("📨 Sending your message..."):
-                        status, msg = send_email(name, email, full_phone, query, subject)
+                    # with st.spinner("📨 Sending your message..."):
+                    status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
                     if status:
                         st.success("✅ Your message has been sent successfully!")
                     else:
-                        st.error(f"❌ Failed to send your message. {msg}")
+                        st.dialog(f"❌ Failed to send your message. {msg}")
+
+@st.dialog("📨 Email Status")
+def email_status(success: bool, msg: str):
+    if success:
+        st.success("✅ Your message has been sent successfully!")
+    else:
+        st.error(f"❌ Failed to send your message. {msg}")
+
+    if st.button("Close"):
+        st.rerun()
