@@ -211,20 +211,27 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
 
     # --- Body ---
     body = f"""
-    Dear {name},
+    <html>
+      <body>
+        <p>Dear {name},</p>
+        <p>
+          Thank you for reaching out to us. We have successfully received your message, 
+          and our team is currently reviewing the details.<br>
+          We will get back to you at the earliest possible time.
+        </p>
 
-    Thank you for reaching out to us. We have successfully received your message, and our team is currently reviewing the details.  
-    We will get back to you at the earliest possible time.
+        <p><b>Details you submitted:</b></p>
+        <ul>
+          <li><b>Name:</b> {name}</li>
+          <li><b>Phone:</b> {phone}</li>
+          <li><b>Email:</b> {to_email}</li>
+          <li><b>Subject:</b> {subject}</li>
+          <li><b>Message/Query:</b> {query}</li>
+        </ul>
 
-    Here are the details you submitted:  
-    - **Name:** {name}  
-    - **Phone:** {phone}  
-    - **Email:** {to_email}  
-    - **Subject:** {subject}  
-    - **Message/Query:** {query}  
-
-    Best regards,  
-    Rambo team  
+        <p>Best regards,<br>[Rambo team]</p>
+      </body>
+    </html>
     """
 
     # --- Build message ---
@@ -233,7 +240,7 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
     msg["To"] = to_email.strip()
     msg["Cc"] = smtp_user
     msg["Subject"] = f'Acknowledgement: {subject}'
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(body, "html"))
 
     # Final recipient list for SMTP
     recipients = to_email.strip()
