@@ -211,12 +211,20 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
 
     # --- Body ---
     body = f"""
-    Thank you for contacting us. Your message has been successfully received, and our team is already reviewing it. We’ll respond to you at the earliest opportunity.
-    Name: {name}
-    Phone: {phone}
-    Email: {to_email}
-    Subject: {subject}
-    Query: {query}
+    Dear {name},
+
+    Thank you for reaching out to us. We have successfully received your message, and our team is currently reviewing the details.  
+    We will get back to you at the earliest possible time.
+
+    Here are the details you submitted:  
+    - **Name:** {name}  
+    - **Phone:** {phone}  
+    - **Email:** {to_email}  
+    - **Subject:** {subject}  
+    - **Message/Query:** {query}  
+
+    Best regards,  
+    Rambo team  
     """
 
     # --- Build message ---

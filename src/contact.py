@@ -1,15 +1,14 @@
+import random
+import re
 import re
 import re
 
+import streamlit as st
 import streamlit as st
 import streamlit as st
 from src.utils import config
 from src.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
-
-import random
-import re
-import streamlit as st
 
 def contact(body_container):
     with body_container:
@@ -39,17 +38,6 @@ def contact(body_container):
                 submit = col1.form_submit_button("Submit")
 
                 if submit:
-                    # --- Captcha validation ---
-                    try:
-                        if int(captcha_answer.strip()) != (st.session_state.captcha_num1 + st.session_state.captcha_num2):
-                            st.error("❌ Captcha validation failed. Please try again.")
-                            # regenerate new captcha
-                            st.session_state.captcha_num1 = random.randint(1, 9)
-                            st.session_state.captcha_num2 = random.randint(1, 9)
-                            return
-                    except:
-                        st.error("❌ Please enter a valid number for captcha.")
-                        return
 
                     # --- Ordered validation ---
                     if not name.strip():
@@ -83,6 +71,19 @@ def contact(body_container):
                         return
                     if not query.strip():
                         st.error("⚠️ Query is required.")
+                        return
+
+                        # --- Captcha validation ---
+                    try:
+                        if int(captcha_answer.strip()) != (
+                                st.session_state.captcha_num1 + st.session_state.captcha_num2):
+                            st.error("❌ Captcha validation failed. Please try again.")
+                            # regenerate new captcha
+                            st.session_state.captcha_num1 = random.randint(1, 9)
+                            st.session_state.captcha_num2 = random.randint(1, 9)
+                            return
+                    except:
+                        st.error("❌ Please enter a valid number for captcha.")
                         return
 
                     # --- Send email ---
