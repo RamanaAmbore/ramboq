@@ -12,19 +12,17 @@ def performance(body_container):
         with st.container(key="perf-container"):
             df_books, df_positions, df_holdings, df_margin = get_books(get_closing_date())
 
-            tabs = st.tabs(["Portfolio", "Holdings", "Positions", "Cash", "F & O"])
+            tabs = st.tabs(["Portfolio", "Holdings", "Positions", "Cash"])
 
             with tabs[0]:
-                st.dataframe(df_books)
+                st.dataframe(df_books, height=600,use_container_width=True)
 
             with tabs[1]:
-                st.write(df_holdings)
+                st.write(df_holdings, height=600,use_container_width=True)
 
             with tabs[2]:
-                st.dataframe(df_positions)
+                st.dataframe(df_positions, height=600,use_container_width=True)
 
             with tabs[3]:
-                st.dataframe(df_margin)
-            with tabs[4]:
-                st.dataframe(df_margin)
+                st.dataframe(df_margin, height=600,use_container_width=True)
 
