@@ -1,6 +1,6 @@
 import streamlit as st
 
-from src.utils import get_image_bin_file, config, constants
+from src.helpers.utils import get_image_bin_file, config, constants
 
 
 # Function to set a PNG image as the page background

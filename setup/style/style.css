@@ -100,7 +100,7 @@ header {
   border-radius: 4px;
   background: rgba(247, 245, 245, 0.85) !important;
   color: black !important;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
 }
 
 /* 📱 Mobile Navbar */
@@ -156,7 +156,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /* 📄 Body Container */
 .st-key-body-container {
-  overflow-y: auto;
+  overflow-y: clip;
   overflow-x: clip;
   scrollbar-width: none;
   display: flex;
@@ -173,7 +173,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 }
 
 /*  About Container */
-.st-key-text-container,  .st-key-contact-container{
+.st-key-text-container,  .st-key-contact-container, .st-key-perf-container {
   /*width:  100vw;
   max-width: var(--max-width-content);*/
   overflow-y: clip;
@@ -183,6 +183,10 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   border: 1px solid rgba(49, 80, 98, 0.2);
   border-radius: 0.5rem;
   box-sizing:border-box;
+}
+
+.st-key-perf-container {
+    overflow-x: clip;
 }
 
 .st-key-contact-container{

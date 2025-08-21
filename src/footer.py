@@ -1,6 +1,6 @@
 import streamlit as st
 
-from src.utils import config
+from src.helpers.utils import config
 
 
 def footer(footer_container):

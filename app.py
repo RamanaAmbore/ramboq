@@ -1,9 +1,7 @@
 # Import necessary modules and components
-import logging  # Module for logging events and messages
-
 import streamlit as st
 from PIL import Image  # PIL module for image handling
-from src.utils import get_image_bin_file  # Functions for setting background and styling
+from src.helpers.utils import get_image_bin_file  # Functions for setting background and styling
 
 from src.body import body
 from src.components import set_png_as_page_bg, markdown
@@ -11,9 +9,13 @@ from src.components import set_png_as_page_bg, markdown
 from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
 from src.header import header
-from src.logger import log_setup  # Custom logging setup
-from src.utils import css_style, get_path, \
+import os
+
+from src.helpers.utils import css_style, get_path, \
     config  # Utility functions for styling, accessing profile data, and image paths
+
+from src.helpers.logger import get_logger
+logger = get_logger(__name__)
 
 
 # Define the initial setup function to configure the Streamlit app
@@ -56,17 +58,15 @@ def initialize_app_state():
         # st.session_state.prev_active_nav = st.session_state.active_nav
         st.query_params["page"] = st.session_state.active_nav
 
-        st.session_state.logger = log_setup()  # Set up the logger
-        logging.info('Logging setup')  # Log an informational message
 
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
+    print("Before:", os.getcwd())
     initial_setup()  # Call the setup function to configure the app
 
     nav_container = st.container(key="navbar-container")
-    body_container = st.empty()
     body_container = st.container(key="body-container")
     footer_container = st.container(key='footer-container')
 

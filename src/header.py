@@ -1,7 +1,7 @@
 import streamlit as st
 from src.components import container
-from src.utils import config
-from src.utils import get_path, capitalize
+from src.helpers.utils import config
+from src.helpers.utils import get_path, capitalize
 
 nav_labels = config['nav_labels']
 logo = get_path(config['logo'])

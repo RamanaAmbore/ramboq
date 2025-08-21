@@ -2,17 +2,30 @@ import base64
 import functools
 import logging
 import random
+import shutil
 import smtplib
+from collections import defaultdict
 from datetime import date
+from decimal import Decimal, ROUND_DOWN
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
+from pathlib import Path
+from datetime import datetime, timedelta
 
+import pandas as pd
+import pyotp
 import streamlit
 import yaml
 from PIL import Image
+import sys
+import os
 
-
+# parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# # Add to sys.path if not already there
+# if parent_dir not in sys.path:
+#     sys.path.insert(0, parent_dir)
+# print(sys.path)
 # Function to get the path of an image file
 def get_path(file):
     # Return the appropriate path based on whether the image is a certificate
@@ -56,7 +69,7 @@ with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as f
 with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     secrets = yaml.safe_load(file)  # Load YAML config file
 
-isd_codes = [f"{item['country']} ({item['code']})" for item in config['isd_codes']]
+isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
 
 @streamlit.cache_resource
@@ -88,13 +101,6 @@ def debug_wrapper(function):
 
     return wrapper
 
-
-def get_selected_colors(lst, size):
-    """
-    Select a random subset of colors from a list.
-    If the list is smaller than the requested size, repeat elements.
-    """
-    return random.sample(lst, size) if len(lst) > size else random.choices(lst, size)
 
 
 @streamlit.cache_resource
@@ -130,39 +136,6 @@ def get_labels(name, label='label'):
     """
     section = constants[name]
     return [capitalize(vals[label] if label in vals else key) for key, vals in section.items()]
-
-
-@streamlit.cache_resource
-def get_darker_color(hex_color, factor=0.75):
-    """
-    Darken a given hex color by a specified factor.
-    Factor should be between 0 (black) and 1 (original color).
-    """
-    if not (0 <= factor):
-        raise ValueError("Factor must be between 0 and 1")
-
-    # Convert hex color to RGB
-    hex_color = hex_color.lstrip('#')
-    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
-
-    # Apply the factor to each channel
-    r = int(r * factor)
-    if r > 255: r = 255
-    g = int(g * factor)
-    if g > 255: g = 255
-    b = int(b * factor)
-    if b > 255: b = 255
-
-    # Clamp values between 0 and 255 and return the new hex color
-    return f"#{r:02x}{g:02x}{b:02x}"
-
-
-@streamlit.cache_resource
-def get_darker_colors(hex_color_list, factor=0.75):
-    """
-    Darken a list of hex colors by a specified factor.
-    """
-    return [get_darker_color(color, factor) for color in hex_color_list]
 
 
 @streamlit.cache_resource
@@ -260,6 +233,126 @@ def send_email(name, to_email, query, phone="", subject="", test=False):
         return False, err_msg
 
 
+def generate_totp(totp_key):
+    """Generate a valid TOTP using the secret key."""
+    return pyotp.TOTP(totp_key).now()
+
+
+def to_decimal(value, precision="0.01"):
+    """Convert float to Decimal with specified precision."""
+    return Decimal(value).quantize(Decimal(precision), rounding=ROUND_DOWN)
+
+
+def delete_folder_contents(folder_path):
+    """Deletes all files and subdirectories inside the specified folder."""
+    folder = Path(folder_path)
+
+    if not folder.exists() or not folder.is_dir():
+        print(f"Folder '{folder_path}' does not exist or is not a directory.")
+        return False
+
+    success = True
+    for item in folder.iterdir():
+        try:
+            if item.is_file() or item.is_symlink():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+        except Exception as e:
+            print(f"Failed to delete {item}: {e}")
+            success = False
+    return success
+
+
+def read_file_content(file_path, file_extension):
+    """Reads the content of a file based on its extension."""
+    try:
+        if file_extension == "txt":
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        elif file_extension == "csv":
+            return pd.read_csv(file_path)  # Convert DataFrame to string
+        elif file_extension == "xlsx":
+            return pd.read_excel(file_path)  # Convert DataFrame to string
+        else:
+            print(f"Unsupported file format: {file_extension}")
+            return ""
+    except Exception as e:
+        print(f"Error reading file {file_path}: {e}")
+        return ""
+
+
+def parse_value(value: str, target_type: type = None):
+    """Converts a string into its appropriate data type or a specified type."""
+
+    if value is None: return None
+    value = value.strip()
+    if value == 'None': return None
+
+    if value == "":
+        return ""  # Return empty string for empty input
+
+    if target_type:
+        try:
+            if target_type is bool:
+                return value.lower() == "true"
+            return target_type(value)
+        except (ValueError, TypeError):
+            raise ValueError(f"Cannot convert '{value}' to {target_type.__name__}")
+
+    if value.lower() in ("true", "false"):
+        return value.lower() == "true"
+
+    if value.isdigit() or (value[0] in "+-" and value[1:].isdigit()):
+        return int(value)
+
+    try:
+        return float(value)
+    except ValueError:
+        return value
+
+
+def create_instr_symbol_xref(data, xref, reverse_key=None, use_type=set):
+    symbol_id_xref = reverse_dict(data, reverse_key, use_type)
+    instr_id_xref = {}
+    for key, val in symbol_id_xref.items():
+        instr_id_xref[xref[key]['instrument_token']] = val
+    return symbol_id_xref, instr_id_xref
+
+
+def reverse_dict(data, reverse_key=None, use_type=set):
+    if use_type is None:
+        multi_set_dict = dict()
+    else:
+        multi_set_dict = defaultdict(use_type)
+
+    for key, val in data.items():
+        temp_key = val[reverse_key]
+        if use_type is None:
+            multi_set_dict[temp_key] = key
+        else:
+            multi_set_dict[temp_key].add(key)
+
+    if use_type is None:
+        return multi_set_dict
+    else:
+        return dict(multi_set_dict)
+
+
+def rec_to_dict(record):
+    return {k: v for k, v in record.__dict__.items() if not k.startswith('_')} if record else {}
+
+def get_closing_date():
+    now = datetime.now()
+    today_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
+
+    if now >= today_8am:
+        dt= now.date()
+    else:
+        dt= (now - timedelta(days=1)).date()
+    return dt
+
+
 if __name__ == "__main__":
     # Test run
     name = "Rambo"
@@ -272,3 +365,6 @@ if __name__ == "__main__":
         print("✅ Email sent successfully!")
     else:
         print("❌ Failed to send email:", msg)
+
+
+
