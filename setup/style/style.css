@@ -159,9 +159,10 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   overflow-y: clip;
   overflow-x: clip;
   scrollbar-width: none;
+  scrollbar-height: none;
   display: flex;
   flex: 1 1 auto;
-  align-items: center;
+  align-items: top;
   margin-top: 2rem !important;
   margin-bottom: 0rem !important;
   margin-left: 0rem !important;

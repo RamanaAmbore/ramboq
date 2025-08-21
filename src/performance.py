@@ -9,20 +9,19 @@ def get_books(dt):
 
 def performance(body_container):
     with body_container:
-        with st.container(key="perf-container"):
             df_books, df_positions, df_holdings, df_margin = get_books(get_closing_date())
 
             tabs = st.tabs(["Portfolio", "Holdings", "Positions", "Cash"])
 
             with tabs[0]:
-                st.dataframe(df_books, height=600,use_container_width=True)
+                st.dataframe(df_books)
 
             with tabs[1]:
-                st.write(df_holdings, height=600,use_container_width=True)
+                st.write(df_holdings)
 
             with tabs[2]:
-                st.dataframe(df_positions, height=600,use_container_width=True)
+                st.dataframe(df_positions)
 
             with tabs[3]:
-                st.dataframe(df_margin, height=600,use_container_width=True)
+                st.dataframe(df_margin)
 
