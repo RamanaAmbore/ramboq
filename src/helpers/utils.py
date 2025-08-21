@@ -72,7 +72,7 @@ with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as 
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def get_image_bin_file(file):
     """
     Encodes an image file as a Base64 string for embedding in HTML.
@@ -103,7 +103,7 @@ def debug_wrapper(function):
 
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def get_config(name):
     """
     Retrieve a section from the config dictionary and return its keys and values.
@@ -112,7 +112,7 @@ def get_config(name):
     return list(section.keys()), list(section.values())
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def get_profile(name):
     """
     Retrieve a section from the profile dictionary and return its keys and values.
@@ -121,7 +121,7 @@ def get_profile(name):
     return list(section.keys()), list(section.values())
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def capitalize(text):
     """
     Capitalize text if it doesn't already contain uppercase characters.
@@ -129,7 +129,7 @@ def capitalize(text):
     return text if isinstance(text, (int, float)) or any([x.isupper() for x in text]) else text.title()
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def get_labels(name, label='label'):
     """
     Get a list of capitalized labels for a given profile section.
@@ -138,7 +138,7 @@ def get_labels(name, label='label'):
     return [capitalize(vals[label] if label in vals else key) for key, vals in section.items()]
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def word_width(text, cap_factor=0.28, small_factor=0.17):
     caps = 0
     smalls = 0
@@ -150,7 +150,7 @@ def word_width(text, cap_factor=0.28, small_factor=0.17):
     return caps * cap_factor + smalls * small_factor
 
 
-@streamlit.cache_resource
+@streamlit.cache_data
 def hover_split(text, size=40):
     lines = []
     line = ''

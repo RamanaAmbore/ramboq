@@ -4,7 +4,7 @@ from src.helpers import kite_connect
 from src.helpers.utils import get_closing_date
 
 
-@st.cache_resource
+@st.cache_data
 def get_books(dt):
     return kite_connect.get_books()
 
