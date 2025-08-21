@@ -185,6 +185,9 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
   border-radius: 0.5rem;
   box-sizing:border-box;
 }
+.stDataFrameGlideDataEditor {
+border: 1px solid rgba(49, 80, 98, 0.2);
+}
 
 .st-key-perf-container {
     overflow-x: clip;
