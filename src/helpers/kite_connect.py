@@ -161,7 +161,7 @@ class KiteConnection():
                 self.holdings["account"] = self.account
                 self.holdings["type"] = "H"
         except Exception as e:
-            print(f"[{self.account}] Failed to fetch holdings: {e}")
+            logger.info(f"[{self.account}] Failed to fetch holdings: {e}")
 
         # ✅ Positions
         try:
@@ -171,7 +171,7 @@ class KiteConnection():
                 self.positions["account"] = self.account
                 self.positions["type"] = "P"
         except Exception as e:
-            print(f"[{self.account}] Failed to fetch positions: {e}")
+            logger.info(f"[{self.account}] Failed to fetch positions: {e}")
 
         # ✅ Margins (Cash)
         try:
@@ -181,7 +181,7 @@ class KiteConnection():
                 self.margins["account"] = self.account
                 self.margins["type"] = "C"
         except Exception as e:
-            print(f"[{self.account}] Failed to fetch margins: {e}")
+            logger.info(f"[{self.account}] Failed to fetch margins: {e}")
         self.update_books()
 
     def update_books(self):
@@ -207,7 +207,82 @@ def get_books():
     df_positions = pd.concat(positions, ignore_index=True)
     df_holdings = pd.concat(holdings, ignore_index=True)
     df_margin = pd.concat(margins, ignore_index=True)
+
+    # Column mapping: original → renamed
+    rename_map = {
+        "tradingsymbol": "Symbol",
+        "opening_quantity": "Qty",
+        "average_price": "I Price",
+        "pnl": "P&L",
+        "close_price": "C Price",
+        "day_change": "ΔPrice",
+        "day_change_percentage": "ΔPrice%",
+        "authorised_date": "Date",
+        "account": "Account"
+    }
+
+    # Extract required columns and rename
+    df_holdings = df_holdings[list(rename_map.keys())].rename(columns=rename_map)
+
+    # Add calculated columns
+    df_holdings["Inv Val"] = df_holdings["I Price"] * df_holdings["Qty"]
+    df_holdings["Cur Val"] = df_holdings["Inv Val"] + df_holdings["P&L"]
+
+    # Δ calculation (delta value)
+    df_holdings["Δ Val"] = df_holdings["ΔPrice"] * df_holdings["Qty"]
+
+    # Round numeric columns to 2 decimals
+    for col in ["Qty", "I Price", "P&L", "C Price", "Δ Val", "ΔPrice", "ΔPrice%", "Inv Val", "Cur Val"]:
+        df_holdings[col] = df_holdings[col].round(2)
+
+    # Format Date column
+    df_holdings["Date"] = pd.to_datetime(df_holdings["Date"]).dt.strftime("%d%b%y")
+
+    # Compute totals row: sum for P&L, Δ Val, Inv Val, Cur Val; other columns blank
+    totals = {col: "" for col in df_holdings.columns}  # default blank for all
+    totals["Symbol"] = "TOTAL"
+    totals["P&L"] = df_holdings["P&L"].sum().round(2)
+    totals["Δ Val"] = df_holdings["Δ Val"].sum().round(2)
+    totals["Inv Val"] = df_holdings["Inv Val"].sum().round(2)
+    totals["Cur Val"] = df_holdings["Cur Val"].sum().round(2)
+
+    # Prepend totals row
+    df_holdings = pd.concat([pd.DataFrame([totals]), df_holdings], ignore_index=True)
+
+
+
+    # Apply formatting to all columns
+    for col in df_holdings.columns:
+        df_holdings[col] = df_holdings[col].apply(format_number_indian)
+
     return df_books, df_positions, df_holdings, df_margin
+def format_number_indian(x):
+    if isinstance(x, (int, float)):
+        sign = "+" if x >= 0 else "-"
+        x_abs = abs(x)
+
+        # Split integer and decimal parts
+        int_part, dec_part = f"{x_abs:.2f}".split(".")
+
+        # Indian-style grouping
+        if len(int_part) > 3:
+            # Last 3 digits remain as is
+            last3 = int_part[-3:]
+            rest = int_part[:-3]
+            # Group remaining digits in pairs
+            rest_groups = []
+            while len(rest) > 2:
+                rest_groups.insert(0, rest[-2:])
+                rest = rest[:-2]
+            if rest:
+                rest_groups.insert(0, rest)
+            int_part_formatted = ",".join(rest_groups + [last3])
+        else:
+            int_part_formatted = int_part
+
+        return f"{sign}{int_part_formatted}.{dec_part}"
+
+    return str(x)
 
 if __name__ == "__main__":
     connections = get_connections()

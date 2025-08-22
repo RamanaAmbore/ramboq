@@ -39,7 +39,8 @@ def performance(body_container):
 
         with tabs[2]:
             st.dataframe(style_dataframe(df_holdings), use_container_width=True,
-                         column_config={col: st.column_config.TextColumn(col, width="small") for col in df_holdings.columns})
+                         column_order=("Symbol",	"P&L", "Δ Val", "Inv Val", "Cur Val", "Qty",	"I Price",		"C Price",	"ΔPrice",	"ΔPrice%",	"Date",	"Account"			),
+                         column_config={col: st.column_config.TextColumn(col, width=None ) for col in df_holdings.columns})
 
         with tabs[3]:
             st.dataframe(style_dataframe(df_positions), use_container_width=True,

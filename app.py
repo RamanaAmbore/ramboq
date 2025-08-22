@@ -63,7 +63,6 @@ def initialize_app_state():
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
-    print("Before:", os.getcwd())
     initial_setup()  # Call the setup function to configure the app
 
     nav_container = st.container(key="navbar-container")
