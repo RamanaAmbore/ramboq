@@ -83,7 +83,6 @@ header {
   text-shadow: var(--shadow-text-light);
   font-size: var(--font-size-sm) !important;
   box-shadow: var(--shadow-box-sides);
-  max-height: 5rem !important;
 }
 
 .st-key-navbar-desktop-container  {
