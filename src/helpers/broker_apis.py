@@ -14,9 +14,9 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
     try:
         df_holdings = pd.DataFrame(kite.holdings())
 
-        if not holdings.empty:
-            holdings["account"] = account
-            holdings["type"] = "H"
+        if not df_holdings.empty:
+            df_holdings["account"] = account
+            df_holdings["type"] = "H"
     except Exception as e:
         logger.error(f"[{account}] Failed to fetch holdings: {e}")
 
@@ -26,9 +26,9 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
 
     # Δ calculation (delta value)
     df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["average_price"]
-
+    # print(df_holdings.columns)
     # Format Date column
-    df_holdings["Date"] = pd.to_datetime(df_holdings["Date"]).dt.strftime("%d%b%y")
+    df_holdings["authorised_date"] = pd.to_datetime(df_holdings["authorised_date"]).dt.strftime("%d%b%y")
 
     return df_holdings
 
@@ -38,11 +38,11 @@ def fetch_positions(connections=Connections, account=None, kite=None):
     # ✅ Positions
     df_positions = pd.DataFrame()
     try:
-        positions = pd.DataFrame(kite.positions()["net"])  # "day" also available
+        df_positions = pd.DataFrame(kite.positions()["net"])  # "day" also available
 
-        if not positions.empty:
-            positions["account"] = account
-            positions["type"] = "P"
+        if not df_positions.empty:
+            df_positions["account"] = account
+            df_positions["type"] = "P"
     except Exception as e:
         logger.error(f"[{account}] Failed to fetch positions: {e}")
 

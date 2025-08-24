@@ -159,8 +159,6 @@ def shutdown_logger():
 
 # --- Example usage ---
 if __name__ == "__main__":
-    os.chdir("..")  # Move up a directory for testing
-    print("cwd:", os.getcwd())
 
     logger1 = get_logger("module1")
     logger2 = get_logger("module2")

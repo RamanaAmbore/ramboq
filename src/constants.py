@@ -1,20 +1,6 @@
 import streamlit as st
 
-holdings_map = {
-    "type": {"tradingsymbol": False,
-             "opening_quantity":  True,
-             "average_price":  True,
-             "pnl":  True,
-             "close_price":  True,
-             "day_change":  True,
-             "day_change_percentage":  True,
-             "authorised_date": False,
-             "account":  False,
-             "inv_val": True,
-             "cur_val": True,
-             "day_change_val": True,
-             },
-    "column_config": {
+holdings_config =         {
         "tradingsymbol": st.column_config.TextColumn(
             "Symbol",
             help="Trading Symbol"
@@ -64,7 +50,7 @@ holdings_map = {
             help="Account Number with Broker"
         )
     }
-}
+
 
 positions_map = {
     "rename": {"tradingsymbol": "Symbol",
