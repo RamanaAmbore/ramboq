@@ -2,7 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from src.settings import constants_manager as const
-from src.helpers.logger import get_logger
+from src.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
 

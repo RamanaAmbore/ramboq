@@ -1,18 +1,18 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from src.helpers.utils import config
+from src.helpers.utils import ramboq_config
 
 
 def faq(body_container):
     with body_container:
         with st.container(key='text-container'):
-            st.write(config['faq'])
-            st.write(config['nav_flow_title'])
-            mermaid_write(config['nav_flow'], height=400)
-            st.write(config['redemption_flow_title'])
-            mermaid_write(config['redemption_flow'], height=300)
-            st.write(config['succession_flow_title'])
-            mermaid_write(config['succession_flow'], height=300)
+            st.write(ramboq_config['faq'])
+            st.write(ramboq_config['nav_flow_title'])
+            mermaid_write(ramboq_config['nav_flow'], height=400)
+            st.write(ramboq_config['redemption_flow_title'])
+            mermaid_write(ramboq_config['redemption_flow'], height=300)
+            st.write(ramboq_config['succession_flow_title'])
+            mermaid_write(ramboq_config['succession_flow'], height=300)
 
 
 def mermaid_write(mermaid_code, height=500):

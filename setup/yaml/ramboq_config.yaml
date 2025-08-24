@@ -1,0 +1,456 @@
+about: |
+    ### About Rambo Quant Investments LLP
+
+    **Invest. Grow. Compound.** — not just a mantra, but the core DNA that drives every decision we make.
+    
+    **Rambo Quant Investments LLP** is helmed by a seasoned FinTech professional with **25+ years** of proven success in active investing and trading across both **U.S. and Indian markets**. What started in **1998** as a deep, hands-on exploration of equities and derivatives has evolved into a **precision-driven investment powerhouse** built on data, discipline, and performance.
+    
+    The founder’s credentials speak for themselves — **FRM Certified**, **CFA Level II**, **PGCBM from XLRI**, and a **Master’s in Computer Science** — matched with decades of cutting-edge innovation in financial technology for capital markets.
+    
+    With a **long-term portfolio XIRR exceeding 22%**, Rambo's approach blends **high-conviction stock picks** with **strategic covered calls** and **intelligent derivatives positioning**. Every move is grounded in deep analytics, rigorous risk management, and an unwavering commitment to the power of compounding.
+    
+    **Rambo Quant** is not for those content with average, index-like returns. It’s built for partners who demand more — **smarter strategies, sharper execution, and sustainable wealth creation**.
+
+contact: |
+  ### Contact Form
+
+faq: |
+  ### Rambo Quant Investments LLP — Frequently Asked Questions (FAQ)
+
+  #### What is Rambo Quant Investments LLP?
+  A Limited Liability Partnership where partners pool capital, managed by *Active Partners* and a *Fund Manager*.  The LLP invests in *growth-oriented equity with covered call and other derivative (F&O) strategies*.  
+  
+  #### Who can become a partner?
+  Any **Indian citizen**, **Non-Resident Indian (NRI)**, or **Overseas Citizen of India (OCI)** meeting the LLP’s eligibility criteria.
+  
+  #### Suitability
+  Ideal for individuals who:
+  - Seek *active, above-average returns*.
+  - Face restrictions on direct equity or derivative investments.
+  - Accept annual redemption cycles and short-term volatility.
+  - Understand equity and derivatives risks.
+  
+  #### Minimum Contribution
+  - Capital contribution amounts are decided by the *Active Partners*.
+  - The first tier carries a *10% profit threshold*.
+  - For every additional tier of contribution, the profit threshold increases by *0.25%*.
+  
+  #### Profit Calculation
+  - Calculated annually on *31 March*.
+  - LLP expenses are deducted at actuals before NAV and profit calculation.
+  - Partners receive threshold return first.
+  - Excess profit split *50:50* between partner and LLP.
+  - LLP share is distributed between Active Partners and the Fund Manager.
+  - Profits are calculated *before tax*; LLP pays taxes before distribution.
+  
+  #### If Profits Are Below Threshold or There Is a Loss
+  - If annual profit is below threshold, the *closing NAV* becomes the new reference NAV for the next year.
+  - If there is a loss, no profit is distributed until NAV recovers to the *last reference NAV*.
+  
+  #### Redemption Rules
+  - Requests only once a year, submitted by *28 February*.
+  - Processed after *31 March* NAV calculation.
+  - No mid-year redemption.
+  - Mid-year contributions can be redeemed only after *31 March* of the following year.
+  
+  #### Post-Redemption NAV
+  After redemption, NAV is recalculated, and allocations for remaining partners are adjusted.
+  
+  #### Succession of Active Partners
+  > As the saying goes — *hope for the best, but always prepare for the worst*.  
+  > When it comes to partners’ hard-earned money, succession planning isn’t optional — it’s essential.
+  
+  - **Active Partner deciding to wind down** must give **at least 1 month’s written notice**, after which the LLP will be wound down and the NAV distributed to all partners.  
+  - **If incapacitated**, the partner with the **largest capital contribution** will assume the role of Active Partner.  
+  - The **new Active Partner** will have up to **1 month** to wind down the LLP and distribute the NAV.
+    
+  #### Management
+  Fund Manager executes strategies under Active Partners’ oversight.
+  
+  #### Taxation
+  - Profits taxed at LLP level under *current Indian law*; no further tax for partners in India.
+  - Avoids *double taxation*.
+  - For NRIs/OCIs, Indian tax applies; foreign tax rules may also apply per *DTAA*.
+  - Tax laws may change; partners should seek professional advice.
+  
+  #### NAV Calculation
+  - Official NAV: *31 March* annually.
+  - LLP expenses are deducted at actuals before NAV is declared.
+  - Interim NAV for reporting only; not used for profit distribution.
+  
+  #### Strategies
+  Growth-oriented equity with covered call and other derivative (F&O) strategies.  
+  
+  #### Lock-in
+  No fixed lock-in; redemption eligibility tied to *annual cycle*.
+  
+  #### Liability of Partners
+  - Each partner’s liability is *limited to the amount of capital contributed* to the LLP.
+  - Partners are *not personally liable* for the LLP’s debts, obligations, or investment losses beyond their committed capital.
+  - The LLP structure protects personal assets; however, partners remain responsible for their own *tax compliance* in their respective jurisdictions.
+  
+  #### Joining Process
+  - Sign LLP agreement.
+  - Transfer investment.
+  - Mid-year joiners eligible for redemption after *31 March* of the following year.
+  
+  Please reach each out to us at contact@ramboq.com for any additional details.
+  
+nav_flow_title: |
+  ### NAV & Profit Distribution Flow
+nav_flow: |
+    flowchart TD
+        A[Capital Contribution by Partners] --> B[Investments in Growth-Oriented Equity + Covered Call + F&O Strategies]
+        B --> C[31 March: Calculate LLP NAV]
+        C --> D[Deduct LLP Expenses at Actuals]
+        D --> E[Calculate Profit Before Tax]
+        E --> F[Compare NAV Growth with Profit Threshold]
+        F -->|Below Threshold| G[Closing NAV Becomes New Reference NAV]
+        F -->|Above Threshold| H[Distribute Threshold Return First]
+        H --> I[Excess Profit Split 50:50 Between Partner & LLP]
+        I --> J[LLP Share Split Between Active Partners & Fund Manager]
+        G --> K[Carry Forward NAV Until Recovery to Reference NAV]
+  
+redemption_flow_title: |
+  ### Redemption Flow
+redemption_flow: |
+  flowchart TD
+      A[Partner Decides to Redeem] --> B[Check if Contribution is Mid-Year]
+      B -->|Mid-Year Contribution| H[Eligible Only After 31 March of Next Year]
+      B -->|Not Mid-Year| C[Submit Request by 28 Feb]
+      C -->|Missed Deadline| D[Wait Until Next Year's 28 Feb]
+      C -->|On Time| E[Process After 31 March NAV Calculation]
+      E --> F[Adjust NAV Post Redemption]
+      F --> G[Reallocate Remaining Partner Units]
+      G --> I[Capital Transfer to Redeeming Partner]
+succession_flow_title: |
+  ### Succession Flow
+succession_flow: |
+  flowchart TD
+    A[Active Partner decides wind down or Is Incapacitated] --> B[1-Month Written Notice or Incapacity Trigger]
+    B --> C[Identify Partner with Largest Capital Contribution]
+    C --> D[New Active Partner Decides Within 1 Month]
+    B -->|Wind Down| F[Distribute NAV & Profits to All Partners]
+    D --> F
+
+default_nav_label: 'about'
+nav_labels:
+  - "about"
+  - "market"
+  - "performance"
+  - "faq"
+  - "post"
+  - "contact"
+favicon: favicon.png
+logo: logo.png
+footer_name: Rambo Quant Investments LLP
+footer_mobile_text2: Markets carry risk.
+footer_desktop_text2: LLDIN00123456
+footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."
+market_prompt: |
+    Use the following prompt #marketreport with proper formatting, current data, and structure and generate response:
+    Latest #marketreport Prompt Template
+    Generate a daily market report for today with the following structure: 1. *Market Summary* — A quick bullet list of the closing prices and key market highlights including: - NIFTY 50, SENSEX, Dow Jones, NASDAQ (with index closing values in bold brackets) - Gold, Silver, Copper spot prices - USD/INR exchange rate, VIX. Double check the data and show only closing prices as I am seeing many errors.  Give market commentary after the stats. 2. *Derivatives*  — key stats for derivative underlyings in India and USA. Mention any event that has impact on derivative prices. 3. *Portfolio Highlights* — Include only the top stocks from [portfolio] that have major corporate actions or significant moves: - Use name, price in ₹ (bolded), and 1-line description of the event 4. *Insights & Outlook* — Add bullet points on overall market sentiment, sector drivers, and what to watch for tomorrow.
+    
+    Mention at the end disclaimer  - Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions.
+    
+    Bold all stock prices (e.g., *₹ 1,450.40*) with thin space after symbol - Ensure all key stock/index/ETF mentions have prices in brackets - Use simple markdown-friendly formatting - Avoid promotional tone — keep it informative and concise. Additional rules: Here's the additional prompt instruction - always wrap prices in markdown bold without using any non-breaking or Unicode spaces between the currency symbol and the number. ✅ Use *₹1,450.40* or *$1,234.56* 🚫 Avoid formats like *₹ 1,450.40* (contains thin or non-breaking space which breaks bold formatting). Show India market and stock news first followed by world market and stock news in each section. Double check the numbers like closing and stock prices from multiple sources. Show title in H3 and section names in H4.
+    
+    Don't show any emojis or icons in headings.
+    
+    Give the output with markdown tags which I can copy paste in code for my website and in markdown format to paste in whatsapp.
+    
+    
+    #portfolio:
+    📄 Cleaned Stocklist (Equity & ETFs)
+    ETF:
+    • GOLDBEES-E – Gold Benchmark Exchange-Traded Scheme
+    • SILVERBEES – Nippon India Silver ETF
+    Equity Holdings:
+    • ABFRL – Aditya Birla Fashion and Retail 
+    • ABLBL – Aditya Birla Lifestyle Brands 
+    • ACE – Action Construction Equipment 
+    • ACMESOLAR
+    • ACUTAAS
+    • ADANIGREEN – Adani Green Energy 
+    • ADANIPORTS – Adani Ports and SEZ 
+    • ANANTRAJ – Anant Raj 
+    • ASMTECPP-X
+    • ASTRAMICRO – Astra Microwave Products 
+    • ATGL – Adani Total Gas 
+    • AVANTEL – Avantel 
+    • BATAINDIA – Bata India 
+    • BDL – Bharat Dynamics 
+    • BEL – Bharat Electronics 
+    • BEML – BEML 
+    • BHEL – Bharat Heavy Electricals 
+    • CAPLIPOINT – Caplin Point Laboratories 
+    • CEINSYSTECH – Ceinsys Tech 
+    • CGPOWER – CG Power and Industrial Solutions 
+    • DATAPATTNS – Data Patterns (India) 
+    • DIXON – Dixon Technologies 
+    • GENUSPOWER – Genus Power Infrastructures 
+    • GMDC– Gujarat Mineral Development Corp. 
+    • GOLDBEES-E – [already listed under ETF]
+    • GRAVITA – Gravita India 
+    • GRSE – Garden Reach Shipbuilders & Engineers 
+    • GVT&D
+    • HAL – Hindustan Aeronautics 
+    • HCC-T – Hindustan Construction Co. 
+    • HIGHENE-XT
+    • HIKAL – Hikal 
+    • IDEAFORGE – ideaForge Technology 
+    • IDFCFIRSTB – IDFC First Bank 
+    • IFCI – IFCI 
+    • INDHOTEL – Indian Hotels Co. 
+    • INDIAMART – IndiaMART InterMESH 
+    • INOXINDIA
+    • INOXWIND – Inox Wind 
+    • IRCTC – Indian Railway Catering and Tourism Corp.
+    • IREDA – Indian Renewable Energy Development Agency 
+    • IRCON – Ircon International 
+    • IRFC – Indian Railway Finance Corp.
+    • JIOFIN – Jio Financial Services 
+    • JUBLPHARMA – Jubilant Pharmova 
+    • KAYNES – Kaynes Technology India 
+    • KOPRAN – Kopran 
+    • KPITTECH – KPIT Technologies 
+    • LAURUSLABS – Laurus Labs 
+    • MAPMYINDIA – C.E. Info Systems 
+    • MANINDS – Man Industries 
+    • MARINE-BE – Marine Electricals 
+    • MAZDOCK – Mazagon Dock Shipbuilders 
+    • MCX – Multi Commodity Exchange of India 
+    • MIDHANI – Mishra Dhatu Nigam 
+    • MMTC – MMTC 
+    • MTNL – Mahanagar Telephone Nigam 
+    • NEULANDLAB – Neuland Laboratories 
+    • NH – Narayana Hrudayalaya 
+    • NIBE – Nibe 
+    • NMDC – NMDC 
+    • OLECTRA – Olectra Greentech 
+    • OPTIEMUS – Optiemus Infracom 
+    • PARAS – Paras Defence & Space Technologies 
+    • PCJEWELLER – PC Jeweller 
+    • PFC – Power Finance Corporation 
+    • PGEL – PG Electroplast 
+    • POLYMED – Poly Medicure 
+    • PREMEXPLN – Premier Explosives 
+    • RAILTEL – RailTel Corporation of India 
+    • RAYMOND – Raymond 
+    • RAYMONDREL – Raymond Realty 
+    • REC– REC 
+    • RELINFRA-T – Reliance Infrastructure 
+    • RIR – Rane (Madras)  or similar
+    • RPOWER-T – Reliance Power 
+    • RVNL – Rail Vikas Nigam 
+    • SCHNEIDER-T – Schneider Electric Infrastructure 
+    • SCI – Shipping Corporation of India 
+    • SHAKTIPUMP – Shakti Pumps (India) 
+    • SIKA – Sika Interplant Systems 
+    • SJVN – SJVN 
+    • SOLARINDS – Solar Industries 
+    • SOUTHBANK – South Indian Bank 
+    • STCINDIA-T – State Trading Corporation of India 
+    • SUZLON – Suzlon Energy 
+    • SWSOLAR – Sterling & Wilson Renewable Energy 
+    • SYRMA – Syrma SGS Technology 
+    • TATATECH – Tata Technologies 
+    • TATAELXSI – Tata Elxsi 
+    • TITAGARH – Titagarh Rail Systems 
+    • TITAN – Titan Company 
+    • TRENT – Trent 
+    • UNIMECH-T – Unimech Industries 
+    • ZENTEC – Zen Technologies
+    • Advait Energy Transitions
+    • Aurionpro Solutions
+    • Black Box
+    • Ceinsys Tech
+    • E2E Networks
+    • Netweb Technologies
+    • Shilchar Technologies
+    • Techno Electric & Engineering
+    • Tejas Networks
+    • Waaree Energies
+    • Websol Energy System
+    • SOFI 
+
+post: |
+  ### ⚡ Energy Storage Potential in India: Pumped Hydro vs. Battery Storage
+  
+  **18 Aug 2025 · Ramana Ambore (Rambo)**
+  
+  #### Why Energy Storage Matters
+  India’s renewable energy mix is increasingly dependent on *solar (daytime)* and *wind (seasonal, nighttime peaks)*.  
+  This volatility creates a mismatch between generation and demand. To ensure **Round-the-Clock (RTC)** renewable power, large-scale storage solutions are essential. Both *Battery Energy Storage Systems (BESS)* and *Pumped Hydro Storage (PHS)* are emerging as the backbone of India’s energy transition.
+  
+  #### Battery Energy Storage Systems (BESS)
+  
+  *Characteristics:*  
+  - Duration: *1–4 hours*  
+  - Response: *Milliseconds* (perfect for frequency regulation, balancing, and peak shaving)  
+  - Modular and scalable, easy to deploy near load centers  
+  - Costs declining rapidly (80% drop since 2015)
+  
+  *Key Players in India:*  
+  - *ReNew Power* → won large-scale BESS tenders integrated with RE.  
+  - *JSW Energy* → targeting ~*1 GWh* of BESS.  
+  - *Tata Power* → deploying battery-based grid support projects.  
+  - *Amp Energy & Greenko* → integrating BESS with hybrid RE projects.
+  
+  *Use Case:* Firming up *solar/wind parks*, reducing curtailment, improving grid stability, and supporting **green hydrogen electrolysis**.
+  
+  #### Pumped Hydro Storage (PHS)
+  
+  *Characteristics:*  
+  - Duration: *6–10+ hours*  
+  - Lifetime: *40–60 years* (far longer than batteries)  
+  - Lowest cost per kWh for long-duration shifting  
+  - Requires favorable geography and long build times (5–7 years)
+  
+  *Key Players in India:*  
+  - *Greenko* → developing a massive *50 GWh* PHS pipeline.  
+  - *JSW Energy* → planning ~*6 GW* of pumped storage.  
+  - *NHPC* → leveraging hydro expertise for new PHS projects.
+  
+  *Use Case:* Deliver *baseload-like renewable power*, hedge against seasonal solar/wind volatility, and supply nighttime industrial demand.
+  
+  *Potential for ACME:* Coupling ACME’s solar/wind projects with PHS enables *true 24×7 renewable energy*—critical for export-grade hydrogen and ammonia contracts.
+  
+  #### Comparative Snapshot
+  
+  | Feature            | BESS                          | Pumped Hydro (PHS)            |
+  |--------------------|-------------------------------|--------------------------------|
+  | *Duration*         | 1–4 hrs                       | 6–10+ hrs                     |
+  | *Response Time*    | Milliseconds                  | Minutes                       |
+  | *CapEx Trend*      | Falling fast                  | Stable, site-specific         |
+  | *Lifetime*         | ~10–15 yrs                    | 40–60 yrs                     |
+  | *Scalability*      | Modular, urban-friendly       | Requires geography, water     |
+  | *Best Fit*         | Grid balancing, RTC blending  | Long-duration bulk storage    |
+  
+  #### Outlook for India
+  - *BESS* will dominate short-duration applications—grid balancing, peak shaving, and distributed renewable projects.  
+  - *PHS* will anchor *large-scale, long-duration storage*, especially in states with suitable sites (Andhra Pradesh, Karnataka, Maharashtra).  
+  - Together, they provide the *firm power backbone* that companies like *ReNew, Greenko, JSW, and Tata Power* require to stabilize renewable portfolios.
+  
+  #### Conclusion
+  As India moves towards its 500 GW renewable energy target by 2030, the synergy between **BESS and PHS** is not a competition, but a complement.  
+  
+  *ACME’s leadership in solar and green ammonia* positions it uniquely to benefit from both technologies—*BESS for short-term flexibility* and *PHS for deep, long-duration firming*.  
+  
+  This dual approach ensures bankability, reduces curtailment, and supports India’s vision of becoming a **global hub for green hydrogen and ammonia exports**.
+
+  ⚠ **Disclaimer:** These are personal opinions of the author and should not be taken as investment advice.
+  
+  ---
+
+  ### Navigating Market Uncertainty: A Long-Term Indian Growth Story  
+  **16 Aug 2025 · Ramana Ambore (Rambo)**
+
+
+
+  #### Global Trade Tensions and Market Outlook  
+
+  Considering the impact of Trump’s tariffs, I don’t see any major up move in the market for the next one year unless the tariff wars subside. The market is likely to remain volatile, reacting heavily to global news, but without a clear directional breakout.  
+
+  #### Currency Dynamics – Rupee’s Role  
+
+  On the dollar–rupee conversion rate, I believe the rupee has been depreciated purposefully to offset the impact of tariffs. However, from Prime Minister Modi’s Red Fort speech, it appears that this may not be the long-term path he envisions.  
+
+  #### India’s Strategic Focus – Building Domestic Strength  
+
+  The government’s clear priority lies in strengthening manufacturing, defense, electronics, and data centers while boosting domestic consumption. Textile exports are already under pressure. Chemicals and pharma could be next in line, and perhaps even services—it’s no longer surprising. That is why I avoided export-oriented sectors from the beginning.  
+
+  #### Trading Strategy – Cushioning Portfolio Risks  
+
+  In this environment, the only practical way to generate returns is by leveraging short-term volatility. I see covered calls as a strong tool to generate consistent profits and cushion potential portfolio losses.  
+
+  #### Policy Shifts – The GST Factor  
+
+  A GST reduction could be a significant positive trigger for domestic manufacturing. Such a move would strengthen competitiveness and attract fresh investments into the Indian economy.  
+
+  #### India’s Long-Term Growth Story  
+
+  Despite near-term headwinds, India remains a strong long-term growth story over the next 10–15 years. The structural growth drivers are intact. For the short term, however, I don’t expect major gains—though the market has proven me wrong many times before. I sincerely hope it proves me wrong again this time.  
+
+  ⚠ Disclaimer: These are personal opinions of the author and should not be taken as investment advice.
+
+market: |
+  ### Market Report — Wednesday, August 13, 2025
+
+  #### Market Summary
+  
+  - **India Markets (Closing August 12, 2025, IST):**
+      - **NIFTY 50:** **₹24,487.40** (−0.40%) [close]
+      - **SENSEX:** **₹80,235.59** (−0.46%) [close]
+      - **India VIX:** **12.23** (+0.12%) [close]
+      - **USD/INR:** **₹87.61** [mid-market]
+      - **Gold (spot international):** **$3,345.00**/oz (declined—strong USD)
+      - **Silver (spot international):** **$37.90**/oz (steady)
+      - **Copper (LME cash):** **$4.39**/lb (LME $9,661.50/ton, steady to positive)[11][19]
+  
+  - **World Markets (Closing August 12, 2025, EDT):**
+      - **Dow Jones:** **$44,458.61** (+1.1%) [close]
+      - **NASDAQ:** **$21,681.90** (+1.4%) [close]
+      - **CBOE VIX:** **14.88** (−1.37%) [close]
+  
+  **Market Commentary:**  
+  Local indices slumped—dragged by financials and realty stocks—with defensive buying in IT, auto, and energy. Volatility increased slightly. Rupee held near record lows despite RBI presence, while US indices surged on softer inflation prints, driving global sentiment positively. Commodity prices were generally rangebound; gold dipped as dollar rallied, copper steadied post selloff.
+  
+  ---
+  
+  #### Derivatives
+  
+  - **India:**
+      - **NIFTY August Futures:** **₹24,550** (closed at premium to spot)[1]
+      - **India VIX:** **12.23** (+0.12%) [reflects increased option hedging]
+      - **Events Impacting Derivatives:** Ongoing rollovers ahead of F&O expiry (Aug 28); heavy trading in HAL, Infosys, Reliance stock futures.  
+      - **No major regulatory events reported.**
+  
+  - **USA:**
+      - **S&P 500, Nasdaq, Dow futures:** All saw upticks; boosted by tame CPI print and expectations for rate pause.
+      - **CBOE VIX:** **14.88** (down), signifying less demand for protection[7]
+      - **No sudden volatility events reported.**
+  
+  ---
+  
+  #### Portfolio Highlights
+  
+  Top [Portfolio] stocks with major moves/events:
+  
+  - **ADANIGREEN (Adani Green):**
+      - **₹[Unavailable]** — Reported robust renewable capacity additions; sector sentiment remains strong.
+  - **ADANIPORTS (Adani Ports & SEZ):**
+      - **₹[Unavailable]** — Continued profit growth from logistics; no dividend/split events.
+  - **IRCTC:**
+      - **₹[Unavailable]** — Issued EOI for new digital food aggregator; stock stable, platform expansion ongoing.
+  - **GOLDBEES-E (Gold ETF):**
+      - **₹100,318** (MCX gold contract reference)[10] — Tracking gold, up YoY; mirrored dip due to USD strength.
+  - **SILVERBEES (Silver ETF):**
+      - **₹113,770** (spot reference for ETF)[10] — In line with global silver, slight uptick on day.
+  
+  **Note:** Only portfolio stocks with major events or price moves are listed. No other significant corporate actions reported.
+  
+  ---
+  
+  #### Insights & Outlook
+  
+  - **Market Sentiment:**  
+      - India: Defensive, awaiting F&O expiry and central bank cues. Select buying in autos/IT, profit booking in finance and realty.
+      - US/global: Bullish momentum driven by tame inflation; risk appetite returning.
+  
+  - **Sector Drivers:**  
+      - **Renewables:** Operational additions drive ADANIGREEN, sector allocations strong.
+      - **Logistics:** ADANIPORTS benefits from marine expansion.
+      - **Digital/rail/IT:** IRCTC expansion, stable tech demand.
+      - **Precious metals:** Weak gold, firm silver reflecting global macro swings.
+  
+  - **Watch for Tomorrow:**  
+      - Indian F&O expiries, RBI moves, Q1 results from financial and energy stocks.
+      - US: Producer price data, Fed commentary, tech earnings, continued inflation impact.
+      - Currency/commodities: Rupee moves near *₹88*, gold rangewatch, copper price resilience.
+  
+  ---
+  
+  _Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions._
+

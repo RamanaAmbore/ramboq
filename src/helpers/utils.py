@@ -1,36 +1,27 @@
 import base64
 import functools
 import logging
-import random
 import shutil
 import smtplib
 from collections import defaultdict
 from datetime import date
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_DOWN
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime, timedelta
 
 import pandas as pd
 import pyotp
-import streamlit
 import yaml
 from PIL import Image
-import sys
-import os
 
-# parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# # Add to sys.path if not already there
-# if parent_dir not in sys.path:
-#     sys.path.insert(0, parent_dir)
-# print(sys.path)
-# Function to get the path of an image file
+
 def get_path(file):
     # Return the appropriate path based on whether the image is a certificate
     if 'http' in file: return file
-    type = file.split('.')[1]
+    typ = file.split('.')[1]
     dirs = {'jpg': 'images/',
             'ico': 'images/',
             'png': 'images/',
@@ -39,7 +30,7 @@ def get_path(file):
             'pdf': 'resume/',
             'certificate': 'images/certificates/',
             'yaml': 'yaml/'}
-    return f"setup/{dirs[type]}/{file}"
+    return f"setup/{dirs[typ]}/{file}"
     # Custom dictionary class to handle keys with suffix matching
 
 
@@ -54,7 +45,7 @@ class CustomDict(dict):
 
 
 # Load profile data from a YAML file
-with open(get_path('constants.yaml'), 'r', errors='ignore', encoding='utf-8') as file:
+with open(get_path('ramboq_constants.yaml'), 'r', errors='ignore', encoding='utf-8') as file:
     constants = yaml.safe_load(file)  # Load YAML file into a Python dictionary
 
 # Load custom CSS styles for styling the frontend
@@ -62,17 +53,20 @@ with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
     css_style = css.read()  # Read the CSS file into a string
 
 # Load additional configuration data from a YAML file
-with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
-    config = yaml.safe_load(file)  # Load YAML config file
+with open('setup/yaml/ramboq_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+    ramboq_config = yaml.safe_load(file)  # Load YAML config file
 
 # Load additional configuration data from a YAML file
 with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     secrets = yaml.safe_load(file)  # Load YAML config file
 
+# Load additional configuration data from a YAML file
+with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+    config = yaml.safe_load(file)  # Load YAML config file
+
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
 
-@streamlit.cache_data
 def get_image_bin_file(file):
     """
     Encodes an image file as a Base64 string for embedding in HTML.
@@ -80,13 +74,13 @@ def get_image_bin_file(file):
 
     if 'http' in file: return file
     img = Image.open(get_path(file))  # Open the image file
-    format = file[-3:].upper()  # Extract the file format (e.g., PNG, JPG)
+    frmt = file[-3:].upper()  # Extract the file frmt (e.g., PNG, JPG)
 
     # Encode the image into a Base64 string
     buffered = BytesIO()
-    img.save(buffered, format=format)
+    img.save(buffered, format=frmt)
     img_str = base64.b64encode(buffered.getvalue()).decode()
-    url = f'data:image/{format.lower()};base64,{img_str}'
+    url = f'data:image/{frmt.lower()};base64,{img_str}'
     return url
 
 
@@ -102,26 +96,6 @@ def debug_wrapper(function):
     return wrapper
 
 
-
-@streamlit.cache_data
-def get_config(name):
-    """
-    Retrieve a section from the config dictionary and return its keys and values.
-    """
-    section = config[name]
-    return list(section.keys()), list(section.values())
-
-
-@streamlit.cache_data
-def get_profile(name):
-    """
-    Retrieve a section from the profile dictionary and return its keys and values.
-    """
-    section = constants[name]
-    return list(section.keys()), list(section.values())
-
-
-@streamlit.cache_data
 def capitalize(text):
     """
     Capitalize text if it doesn't already contain uppercase characters.
@@ -129,16 +103,6 @@ def capitalize(text):
     return text if isinstance(text, (int, float)) or any([x.isupper() for x in text]) else text.title()
 
 
-@streamlit.cache_data
-def get_labels(name, label='label'):
-    """
-    Get a list of capitalized labels for a given profile section.
-    """
-    section = constants[name]
-    return [capitalize(vals[label] if label in vals else key) for key, vals in section.items()]
-
-
-@streamlit.cache_data
 def word_width(text, cap_factor=0.28, small_factor=0.17):
     caps = 0
     smalls = 0
@@ -150,26 +114,9 @@ def word_width(text, cap_factor=0.28, small_factor=0.17):
     return caps * cap_factor + smalls * small_factor
 
 
-@streamlit.cache_data
-def hover_split(text, size=40):
-    lines = []
-    line = ''
-    for word in text.split():
-        if word.strip() != '':
-            if len(test_line := f'{line} {word}') < size:
-                line = test_line
-            else:
-                lines.append(line)
-                line = word
-    lines.append(line)
-
-    lines = '<br>'.join(lines)
-    return lines
-
-
 def send_email(name, to_email, query, phone="", subject="", test=False):
     """
-    Send email to a single recipient, CC to the smtp_user.
+    Email a single recipient, CC to the smtp_user.
     - to_email: str (single email address)
     """
 
@@ -342,14 +289,15 @@ def reverse_dict(data, reverse_key=None, use_type=set):
 def rec_to_dict(record):
     return {k: v for k, v in record.__dict__.items() if not k.startswith('_')} if record else {}
 
+
 def get_closing_date():
     now = datetime.now()
     today_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
 
     if now >= today_8am:
-        dt= now.date()
+        dt = now.date()
     else:
-        dt= (now - timedelta(days=1)).date()
+        dt = (now - timedelta(days=1)).date()
     return dt
 
 
@@ -360,11 +308,8 @@ if __name__ == "__main__":
     phone = "9876543210"
     query = "Testing multiple recipient email functionality."
 
-    success, msg = send_email(name, recipients, query, phone, subject, test=True)
+    success, msg = send_email(name, recipients, query, test=True)
     if success:
         print("✅ Email sent successfully!")
     else:
         print("❌ Failed to send email:", msg)
-
-
-

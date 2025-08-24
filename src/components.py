@@ -1,11 +1,11 @@
 import streamlit as st
 
-from src.helpers.utils import get_image_bin_file, config, constants
+from src.helpers.utils import ramboq_config, constants, get_image_bin_file as get_image_file
 
 
 # Function to set a PNG image as the page background
 def set_png_as_page_bg(png_file, icon=False):
-    bin_str = get_image_bin_file(png_file)  # Convert image file to binary string
+    bin_str = get_image_file(png_file)  # Convert image file to binary string
     page_bg_img = f'''
     <style>
         .appview-container {{
@@ -60,7 +60,7 @@ def markdown(html_block, **kwargs):
 
 # Function to display a section heading with an optional icon and styling
 def write_section_heading(text):
-    icon = config["section_icons"]  # Get icon from config based on section name
+    icon = ramboq_config["section_icons"]  # Get icon from config based on section name
     st.subheader(f':{icon[text]}: {text.title()}', anchor=text.title(), divider='rainbow')  # Display section heading
 
 
@@ -71,7 +71,7 @@ def write_subheading(heading, text, key=None):
 
 # Function to display an icon with text and a link, with optional custom HTML tag
 def disp_icon_text(icon=None, text=None, link=None, tag=""):
-    icon = get_image_bin_file(icon)  # Get the binary string of the icon image
+    icon = get_image_file(icon)  # Get the binary string of the icon image
     text = "" if text is None else text
     if tag == "":
         tag = f"<img src='{icon}' class='href_icon'>{text}"  # Format icon with text

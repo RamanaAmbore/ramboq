@@ -1,20 +1,16 @@
 # Import necessary modules and components
 import streamlit as st
-from PIL import Image  # PIL module for image handling
-from src.helpers.utils import get_image_bin_file  # Functions for setting background and styling
 
 from src.body import body
-from src.components import set_png_as_page_bg, markdown
+from src.utils_streamlit import get_image_bin_file
 # Import custom components and functions from the src directory
 from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
 from src.header import header
-import os
+from src.helpers.ramboq_logger import get_logger
+from src.helpers.utils import get_path, css_style,\
+    ramboq_config  # Utility functions for styling, accessing profile data, and image paths
 
-from src.helpers.utils import css_style, get_path, \
-    config  # Utility functions for styling, accessing profile data, and image paths
-
-from src.helpers.logger import get_logger
 logger = get_logger(__name__)
 
 
@@ -23,7 +19,7 @@ def initial_setup():
     global css_style
 
     # Load the favicon image from the specified file path
-    favicon_path = get_path(config['favicon'])
+    favicon_path = get_path(ramboq_config['favicon'])
 
     # Set the page configuration for the Streamlit app
     st.set_page_config(
@@ -42,6 +38,7 @@ def initial_setup():
 
     initialize_app_state()
 
+
 def initialize_app_state():
     # Initialize session state
     if "first_time" not in st.session_state:
@@ -51,14 +48,12 @@ def initialize_app_state():
         params = st.query_params
         parm_label = params.get("page", None)
 
-        if params and parm_label in config['nav_labels']:
+        if params and parm_label in ramboq_config['nav_labels']:
             st.session_state.active_nav = parm_label
         else:
-            st.session_state.active_nav = config['default_nav_label']
+            st.session_state.active_nav = ramboq_config['default_nav_label']
         # st.session_state.prev_active_nav = st.session_state.active_nav
         st.query_params["page"] = st.session_state.active_nav
-
-
 
 
 # Main function to execute the initial setup and generate different sections of the profile page

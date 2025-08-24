@@ -5,4 +5,4 @@ __pycache__/
 .venv
 .vscode
 setup/yaml/secrets.yaml
-setup/yaml/deploy.yaml
+setup/yaml/logger.yaml

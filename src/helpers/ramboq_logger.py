@@ -2,10 +2,11 @@ import logging
 import os
 import queue
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
+
 import yaml
 
 # Load configuration from YAML file
-with open('setup/yaml/deploy.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+with open('setup/yaml/ramboq_logger.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     deploy = yaml.safe_load(file)
 
 # Extract log and Twilio settings from config
@@ -20,21 +21,20 @@ TWILIO_ALERT = deploy['twilio_alert']
 TWILIO_ACCOUNT_SID = deploy['twilio_account_sid']
 TWILIO_AUTH_TOKEN = deploy['twilio_auth_token']
 
-
-def send_twilio_alert(message):
-    """Send an alert via Twilio if enabled in configuration."""
-    if not TWILIO_ALERT:
-        return
-    try:
-        from twilio.rest import Client  # Import here to avoid dependency if not used
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        client.messages.create(
-            body=message,
-            from_=f'{TWILIO_FROM_NUMBER}',
-            to=f'{TWILIO_TO_NUMBER}'
-        )
-    except Exception as e:
-        print(f"[TwilioHandler] Failed to send alert: {e}")
+# def send_twilio_alert(message):
+#     """Send an alert via Twilio if enabled in configuration."""
+#     if not TWILIO_ALERT:
+#         return
+#     try:
+#         from twilio.rest import Client  # Import here to avoid dependency if not used
+#         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+#         client.messages.create(
+#             body=message,
+#             from_=f'{TWILIO_FROM_NUMBER}',
+#             to=f'{TWILIO_TO_NUMBER}'
+#         )
+#     except Exception as e:
+#         print(f"[TwilioHandler] Failed to send alert: {e}")
 
 
 # Ensure log directory exists
@@ -46,13 +46,12 @@ log_queue = queue.Queue()
 # Common formatter for all handlers
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-
 # --- Rotating File Handlers ---
 # Maintains multiple log files with size-based rotation
 log_file_handler = RotatingFileHandler(
     FILE_LOG_FILE,
     maxBytes=5 * 1024 * 1024,  # 5 MB
-    backupCount=5
+    backupCount=5, encoding="utf-8"
 )
 log_file_handler.setLevel(FILE_LOG_LEVEL)
 log_file_handler.setFormatter(formatter)
@@ -60,7 +59,8 @@ log_file_handler.setFormatter(formatter)
 error_file_handler = RotatingFileHandler(
     ERROR_LOG_FILE,
     maxBytes=5 * 1024,  # ~5 KB (small log, only errors)
-    backupCount=5
+    backupCount=5,
+    encoding="utf-8"
 )
 error_file_handler.setLevel(ERROR_LOG_LEVEL)
 error_file_handler.setFormatter(formatter)
@@ -72,14 +72,16 @@ class LineLimitedFileHandler(logging.FileHandler):
     Custom FileHandler that keeps only the last N lines.
     Useful for "short logs" where only recent activity matters.
     """
+
     def __init__(self, filename, mode='a', max_lines=100, encoding=None, delay=False):
         super().__init__(filename, mode, encoding, delay)
         self.max_lines = max_lines
         self.filename = filename
 
     def emit(self, record):
-        super().emit(record)
-        self._trim_file()
+        pass
+        # super().emit(record)
+        # self._trim_file()
 
     def _trim_file(self):
         try:
@@ -94,36 +96,32 @@ class LineLimitedFileHandler(logging.FileHandler):
 
 short_log_file_handler = LineLimitedFileHandler(
     SHORT_FILE_LOG_FILE,
-    max_lines=50
+    max_lines=50, encoding="utf-8"
 )
 short_log_file_handler.setLevel(FILE_LOG_LEVEL)
 short_log_file_handler.setFormatter(formatter)
 
 short_error_file_handler = LineLimitedFileHandler(
     SHORT_ERROR_LOG_FILE,
-    max_lines=50
+    max_lines=50, encoding="utf-8"
 )
 short_error_file_handler.setLevel(ERROR_LOG_LEVEL)
 short_error_file_handler.setFormatter(formatter)
-
 
 # --- Console Handler ---
 console_handler = logging.StreamHandler()
 console_handler.setLevel(CONSOLE_LOG_LEVEL)
 console_handler.setFormatter(formatter)
 
-
-# --- Twilio Handler ---
-class TwilioHandler(logging.Handler):
-    """Custom handler that sends Twilio alerts for error-level logs."""
-    def emit(self, record):
-        if record.levelno >= logging.ERROR:
-            send_twilio_alert(self.format(record))
-
-
-twilio_handler = TwilioHandler()
-twilio_handler.setLevel(logging.ERROR)
-twilio_handler.setFormatter(formatter)
+# # --- Twilio Handler ---
+# class TwilioHandler(logging.Handler):
+#     """Custom handler that sends Twilio alerts for error-level logs."""
+#     def emit(self, record):
+#         if record.levelno >= logging.ERROR:
+#             send_twilio_alert(self.format(record))
+# twilio_handler = TwilioHandler()
+# twilio_handler.setLevel(logging.ERROR)
+# twilio_handler.setFormatter(formatter)
 
 
 # --- Queue Listener ---
@@ -135,7 +133,7 @@ queue_listener = QueueListener(
     error_file_handler,
     short_log_file_handler,
     short_error_file_handler,
-    twilio_handler,
+    # twilio_handler,
     respect_handler_level=True
 )
 queue_listener.start()
@@ -173,7 +171,3 @@ if __name__ == "__main__":
     logger2.error("Module 2 → Error occurred! (This will trigger Twilio alert if enabled)")
 
     shutdown_logger()
-
-
-
-

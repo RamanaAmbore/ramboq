@@ -2,14 +2,14 @@ import random
 import re
 
 import streamlit as st
-from src.helpers.utils import config
+from src.helpers.utils import ramboq_config
 from src.helpers.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
 
 def contact(body_container):
     with body_container:
         with st.container(key="contact-container"):
-            st.write(config["contact"])
+            st.write(ramboq_config["contact"])
 
             # --- Simple Captcha Question ---
             if "captcha_num1" not in st.session_state:

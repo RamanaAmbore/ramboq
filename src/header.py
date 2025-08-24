@@ -1,10 +1,10 @@
 import streamlit as st
 from src.components import container
-from src.helpers.utils import config
+from src.helpers.utils import ramboq_config
 from src.helpers.utils import get_path, capitalize
 
-nav_labels = config['nav_labels']
-logo = get_path(config['logo'])
+nav_labels = ramboq_config['nav_labels']
+logo = get_path(ramboq_config['logo'])
 
 
 def header(nav_container):
@@ -73,7 +73,7 @@ def toggle_Signin():
 def set_active_nav(label):
     params = st.query_params
     parm_label = params.get("page", None)
-    if params and parm_label in config['nav_labels']:
+    if params and parm_label in ramboq_config['nav_labels']:
         if st.session_state.active_nav == parm_label:
             st.session_state.active_nav = label
         else:
@@ -87,5 +87,5 @@ def validate_parms():
     params = st.query_params
 
     # --- Validation ---
-    if params and params.get("page", [None])[0] not in config['nav_labels']:
-        st.session_state.active_nav = config['default_nav_label']
+    if params and params.get("page", [None])[0] not in ramboq_config['nav_labels']:
+        st.session_state.active_nav = ramboq_config['default_nav_label']

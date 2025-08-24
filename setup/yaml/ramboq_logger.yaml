@@ -4,8 +4,9 @@ file_log_level: 10
 error_log_level: 40
 short_file_log_file : d:/ramboq_new/.log/short_log_file
 short_error_log_file : d:/ramboq_new/.log/short_error_file
-console_log_level : 20
+console_log_level : 40
 
 twilio_alert: ''
 twilio_account_sid: ''
 twilio_auth_token: ''
+
