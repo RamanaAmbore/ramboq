@@ -10,9 +10,9 @@ logger = get_logger(__name__)
 @for_all_accounts
 def fetch_holdings(connections=Connections, account=None, kite=None):
     # ✅ Holdings
-    holdings = []
+    df_holdings = pd.DataFrame()
     try:
-        holdings = pd.DataFrame(kite.holdings())
+        df_holdings = pd.DataFrame(kite.holdings())
 
         if not holdings.empty:
             holdings["account"] = account
@@ -20,13 +20,23 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
     except Exception as e:
         logger.error(f"[{account}] Failed to fetch holdings: {e}")
 
-    return holdings
+        # Add calculated columns
+    df_holdings["inv_val"] = df_holdings["average_price"] * df_holdings["opening_quantity"]
+    df_holdings["cur_val"] = df_holdings["inv_val"] + df_holdings["pnl"]
+
+    # Δ calculation (delta value)
+    df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["average_price"]
+
+    # Format Date column
+    df_holdings["Date"] = pd.to_datetime(df_holdings["Date"]).dt.strftime("%d%b%y")
+
+    return df_holdings
 
 
 @for_all_accounts
 def fetch_positions(connections=Connections, account=None, kite=None):
     # ✅ Positions
-    positions = []
+    df_positions = pd.DataFrame()
     try:
         positions = pd.DataFrame(kite.positions()["net"])  # "day" also available
 
@@ -36,16 +46,15 @@ def fetch_positions(connections=Connections, account=None, kite=None):
     except Exception as e:
         logger.error(f"[{account}] Failed to fetch positions: {e}")
 
-    return positions
+    return df_positions
 
 
 @for_all_accounts
 def fetch_margins(connections=Connections, account=None, kite=None):
     # ✅ Margins (Cash)
-    margins = []
+    df_margins = pd.DataFrame()
     try:
-        margins = kite.margins(segment="equity")
-        df_margins = pd.DataFrame([margins])
+        df_margins = pd.DataFrame([kite.margins(segment="equity")])
 
         # Flatten 'utilised' if it exists
         if "utilised" in df_margins.columns:
@@ -67,7 +76,7 @@ def fetch_margins(connections=Connections, account=None, kite=None):
     except Exception as e:
         logger.error(f"[{account}] Failed to fetch margins: {e}")
 
-    return margins
+    return df_margins
 
 
 def update_books(holdings, positions, margins):
@@ -133,14 +142,5 @@ def update_books(holdings, positions, margins):
 
 if __name__ == "__main__":
     # print(pd.concat(fetch_holdings(), ignore_index=True))
-    print(pd.concat(fetch_positions(), ignore_index=True))
-    print(pd.concat(fetch_positions(), ignore_index=True))
-
-    # df_holdings = pd.concat([fetch_holdings(conn) for conn in connections.connections])
-    # df_positions = pd.concat([fetch_positions(conn) for conn in connections.connections])
-    # df_margins = pd.concat([fetch_margins(conn) for conn in connections.connections])
-    #
-    # # Union/concat them into one dataframe
-    # all_data = pd.concat(dfs, ignore_index=True)
-    #
-    # print(all_data)
+    # print(pd.concat(fetch_positions(), ignore_index=True))
+    print(pd.concat(fetch_margins(), ignore_index=True))

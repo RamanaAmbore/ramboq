@@ -14,16 +14,6 @@ holdings_map = {
              "cur_val": True,
              "day_change_val": True,
              },
-    "total": {"tradingsymbol": False,
-             "opening_quantity": True,
-             "average_price": True,
-             "pnl": True,
-             "close_price": True,
-             "day_change": True,
-             "day_change_percentage": True,
-             "authorised_date": False,
-             "account": False,
-             },
     "column_config": {
         "tradingsymbol": st.column_config.TextColumn(
             "Symbol",

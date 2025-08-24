@@ -1,7 +1,9 @@
 import streamlit as st
+
+from src.helpers.broker_apis import fetch_holdings
 from src.helpers.utils import get_closing_date
-from src.helpers.constants import holdings_map
-from src.utils_streamlit import fetch_books
+from src.constants import holdings_map
+from src.utils_streamlit import fetch_holdings
 
 
 def performance(body_container):
@@ -14,17 +16,17 @@ def performance(body_container):
             )
 
         tabs = st.tabs(["P & L", "Portfolio", "Holdings", "Positions", "Cash"])
-        df_books, df_positions, df_holdings, df_margin = fetch_books(get_closing_date())
+        df_holdings = fetch_holdings(get_closing_date())
 
         with tabs[0]:
-            st.dataframe(style_dataframe(df_books), use_container_width=True,
-                         column_config={col: st.column_config.TextColumn(col, width="small") for col in
-                                        df_books.columns})
+            st.dataframe(style_dataframe(df_holdings), use_container_width=True,
+                         column_order=holdings_map['rename'].keys(),
+                         column_config=holdings_map['column_config'])
 
         with tabs[1]:
-            st.dataframe(style_dataframe(df_books), use_container_width=True,
-                         column_config={col: st.column_config.TextColumn(col, width="small") for col in
-                                        df_books.columns})
+            st.dataframe(style_dataframe(df_holdings), use_container_width=True,
+                         column_order=holdings_map['rename'].keys(),
+                         column_config=holdings_map['column_config'])
 
         with tabs[2]:
             st.dataframe(style_dataframe(df_holdings), use_container_width=True,
@@ -32,11 +34,11 @@ def performance(body_container):
                          column_config=holdings_map['column_config'])
 
         with tabs[3]:
-            st.dataframe(style_dataframe(df_positions), use_container_width=True,
-                         column_config={col: st.column_config.TextColumn(col, width="small") for col in
-                                        df_positions.columns})
+            st.dataframe(style_dataframe(df_holdings), use_container_width=True,
+                         column_order=holdings_map['rename'].keys(),
+                         column_config=holdings_map['column_config'])
 
         with tabs[4]:
-            st.dataframe(style_dataframe(df_margin), use_container_width=True,
-                         column_config={col: st.column_config.TextColumn(col, width="small") for col in
-                                        df_margin.columns})
+            st.dataframe(style_dataframe(df_holdings), use_container_width=True,
+                         column_order=holdings_map['rename'].keys(),
+                         column_config=holdings_map['column_config'])
