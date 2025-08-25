@@ -17,19 +17,17 @@ def performance(body_container):
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
         with tabs[0]:
             df = fetch_margins(get_closing_date())
-            st.dataframe(style_dataframe(df), hide_index = True,
+            st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=margins_config)
 
         with tabs[1]:
-            df = fetch_holdings(get_closing_date())
+            df, sum_df = fetch_holdings(get_closing_date())
             st.dataframe(style_dataframe(sum_df), hide_index=True,
                          column_config=holdings_config)
-            st.dataframe(style_dataframe(df), hide_index = True,
+            st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=holdings_config)
-
-
 
         with tabs[3]:
             df = fetch_positions(get_closing_date())
-            st.dataframe(style_dataframe(df), hide_index = True,
+            st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=positions_config)
