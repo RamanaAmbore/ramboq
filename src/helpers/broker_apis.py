@@ -23,6 +23,8 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
         # Add calculated columns
     df_holdings["inv_val"] = df_holdings["average_price"] * df_holdings["opening_quantity"]
     df_holdings["cur_val"] = df_holdings["inv_val"] + df_holdings["pnl"]
+    df_holdings["price_change"] = df_holdings["close_price"] - df_holdings["average_price"]
+    df_holdings["pnl_percentage"] = df_holdings["pnl"] / df_holdings["inv_val"]*100
 
     # Δ calculation (delta value)
     df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["average_price"]

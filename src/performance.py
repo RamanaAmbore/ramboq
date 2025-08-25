@@ -14,7 +14,7 @@ def performance(body_container):
                 .set_properties(**{"background-color": "#fcfeff"})  # cell background
             )
 
-        tabs = st.tabs(["Funds", "Portfolio", "Holdings", "Positions"])
+        tabs = st.tabs(["Funds", "Holdings", "Positions"])
         with tabs[0]:
             df = fetch_margins(get_closing_date())
             st.dataframe(style_dataframe(df), hide_index = True,
@@ -22,13 +22,12 @@ def performance(body_container):
 
         with tabs[1]:
             df = fetch_holdings(get_closing_date())
+            st.dataframe(style_dataframe(sum_df), hide_index=True,
+                         column_config=holdings_config)
             st.dataframe(style_dataframe(df), hide_index = True,
                          column_config=holdings_config)
 
-        with tabs[2]:
-            df = fetch_holdings(get_closing_date())
-            st.dataframe(style_dataframe(df), hide_index = True,
-                         column_config=holdings_config)
+
 
         with tabs[3]:
             df = fetch_positions(get_closing_date())

@@ -17,18 +17,43 @@ holdings_config =         {
             format="%.2f",  # integer with comma separator
             default=None  # <- ensures empty shown for NaN
         ),
+        "close_price": st.column_config.NumberColumn(
+            "Cur Price", width="small",
+            help="Closing Price",
+            format="%.2f",  # integer with comma separator
+            default=None  # <- ensures empty shown for NaN
+        ),
+        "price_change": st.column_config.NumberColumn(
+            "Price Δ", width="small",
+            help="Closing Price",
+            format="%.2f",  # integer with comma separator
+            default=None  # <- ensures empty shown for NaN
+        ),
+        "inv_val": st.column_config.NumberColumn(
+            "Inv Val", width="small",
+            help="Profit & Loss",
+            format="%.0f",  # integer with comma separator
+            default=None  # <- ensures empty shown for NaN
+        ),
+        "cur_val": st.column_config.NumberColumn(
+            "Cur Val", width="small",
+            help="Profit & Loss",
+            format="%.0f",  # integer with comma separator
+            default=None  # <- ensures empty shown for NaN
+        ),
         "pnl": st.column_config.NumberColumn(
             "P&L",width="small",
             help="Profit & Loss",
             format="%.0f",  # integer with comma separator
             default=None  # <- ensures empty shown for NaN
         ),
-        "close_price": st.column_config.NumberColumn(
-            "Cur Price",width="small",
-            help="Closing Price",
-            format="%.1f",  # integer with comma separator
+        "pnl_percentage": st.column_config.NumberColumn(
+            "P&L %", width="small",
+            help="Profit & Loss",
+            format="%.0f",  # integer with comma separator
             default=None  # <- ensures empty shown for NaN
         ),
+
         "day_change": st.column_config.NumberColumn(
             "Day Δ",width="small",
             help="Day price Change",
@@ -39,6 +64,12 @@ holdings_config =         {
             "Day Δ%",width="small",
             help="Day price Change Percentage",
             format="%.2f",  # integer with comma separator
+            default=None  # <- ensures empty shown for NaN
+        ),
+        "day_change_val": st.column_config.NumberColumn(
+            "Day Δ Val", width="small",
+            help="Profit & Loss",
+            format="%.0f",  # integer with comma separator
             default=None  # <- ensures empty shown for NaN
         ),
         "authorised_date": st.column_config.TextColumn(
@@ -87,10 +118,11 @@ positions_config = {
     ),
 }
 
-
 margins_config = {
+    "account": st.column_config.TextColumn(label="A", width="small"),
     "avail opening_balance": st.column_config.NumberColumn(label="Cash", format="%d", width="small"),
     "avail collateral": st.column_config.NumberColumn(label="Collateral", format="%d", width="small"),
     "util debits": st.column_config.NumberColumn(label="Used Margin", format="%d", width="small"),
     "net": st.column_config.NumberColumn(label="Avail Margin", format="%d", width="small"),
+
 }
