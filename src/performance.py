@@ -27,7 +27,7 @@ def performance(body_container):
             st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=holdings_config)
 
-        with tabs[3]:
+        with tabs[2]:
             df = fetch_positions(get_closing_date())
             st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=positions_config)
