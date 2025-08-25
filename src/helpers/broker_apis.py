@@ -141,6 +141,12 @@ def update_books(holdings, positions, margins):
 
 
 if __name__ == "__main__":
-    # print(pd.concat(fetch_holdings(), ignore_index=True))
+    df = pd.concat(fetch_holdings(), ignore_index=True)
+    non_numeric_cols = [
+        col for col in df.columns
+        if not pd.to_numeric(df[col], errors="coerce").notna().all()
+    ]
+
+    print(non_numeric_cols)
     # print(pd.concat(fetch_positions(), ignore_index=True))
-    print(pd.concat(fetch_margins(), ignore_index=True))
+    # print(pd.concat(fetch_margins(), ignore_index=True))

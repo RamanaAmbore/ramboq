@@ -157,7 +157,7 @@ div[data-testid="stPopoverBody"] .stVerticalBlock {
 
 /* 📄 Body Container */
 .st-key-body-container {
-  overflow-y: clip;
+  overflow-y: auto;
   overflow-x: clip;
   scrollbar-width: none;
   scrollbar-height: none;

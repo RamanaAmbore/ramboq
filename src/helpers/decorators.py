@@ -1,12 +1,12 @@
+import inspect
 import threading
 import time
+from functools import wraps
 from inspect import iscoroutinefunction
 
 from src.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
-
-from functools import wraps
 
 
 def singleton_init_guard(init_func):
@@ -21,12 +21,6 @@ def singleton_init_guard(init_func):
     return wrapper
 
 
-import inspect
-import logging
-from functools import wraps
-
-logger = logging.getLogger(__name__)
-
 def retry_kite_conn(max_attempts: int):
     """
     Decorator to retry a function on failure.
@@ -35,6 +29,7 @@ def retry_kite_conn(max_attempts: int):
     signature, the decorator will set `test_conn=True` starting from the
     second attempt.
     """
+
     def decorator(func):
         sig = inspect.signature(func)
         has_test_conn = "test_conn" in sig.parameters  # ✅ explicit check
@@ -58,9 +53,10 @@ def retry_kite_conn(max_attempts: int):
                             f"{func.__name__}: Operation failed after {max_attempts} attempts."
                         )
                         raise
-        return wrapper
-    return decorator
 
+        return wrapper
+
+    return decorator
 
 
 def track_it():

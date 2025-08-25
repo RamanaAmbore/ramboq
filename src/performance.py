@@ -1,9 +1,8 @@
 import streamlit as st
 
-from src.helpers.broker_apis import fetch_holdings
+from src.constants import holdings_config, margins_config, positions_config
 from src.helpers.utils import get_closing_date
-from src.constants import holdings_config
-from src.utils_streamlit import fetch_holdings
+from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins
 
 
 def performance(body_container):
@@ -15,9 +14,22 @@ def performance(body_container):
                 .set_properties(**{"background-color": "#fcfeff"})  # cell background
             )
 
-        tabs = st.tabs(["PNL & Cash", "Portfolio", "Holdings", "Positions", "Cash"])
-        df_holdings = fetch_holdings(get_closing_date())
-
+        tabs = st.tabs(["Funds", "Portfolio", "Holdings", "Positions"])
         with tabs[0]:
-            st.dataframe(df_holdings, use_container_width=True)
+            df = fetch_margins(get_closing_date())
+            st.dataframe(style_dataframe(df),
+                         column_config=margins_config)
 
+        with tabs[1]:
+            df = fetch_holdings(get_closing_date())
+            st.dataframe(style_dataframe(df),
+                         column_config=holdings_config)
+
+        with tabs[2]:
+            df = fetch_holdings(get_closing_date())
+            st.dataframe(style_dataframe(df))
+
+        with tabs[3]:
+            df = fetch_positions(get_closing_date())
+            st.dataframe(style_dataframe(df),
+                         column_config=positions_config)
