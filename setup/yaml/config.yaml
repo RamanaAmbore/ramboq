@@ -1,2 +1,3 @@
 retry_count: 3
 conn_reset_hours: 23
+test: True

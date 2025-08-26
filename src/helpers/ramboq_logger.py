@@ -6,7 +6,7 @@ from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 import yaml
 
 # Load configuration from YAML file
-with open('setup/yaml/ramboq_logger.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+with open('setup/yaml/ramboq_deploy.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     deploy = yaml.safe_load(file)
 
 # Extract log and Twilio settings from config

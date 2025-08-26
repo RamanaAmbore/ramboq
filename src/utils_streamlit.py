@@ -4,6 +4,7 @@ from src.constants import holdings_config, margins_config, positions_config
 from src.helpers import broker_apis
 from src.helpers.utils import get_image_bin_file as get_image_file
 import pandas as pd
+from src.helpers import genai_api
 
 
 @st.cache_data
@@ -50,3 +51,7 @@ def fetch_margins(dt):
     df= pd.concat(broker_apis.fetch_margins(), ignore_index=True)
     df = df[list(margins_config.keys())]
     return df
+
+@st.cache_data(show_spinner="Connecting to GenAI for market update…")
+def get_market_update(dt):
+    return genai_api.get_market_update()

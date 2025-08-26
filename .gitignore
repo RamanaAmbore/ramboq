@@ -5,4 +5,5 @@ __pycache__/
 .venv
 .vscode
 setup/yaml/secrets.yaml
-setup/yaml/logger.yaml
+setup/yaml/ramboq_deploy.yaml
+setup/yaml/ramboq_logger.yaml
