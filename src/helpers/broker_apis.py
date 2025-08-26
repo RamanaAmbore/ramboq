@@ -27,8 +27,8 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
     df_holdings["pnl_percentage"] = df_holdings["pnl"] / df_holdings["inv_val"] * 100
 
     # Δ calculation (delta value)
-    df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["quantity"]
-    # print(df_holdings.columns)
+    df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["opening_quantity"]
+    # print(df_holdings["day_change", "quantity", "day_change_val"])
     # Format Date column
     df_holdings["authorised_date"] = pd.to_datetime(df_holdings["authorised_date"]).dt.strftime("%d%b%y")
 

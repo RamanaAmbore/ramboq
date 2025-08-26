@@ -1,4 +1,6 @@
+import functools
 import inspect
+import logging
 import threading
 import time
 from functools import wraps
@@ -161,5 +163,16 @@ def for_all_accounts(func):
             result = func(*args, **new_kwargs)  # ✅ fix: use new_kwargs
             results.append(result)
         return results
+
+    return wrapper
+
+
+def debug_wrapper(function):
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        logging.debug(f'{function.__name__} started')  # Log function start
+        result = function(*args, **kwargs)
+        logging.debug(f'{function.__name__} ended')  # Log function end
+        return result
 
     return wrapper

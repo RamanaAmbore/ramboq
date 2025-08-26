@@ -1,25 +1,22 @@
 from openai import OpenAI
+
+from src.helpers.date_time_utils import timestamp_indian
+from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
 
-from datetime import datetime
-from src.helpers.ramboq_logger import get_logger
-
 logger = get_logger(__name__)
-
-
-
 
 
 # --- Replace this with your actual Perplexity API key ---
 def get_market_update():
     # Get current day, date, and time in formatted string
-    now = datetime.now()
+    now = timestamp_indian()
     formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
     logger.info(f'GenAI for market updated invoked at {formatted_datetime}')
     if ramboq_deploy['test']:
         # Prepare the message text
-        message = f"Market Report — {formatted_datetime}"
-        report =  ramboq_config['market'].replace("Market Report", message)
+        message = f"Market Report — {formatted_datetime} IST"
+        report = ramboq_config['market'].replace("Market Report", message)
         return report
 
     client = OpenAI(
@@ -36,7 +33,7 @@ def get_market_update():
     # Your market report prompt (user message)
     user_message = {
         "role": "user",
-        "content":  ramboq_config["pplx_user_msg"] # Paste your full portfolio as in the previous message
+        "content": ramboq_config["pplx_user_msg"]  # Paste your full portfolio as in the previous message
     }
 
     # Compose the messages list (system message optional)
@@ -44,17 +41,17 @@ def get_market_update():
 
     # Call the Perplexity API via the OpenAI-compatible client
     response = client.chat.completions.create(
-        model="sonar-pro",              # Or another supported Perplexity model
+        model="sonar-pro",  # Or another supported Perplexity model
         messages=messages,
         temperature=float(ramboq_config['pplx_temperature']),
         max_tokens=int(ramboq_config['pplx_max_tokens'])
     )
 
-
     # Print only the response text
     resp = response.choices[0].message.content
     logger.info(resp)
     return resp
+
 
 if __name__ == "__main__":
     print(get_market_update())

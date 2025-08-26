@@ -1,11 +1,9 @@
 import base64
-import functools
-import logging
 import shutil
 import smtplib
 from collections import defaultdict
 from datetime import date
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal, ROUND_DOWN
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,9 +12,10 @@ from pathlib import Path
 
 import pandas as pd
 import pyotp
-import pytz
 import yaml
 from PIL import Image
+
+from src.helpers.date_time_utils import timestamp_indian
 
 
 def get_path(file):
@@ -87,18 +86,6 @@ def get_image_bin_file(file):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     url = f'data:image/{frmt.lower()};base64,{img_str}'
     return url
-
-
-# Debug wrapper to log the start and end of functions
-def debug_wrapper(function):
-    @functools.wraps(function)
-    def wrapper(*args, **kwargs):
-        logging.debug(f'{function.__name__} started')  # Log function start
-        result = function(*args, **kwargs)
-        logging.debug(f'{function.__name__} ended')  # Log function end
-        return result
-
-    return wrapper
 
 
 def capitalize(text):
@@ -295,13 +282,11 @@ def rec_to_dict(record):
     return {k: v for k, v in record.__dict__.items() if not k.startswith('_')} if record else {}
 
 
-def get_closing_date():
-    # Define the IST timezone
-    ist = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(ist)
-    today_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
+def get_cycle_date(hours=8, mins=0):
+    now = timestamp_indian()
+    today_cutoff = now.replace(hour=hours, minute=mins, second=0, microsecond=0)
 
-    if now >= today_8am:
+    if now >= today_cutoff:
         dt = now.date()
     else:
         dt = (now - timedelta(days=1)).date()

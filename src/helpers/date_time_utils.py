@@ -1,14 +1,14 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from src.settings import constants_manager as const
+
 from src.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
 
 # Define constants for timezones
-EST_ZONE = ZoneInfo(const.EST_TIMEZONE)
-INDIAN_TIMEZONE = ZoneInfo(const.INDIAN_TIMEZONE)
+EST_ZONE = ZoneInfo("US/Eastern")
+INDIAN_TIMEZONE = ZoneInfo("Asia/Kolkata")
 
 
 # Helper functions for direct use

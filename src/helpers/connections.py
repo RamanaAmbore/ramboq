@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import requests
 from kiteconnect import KiteConnect
 
+from src.helpers.date_time_utils import timestamp_indian
 from src.helpers.decorators import retry_kite_conn
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.singleton_base import SingletonBase
@@ -73,7 +74,7 @@ class KiteConnection:
     @retry_kite_conn(RETRY_COUNT)
     def get_kite_conn(self, test_conn=False):
         """Return kite connection, refreshing if older than 20 hours"""
-        now = datetime.now()
+        now = timestamp_indian()
         if (
                 self._conn_created_at is None
                 or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
