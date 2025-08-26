@@ -52,7 +52,9 @@ def get_market_update():
 
 
     # Print only the response text
-    return response.choices[0].message.content
+    resp = response.choices[0].message.content
+    logger.info(resp)
+    return resp
 
 if __name__ == "__main__":
     print(get_market_update())
