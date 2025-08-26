@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-import pandas as pd
 import requests
 from kiteconnect import KiteConnect
 
@@ -46,21 +45,11 @@ class KiteConnection:
 
     def init_kite_conn(self, test_conn=False):
         """Returns KiteConnect instance, initializing it if necessary."""
-        self._conn_created_at = datetime.now()
 
-        if not test_conn and self._access_token:
+        if not test_conn:
             return
 
-        if self._access_token:
-            self.kite = KiteConnect(api_key=self.api_key)
-            self.kite.set_access_token(self._access_token)
-            try:
-                self.kite.profile()
-                logger.info("Stored access token is fetched and successfully validated")
-                return
-            except Exception:
-                logger.warning("Stored access token is invalid. Re-authenticating...")
-
+        self.kite = KiteConnect(api_key=self.api_key)
         request_id = self.login()
 
         self.totp_authenticate(request_id)
@@ -84,11 +73,15 @@ class KiteConnection:
     @retry_kite_conn(RETRY_COUNT)
     def get_kite_conn(self, test_conn=False):
         """Return kite connection, refreshing if older than 20 hours"""
+        now = datetime.now()
         if (
-            self._conn_created_at is None
-            or datetime.now() - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
+                self._conn_created_at is None
+                or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
         ):
             # connection too old → force re-init
+            self._conn_created_at = now
+            formatted_datetime = self._conn_created_at.strftime('%A, %B %d, %Y, %I:%M %p')
+            logger.info(f'Kite connection connection refreshed at {formatted_datetime}')
             test_conn = True
 
         self.init_kite_conn(test_conn=test_conn)
@@ -137,6 +130,7 @@ class KiteConnection:
 class Connections(SingletonBase):
     def __init__(self):
         self.conn = {account: KiteConnection(account, secrets) for account in secrets['kite_accounts'].keys()}
+
 
 if __name__ == "__main__":
     Connections()

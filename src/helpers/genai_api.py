@@ -2,15 +2,20 @@ from openai import OpenAI
 from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
 
 from datetime import datetime
+from src.helpers.ramboq_logger import get_logger
 
-# Get current day, date, and time in formatted string
-now = datetime.now()
-formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
+logger = get_logger(__name__)
+
+
 
 
 
 # --- Replace this with your actual Perplexity API key ---
 def get_market_update():
+    # Get current day, date, and time in formatted string
+    now = datetime.now()
+    formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
+    logger.info(f'GenAI for market updated invoked at {formatted_datetime}')
     if ramboq_deploy['test']:
         # Prepare the message text
         message = f"Market Report — {formatted_datetime}"

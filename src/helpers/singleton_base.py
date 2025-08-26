@@ -21,7 +21,7 @@ class SingletonBase:
             with cls._lock:  # Lock acquired only if instance might not exist
                 # Second check (inside lock)
                 if cls not in cls._instances:
-                    logger.debug(f"Creating new Singleton instance for class {cls.__name__}")
+                    #logger.debug(f"Creating new Singleton instance for class {cls.__name__}")
                     # Create the new instance using the standard __new__
                     instance = super().__new__(cls)
                     # Store the instance in the class-specific dictionary

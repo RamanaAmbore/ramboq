@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 import pyotp
+import pytz
 import yaml
 from PIL import Image
 
@@ -295,7 +296,9 @@ def rec_to_dict(record):
 
 
 def get_closing_date():
-    now = datetime.now()
+    # Define the IST timezone
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
     today_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
 
     if now >= today_8am:
@@ -303,6 +306,10 @@ def get_closing_date():
     else:
         dt = (now - timedelta(days=1)).date()
     return dt
+
+
+def mask_column(col):
+    return col.astype(str).str.replace(r'\d', '#', regex=True)
 
 
 if __name__ == "__main__":

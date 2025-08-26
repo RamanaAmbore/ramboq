@@ -24,10 +24,10 @@ def fetch_holdings(connections=Connections, account=None, kite=None):
     df_holdings["inv_val"] = df_holdings["average_price"] * df_holdings["opening_quantity"]
     df_holdings["cur_val"] = df_holdings["inv_val"] + df_holdings["pnl"]
     df_holdings["price_change"] = df_holdings["close_price"] - df_holdings["average_price"]
-    df_holdings["pnl_percentage"] = df_holdings["pnl"] / df_holdings["inv_val"]*100
+    df_holdings["pnl_percentage"] = df_holdings["pnl"] / df_holdings["inv_val"] * 100
 
     # Δ calculation (delta value)
-    df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["average_price"]
+    df_holdings["day_change_val"] = df_holdings["day_change"] * df_holdings["quantity"]
     # print(df_holdings.columns)
     # Format Date column
     df_holdings["authorised_date"] = pd.to_datetime(df_holdings["authorised_date"]).dt.strftime("%d%b%y")
@@ -41,6 +41,7 @@ def fetch_positions(connections=Connections, account=None, kite=None):
     df_positions = pd.DataFrame()
     try:
         df_positions = pd.DataFrame(kite.positions()["net"])  # "day" also available
+        df_positions['quantity'] = df_positions['quantity'] * df_positions['multiplier']
 
         if not df_positions.empty:
             df_positions["account"] = account

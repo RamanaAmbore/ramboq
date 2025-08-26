@@ -79,9 +79,8 @@ class LineLimitedFileHandler(logging.FileHandler):
         self.filename = filename
 
     def emit(self, record):
-        pass
-        # super().emit(record)
-        # self._trim_file()
+        super().emit(record)
+        self._trim_file()
 
     def _trim_file(self):
         try:

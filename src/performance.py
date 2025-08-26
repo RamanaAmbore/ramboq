@@ -28,6 +28,8 @@ def performance(body_container):
                          column_config=holdings_config)
 
         with tabs[2]:
-            df = fetch_positions(get_closing_date())
+            df, sum_df = fetch_positions(get_closing_date())
+            st.dataframe(style_dataframe(sum_df), hide_index=True,
+                         column_config=positions_config)
             st.dataframe(style_dataframe(df), hide_index=True,
                          column_config=positions_config)
