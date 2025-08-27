@@ -162,7 +162,7 @@ pplx_user_msg: |
     4. *Portfolio Highlights* — Include only the instruments from [portfolio] that have major corporate actions or significant moves: - Use instrument name, price in ₹ (bolded), and 1-line description of the event 
     5. *Insights & Outlook* — Add bullet points on overall market sentiment, sector drivers, and what to watch for tomorrow.
     
-    Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions.
+    _Disclaimer: This Market Report is generated using AI and market data sources. Figures may not be accurate at all times. Please validate from official sources before making investment decisions._
     After disclaimer no additional information.
     
     portfolio:
