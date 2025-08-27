@@ -14,6 +14,7 @@ import pandas as pd
 import pyotp
 import yaml
 from PIL import Image
+from babel.numbers import format_decimal
 
 from src.helpers.date_time_utils import timestamp_indian
 
@@ -296,6 +297,40 @@ def get_cycle_date(hours=8, mins=0):
 def mask_column(col):
     return col.astype(str).str.replace(r'\d', '#', regex=True)
 
+def add_comma_to_df_numbers(df):
+    # Format numeric cols with Indian commas
+    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    for col in num_cols:
+        df[col] = df[col].apply(add_comma_to_number)
+    return df
+
+def add_comma_to_number(x):
+    if pd.isna(x):
+        return ""
+    try:
+        num = float(x)
+        if abs(num) >= 1000:
+            # No decimals for numbers >= 1000
+            return format_decimal(num, locale="en_IN", format="#,##,##0")
+        else:
+            # Max 2 decimal places
+            return format_decimal(num, locale="en_IN", format="#,##0.##")
+    except Exception:
+        return x
+
+# --- Apply Styles Automatically ---
+def style_dataframe(df: pd.DataFrame):
+    # Detect numeric columns
+    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+
+    # Apply background + alignment
+    styler = (
+        df.style
+        .set_properties(**{"background-color": "#fcfeff"})  # background
+        .set_properties(subset=num_cols, **{"text-align": "right"})  # right align numbers
+    )
+
+    return styler
 
 if __name__ == "__main__":
     # Test run
