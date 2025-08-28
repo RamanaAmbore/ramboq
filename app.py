@@ -50,8 +50,6 @@ def initialize_app_state():
         st.session_state.user_locked = False
         st.session_state.user_prof_updated = False
 
-
-
         params = st.query_params
         parm_label = params.get("page", None)
 
