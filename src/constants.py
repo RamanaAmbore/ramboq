@@ -1,6 +1,8 @@
-from collections import OrderedDict
-
 import streamlit as st
+
+small = "small"
+smallest = 35
+smaller = 40
 
 holdings_config = {
     "tradingsymbol": st.column_config.TextColumn(
@@ -8,17 +10,17 @@ holdings_config = {
         help="Trading Symbol"
     ),
     "opening_quantity": st.column_config.NumberColumn(
-        "Qty", width=30,
+        "Qty", width=smallest,
         help="Quantity",
         default=None  # <- ensures empty shown for NaN
     ),
     "average_price": st.column_config.NumberColumn(
-        "Inv Price", width=40,
+        "Inv Price", width=smaller,
         help="Average Investment Price",
         default=None  # <- ensures empty shown for NaN
     ),
     "close_price": st.column_config.NumberColumn(
-        "Cur Price", width=40,
+        "Cur Price", width=smaller,
         help="Closing Price",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -47,23 +49,23 @@ holdings_config = {
         help="Holdings plus cash"
     ),
     "price_change": st.column_config.NumberColumn(
-        "Price Δ", width=40,
+        "Price Δ", width=smaller,
         help="Closing Price",
         default=None  # <- ensures empty shown for NaN
     ),
     "pnl_percentage": st.column_config.NumberColumn(
-        "P&L %", width=20,
+        "P&L %", width=smallest,
         help="Profit & Loss",
         default=None  # <- ensures empty shown for NaN
     ),
 
     "day_change": st.column_config.NumberColumn(
-        "Day Δ", width=40,
+        "Day Δ", width=smaller,
         help="Day price Change",
         default=None  # <- ensures empty shown for NaN
     ),
     "day_change_percentage": st.column_config.NumberColumn(
-        "DayΔ%", width=20,
+        "DayΔ%", width=smallest,
         help="Day price Change Percentage",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -73,11 +75,11 @@ holdings_config = {
         default=None  # <- ensures empty shown for NaN
     ),
     "authorised_date": st.column_config.TextColumn(
-        "Date", width=35,
+        "Date", width=smaller,
         help="When it the report generated?"
     ),
     "account": st.column_config.TextColumn(
-        "Account", width=35,
+        "Account", width=smallest,
         help="Account Number with Broker"
     )
 }
@@ -88,12 +90,12 @@ positions_config = {
         help="Trading Symbol"
     ),
     "quantity": st.column_config.NumberColumn(
-        "Qty", width=30,
+        "Qty", width=smallest,
         help="Quantity",
         default=None
     ),
     "average_price": st.column_config.NumberColumn(
-        "Inv Price", width=40,
+        "Inv Price", width=smaller,
         help="Average Investment Price",
         default=None
     ),
@@ -103,21 +105,21 @@ positions_config = {
         default=None
     ),
     "close_price": st.column_config.NumberColumn(
-        "Cur Price", width=40,
+        "Cur Price", width=smaller,
         help="Closing Price",
         default=None
     ),
     "account": st.column_config.TextColumn(
-        "Account", width=35,
+        "Account", width=smallest,
         help="Account Number with Broker"
     ),
 }
 
 margins_config = {
-    "account": st.column_config.TextColumn(label="Account", width=40),
-    "avail opening_balance": st.column_config.NumberColumn(label="Cash",width=40),
-    "net": st.column_config.NumberColumn(label="Avail Margin", width=40),
-    "util debits": st.column_config.NumberColumn(label="Used Margin", width=40),
-    "avail collateral": st.column_config.NumberColumn(label="Collateral",width=40),
+    "account": st.column_config.TextColumn(label="Account", width=smaller),
+    "avail opening_balance": st.column_config.NumberColumn(label="Cash", width=smaller),
+    "net": st.column_config.NumberColumn(label="Avail Margin", width=smaller),
+    "util debits": st.column_config.NumberColumn(label="Used Margin", width=smaller),
+    "avail collateral": st.column_config.NumberColumn(label="Collateral", width=smaller),
 
 }
