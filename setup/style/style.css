@@ -306,7 +306,9 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
     flex-flow:nowrap;
     padding-right: 2.5rem;
  }
-
+ .stSpinner, .stSpinner p, .stSpinner div {
+    background-color: white;
+ }
 
 
 
