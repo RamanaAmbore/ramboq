@@ -1,16 +1,19 @@
-
 import streamlit as st
+
 from src.about import about
 from src.contact import contact
 from src.faq import faq
 from src.market import market
 from src.performance import performance
 from src.post import post
+from src.signin import signin
 
 
 def body(body_container):
     with body_container:
-        if st.session_state.active_nav == "about":
+        if st.session_state.signin_pressed:
+            signin(body_container)
+        elif st.session_state.active_nav == "about":
             about(body_container)
         elif st.session_state.active_nav == "market":
             market(body_container)

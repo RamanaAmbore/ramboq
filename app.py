@@ -42,8 +42,14 @@ def initial_setup():
 def initialize_app_state():
     # Initialize session state
     if "first_time" not in st.session_state:
-        st.session_state.logged_in = False
         st.session_state.first_time = False
+
+        st.session_state.auth_status = False
+        st.session_state.validated = False
+        st.session_state.locked = False
+        st.session_state.prof_updated = False
+        st.session_state.signin_pressed = False
+
 
         params = st.query_params
         parm_label = params.get("page", None)

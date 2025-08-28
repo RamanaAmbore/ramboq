@@ -4,6 +4,7 @@ import streamlit as st
 from src.constants import holdings_config, margins_config, positions_config
 from src.helpers import broker_apis
 from src.helpers import genai_api
+
 from src.helpers.utils import get_image_bin_file as get_image_file, mask_column
 
 
@@ -11,11 +12,15 @@ from src.helpers.utils import get_image_bin_file as get_image_file, mask_column
 def get_image_bin_file(file):
     return get_image_file(file)
 
-
 @st.cache_data(show_spinner="Connecting to broker platform and loading data…")
-def fetch_holdings(dt):
+def fetch_holdings(dt, df_sum_margins=None):
     df = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
-    df = df[list(holdings_config.keys())]
+    lst = list(holdings_config.keys())
+    lst.remove('cash')
+    lst.remove('net')
+    df = df[lst]
+
+
     # print(df)
     df['account'] = mask_column(df['account'])
 
@@ -29,10 +34,18 @@ def fetch_holdings(dt):
     # Group by 'account' and sum
     grouped_sums = df.groupby("account")[sum_columns].sum().reset_index()
 
-    # Calculate total sums for whole dataframe (all accounts)
-    total_sums = df[sum_columns].sum().to_frame().T
-    total_sums["account"] = "TOTAL"
+    if df_sum_margins is not None:
+        grouped_sums = pd.merge(grouped_sums, df_sum_margins[["account", "avail opening_balance"]], on="account", how="inner")
+        grouped_sums.rename(columns={"avail opening_balance":"cash"}, inplace=True)
+        grouped_sums["net"] = grouped_sums['cur_val'] + grouped_sums['cash']
+        print(grouped_sums)
+        # Calculate total sums for whole dataframe (all accounts)
+        total_sums = grouped_sums[[*sum_columns,'net','cash']].sum().to_frame().T
+    else:
+        total_sums = grouped_sums[sum_columns].sum().to_frame().T
 
+    total_sums["account"] = "TOTAL"
+    total_columns = []
     # Append total sums as a row to grouped sums
     total_df = pd.concat([grouped_sums, total_sums], ignore_index=True)
     total_df['pnl_percentage'] = total_df['pnl'] / total_df['inv_val'] * 100
@@ -43,13 +56,14 @@ def fetch_holdings(dt):
 
 
 @st.cache_data(show_spinner="Connecting to broker platform and loading data…")
-def fetch_positions(dt):
+def fetch_positions(dt, df_sum_margins=None):
     df = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
     df = df[list(positions_config.keys())]
     df['account'] = mask_column(df['account'])
     sum_columns = [
         "pnl"
     ]
+
     # Group by 'account' and sum
     grouped_sums = df.groupby("account")[sum_columns].sum().reset_index()
 

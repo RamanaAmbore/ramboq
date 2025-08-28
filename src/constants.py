@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import streamlit as st
 
 holdings_config = {
@@ -20,11 +22,11 @@ holdings_config = {
         help="Closing Price",
         default=None  # <- ensures empty shown for NaN
     ),
-    "price_change": st.column_config.NumberColumn(
-        "Price Δ", width="small",
-        help="Closing Price",
-        default=None  # <- ensures empty shown for NaN
+    "cash": st.column_config.NumberColumn(
+        "Cash", width="small",
+        help="Cash balance"
     ),
+
     "inv_val": st.column_config.NumberColumn(
         "Inv Val", width="small",
         help="Profit & Loss",
@@ -36,12 +38,21 @@ holdings_config = {
         default=None  # <- ensures empty shown for NaN
     ),
     "pnl": st.column_config.NumberColumn(
-        "P&L", width="small",
+        "P & L", width="small",
         help="Profit & Loss",
         default=None  # <- ensures empty shown for NaN
     ),
+    "net": st.column_config.NumberColumn(
+        "Holding+Cash", width="small",
+        help="Holdings plus cash"
+    ),
+    "price_change": st.column_config.NumberColumn(
+        "Price Δ", width="small",
+        help="Closing Price",
+        default=None  # <- ensures empty shown for NaN
+    ),
     "pnl_percentage": st.column_config.NumberColumn(
-        "P&L %", width="small",
+        "P & L %", width="small",
         help="Profit & Loss",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -87,7 +98,7 @@ positions_config = {
         default=None
     ),
     "pnl": st.column_config.NumberColumn(
-        "P&L", width="small",
+        "P & L", width="small",
         help="Profit & Loss",
         default=None
     ),
@@ -102,13 +113,11 @@ positions_config = {
     ),
 }
 
-
-
 margins_config = {
     "account": st.column_config.TextColumn(label="Account", width="small"),
     "avail opening_balance": st.column_config.NumberColumn(label="Cash",width="small"),
-    "avail collateral": st.column_config.NumberColumn(label="Collateral",width="small"),
-    "util debits": st.column_config.NumberColumn(label="Used Margin", width="small"),
     "net": st.column_config.NumberColumn(label="Avail Margin", width="small"),
+    "util debits": st.column_config.NumberColumn(label="Used Margin", width="small"),
+    "avail collateral": st.column_config.NumberColumn(label="Collateral",width="small"),
 
 }

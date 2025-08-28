@@ -17,13 +17,15 @@ def performance(body_container):
         # --- Streamlit UI ---
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
         with tabs[0]:
-            df = fetch_margins(get_cycle_date())  # <-- your data
+            df = fetch_margins(get_cycle_date())
+            fetch_holdings(get_cycle_date(), df)
+            fetch_positions(get_cycle_date())
 
             st.dataframe(style_dataframe(add_comma_to_df_numbers(df)), hide_index=True,
                      column_config=margins_config)
 
         with tabs[1]:
-            df, sum_df = fetch_holdings(get_cycle_date())
+            df, sum_df = fetch_holdings(get_cycle_date(), fetch_margins(get_cycle_date()))
 
             st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_df)), hide_index=True,
                          column_config=holdings_config)
