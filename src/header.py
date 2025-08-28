@@ -26,7 +26,7 @@ def create_navbar_desktop_container():
             for i, label in enumerate(nav_labels):
                 with nav_cols[i]:
                     if label == 'profile':
-                        if not st.session_state.auth_status:
+                        if not st.session_state.user_validated:
                             st.empty()
                     elif st.session_state.active_nav == label:
                         st.button(capitalize(label), type="tertiary", key=f'button-active-desktop', disabled=True)
@@ -38,7 +38,7 @@ def create_navbar_desktop_container():
 
         with signin_col:
             with st.container(key='signin-out'):
-                st.button("Sign out" if st.session_state.auth_status else "Sign in/Sign up", type="tertiary",
+                st.button("Sign out" if st.session_state.user_validated else "Sign in/Sign up", type="tertiary",
                           on_click=toggle_signin)
 
 
@@ -52,10 +52,10 @@ def create_navbar_mobile_container():
             with st.popover("☰", use_container_width=True):
                 for label in nav_labels + ["Sign in/Sign up"]:
                     if label == 'profile':
-                        if not st.session_state.auth_status:
+                        if not st.session_state.user_validated:
                             st.empty()
-                    if label == 'Sign in/Sign up':
-                        st.button("Sign out" if st.session_state.auth_status else "Sign in/Sign up",
+                    elif label == 'Sign in/Sign up':
+                        st.button("Sign out" if st.session_state.user_validated else "Sign in/Sign up",
                                   on_click=toggle_signin,
                                   type="tertiary", key=f'button-{label}-mobile')
                     elif st.session_state.active_nav == label:

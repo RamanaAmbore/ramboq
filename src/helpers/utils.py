@@ -1,4 +1,6 @@
 import base64
+import random
+import re
 import shutil
 import smtplib
 from collections import defaultdict
@@ -297,12 +299,14 @@ def get_cycle_date(hours=8, mins=0):
 def mask_column(col):
     return col.astype(str).str.replace(r'\d', '#', regex=True)
 
+
 def add_comma_to_df_numbers(df):
     # Format numeric cols with Indian commas
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     for col in num_cols:
         df[col] = df[col].apply(add_comma_to_number)
     return df
+
 
 def add_comma_to_number(x):
     if pd.isna(x):
@@ -318,19 +322,67 @@ def add_comma_to_number(x):
     except Exception:
         return x
 
-# --- Apply Styles Automatically ---
-def style_dataframe(df: pd.DataFrame):
-    # Detect numeric columns
-    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
-    # Apply background + alignment
-    styler = (
-        df.style
-        .set_properties(**{"background-color": "#fcfeff"})  # background
-        .set_properties(subset=num_cols, **{"text-align": "right"})  # right align numbers
-    )
+def validate_email(email: str) -> bool:
+    """Check if email has a valid format."""
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(pattern, email) is not None
 
-    return styler
+
+def validate_password(password: str) -> bool:
+    """
+    Validate password:
+    - At least 8 chars
+    - At least one uppercase
+    - At least one lowercase
+    - At least one digit
+    - At least one special character
+    """
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"[0-9]", password):
+        return False
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False
+    return True
+
+
+def generate_captcha():
+    """Return a simple numeric captcha as (question, answer)."""
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    return f"{a} + {b} = ?", a + b
+
+
+def validate_captcha(answer, num1, num2):
+    try:
+        if float(answer) == (num1 + num2):
+            return True, "Captcha validated successfully."
+        else:
+            return False, "Captcha answer is incorrect."
+    except ValueError:
+        return False, "Please enter a numeric answer for the captcha."
+
+
+def validate_phone(country_code: str, phone_number: str):
+    # Keep only digits in country code
+    code = re.sub(r"\D", "", country_code)
+    full_phone = f"+{code}{phone_number}"
+
+    phone_pattern = r"^[0-9+\s()]+$"
+    if not re.match(phone_pattern, full_phone):
+        return False, "❌ Phone number may only contain digits, +, spaces, ( and )", None
+
+    digits_only = re.sub(r"\D", "", phone_number)
+    if not (7 <= len(digits_only) <= 15):
+        return False, "❌ Phone number must be between 7 and 15 digits", None
+
+    return True, "", full_phone
+
 
 if __name__ == "__main__":
     # Test run

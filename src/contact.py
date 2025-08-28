@@ -2,7 +2,7 @@ import random
 import re
 
 import streamlit as st
-from src.helpers.utils import ramboq_config
+from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
 from src.helpers.utils import isd_codes, send_email  # YAML-loaded ISD codes
 
 
@@ -34,8 +34,7 @@ def contact(body_container):
                 submit = col1.form_submit_button("Submit")
 
                 if submit:
-
-                    # --- Ordered validation ---
+                    # --- Validations ---
                     if not name.strip():
                         st.error("⚠️ Full Name is required.")
                         return
@@ -43,24 +42,16 @@ def contact(body_container):
                         st.error("⚠️ Email Address is required.")
                         return
 
-                    email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-                    if not re.match(email_pattern, email.strip()):
+                    if not validate_email(email.strip()):
                         st.error("❌ Invalid email format.")
                         return
 
+                    full_phone = ""
                     if phone_number.strip():
-                        country_code = re.sub(r"\D", "", phone_country)  # keep only digits
-                        full_phone = f"+{country_code}{phone_number.strip()}"
-                        phone_pattern = r"^[0-9+\s()]+$"
-                        if not re.match(phone_pattern, full_phone):
-                            st.error("❌ Phone number may only contain digits, +, spaces, ( and )")
+                        ok, msg, full_phone = validate_phone(phone_country, phone_number.strip())
+                        if not ok:
+                            st.error(msg)
                             return
-                        digits_only = re.sub(r"\D", "", phone_number)
-                        if not (7 <= len(digits_only) <= 15):
-                            st.error("❌ Phone number must be between 7 and 15 digits")
-                            return
-                    else:
-                        full_phone = ""
 
                     if not subject.strip():
                         st.error("⚠️ Subject is required.")
@@ -69,17 +60,17 @@ def contact(body_container):
                         st.error("⚠️ Query is required.")
                         return
 
-                        # --- Captcha validation ---
-                    try:
-                        if int(captcha_answer.strip()) != (
-                                st.session_state.captcha_num1 + st.session_state.captcha_num2):
-                            st.error("❌ Captcha validation failed. Please try again.")
-                            # regenerate new captcha
-                            st.session_state.captcha_num1 = random.randint(1, 9)
-                            st.session_state.captcha_num2 = random.randint(1, 9)
-                            return
-                    except:
-                        st.error("❌ Please enter a valid number for captcha.")
+                    # --- Captcha validation ---
+                    ok, msg = validate_captcha(
+                        captcha_answer.strip(),
+                        st.session_state.captcha_num1,
+                        st.session_state.captcha_num2
+                    )
+                    if not ok:
+                        st.error(msg)
+                        # regenerate new captcha
+                        st.session_state.captcha_num1 = random.randint(1, 9)
+                        st.session_state.captcha_num2 = random.randint(1, 9)
                         return
 
                     # --- Send email ---

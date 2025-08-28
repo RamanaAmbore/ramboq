@@ -1,8 +1,8 @@
 import streamlit as st
 
 from src.constants import holdings_config, margins_config, positions_config
-from src.helpers.utils import get_cycle_date, add_comma_to_number, style_dataframe, add_comma_to_df_numbers
-from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins
+from src.helpers.utils import get_cycle_date, add_comma_to_number, add_comma_to_df_numbers
+from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins, style_dataframe
 
 
 def performance(body_container):
