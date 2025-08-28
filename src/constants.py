@@ -1,8 +1,7 @@
 import streamlit as st
 
 small = "small"
-smallest = 35
-smaller = 40
+smaller = 45
 
 holdings_config = {
     "tradingsymbol": st.column_config.TextColumn(
@@ -10,7 +9,7 @@ holdings_config = {
         help="Trading Symbol"
     ),
     "opening_quantity": st.column_config.NumberColumn(
-        "Qty", width=smallest,
+        "Qty", width=smaller,
         help="Quantity",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -54,7 +53,7 @@ holdings_config = {
         default=None  # <- ensures empty shown for NaN
     ),
     "pnl_percentage": st.column_config.NumberColumn(
-        "P&L %", width=smallest,
+        "P&L %", width=smaller,
         help="Profit & Loss",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -65,7 +64,7 @@ holdings_config = {
         default=None  # <- ensures empty shown for NaN
     ),
     "day_change_percentage": st.column_config.NumberColumn(
-        "DayΔ%", width=smallest,
+        "DayΔ%", width=smaller,
         help="Day price Change Percentage",
         default=None  # <- ensures empty shown for NaN
     ),
@@ -79,7 +78,7 @@ holdings_config = {
         help="When it the report generated?"
     ),
     "account": st.column_config.TextColumn(
-        "Account", width=smallest,
+        "Account", width=smaller,
         help="Account Number with Broker"
     )
 }
@@ -90,7 +89,7 @@ positions_config = {
         help="Trading Symbol"
     ),
     "quantity": st.column_config.NumberColumn(
-        "Qty", width=smallest,
+        "Qty", width=smaller,
         help="Quantity",
         default=None
     ),
@@ -110,7 +109,7 @@ positions_config = {
         default=None
     ),
     "account": st.column_config.TextColumn(
-        "Account", width=smallest,
+        "Account", width=smaller,
         help="Account Number with Broker"
     ),
 }
