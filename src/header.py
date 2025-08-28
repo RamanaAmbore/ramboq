@@ -35,7 +35,6 @@ def create_navbar_desktop_container():
                                   on_click=set_active_nav,
                                   args=(label,))
 
-
         with signin_col:
             with st.container(key='signin-out'):
                 st.button("Sign out" if st.session_state.user_validated else "Sign in/Sign up", type="tertiary",
@@ -67,7 +66,6 @@ def create_navbar_mobile_container():
 
 # function to simulate Signin/Sign out action
 def toggle_signin():
-
     st.session_state.signin_pressed = True
 
 
