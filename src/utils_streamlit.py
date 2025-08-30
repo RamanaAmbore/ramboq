@@ -113,6 +113,29 @@ def style_dataframe(df: pd.DataFrame):
     return styler
 
 
-def set_math_puzzle():
-    st.session_state.captcha_num1 = random.randint(1, 9)
-    st.session_state.captcha_num2 = random.randint(1, 9)
+@st.dialog("📨 Email Status")
+def show_email_status(success: bool, msg: str, clear):
+    if success:
+        st.success("✅ Your message has been sent successfully!")
+    else:
+        st.error(f"❌ Failed to send your message. {msg}")
+
+    if st.button("Close"):
+        st.session_state[clear] = True
+        st.rerun()
+
+
+def set_captcha_state(field_names, clear, captcha_min=1, captcha_max=9):
+    if clear not in st.session_state or st.session_state[clear]:
+        st.session_state[clear] = False
+        for field in field_names:
+            st.session_state[field] = ""
+
+        st.session_state['captcha_num1'] = random.randint(captcha_min, captcha_max)
+        st.session_state['captcha_num2'] = random.randint(captcha_min, captcha_max)
+        st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
+    else:
+        st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
+        st.session_state['captcha_num1'] = random.randint(captcha_min, captcha_max)
+        st.session_state['captcha_num2'] = random.randint(captcha_min, captcha_max)
+    return

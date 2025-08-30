@@ -1,33 +1,16 @@
-import random
-
 import streamlit as st
 
 from src.helpers.utils import isd_codes, send_email  # YAML-loaded ISD codes
 from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
+from src.utils_streamlit import show_email_status, set_captcha_state
 
 
 def contact(body_container):
     with body_container:
         with st.container(key="contact-container"):
             st.write(ramboq_config["contact"])
-            if 'clear' in st.session_state and st.session_state['clear']:
-                st.session_state['name'] = ""
-                st.session_state['email'] = ""
-                st.session_state['phone_number'] = ""
-                st.session_state['subject'] = ""
-                st.session_state['query'] = ""
-                st.session_state['answer'] = ""
-
-            # --- Simple Captcha Question ---
-            if 'captcha_num1' not in st.session_state:
-                st.session_state['captcha_num1'] = random.randint(1, 9)
-                st.session_state['captcha_num2'] = random.randint(1, 9)
-                st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
-            else:
-                st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
-                st.session_state['captcha_num1'] = random.randint(1, 9)
-                st.session_state['captcha_num2'] = random.randint(1, 9)
-
+            lst = ['name', 'email', 'phone_number', 'subject', 'query', 'answer']
+            set_captcha_state(lst, 'contact_clear')
 
 
             with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
@@ -85,16 +68,6 @@ def contact(body_container):
                     with st.spinner("📨 Sending your message..."):
                         status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
-                    show_email_status(status, msg)
+                    show_email_status(status, msg, 'contact_clear')
 
 
-@st.dialog("📨 Email Status")
-def show_email_status(success: bool, msg: str):
-    if success:
-        st.success("✅ Your message has been sent successfully!")
-    else:
-        st.error(f"❌ Failed to send your message. {msg}")
-
-    if st.button("Close"):
-        st.session_state['clear'] = True
-        st.rerun()
