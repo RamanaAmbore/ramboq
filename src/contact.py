@@ -10,16 +10,23 @@ def contact(body_container):
     with body_container:
         with st.container(key="contact-container"):
             st.write(ramboq_config["contact"])
+            if 'clear' in st.session_state and st.session_state['clear']:
+                st.session_state['name'] = ""
+                st.session_state['email'] = ""
+                st.session_state['phone_number'] = ""
+                st.session_state['subject'] = ""
+                st.session_state['query'] = ""
+                st.session_state['answer'] = ""
 
             # --- Simple Captcha Question ---
             if 'captcha_num1' not in st.session_state:
-                st.session_state.captcha_num1 = random.randint(1, 9)
-                st.session_state.captcha_num2 = random.randint(1, 9)
-                st.session_state.captcha_result = st.session_state.captcha_num1 + st.session_state.captcha_num2
+                st.session_state['captcha_num1'] = random.randint(1, 9)
+                st.session_state['captcha_num2'] = random.randint(1, 9)
+                st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
             else:
-                st.session_state.captcha_result = st.session_state.captcha_num1 + st.session_state.captcha_num2
-                st.session_state.captcha_num1 = random.randint(1, 9)
-                st.session_state.captcha_num2 = random.randint(1, 9)
+                st.session_state['captcha_result'] = st.session_state['captcha_num1'] + st.session_state['captcha_num2']
+                st.session_state['captcha_num1'] = random.randint(1, 9)
+                st.session_state['captcha_num2'] = random.randint(1, 9)
 
 
 
@@ -33,7 +40,7 @@ def contact(body_container):
 
                 # --- Captcha field ---
                 captcha_answer = st.text_input("Answer", key='answer')
-                st.write(f"Solve to verify: {st.session_state.captcha_num1} + {st.session_state.captcha_num2} = ?")
+                st.write(f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
                 print(captcha_answer)
 
                 col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
@@ -69,7 +76,7 @@ def contact(body_container):
 
                     # --- Captcha validation ---
                     ok, msg = validate_captcha(
-                        captcha_answer.strip(), st.session_state.captcha_result)
+                        captcha_answer.strip(), st.session_state['captcha_result'])
                     if not ok:
                         st.error(msg)
                         return
@@ -89,4 +96,5 @@ def show_email_status(success: bool, msg: str):
         st.error(f"❌ Failed to send your message. {msg}")
 
     if st.button("Close"):
+        st.session_state['clear'] = True
         st.rerun()
