@@ -43,16 +43,13 @@ def contact(body_container):
                     # --- Validations ---
                     if not name.strip():
                         st.error("⚠️ Name is required.")
-
                         return
                     if not email.strip():
                         st.error("⚠️ Email Address is required.")
-
                         return
 
                     if not validate_email(email.strip()):
                         st.error("❌ Invalid email format.")
-
                         return
 
                     full_phone = ""
@@ -64,8 +61,8 @@ def contact(body_container):
 
                     if not subject.strip():
                         st.error("⚠️ Subject is required.")
-
                         return
+
                     if not query.strip():
                         st.error("⚠️ Query is required.")
                         return
@@ -75,7 +72,6 @@ def contact(body_container):
                         captcha_answer.strip(), st.session_state.captcha_result)
                     if not ok:
                         st.error(msg)
-
                         return
 
                     # --- Send email ---
