@@ -114,14 +114,15 @@ def style_dataframe(df: pd.DataFrame):
 
 
 @st.dialog("📨 Email Status")
-def show_email_status(success: bool, msg: str, clear):
+def show_status_dialog(success: bool, msg: str):
     if success:
         st.success("✅ Your message has been sent successfully!")
     else:
         st.error(f"❌ Failed to send your message. {msg}")
 
     if st.button("Close"):
-        st.session_state[clear] = True
+        for fld in ['reset_clear', 'signin_clear', 'signup_clear', 'contact_clear']:
+            st.session_state[fld] = True
         st.rerun()
 
 
