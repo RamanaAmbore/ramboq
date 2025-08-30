@@ -12,7 +12,7 @@ from src.signin import signin
 def body(body_container):
     with body_container:
         body_container =st.empty()
-        if st.session_state.signin_pressed:
+        if st.session_state.active_nav == "signin":
             signin(body_container)
         elif st.session_state.active_nav == "about":
             about(body_container)

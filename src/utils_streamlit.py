@@ -1,3 +1,5 @@
+import random
+
 import pandas as pd
 import streamlit as st
 
@@ -38,7 +40,7 @@ def fetch_holdings(dt, df_sum_margins=None):
                                 how="inner")
         grouped_sums.rename(columns={"avail opening_balance": "cash"}, inplace=True)
         grouped_sums["net"] = grouped_sums['cur_val'] + grouped_sums['cash']
-        print(grouped_sums)
+
         # Calculate total sums for whole dataframe (all accounts)
         total_sums = grouped_sums[[*sum_columns, 'net', 'cash']].sum().to_frame().T
     else:
@@ -109,3 +111,8 @@ def style_dataframe(df: pd.DataFrame):
     )
 
     return styler
+
+
+def set_math_puzzle():
+    st.session_state.captcha_num1 = random.randint(1, 9)
+    st.session_state.captcha_num2 = random.randint(1, 9)

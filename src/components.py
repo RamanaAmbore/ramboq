@@ -1,3 +1,5 @@
+import random
+
 import streamlit as st
 
 from src.helpers.utils import ramboq_config, constants, get_image_bin_file as get_image_file
@@ -30,6 +32,7 @@ def container(*args, **kwargs):
 
     return function(*args, **kwargs)  # Return function without container
 
+
 # # Function to render Markdown text with optional styling
 # def markdown(text, style_tag=True):
 #     if style_tag:
@@ -38,9 +41,9 @@ def container(*args, **kwargs):
 
 # Wrapper function for streamlit's container element to support function calls within it
 def markdown(html_block, **kwargs):
-    style =""
+    style = ""
     if 'css' in kwargs and kwargs['css']:
-        return st.markdown(f"<style>{html_block}</style>" , unsafe_allow_html=True)
+        return st.markdown(f"<style>{html_block}</style>", unsafe_allow_html=True)
     if 'style' in kwargs:
         style = kwargs.pop('style')  # Unique key for container
     if 'class_name' in kwargs:
@@ -54,8 +57,7 @@ def markdown(html_block, **kwargs):
 
     html_block = f"<{tag} {style}> {html_block}</{tag}>"
 
-    return st.markdown(html_block, unsafe_allow_html=True, **kwargs )  # Return function without container
-
+    return st.markdown(html_block, unsafe_allow_html=True, **kwargs)  # Return function without container
 
 
 # Function to display a section heading with an optional icon and styling
@@ -87,7 +89,6 @@ def disp_icon_text(icon=None, text=None, link=None, tag=""):
                 </div>
                 """
     else:
-
         markdown_text = f"""
                     <div class='icon_href_text_div'>
                         <span> 
@@ -103,9 +104,11 @@ def disp_icon_text(icon=None, text=None, link=None, tag=""):
 def create_ruler():
     st.markdown('---', unsafe_allow_html=True)  # Render a horizontal rule using Markdown
 
+
 # Function to create a horizontal rule (line)
 def create_ruler_white():
-    st.markdown("<hr style='border: 1px solid white;'>", unsafe_allow_html=True)  # Render a horizontal rule using Markdown
+    st.markdown("<hr style='border: 1px solid white;'>",
+                unsafe_allow_html=True)  # Render a horizontal rule using Markdown
 
 
 # Function to display profile information in a container based on the name
@@ -128,3 +131,6 @@ def write_columns(column_list, name):
         label = vals['label'] if 'label' in vals else profile_keys[idx]  # Use 'label' if it exists
         with col:
             disp_icon_text(vals['icon'], label, vals['link'])  # Display the profile icon, label, and link
+
+
+

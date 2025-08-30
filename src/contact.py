@@ -1,9 +1,9 @@
 import random
-import re
 
 import streamlit as st
-from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
+
 from src.helpers.utils import isd_codes, send_email  # YAML-loaded ISD codes
+from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
 
 
 def contact(body_container):
@@ -12,9 +12,16 @@ def contact(body_container):
             st.write(ramboq_config["contact"])
 
             # --- Simple Captcha Question ---
-            if "captcha_num1" not in st.session_state:
+            if 'captcha_num1' not in st.session_state:
                 st.session_state.captcha_num1 = random.randint(1, 9)
                 st.session_state.captcha_num2 = random.randint(1, 9)
+                st.session_state.captcha_result = st.session_state.captcha_num1 + st.session_state.captcha_num2
+            else:
+                st.session_state.captcha_result = st.session_state.captcha_num1 + st.session_state.captcha_num2
+                st.session_state.captcha_num1 = random.randint(1, 9)
+                st.session_state.captcha_num2 = random.randint(1, 9)
+
+
 
             with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
                 name = st.text_input("Full Name *", key="name", max_chars=100)
@@ -25,10 +32,9 @@ def contact(body_container):
                 query = st.text_area("Your Query *", key="query", height=150)
 
                 # --- Captcha field ---
-                captcha_answer = st.text_input(
-                    f"Solve to verify: {st.session_state.captcha_num1} + {st.session_state.captcha_num2} = ?",
-                    key="captcha"
-                )
+                captcha_answer = st.text_input("Answer", key='answer')
+                st.write(f"Solve to verify: {st.session_state.captcha_num1} + {st.session_state.captcha_num2} = ?")
+                print(captcha_answer)
 
                 col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
                 submit = col1.form_submit_button("Submit")
@@ -36,14 +42,17 @@ def contact(body_container):
                 if submit:
                     # --- Validations ---
                     if not name.strip():
-                        st.error("⚠️ Full Name is required.")
+                        st.error("⚠️ Name is required.")
+
                         return
                     if not email.strip():
                         st.error("⚠️ Email Address is required.")
+
                         return
 
                     if not validate_email(email.strip()):
                         st.error("❌ Invalid email format.")
+
                         return
 
                     full_phone = ""
@@ -55,6 +64,7 @@ def contact(body_container):
 
                     if not subject.strip():
                         st.error("⚠️ Subject is required.")
+
                         return
                     if not query.strip():
                         st.error("⚠️ Query is required.")
@@ -62,30 +72,21 @@ def contact(body_container):
 
                     # --- Captcha validation ---
                     ok, msg = validate_captcha(
-                        captcha_answer.strip(),
-                        st.session_state.captcha_num1,
-                        st.session_state.captcha_num2
-                    )
+                        captcha_answer.strip(), st.session_state.captcha_result)
                     if not ok:
                         st.error(msg)
-                        # regenerate new captcha
-                        st.session_state.captcha_num1 = random.randint(1, 9)
-                        st.session_state.captcha_num2 = random.randint(1, 9)
+
                         return
 
                     # --- Send email ---
                     with st.spinner("📨 Sending your message..."):
                         status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
-                    email_status(status, msg)
-
-                    # regenerate captcha for next attempt
-                    st.session_state.captcha_num1 = random.randint(1, 9)
-                    st.session_state.captcha_num2 = random.randint(1, 9)
+                    show_email_status(status, msg)
 
 
 @st.dialog("📨 Email Status")
-def email_status(success: bool, msg: str):
+def show_email_status(success: bool, msg: str):
     if success:
         st.success("✅ Your message has been sent successfully!")
     else:

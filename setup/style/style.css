@@ -295,7 +295,7 @@ input, [data-baseweb="select"], textarea, .stSelectbox div[data-baseweb="select"
   border-color: gray !important;
 }
 
-.st-key-contact-container button {
+.st-key-form-container button {
   background-color: var(--color-popover-button);
   text-shadow: var(--shadow-text-dark) !important;
   border-color:darkgray!important;

@@ -58,6 +58,15 @@ with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
 # Load additional configuration data from a YAML file
 with open('setup/yaml/ramboq_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     ramboq_config = yaml.safe_load(file)  # Load YAML config file
+    nav_labels = ramboq_config['nav_labels']
+    default_nav_label = ramboq_config['default_nav_label']
+    signin_label = "signin"
+    signout_label = "signout"
+    signin_label_val = "Sign in/Sign up"
+    signout_label_val = "Sign out"
+    nav_plus_signin = ramboq_config['nav_labels'] + [signin_label]
+    nav_plus_signin_out = ramboq_config['nav_labels'] + [signin_label, signout_label]
+    logo = get_path(ramboq_config['logo'])
 
 # Load additional configuration data from a YAML file
 with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as file:
@@ -351,16 +360,9 @@ def validate_password(password: str) -> bool:
     return True
 
 
-def generate_captcha():
-    """Return a simple numeric captcha as (question, answer)."""
-    a = random.randint(1, 9)
-    b = random.randint(1, 9)
-    return f"{a} + {b} = ?", a + b
-
-
-def validate_captcha(answer, num1, num2):
+def validate_captcha(answer, result):
     try:
-        if float(answer) == (num1 + num2):
+        if float(answer) == result:
             return True, "Captcha validated successfully."
         else:
             return False, "Captcha answer is incorrect."
