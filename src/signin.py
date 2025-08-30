@@ -52,7 +52,6 @@ def signin(body_container):
                             for e in errors:
                                 st.error(e)
                         else:
-                            # TODO: Backend validation of email/account + password
                             show_status_dialog(True, "Signed in successfully!")
 
             # --- SIGN UP FORM ---
