@@ -127,6 +127,9 @@ def show_status_dialog(success: bool, msg: str):
 
 
 def set_captcha_state(field_names, clear, captcha_min=1, captcha_max=9):
+    for fld in ['reset_clear', 'signin_clear', 'signup_clear', 'contact_clear']:
+        if clear != fld: st.session_state[fld] = True
+
     if clear not in st.session_state or st.session_state[clear]:
         st.session_state[clear] = False
         for field in field_names:
