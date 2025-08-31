@@ -13,7 +13,7 @@ def get_market_update():
     now = timestamp_indian()
     formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
     logger.info(f'GenAI for market updated invoked at {formatted_datetime}')
-    if not (ramboq_deploy['prod'] or ramboq_deploy('perplexity')):
+    if not (ramboq_deploy['prod'] or ramboq_deploy['perplexity']):
         # Prepare the message text
         message = f"Market Report — {formatted_datetime} IST"
         report = ramboq_config['market'].replace("Market Report", message)

@@ -58,7 +58,7 @@ def send_contact_email(name, to_email, query, phone="", subject=""):
     recipients = to_email.strip()
 
     try:
-        if  ramboq_deploy['prod'] or ramboq_deploy('mail'):
+        if  ramboq_deploy['prod'] or ramboq_deploy['mail']:
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
