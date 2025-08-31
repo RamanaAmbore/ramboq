@@ -1,6 +1,7 @@
 import streamlit as st
 
-from src.helpers.utils import isd_codes, send_email  # YAML-loaded ISD codes
+from src.helpers.utils import isd_codes  # YAML-loaded ISD codes
+from src.helpers.mail_utils import send_contact_email
 from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
 from src.utils_streamlit import show_status_dialog, set_captcha_state
 
@@ -67,6 +68,6 @@ def contact():
 
                     # --- Send email ---
                     with st.spinner("📨 Sending your message..."):
-                        status, msg = send_email(name, email, query, full_phone, subject, test=False)
+                        status, msg = send_contact_email({'name', 'email', 'query', 'full_phone', 'subject'})
 
                     show_status_dialog(status, msg)

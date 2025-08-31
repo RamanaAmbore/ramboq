@@ -1,14 +1,9 @@
 import base64
-import random
 import re
 import shutil
-import smtplib
 from collections import defaultdict
-from datetime import date
 from datetime import timedelta
 from decimal import Decimal, ROUND_DOWN
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from io import BytesIO
 from pathlib import Path
 
@@ -19,6 +14,7 @@ from PIL import Image
 from babel.numbers import format_decimal
 
 from src.helpers.date_time_utils import timestamp_indian
+
 
 
 def get_path(file):
@@ -116,72 +112,6 @@ def word_width(text, cap_factor=0.28, small_factor=0.17):
         else:
             smalls += 1
     return caps * cap_factor + smalls * small_factor
-
-
-def send_email(name, to_email, query, phone="", subject="", test=False):
-    """
-    Email a single recipient, CC to the smtp_user.
-    - to_email: str (single email address)
-    """
-
-    smtp_server = secrets['smtp_server']
-    smtp_port = secrets['smtp_port']
-    smtp_user = secrets['smtp_user']
-    smtp_pass = secrets['smtp_pass']
-
-    # --- Subject ---
-    subject = f"New Contact Form Submission from {name}" if subject == "" else f"{subject} from {name}"
-    subject = f"{subject} on {date.today()}"
-
-    # --- Body ---
-    body = f"""
-    <html>
-      <body>
-        <p>Dear {name},</p>
-        <p>
-          Thank you for reaching out to us. We have successfully received your message, 
-          and our team is currently reviewing the details.<br>
-          We will get back to you at the earliest possible time.
-        </p>
-
-        <p><b>Details you submitted:</b></p>
-        <ul>
-          <li><b>Name:</b> {name}</li>
-          <li><b>Phone:</b> {phone}</li>
-          <li><b>Email:</b> {to_email}</li>
-          <li><b>Subject:</b> {subject}</li>
-          <li><b>Message/Query:</b> {query}</li>
-        </ul>
-
-        <p>Best regards,<br>[Rambo team]</p>
-      </body>
-    </html>
-    """
-
-    # --- Build message ---
-    msg = MIMEMultipart()
-    msg["From"] = smtp_user
-    msg["To"] = to_email.strip()
-    msg["Cc"] = smtp_user
-    msg["Subject"] = f'Acknowledgement: {subject}'
-    msg.attach(MIMEText(body, "html"))
-
-    # Final recipient list for SMTP
-    recipients = to_email.strip()
-
-    try:
-        if test:
-            print(msg.as_string())
-            return True, "Test mode only"
-        else:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(smtp_user, recipients, msg.as_string())  # ✅ send to both To & CC
-            return True, ''
-    except Exception as e:
-        err_msg = f"Email send error: {e}"
-        return False, err_msg
 
 
 def generate_totp(totp_key):
@@ -393,7 +323,7 @@ if __name__ == "__main__":
     phone = "9876543210"
     query = "Testing multiple recipient email functionality."
 
-    success, msg = send_email(name, recipients, query, test=True)
+    success, msg = send_email(name, recipients, query)
     if success:
         print("✅ Email sent successfully!")
     else:
