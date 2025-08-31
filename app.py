@@ -1,6 +1,3 @@
-# Import necessary modules and components
-
-
 import streamlit as st
 
 # Patch before anything else touches st.cache
