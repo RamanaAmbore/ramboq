@@ -50,7 +50,7 @@ def initial_setup():
 
     # Set the page configuration for the Streamlit app
     st.set_page_config(
-        page_title="Rambo Quant Investments",  # Set the page title dynamically
+        page_title="RamboQ: Rambo Quant Investments",  # Set the page title dynamically
         page_icon=favicon_path,  # Use the favicon image
         layout="centered"  # Use a wide layout for the app
     )

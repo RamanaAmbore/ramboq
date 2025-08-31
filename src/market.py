@@ -9,8 +9,7 @@ def market():
         with st.container(key='text-container'):
             placeholder = st.empty()  # reserve placeholder spot
 
-    # Generate content which takes time
-    content = get_market_update(get_cycle_date())
-
-    # Update the placeholder with the generated content
-    placeholder.write(content)
+            with st.spinner("Fetching response from GenAI…"):
+                content = get_market_update(get_cycle_date())
+                # After content is ready, update the placeholder
+                placeholder.write(content)
