@@ -1,12 +1,12 @@
 import streamlit as st
 
 from src.constants import holdings_config, margins_config, positions_config
-from src.helpers.utils import get_cycle_date, add_comma_to_number, add_comma_to_df_numbers
-from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins, style_dataframe
+from src.helpers.utils import get_cycle_date, add_comma_to_df_numbers
+from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins
 
 
-def performance(body_container):
-    with body_container:
+def performance():
+    with st.container(key="body-container"):
         # Apply custom styles
         def style_dataframe(df):
             return (
@@ -22,7 +22,7 @@ def performance(body_container):
             fetch_positions(get_cycle_date())
 
             st.dataframe(style_dataframe(add_comma_to_df_numbers(df)), hide_index=True,
-                     column_config=margins_config)
+                         column_config=margins_config)
 
         with tabs[1]:
             df, sum_df = fetch_holdings(get_cycle_date(), fetch_margins(get_cycle_date()))

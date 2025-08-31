@@ -1,10 +1,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
+
 from src.helpers.utils import ramboq_config
 
 
-def faq(body_container):
-    with body_container:
+def faq():
+    with st.container(key="body-container"):
         with st.container(key='text-container'):
             st.write(ramboq_config['faq'])
             st.write(ramboq_config['nav_flow_title'])

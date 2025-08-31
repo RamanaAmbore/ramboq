@@ -3,9 +3,9 @@ import streamlit as st
 from src.helpers.utils import ramboq_config
 
 
-def footer(footer_container):
+def footer():
     footer_name = f"© {ramboq_config['footer_name']}"
-    with footer_container:
+    with st.container(key='footer-container'):
         st.markdown(
             f"""
             <p class="footer-desktop">

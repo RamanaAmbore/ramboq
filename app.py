@@ -1,16 +1,23 @@
 import streamlit as st
 
+from src.about import about
+from src.contact import contact
+from src.faq import faq
+from src.market import market
+from src.performance import performance
+from src.post import post
+from src.signin import signin
+
 # Patch before anything else touches st.cache
 if hasattr(st, "cache") and hasattr(st, "cache_data"):
     st.cache = st.cache_data
 
 from streamlit_cookies_manager import EncryptedCookieManager
 
-from src.body import body
 # Import custom components and functions from the src directory
 from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
-from src.header import create_navbar_desktop_container, create_navbar_mobile_container
+from src.header import create_navbar
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import get_path, css_style, \
     ramboq_config, nav_plus_signin, \
@@ -92,12 +99,19 @@ def initialize_app_state():
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
 
-    with st.container(key="navbar-container"):
-        create_navbar_desktop_container()
-        create_navbar_mobile_container()
+    create_navbar()
 
-    body_container = st.container(key="body-container")
-    footer_container = st.container(key='footer-container')
+    # Create a mapping from nav labels to functions
+    page_functions = {
+        "signin": signin,
+        "about": about,
+        "market": market,
+        "performance": performance,
+        "faq": faq,
+        "post": post,
+        "contact": contact,
+    }
 
-    body(body_container)
-    footer(footer_container)
+    page_functions[st.session_state.active_nav]()
+
+    footer()

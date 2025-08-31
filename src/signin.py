@@ -4,9 +4,10 @@ from src.helpers.utils import validate_captcha, validate_password, validate_emai
 from src.utils_streamlit import set_captcha_state, show_status_dialog
 
 
-def signin(body_container):
-    with body_container:
-        with st.container(key='contact_container'):
+@st.fragment
+def signin():
+    with st.container(key="body-container"):
+        with st.container(key='contact-container'):
 
             # Menu to switch between forms
             menu = st.radio("Choose option:", ["Sign In", "Sign Up", "Reset Password"], horizontal=True)

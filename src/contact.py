@@ -5,13 +5,13 @@ from src.helpers.utils import ramboq_config, validate_email, validate_phone, val
 from src.utils_streamlit import show_status_dialog, set_captcha_state
 
 
-def contact(body_container):
-    with body_container:
-        with st.container(key="contact-container"):
+@st.fragment
+def contact():
+    with st.container(key="body-container"):
+        with st.container(key='contact-container'):
             st.write(ramboq_config["contact"])
             lst = ['name', 'email', 'phone_number', 'subject', 'query', 'answer']
             set_captcha_state(lst, 'contact_clear')
-
 
             with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
                 name = st.text_input("Full Name *", key="name", max_chars=100)
@@ -23,7 +23,8 @@ def contact(body_container):
 
                 # --- Captcha field ---
                 captcha_answer = st.text_input("Answer", key='answer')
-                st.write(f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
+                st.write(
+                    f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
                 print(captcha_answer)
 
                 col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
@@ -69,5 +70,3 @@ def contact(body_container):
                         status, msg = send_email(name, email, query, full_phone, subject, test=False)
 
                     show_status_dialog(status, msg)
-
-

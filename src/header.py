@@ -1,10 +1,17 @@
 import streamlit as st
 
 from src.components import container
-from src.helpers.utils import capitalize, nav_plus_signin, logo, nav_labels, nav_plus_signin_out
+from src.helpers.utils import nav_plus_signin, logo, nav_labels
 from src.helpers.utils import ramboq_config
 
-def conf_nav_label (label="", type='desktop'):
+
+def create_navbar():
+    with st.container(key="navbar-container"):
+        create_navbar_desktop_container()
+        create_navbar_mobile_container()
+
+
+def conf_nav_label(label="", type='desktop'):
     if st.session_state.active_nav == label:
         st.button(st.session_state.nav_map[label], type="tertiary", key=f'button-active-{type}', disabled=True)
     else:
@@ -30,7 +37,8 @@ def create_navbar_desktop_container():
 
         with signin_col:
             with st.container(key='signin-out'):
-                st.button(st.session_state.nav_map['signin'], type="tertiary", on_click=set_active_nav, args=('signin',))
+                st.button(st.session_state.nav_map['signin'], type="tertiary", on_click=set_active_nav,
+                          args=('signin',))
 
 
 def create_navbar_mobile_container():
