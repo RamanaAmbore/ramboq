@@ -1,7 +1,13 @@
 # Import necessary modules and components
-import random
+
 
 import streamlit as st
+
+# Patch before anything else touches st.cache
+if hasattr(st, "cache") and hasattr(st, "cache_data"):
+    st.cache = st.cache_data
+
+from streamlit_cookies_manager import EncryptedCookieManager
 
 from src.body import body
 # Import custom components and functions from the src directory
@@ -13,10 +19,24 @@ from src.helpers.utils import get_path, css_style, \
     ramboq_config, nav_plus_signin, \
     default_nav_label, nav_plus_signin_out, \
     capitalize, signin_label, signout_label, \
-    signin_label_val, signout_label_val  # Utility functions for styling, accessing profile data, and image paths
+    signin_label_val, signout_label_val, \
+    secrets  # Utility functions for styling, accessing profile data, and image paths
 from src.utils_streamlit import get_image_bin_file
 
 logger = get_logger(__name__)
+
+# Monkey patch st.cache → st.cache_data if any package still uses it
+if hasattr(st, "cache") and hasattr(st, "cache_data"):
+    st.cache = st.cache_data
+
+# Create cookie manager
+cookies = EncryptedCookieManager(
+    prefix="ramboq_",  # prefix for your app cookies
+    password=secrets['cookie_secret'],  # should be kept secret
+)
+
+if not cookies.ready():
+    st.stop()  # Wait until cookies are available
 
 
 # Define the initial setup function to configure the Streamlit app
@@ -54,7 +74,6 @@ def initialize_app_state():
         st.session_state.user_validated = False
         st.session_state.user_locked = False
         st.session_state.prof_label = ""
-
 
         params = st.query_params
         parm_label = params.get("page", None)
