@@ -133,7 +133,8 @@ def set_captcha_state(field_names, clear, captcha_min=1, captcha_max=9):
     if clear not in st.session_state or st.session_state[clear]:
         st.session_state[clear] = False
         for field in field_names:
-            st.session_state[field] = ""
+            if field != 'ph_country':
+                st.session_state[field] = ""
 
         st.session_state['captcha_num1'] = random.randint(captcha_min, captcha_max)
         st.session_state['captcha_num2'] = random.randint(captcha_min, captcha_max)

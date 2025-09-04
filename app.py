@@ -24,7 +24,7 @@ from src.helpers.utils import get_path, css_style, \
     default_nav_label, nav_plus_signin_out, \
     capitalize, signin_label, signout_label, \
     signin_label_val, signout_label_val, \
-    secrets  # Utility functions for styling, accessing profile data, and image paths
+    secrets, isd_codes  # Utility functions for styling, accessing profile data, and image paths
 from src.utils_streamlit import get_image_bin_file
 
 logger = get_logger(__name__)
@@ -78,6 +78,8 @@ def initialize_app_state():
         st.session_state.user_validated = False
         st.session_state.user_locked = False
         st.session_state.prof_label = ""
+
+        st.session_state.ph_country = isd_codes[0]
 
         params = st.query_params
         parm_label = params.get("page", None)

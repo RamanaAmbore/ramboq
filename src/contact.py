@@ -1,9 +1,12 @@
+from datetime import date
+
 import streamlit as st
 
-from src.helpers.utils import isd_codes  # YAML-loaded ISD codes
+from src.components import render_form
+from src.constants import email_ack_tmpl
 from src.helpers.mail_utils import send_contact_email
-from src.helpers.utils import ramboq_config, validate_email, validate_phone, validate_captcha
-from src.utils_streamlit import show_status_dialog, set_captcha_state
+from src.helpers.utils import ramboq_config
+from src.utils_streamlit import show_status_dialog
 
 
 @st.fragment
@@ -11,63 +14,26 @@ def contact():
     with st.container(key="body-container"):
         with st.container(key='contact-container'):
             st.write(ramboq_config["contact"])
-            lst = ['name', 'email', 'phone_number', 'subject', 'query', 'answer']
-            set_captcha_state(lst, 'contact_clear')
+            # field list
+            fields = ['name', 'email_id', 'ph_country', 'ph_num', 'subject', 'query', 'captcha_answer']
+            names = ['Name', 'Email Address', 'Phone Country Code', 'Phone Number', 'Subject', 'Your query', 'Answer']
+            must = [True, True, False, False, True, True, False]
 
-            with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
-                name = st.text_input("Full Name *", key="name", max_chars=100)
-                email = st.text_input("Email Address *", key="email")
-                phone_country = st.selectbox("Country Code", isd_codes, key="phone_country")
-                phone_number = st.text_input("Phone Number", key="phone_number")
-                subject = st.text_input("Subject *", key="subject", max_chars=150)
-                query = st.text_area("Your Query *", key="query", height=150)
+            v_xref, msg = render_form(fields, names, must)
+            if not v_xref:
+                if msg:
+                    st.error(msg)
+                return
 
-                # --- Captcha field ---
-                captcha_answer = st.text_input("Answer", key='answer')
-                st.write(
-                    f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
-                print(captcha_answer)
 
-                col1, col2, _ = st.columns([1, 1, 2], vertical_alignment="center")
-                submit = col1.form_submit_button("Submit")
+            v_xref['subject'] = f"Acknowledgement: {v_xref['subject']} on {date.today()}"
 
-                if submit:
-                    # --- Validations ---
-                    if not name.strip():
-                        st.error("⚠️ Name is required.")
-                        return
-                    if not email.strip():
-                        st.error("⚠️ Email Address is required.")
-                        return
+            # Usage:
+            html_body = email_ack_tmpl.format(**v_xref)
 
-                    if not validate_email(email.strip()):
-                        st.error("❌ Invalid email format.")
-                        return
+            # --- Send email ---
+            with st.spinner("📨 Sending your message..."):
+                status, msg = send_contact_email(v_xref['name'], v_xref['email_id'], v_xref['subject'],
+                                                 html_body)
 
-                    full_phone = ""
-                    if phone_number.strip():
-                        ok, msg, full_phone = validate_phone(phone_country, phone_number.strip())
-                        if not ok:
-                            st.error(msg)
-                            return
-
-                    if not subject.strip():
-                        st.error("⚠️ Subject is required.")
-                        return
-
-                    if not query.strip():
-                        st.error("⚠️ Query is required.")
-                        return
-
-                    # --- Captcha validation ---
-                    ok, msg = validate_captcha(
-                        captcha_answer.strip(), st.session_state['captcha_result'])
-                    if not ok:
-                        st.error(msg)
-                        return
-
-                    # --- Send email ---
-                    with st.spinner("📨 Sending your message..."):
-                        status, msg = send_contact_email({'name', 'email', 'query', 'full_phone', 'subject'})
-
-                    show_status_dialog(status, msg)
+            show_status_dialog(status, msg)

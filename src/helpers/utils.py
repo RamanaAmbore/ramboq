@@ -302,18 +302,22 @@ def validate_captcha(answer, result):
 
 def validate_phone(country_code: str, phone_number: str):
     # Keep only digits in country code
+
+    if not country_code:
+        return False, "❌ Phone country code is not selected", None
+
     code = re.sub(r"\D", "", country_code)
-    full_phone = f"+{code}{phone_number}"
+
 
     phone_pattern = r"^[0-9+\s()]+$"
-    if not re.match(phone_pattern, full_phone):
+    if not re.match(phone_pattern, phone_number):
         return False, "❌ Phone number may only contain digits, +, spaces, ( and )", None
 
     digits_only = re.sub(r"\D", "", phone_number)
     if not (7 <= len(digits_only) <= 15):
         return False, "❌ Phone number must be between 7 and 15 digits", None
-
-    return True, "", full_phone
+    full_phone = re.sub(r'[\s()-]', '', phone_number)
+    return True, "", digits_only
 
 
 if __name__ == "__main__":
