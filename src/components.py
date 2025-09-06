@@ -2,7 +2,7 @@ import streamlit as st
 
 from src.helpers.utils import ramboq_config, constants, get_image_bin_file as get_image_file, isd_codes, validate_email, \
     validate_phone, validate_captcha
-from src.utils_streamlit import set_captcha_state
+from src.utils_streamlit import reset_form_state_vars
 
 
 # Function to set a PNG image as the page background
@@ -133,7 +133,7 @@ def write_columns(column_list, name):
             disp_icon_text(vals['icon'], label, vals['link'])  # Display the profile icon, label, and link
 
 
-def render_form(fields, names, must):
+def render_form(fields, names, must, labels=None, form='contact'):
     """
     Render a generic form based on fields, names, and must (required).
     Returns dict of field values if submitted, else None.
@@ -142,21 +142,29 @@ def render_form(fields, names, must):
     # xref dictionaries
     xref = dict(zip(fields, names))
     m_xref = dict(zip(fields, must))
-    l_xref = {key: (f'{xref[key]} *' if m_xref[key] else xref[key]) for key in fields}
+
+    if labels is not None:
+        l_xref = dict(zip(fields,labels))
+    else:
+        l_xref = {key: (f'{xref[key]} *' if m_xref[key] else xref[key]) for key in fields}
 
     if 'captcha_answer' in fields:
-        set_captcha_state(fields, 'contact_clear')
+        reset_form_state_vars(fields, f'{form}_clear')
 
-    with st.form("contact_form", clear_on_submit=False):  # Don't clear on error
-        for fld in xref:
+    with st.form("form", clear_on_submit=False):  # Don't clear on error
+        for fld in fields:
             if fld == 'ph_country':
-                st.selectbox(l_xref['ph_country'], isd_codes, key="ph_country")
+                st.selectbox(l_xref[fld], isd_codes, key=fld)
+            elif fld.endswith('password'):
+                st.text_input(l_xref[fld], type='password', key=fld)
+            elif fld.endswith('calendar'):
+                st.date_input(l_xref[fld], key=fld)
             elif fld == 'query':
                 st.text_area(l_xref['query'], key="query", height=150)
-            elif fld != 'captcha_answer':
+            elif not fld.startswith('captcha'):
                 st.text_input(l_xref[fld], key=fld)
             # --- Captcha field ---
-            elif 'captcha_answer' in fields:
+            elif fld.startswith('captcha'):
                 captcha_answer = st.text_input("Answer", key='captcha_answer')
                 st.write(
                     f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
@@ -167,21 +175,23 @@ def render_form(fields, names, must):
         if submit:
             v_xref = {key: st.session_state[key].strip() for key in fields}
 
-            for key, required in m_xref.items():
-                if required and not v_xref[key]:
+            for key in fields:
+                if m_xref[key] and not v_xref[key]:
                     return False, f"⚠️ {xref[key]} is required"
 
-            if v_xref['email_id'] and not validate_email(v_xref['email_id']):
-                return False, "❌ Invalid email format."
+                if fld=='email_id' and v_xref['email_id'] and not validate_email(v_xref['email_id']):
+                    return False, "❌ Invalid email format."
 
-            if v_xref['ph_num']:
-                ok, msg, st.session_state.full_phone = validate_phone(v_xref['ph_country'], v_xref['ph_num'])
-                v_xref['ph_num'] = st.session_state.full_phone
-                if not ok:
-                    # st.error(msg)
-                    return False, msg
-            else:
-                st.session_state.full_phone = ""
+                if fld=='ph_num':
+                    if v_xref['ph_num']:
+                        ok, msg, st.session_state.full_phone = validate_phone(v_xref['ph_country'], v_xref['ph_num'])
+                        v_xref['ph_num'] = st.session_state.full_phone
+                        if not ok:
+                            # st.error(msg)
+                            return False, msg
+                    else:
+                        st.session_state.full_phone = ""
+
 
             # --- Captcha validation ---
             if 'captcha_answer' in fields:
@@ -191,6 +201,6 @@ def render_form(fields, names, must):
                     # st.error(msg)
                     return False, msg
 
-                return v_xref, ""
+            return v_xref, ""
 
         return False, ""

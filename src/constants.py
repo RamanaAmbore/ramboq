@@ -120,7 +120,7 @@ margins_config = {
 
 }
 
-email_ack_tmpl = """
+email_contact_tmpl = """
         <html>
           <body>
             <p>Dear {name},</p>

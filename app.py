@@ -6,7 +6,7 @@ from src.faq import faq
 from src.market import market
 from src.performance import performance
 from src.post import post
-from src.signin import signin
+from src.signin import user_setup
 
 # Patch before anything else touches st.cache
 if hasattr(st, "cache") and hasattr(st, "cache_data"):
@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
     # Create a mapping from nav labels to functions
     page_functions = {
-        "signin": signin,
+        "signin": user_setup,
         "about": about,
         "market": market,
         "performance": performance,

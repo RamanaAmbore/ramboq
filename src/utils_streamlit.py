@@ -114,9 +114,9 @@ def style_dataframe(df: pd.DataFrame):
 
 
 @st.dialog("📨 Email Status")
-def show_status_dialog(success: bool, msg: str):
+def show_status_dialog(success: bool, msg="✅ Your message has been sent successfully!"):
     if success:
-        st.success("✅ Your message has been sent successfully!")
+        st.success(msg)
     else:
         st.error(f"❌ Failed to send your message. {msg}")
 
@@ -126,7 +126,7 @@ def show_status_dialog(success: bool, msg: str):
         st.rerun()
 
 
-def set_captcha_state(field_names, clear, captcha_min=1, captcha_max=9):
+def reset_form_state_vars(field_names, clear, captcha_min=1, captcha_max=9):
     for fld in ['reset_clear', 'signin_clear', 'signup_clear', 'contact_clear']:
         if clear != fld: st.session_state[fld] = True
 
