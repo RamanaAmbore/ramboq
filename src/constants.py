@@ -140,7 +140,7 @@ email_contact_tmpl = """
               <li><b>Message/Query:</b> {query}</li>
             </ul>
 
-            <p>Best regards,<br>[Rambo team]</p>
+            <p>Best regards,<br>[RamboQ team]</p>
           </body>
         </html>
         """
@@ -154,11 +154,11 @@ email_reg_tmpl = """
 
             To complete your onboarding, please follow these steps:
             
-            <ol> <li><b>Sign in</b> to your account using your registered email and password.</li> <li><b>Update your profile</b> with the required information.</li> <li>Your registration details will be <b>reviewed and validated by a member of the Rambo team</b>.</li> <li>Once your profile is approved, you will receive a confirmation. <b>You will then be able to access and use all features of your account.</b></li> </ol>
+            <ol> <li><b>Sign in</b> to your account using your registered email and password.</li> <li><b>Update your profile</b> with the required information.</li> <li>Your registration details will be <b>reviewed and validated by a member of the RamboQ team</b>.</li> <li>Once your profile is approved, you will receive a confirmation. <b>You will then be able to access and use all features of your account.</b></li> </ol>
             If you have any questions, feel free to contact us.
             </p>
             
-            <p>Best regards,<br>[Rambo team]</p>
+            <p>Best regards,<br>[RamboQ team]</p>
           </body>
         </html>
         """
@@ -174,13 +174,13 @@ email_prof_updated_tmpl = """
             <p>
               <b>What happens next?</b>
               <ol>
-                <li>Your registration and profile information will now be <b>reviewed and validated by a member of the Rambo team</b>.</li>
+                <li>Your registration and profile information will now be <b>reviewed and validated by a member of the RamboQ team</b>.</li>
                 <li>Once your profile is approved, you will receive a confirmation by email.</li>
                 <li>After approval, you will have full access to your account and all platform features.</li>
               </ol>
               If you have any questions, feel free to contact us at any time.
             </p>
-            <p>Best regards,<br>[Rambo team]</p>
+            <p>Best regards,<br>[RamboQ team]</p>
           </body>
         </html>
         """
@@ -196,7 +196,7 @@ email_prof_approval_tmpl = """
               You now have full access to your account and all features on our platform. If you have any questions or need assistance, please feel free to reach out to us at any time.
             </p>
             <p>Thank you for choosing Rambo!</p>
-            <p>Best regards,<br>[Rambo team]</p>
+            <p>Best regards,<br>[RamboQ team]</p>
           </body>
         </html>
         """
@@ -218,7 +218,7 @@ email_reset_tmpl = """
     <p>
       Thank you for being a valued member of the Rambo community.
     </p>
-    <p>Best regards,<br>[Rambo team]</p>
+    <p>Best regards,<br>[RamboQ team]</p>
   </body>
 </html>
 """
