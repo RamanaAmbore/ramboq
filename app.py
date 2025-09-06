@@ -6,6 +6,7 @@ from src.faq import faq
 from src.market import market
 from src.performance import performance
 from src.post import post
+from src.profile import profile
 from src.user import user
 
 # Patch before anything else touches st.cache
@@ -71,13 +72,14 @@ def initialize_app_state():
     if "first_time" not in st.session_state:
         st.session_state.first_time = False
 
-        st.session_state.signin_pressed = False
-        st.session_state.signout_pressed = False
+        st.session_state.signin_completed = False
+        st.session_state.signout_completed = False
+        st.session_state.reset_completed = False
         st.session_state.reg_completed = False
-        st.session_state.user_prof_updated = False
+        st.session_state.profile_updated = False
         st.session_state.user_validated = False
         st.session_state.user_locked = False
-        st.session_state.prof_label = ""
+        st.session_state.user_label = ""
 
         st.session_state.ph_country = isd_codes[0]
 
@@ -95,12 +97,13 @@ def initialize_app_state():
         st.session_state.nav_map[signout_label] = signout_label_val
 
         st.query_params["page"] = st.session_state.active_nav
+        st.session_state.nav_map['profile'] = "Ramana"
 
 
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
-    print("i am here")
+
     create_navbar()
 
     # Create a mapping from nav labels to functions
@@ -112,6 +115,7 @@ if __name__ == '__main__':
         "faq": faq,
         "post": post,
         "contact": contact,
+        "profile": profile
     }
 
     page_functions[st.session_state.active_nav]()

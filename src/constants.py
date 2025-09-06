@@ -201,12 +201,12 @@ email_prof_approval_tmpl = """
         </html>
         """
 
-email_reset_tmpl = """
+email_update_tmpl = """
 <html>
   <body>
     <p>Dear sir/madam,</p>
     <p>
-      Your password for the account registered with {email_id} has been successfully reset.
+      Your password for the account registered with {email_id} has been successfully updated.
     </p>
     <p>
       You can now sign in using your new password.<br>

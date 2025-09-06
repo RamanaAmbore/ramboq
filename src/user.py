@@ -3,26 +3,26 @@ from datetime import date
 import streamlit as st
 
 from src.components import render_form
-from src.constants import email_reg_tmpl, email_reset_tmpl
+from src.constants import email_reg_tmpl, email_update_tmpl
 from src.helpers.mail_utils import send_email
 from src.helpers.utils import validate_password_standard
 from src.utils_streamlit import show_status_dialog
 
 
-
+@st.fragment
 def user():
     with st.container(key="body-container"):
         with st.container(key='contact-container'):
             # Menu to switch between forms
-            menu = st.radio("Choose option:", ["Sign In", "Sign Up", "Reset Password"], horizontal=True)
+            menu = st.radio("Choose option:", ["Sign In", "Sign Up",  "Update Password"], horizontal=True)
 
             # Delegate to the corresponding form function
             if menu == "Sign In":
                 signin_form()
             elif menu == "Sign Up":
                 signup_form()
-            elif menu == "Reset Password":
-                reset_form()
+            elif menu == "Update Password":
+                update_form()
 
 @st.fragment
 def signup_form():
@@ -57,7 +57,8 @@ def signup_form():
 
         status, msg = send_email("", v_xref['email_id'], v_xref['subject'], html_body)
         if status:
-            st.session_state['form'] = "✅ Email has been sent with additional instructions!"
+            msg = "✅ Email has been sent with additional instructions!"
+            st.session_state.reg_completed = True
 
     show_status_dialog(status, msg)
 
@@ -83,12 +84,14 @@ def signin_form():
         if not status:
             st.error(msg)
             return
+    st.session_state.signin_completed = True
+    st.session_state.nav_map['profile'] = "Ramana"
 
     show_status_dialog(True, "➡️ Signed in successfully")
 
 @st.fragment
-def reset_form():
-    st.subheader("Reset Password")
+def update_form():
+    st.subheader("Update Password")
     fields = ['email_id', 'account_no', 'old_password', 'new_password', 'confirm_password', 'captcha_answer']
     names = ['Email', 'Account', 'Current Password', 'New Password', 'Confirm New Password', 'Answer']
     l_xref = ['Email *', 'Account *', 'Current Password *', 'New Password *', 'Confirm New Password *', 'Answer *']
@@ -117,9 +120,9 @@ def reset_form():
     with (st.spinner("📨 Sending confirmation email...")):
         v_xref['subject'] = \
             f"Password Reset: Your password reset on RamboQ for {v_xref['email_id']} {v_xref['account_no']}on {date.today()}"
-        html_body = email_reset_tmpl.format(**v_xref)
+        html_body = email_update_tmpl.format(**v_xref)
         status, msg = send_email('', v_xref['email_id'], v_xref['subject'], html_body)
         if status:
-            msg = '✉️🔒 Password reset request has been confirmed — email sent successfully'
-
+            msg = '✉️🔒 Password update request has been confirmed — email sent successfully'
+            st.session_state.reset_completed = True
     show_status_dialog(status, msg)

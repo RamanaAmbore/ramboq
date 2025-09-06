@@ -16,7 +16,7 @@ def contact():
             st.write(ramboq_config["contact"])
             # field list
             fields = ['name', 'email_id', 'ph_country', 'ph_num', 'subject', 'query', 'captcha_answer']
-            names = ['Name', 'Email Address', 'Phone Country Code', 'Phone Number', 'Subject', 'Your query', 'Answer']
+            names = ['Name', 'Email Address', 'ISD Code', 'Phone Number', 'Subject', 'Your query', 'Answer']
             must = [True, True, False, False, True, True, True]
 
             v_xref, msg = render_form(fields, names, must)

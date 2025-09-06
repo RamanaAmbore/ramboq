@@ -64,7 +64,6 @@ def set_active_nav(label):
     else:
         st.session_state.active_nav = label
     st.query_params["page"] = st.session_state.active_nav
-    st.session_state.signin_pressed = False
 
 
 def validate_parms():

@@ -133,7 +133,7 @@ def write_columns(column_list, name):
             disp_icon_text(vals['icon'], label, vals['link'])  # Display the profile icon, label, and link
 
 
-def render_form(fields, names, must, labels=None, form='contact'):
+def render_form(fields, names, must, labels=None, disabled=None, form='contact'):
     """
     Render a generic form based on fields, names, and must (required).
     Returns dict of field values if submitted, else None.
@@ -142,6 +142,9 @@ def render_form(fields, names, must, labels=None, form='contact'):
     # xref dictionaries
     xref = dict(zip(fields, names))
     m_xref = dict(zip(fields, must))
+    if disabled is None:
+        disabled = [False] * len(fields)
+    d_xref = dict(zip(fields, disabled))
 
     if labels is not None:
         l_xref = dict(zip(fields,labels))
@@ -153,19 +156,19 @@ def render_form(fields, names, must, labels=None, form='contact'):
 
     with st.form("ramboq_form", clear_on_submit=False):  # Don't clear on error
         for fld in fields:
-            if fld == 'ph_country':
-                st.selectbox(l_xref[fld], isd_codes, key=fld)
-            elif fld.endswith('password'):
-                st.text_input(l_xref[fld], type='password', key=fld)
-            elif fld.endswith('calendar'):
+            if 'ph_country' in fld:
+                st.selectbox(l_xref[fld], isd_codes, key=fld,disabled=d_xref[fld])
+            elif 'password' in fld:
+                st.text_input(l_xref[fld], type='password', key=fld,disabled=d_xref[fld])
+            elif 'dob' in fld:
                 st.date_input(l_xref[fld], key=fld)
-            elif fld == 'query':
-                st.text_area(l_xref['query'], key="query", height=150)
+            elif 'query' in fld:
+                st.text_area(l_xref['query'], key="query", height=150,disabled=d_xref[fld])
             elif not fld.startswith('captcha'):
-                st.text_input(l_xref[fld], key=fld)
+                st.text_input(l_xref[fld], key=fld,disabled=d_xref[fld])
             # --- Captcha field ---
             elif fld.startswith('captcha'):
-                captcha_answer = st.text_input("Answer", key='captcha_answer')
+                captcha_answer = st.text_input("Answer", key='captcha_answer',disabled=d_xref[fld])
                 st.write(
                     f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
 
@@ -179,10 +182,10 @@ def render_form(fields, names, must, labels=None, form='contact'):
                 if m_xref[key] and not v_xref[key]:
                     return False, f"⚠️ {xref[key]} is required"
 
-                if fld=='email_id' and v_xref['email_id'] and not validate_email(v_xref['email_id']):
+                if 'email_id' in fld and v_xref['email_id'] and not validate_email(v_xref['email_id']):
                     return False, "❌ Invalid email format."
 
-                if fld=='ph_num':
+                if 'ph_num' in fld:
                     if v_xref['ph_num']:
                         ok, msg, st.session_state.full_phone = validate_phone(v_xref['ph_country'], v_xref['ph_num'])
                         v_xref['ph_num'] = st.session_state.full_phone
