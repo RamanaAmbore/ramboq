@@ -4,12 +4,13 @@ import streamlit as st
 
 from src.components import render_form
 from src.constants import email_reg_tmpl, email_reset_tmpl
-from src.helpers.mail_utils import send_contact_email
+from src.helpers.mail_utils import send_email
+from src.helpers.utils import validate_password_standard
 from src.utils_streamlit import show_status_dialog
 
 
-@st.fragment
-def user_setup():
+
+def user():
     with st.container(key="body-container"):
         with st.container(key='contact-container'):
             # Menu to switch between forms
@@ -23,7 +24,7 @@ def user_setup():
             elif menu == "Reset Password":
                 reset_form()
 
-
+@st.fragment
 def signup_form():
     st.subheader("Create Account")
     fields = ['email_id', 'password', 'confirm_password', 'captcha_answer']
@@ -33,6 +34,11 @@ def signup_form():
     v_xref, msg = render_form(fields, names, must, form='signup')
     if not v_xref:
         if msg: st.error(msg)
+        return
+
+    status, msg = validate_password_standard(v_xref['password'])
+    if not status:
+        st.error(msg)
         return
 
     if v_xref['password'] != v_xref['confirm_password']:
@@ -49,11 +55,14 @@ def signup_form():
         v_xref['subject'] = f"Registration Acknowledgement: Your registration in RamboQ on {date.today()}"
         html_body = email_reg_tmpl.format(**v_xref)
 
-        status, msg = send_contact_email("", v_xref['email_id'], v_xref['subject'], html_body)
+        status, msg = send_email("", v_xref['email_id'], v_xref['subject'], html_body)
+        if status:
+            st.session_state['form'] = "✅ Email has been sent with additional instructions!"
 
     show_status_dialog(status, msg)
 
 
+@st.fragment
 def signin_form():
     st.subheader("Sign In")
     fields = ['email_id', 'account', 'password', 'captcha_answer']
@@ -77,10 +86,10 @@ def signin_form():
 
     show_status_dialog(True, "➡️ Signed in successfully")
 
-
+@st.fragment
 def reset_form():
     st.subheader("Reset Password")
-    fields = ['email_id', 'account', 'old_password', 'new_password', 'confirm_password', 'captcha_answer']
+    fields = ['email_id', 'account_no', 'old_password', 'new_password', 'confirm_password', 'captcha_answer']
     names = ['Email', 'Account', 'Current Password', 'New Password', 'Confirm New Password', 'Answer']
     l_xref = ['Email *', 'Account *', 'Current Password *', 'New Password *', 'Confirm New Password *', 'Answer *']
     must = [False, False, True, True, True, True]
@@ -88,6 +97,15 @@ def reset_form():
     v_xref, msg = render_form(fields, names, must, l_xref, form='reset')
     if not v_xref:
         if msg: st.error(msg)
+        return
+
+    status, msg = validate_password_standard(v_xref['new_password'])
+    if not status:
+        st.error(msg)
+        return
+
+    if v_xref['new_password'] != v_xref['confirm_password']:
+        st.error("❌ New and confirm passwords don't match")
         return
 
     with st.spinner("Resetting the account password..."):
@@ -100,5 +118,8 @@ def reset_form():
         v_xref['subject'] = \
             f"Password Reset: Your password reset on RamboQ for {v_xref['email_id']} {v_xref['account_no']}on {date.today()}"
         html_body = email_reset_tmpl.format(**v_xref)
-        status, msg = send_contact_email('', v_xref['email_id'], v_xref['subject'], html_body)
+        status, msg = send_email('', v_xref['email_id'], v_xref['subject'], html_body)
+        if status:
+            msg = '✉️🔒 Password reset request has been confirmed — email sent successfully'
+
     show_status_dialog(status, msg)

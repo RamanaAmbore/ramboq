@@ -7,7 +7,7 @@ from email.utils import formataddr
 from src.helpers.utils import secrets, ramboq_deploy
 
 
-def send_contact_email(name, email_id, subject, html_body):
+def send_email(name, email_id, subject, html_body):
     """
     Email a single recipient, CC to the smtp_user.
     - to_email: str (single email address)
@@ -40,7 +40,7 @@ def send_contact_email(name, email_id, subject, html_body):
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, recipients, msg.as_string())  # ✅ send to both To & CC
-            return True, ''
+            return True, '✅ Your message has been sent successfully!'
         else:
             print(msg.as_string())
             return True, "Non-prod mode only"
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     phone = "9876543210"
     query = "Testing multiple recipient email functionality."
 
-    success, msg = send_contact_email(name, recipients, query)
+    success, msg = send_email(name, recipients, query)
     if success:
         print("✅ Email sent successfully!")
     else:

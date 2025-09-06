@@ -6,7 +6,7 @@ from src.faq import faq
 from src.market import market
 from src.performance import performance
 from src.post import post
-from src.signin import user_setup
+from src.user import user
 
 # Patch before anything else touches st.cache
 if hasattr(st, "cache") and hasattr(st, "cache_data"):
@@ -50,7 +50,7 @@ def initial_setup():
 
     # Set the page configuration for the Streamlit app
     st.set_page_config(
-        page_title="RamboQ: Rambo Quant Investments",  # Set the page title dynamically
+        page_title="RamboQ: Rambo Quant Strategies",  # Set the page title dynamically
         page_icon=favicon_path,  # Use the favicon image
         layout="centered"  # Use a wide layout for the app
     )
@@ -100,12 +100,12 @@ def initialize_app_state():
 # Main function to execute the initial setup and generate different sections of the profile page
 if __name__ == '__main__':
     initial_setup()  # Call the setup function to configure the app
-
+    print("i am here")
     create_navbar()
 
     # Create a mapping from nav labels to functions
     page_functions = {
-        "signin": user_setup,
+        "signin": user,
         "about": about,
         "market": market,
         "performance": performance,

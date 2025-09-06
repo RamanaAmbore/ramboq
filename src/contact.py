@@ -4,7 +4,7 @@ import streamlit as st
 
 from src.components import render_form
 from src.constants import email_contact_tmpl
-from src.helpers.mail_utils import send_contact_email
+from src.helpers.mail_utils import send_email
 from src.helpers.utils import ramboq_config
 from src.utils_streamlit import show_status_dialog
 
@@ -30,7 +30,7 @@ def contact():
                 v_xref['subject'] = f"Acknowledgement: {v_xref['subject']} on {date.today()}"
                 html_body = email_contact_tmpl.format(**v_xref)
 
-                status, msg = send_contact_email(v_xref['name'], v_xref['email_id'], v_xref['subject'],
-                                                 html_body)
+                status, msg = send_email(v_xref['name'], v_xref['email_id'], v_xref['subject'],
+                                         html_body)
 
             show_status_dialog(status, msg)

@@ -6,7 +6,7 @@ import streamlit as st
 from src.constants import holdings_config, margins_config, positions_config
 from src.helpers import broker_apis
 from src.helpers import genai_api
-from src.helpers.utils import get_image_bin_file as get_image_file, mask_column
+from src.helpers.utils import get_image_bin_file as get_image_file, mask_column, isd_codes
 
 
 @st.cache_data
@@ -114,26 +114,25 @@ def style_dataframe(df: pd.DataFrame):
 
 
 @st.dialog("📨 Email Status")
-def show_status_dialog(success: bool, msg="✅ Your message has been sent successfully!"):
+def show_status_dialog(success: bool, msg=""):
     if success:
+        st.session_state['form'] = ""
         st.success(msg)
     else:
         st.error(f"❌ Failed to send your message. {msg}")
 
     if st.button("Close"):
-        for fld in ['reset_clear', 'signin_clear', 'signup_clear', 'contact_clear']:
-            st.session_state[fld] = True
         st.rerun()
 
 
-def reset_form_state_vars(field_names, clear, captcha_min=1, captcha_max=9):
-    for fld in ['reset_clear', 'signin_clear', 'signup_clear', 'contact_clear']:
-        if clear != fld: st.session_state[fld] = True
+def reset_form_state_vars(field_names, form, captcha_min=1, captcha_max=9):
+    if 'form' not in st.session_state or form != st.session_state['form']:
+        st.session_state['form'] = form
 
-    if clear not in st.session_state or st.session_state[clear]:
-        st.session_state[clear] = False
         for field in field_names:
-            if field != 'ph_country':
+            if field == 'ph_country':
+                st.session_state[field] = isd_codes[0]
+            else:
                 st.session_state[field] = ""
 
         st.session_state['captcha_num1'] = random.randint(captcha_min, captcha_max)

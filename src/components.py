@@ -149,9 +149,9 @@ def render_form(fields, names, must, labels=None, form='contact'):
         l_xref = {key: (f'{xref[key]} *' if m_xref[key] else xref[key]) for key in fields}
 
     if 'captcha_answer' in fields:
-        reset_form_state_vars(fields, f'{form}_clear')
+        reset_form_state_vars(fields, form)
 
-    with st.form("form", clear_on_submit=False):  # Don't clear on error
+    with st.form("ramboq_form", clear_on_submit=False):  # Don't clear on error
         for fld in fields:
             if fld == 'ph_country':
                 st.selectbox(l_xref[fld], isd_codes, key=fld)

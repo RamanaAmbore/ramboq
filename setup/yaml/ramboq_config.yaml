@@ -1,9 +1,9 @@
 about: |
-    ### About Rambo Quant Investments LLP
+    ### About Rambo Quant Strategies LLP
 
     **Invest. Grow. Compound.** — not just a mantra, but the core DNA that drives every decision we make.
     
-    **Rambo Quant Investments LLP** is helmed by a seasoned FinTech professional with **25+ years** of proven success in active investing and trading across both **U.S. and Indian markets**. What started in **1998** as a deep, hands-on exploration of equities and derivatives has evolved into a **precision-driven investment powerhouse** built on data, discipline, and performance.
+    **Rambo Quant Strategies LLP** is helmed by a seasoned FinTech professional with **25+ years** of proven success in active investing and trading across both **U.S. and Indian markets**. What started in **1998** as a deep, hands-on exploration of equities and derivatives has evolved into a **precision-driven investment powerhouse** built on data, discipline, and performance.
     
     The founder’s credentials speak for themselves — **FRM Certified**, **CFA Level II**, **PGCBM from XLRI**, and a **Master’s in Computer Science** — matched with decades of cutting-edge innovation in financial technology for capital markets.
     
@@ -15,9 +15,9 @@ contact: |
   ### Contact Form
 
 faq: |
-  ### Rambo Quant Investments LLP — Frequently Asked Questions (FAQ)
+  ### Rambo Quant Strategies LLP — Frequently Asked Questions (FAQ)
 
-  #### What is Rambo Quant Investments LLP?
+  #### What is Rambo Quant Strategies LLP?
   A Limited Liability Partnership where partners pool capital, managed by *Active Partners* and a *Fund Manager*.  The LLP invests in *growth-oriented equity with covered call and other derivative (F&O) strategies*.  
   
   #### Who can become a partner?
@@ -100,7 +100,7 @@ nav_flow_title: |
   ### NAV & Profit Distribution Flow
 nav_flow: |
     flowchart TD
-        A[Capital Contribution by Partners] --> B[Investments in Growth-Oriented Equity + Covered Call + F&O Strategies]
+        A[Capital Contribution by Partners] --> B[Strategies in Growth-Oriented Equity + Covered Call + F&O Strategies]
         B --> C[31 March: Calculate LLP NAV]
         C --> D[Deduct LLP Expenses at Actuals]
         D --> E[Calculate Profit Before Tax]
@@ -144,7 +144,7 @@ nav_labels:
   - "profile"
 favicon: favicon.png
 logo: logo.png
-footer_name: Rambo Quant Investments LLP
+footer_name: Rambo Quant Strategies LLP
 footer_mobile_text2: Markets carry risk.
 footer_desktop_text2: LLDIN00123456
 footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."

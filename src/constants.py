@@ -150,7 +150,7 @@ email_reg_tmpl = """
           <body>
             <p>Dear sir/madam,</p>
             <p>
-              Thank you for registering with us suing {email}! Your sign-up was successful, and your details have been received.
+              Thank you for registering with us using {email_id}! Your sign-up was successful, and your details have been received.
 
             To complete your onboarding, please follow these steps:
             
@@ -168,7 +168,7 @@ email_prof_updated_tmpl = """
           <body>
             <p>Dear sir/madam,</p>
             <p>
-              Thank you for updating your profile for your account registered with {email}!<br>
+              Thank you for updating your profile for your account registered with {email_id}!<br>
               Your updated details have been received successfully.
             </p>
             <p>
@@ -190,7 +190,7 @@ email_prof_approval_tmpl = """
           <body>
             <p>Dear sir/madam,</p>
             <p>
-              We are pleased to inform you that your profile associated with the account registered under {email} has been <b>approved</b>.
+              We are pleased to inform you that your profile associated with the account registered under {email_id} has been <b>approved</b>.
             </p>
             <p>
               You now have full access to your account and all features on our platform. If you have any questions or need assistance, please feel free to reach out to us at any time.
@@ -206,7 +206,7 @@ email_reset_tmpl = """
   <body>
     <p>Dear sir/madam,</p>
     <p>
-      Your password for the account registered with {email} has been successfully reset.
+      Your password for the account registered with {email_id} has been successfully reset.
     </p>
     <p>
       You can now sign in using your new password.<br>
