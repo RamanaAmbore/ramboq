@@ -1,7 +1,7 @@
 import streamlit as st
 
 from src.helpers.utils import ramboq_config, constants, get_image_bin_file as get_image_file, isd_codes, validate_email, \
-    validate_phone, validate_captcha
+    validate_phone, validate_captcha, validate_pin
 from src.utils_streamlit import reset_form_state_vars
 
 
@@ -147,28 +147,30 @@ def render_form(fields, names, must, labels=None, disabled=None, form='contact')
     d_xref = dict(zip(fields, disabled))
 
     if labels is not None:
-        l_xref = dict(zip(fields,labels))
+        l_xref = dict(zip(fields, labels))
     else:
         l_xref = {key: (f'{xref[key]} *' if m_xref[key] else xref[key]) for key in fields}
 
     if 'captcha_answer' in fields:
         reset_form_state_vars(fields, form)
 
-    with st.form("ramboq_form", clear_on_submit=False):  # Don't clear on error
+    with (((((((((st.form("ramboq_form", clear_on_submit=False)))))))))):  # Don't clear on error
         for fld in fields:
             if 'ph_country' in fld:
-                st.selectbox(l_xref[fld], isd_codes, key=fld,disabled=d_xref[fld])
+                st.selectbox(l_xref[fld], isd_codes, key=fld, disabled=d_xref[fld])
             elif 'password' in fld:
-                st.text_input(l_xref[fld], type='password', key=fld,disabled=d_xref[fld])
+                st.text_input(l_xref[fld], type='password', key=fld, disabled=d_xref[fld])
             elif 'dob' in fld:
                 st.date_input(l_xref[fld], key=fld)
             elif 'query' in fld:
-                st.text_area(l_xref['query'], key="query", height=150,disabled=d_xref[fld])
+                st.text_area(l_xref[fld], key=fld, height=150, disabled=d_xref[fld])
+            elif 'same' in fld:
+                    st.checkbox(l_xref[fld],  key=fld, disabled=d_xref[fld])
             elif not fld.startswith('captcha'):
-                st.text_input(l_xref[fld], key=fld,disabled=d_xref[fld])
+                st.text_input(l_xref[fld], key=fld, disabled=d_xref[fld])
             # --- Captcha field ---
             elif fld.startswith('captcha'):
-                captcha_answer = st.text_input("Answer", key='captcha_answer',disabled=d_xref[fld])
+                captcha_answer = st.text_input("Answer", key='captcha_answer', disabled=d_xref[fld])
                 st.write(
                     f"Solve to verify: {st.session_state['captcha_num1']} + {st.session_state['captcha_num2']} = ?")
 
@@ -176,16 +178,16 @@ def render_form(fields, names, must, labels=None, disabled=None, form='contact')
         submit = col.form_submit_button("Submit")
 
         if submit:
-            v_xref = {key: st.session_state[key].strip() for key in fields}
+            v_xref = {key: st.session_state[key].strip() for key in fields if key not in ['same', 'dob']}
 
             for key in fields:
                 if m_xref[key] and not v_xref[key]:
                     return False, f"⚠️ {xref[key]} is required"
 
-                if 'email_id' in fld and v_xref['email_id'] and not validate_email(v_xref['email_id']):
+                elif 'email_id' in fld and v_xref['email_id'] and not validate_email(v_xref['email_id']):
                     return False, "❌ Invalid email format."
 
-                if 'ph_num' in fld:
+                elif 'ph_num' in fld:
                     if v_xref['ph_num']:
                         ok, msg, st.session_state.full_phone = validate_phone(v_xref['ph_country'], v_xref['ph_num'])
                         v_xref['ph_num'] = st.session_state.full_phone
@@ -194,6 +196,36 @@ def render_form(fields, names, must, labels=None, disabled=None, form='contact')
                             return False, msg
                     else:
                         st.session_state.full_phone = ""
+
+                elif 'pin' in fld:
+                    ok, msg, pin = validate_pin(v_xref[fld])
+                    if not ok:
+                        return False, msg
+                    else:
+                        st.session_state[fld] = pin
+                elif 'same' in fld and v_xref[fld]:
+                    print('same here')
+                    st.session_state['nom_address_line1']=st.session_state['address_line1']
+                    st.session_state['nom_address_line2']=st.session_state['address_line2']
+                    st.session_state['nom_landmark']=st.session_state['landmark']
+                    st.session_state['nom_city']=st.session_state['city']
+                    st.session_state['nom_state']=st.session_state['state']
+                    st.session_state['nom_pin_code']=st.session_state['pin_code']
+                    st.session_state['nom_country']=st.session_state['country']
+                    st.session_state['nom_ph_country1']=st.session_state['ph_country1']
+                    st.session_state['nom_ph_num1']=st.session_state['ph_num1']
+                    st.session_state['nom_ph_country2']=st.session_state['ph_country2']
+                    st.session_state['nom_ph_num2']=st.session_state['ph_num2']
+                    st.session_state['nom_email_id1']=st.session_state['email_id']
+                    st.session_state['nom_email_id2'] = st.session_state['email_id1']
+                    st.session_state['same'] = False
+                    st.rerun()
+                elif 'age' in fld:
+                    try:
+                        st.session_state[fld] = int(st.session_state[fld])
+                    except:
+                        return False, "Invalid Age"
+
 
 
             # --- Captcha validation ---

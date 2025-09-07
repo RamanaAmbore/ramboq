@@ -27,16 +27,22 @@ def profile():
 def profile_update_form(disabled=None, must=True, called=False):
     if not called:
         st.subheader("Update Profile")
-    fields = fields = ['email_id', 'first_name', 'middle_name', 'last_name', 'dob', 'address_line1', 'address_line2',
-                       'landmark', 'city', 'state', 'pin_code', 'country', 'ph_country1', 'ph_num1', 'ph_country2',
-                       'ph_num2', 'backup_email_id', 'nom_name', 'nom_age', 'relation', 'nom_address_line1', 'nom_address_line2',
-                       'nom_address_landmark', 'nom_city', 'nom_state', 'nom_pin_code', 'nom_country', 'nom_ph_country',
-                       'nom_ph_num', 'nom_email_id']
-    names = ['Primary Email', 'First Name', 'Middle Name', 'Last Name', 'DOB', 'Address Line 1', 'Address Line 2',
-                       'Landmark', 'City', 'State', 'Pin/ZIP Code', 'Country', 'ISD Code for Phone Number', 'Phone Number', 'ISD Code Backup Phone Number',
-                       'Backup Phone Number', 'Backup Email', 'Nominee Name', 'Nominee Age', 'Relation with Account Holder', 'Nominee Address Line 1', 'Nominee Address Line 2',
-                       'Nominee Address Landmark', 'Nominee City', 'Nominee State', 'Nominee Pin/Zip', 'Nominee Country', 'Nominee Phone ISD Code',
-                       'Nominee Phone Number', 'Nominee Email']
+    fields = ['email_id', 'first_name', 'middle_name', 'last_name', 'dob', 'address_line1', 'address_line2',
+                       'landmark', 'city', 'state', 'pin_code', 'country', 'ph_country1',
+                       'ph_num1', 'ph_country2', 'ph_num2', 'email_id2',
+                       'nom_name', 'nom_age', 'relation', 'same',
+                       'nom_address_line1', 'nom_address_line2', 'nom_landmark', 'nom_city',
+                       'nom_state', 'nom_pin_code', 'nom_country', 'nom_ph_country1',
+                       'nom_ph_num1', 'nom_ph_country2',
+                      'nom_ph_num2','nom_email_id1', 'nom_email_id2']
+    names = ['Primary Email', 'First Name', 'Middle Name', 'Last Name', 'DOB (Date-of-birth)', 'Address Line 1', 'Address Line 2',
+                       'Landmark', 'City', 'State', 'Pin/ZIP Code', 'Country', 'ISD Code for Phone Number',
+                       'Phone Number', 'ISD Code Backup Phone Number', 'Backup Phone Number', 'Backup Email',
+                       'Nominee Name', 'Nominee Age', 'Relation with Account Holder', 'Address same as Account Holder',
+                       'Nominee Address Line 1', 'Nominee Address Line 2', 'Nominee Address Landmark', 'Nominee City',
+                       'Nominee State', 'Nominee Pin/Zip', 'Nominee Country', 'Nominee Phone ISD Code',
+                       'Nominee Phone Number', 'Nominee Backup Phone ISD Code',
+                       'Nominee Backup Phone Number','Nominee Email', 'Nominee Backup Email']
 
     must = [must] * len(names)
     must[0] = False

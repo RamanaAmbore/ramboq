@@ -1,8 +1,6 @@
 import base64
-import re
 import shutil
 from collections import defaultdict
-from datetime import timedelta
 from decimal import Decimal, ROUND_DOWN
 from io import BytesIO
 from pathlib import Path
@@ -14,7 +12,6 @@ from PIL import Image
 from babel.numbers import format_decimal
 
 from src.helpers.date_time_utils import timestamp_indian
-
 
 
 def get_path(file):
@@ -224,15 +221,46 @@ def rec_to_dict(record):
     return {k: v for k, v in record.__dict__.items() if not k.startswith('_')} if record else {}
 
 
-def get_cycle_date(hours=8, mins=0):
-    now = timestamp_indian()
-    today_cutoff = now.replace(hour=hours, minute=mins, second=0, microsecond=0)
+from datetime import datetime, timedelta
 
-    if now >= today_cutoff:
-        dt = now.date()
+
+def round_to_nearest_interval(dt: datetime, interval_minutes: int) -> datetime:
+    total_minutes = dt.hour * 60 + dt.minute
+    remainder = total_minutes % interval_minutes
+
+    if remainder >= (interval_minutes / 2):
+        # Round up
+        total_minutes += (interval_minutes - remainder)
     else:
-        dt = (now - timedelta(days=1)).date()
-    return dt
+        # Round down
+        total_minutes -= remainder
+
+    rounded_hour = total_minutes // 60
+    rounded_minute = total_minutes % 60
+
+    return dt.replace(hour=rounded_hour % 24, minute=rounded_minute, second=0, microsecond=0)
+
+
+def get_cycle_date(from_hour: int = 9, from_min: int = 0, to_hour: int = 11, to_min: int = 30,
+                   interval: int = 10) -> str:
+    now = timestamp_indian()
+    from_time = now.replace(hour=from_hour, minute=from_min, second=0, microsecond=0)
+    to_time = now.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
+
+    # Handle time window crossing midnight
+    if from_time <= to_time:
+        in_window = from_time <= now <= to_time
+    else:
+        in_window = now >= from_time or now <= to_time
+
+    if in_window:
+        previous_day = now - timedelta(days=1)
+        target_time = previous_day.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
+        rounded_time = round_to_nearest_interval(target_time, interval)
+        return rounded_time.strftime("%d-%b-%y %H:%M")
+    else:
+        rounded_now = round_to_nearest_interval(now, interval)
+        return rounded_now.strftime("%d-%b-%y %H:%M")
 
 
 def mask_column(col):
@@ -270,6 +298,7 @@ def validate_email(email: str) -> bool:
 
 import re
 
+
 def validate_password_standard(password: str) -> tuple[bool, str]:
     """
     Validate password if not in production.
@@ -291,7 +320,6 @@ def validate_password_standard(password: str) -> tuple[bool, str]:
         return False, "Password must contain at least one special character."
 
     return True, "Password is valid."
-
 
 
 def validate_captcha(answer, result):
@@ -321,15 +349,19 @@ def validate_phone(country_code: str, phone_number: str):
     return True, "", digits_only
 
 
-if __name__ == "__main__":
-    # Test run
-    name = "Rambo"
-    recipients = "ramboquant@gmail.com"
-    phone = "9876543210"
-    query = "Testing multiple recipient email functionality."
+import re
 
-    success, msg = send_email(name, recipients, query)
-    if success:
-        print("✅ Email sent successfully!")
+import re
+
+
+def validate_pin(pin: str) :
+    # Remove all non-numeric characters
+    numeric_pin = re.sub(r"\D", "", pin)
+
+    # Validate length (assuming valid lengths are 5 or 6 digits)
+    if len(numeric_pin) in (5, 6):
+        return           True,"Valid PIN code.",              numeric_pin
+
     else:
-        print("❌ Failed to send email:", msg)
+        return False, "Invalid PIN code length. Expected 5 or 6 digits.",None
+

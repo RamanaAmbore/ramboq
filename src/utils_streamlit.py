@@ -130,9 +130,9 @@ def reset_form_state_vars(field_names, form, captcha_min=1, captcha_max=9):
         st.session_state['form'] = form
 
         for field in field_names:
-            if field == 'ph_country':
+            if 'ph_country' in field:
                 st.session_state[field] = isd_codes[0]
-            else:
+            elif 'dob' not in field:
                 st.session_state[field] = ""
 
         st.session_state['captcha_num1'] = random.randint(captcha_min, captcha_max)
