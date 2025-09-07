@@ -240,9 +240,18 @@ def round_to_nearest_interval(dt: datetime, interval_minutes: int) -> datetime:
 
     return dt.replace(hour=rounded_hour % 24, minute=rounded_minute, second=0, microsecond=0)
 
+def get_cycle_date(hours=8, mins=0):
+    now = timestamp_indian()
+    today_cutoff = now.replace(hour=hours, minute=mins, second=0, microsecond=0)
 
-def get_cycle_date(from_hour: int = 9, from_min: int = 0, to_hour: int = 11, to_min: int = 30,
-                   interval: int = 10) -> str:
+    if now >= today_cutoff:
+        dt = now.date()
+    else:
+        dt = (now - timedelta(days=1)).date()
+    return dt
+
+def get_nearest_time(from_hour: int = 9, from_min: int = 0, to_hour: int = 11, to_min: int = 30,
+                     interval: int = 10) -> str:
     now = timestamp_indian()
     from_time = now.replace(hour=from_hour, minute=from_min, second=0, microsecond=0)
     to_time = now.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
