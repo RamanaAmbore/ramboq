@@ -254,19 +254,22 @@ def get_nearest_time(from_hour: int = 9, from_min: int = 0, to_hour: int = 23, t
     to_time = now.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
 
     # Handle time window crossing midnight
-    if from_time <= to_time:
-        in_window = from_time <= now <= to_time
-    else:
-        in_window = now >= from_time or now <= to_time
+
+    in_window = from_time <= now <= to_time
+
 
     if in_window:
-        previous_day = now - timedelta(days=1)
-        target_time = previous_day.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
-        rounded_time = round_down_to_interval(target_time, interval)
+        rounded_time = round_down_to_interval(now, interval)
         return rounded_time.strftime("%d-%b-%y %H:%M")
     else:
-        rounded_now = round_down_to_interval(now, interval)
-        return rounded_now.strftime("%d-%b-%y %H:%M")
+        # Assume get_cycle_date returns a date object
+        cycle_date = get_cycle_date(hours=9, mins=0)  # e.g., datetime.date(2025, 9, 7)
+
+        # Combine with fixed time (23:30)
+        fixed_datetime = datetime.combine(cycle_date, datetime.min.time()).replace(hour=23, minute=30)
+
+        # Format as desired
+        return fixed_datetime.strftime("%d-%b-%y %H:%M")
 
 
 def mask_column(col):

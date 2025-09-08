@@ -15,7 +15,7 @@ def performance():
             )
 
         refresh_time = get_nearest_time()
-        st.write(f"**Refresh Time: {refresh_time}**")
+        st.write(f"**Refreshed at  {refresh_time}**")
         # Create tabs
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
 
