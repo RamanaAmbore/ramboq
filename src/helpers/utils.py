@@ -1,6 +1,8 @@
 import base64
+import re
 import shutil
 from collections import defaultdict
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_DOWN
 from io import BytesIO
 from pathlib import Path
@@ -221,24 +223,18 @@ def rec_to_dict(record):
     return {k: v for k, v in record.__dict__.items() if not k.startswith('_')} if record else {}
 
 
-from datetime import datetime, timedelta
 
 
-def round_to_nearest_interval(dt: datetime, interval_minutes: int) -> datetime:
+
+def round_down_to_interval(dt: datetime, interval_minutes: int) -> datetime:
     total_minutes = dt.hour * 60 + dt.minute
-    remainder = total_minutes % interval_minutes
+    rounded_total_minutes = (total_minutes // interval_minutes) * interval_minutes
 
-    if remainder >= (interval_minutes / 2):
-        # Round up
-        total_minutes += (interval_minutes - remainder)
-    else:
-        # Round down
-        total_minutes -= remainder
-
-    rounded_hour = total_minutes // 60
-    rounded_minute = total_minutes % 60
+    rounded_hour = rounded_total_minutes // 60
+    rounded_minute = rounded_total_minutes % 60
 
     return dt.replace(hour=rounded_hour % 24, minute=rounded_minute, second=0, microsecond=0)
+
 
 def get_cycle_date(hours=8, mins=0):
     now = timestamp_indian()
@@ -250,7 +246,8 @@ def get_cycle_date(hours=8, mins=0):
         dt = (now - timedelta(days=1)).date()
     return dt
 
-def get_nearest_time(from_hour: int = 9, from_min: int = 0, to_hour: int = 11, to_min: int = 30,
+
+def get_nearest_time(from_hour: int = 9, from_min: int = 0, to_hour: int = 23, to_min: int = 30,
                      interval: int = 10) -> str:
     now = timestamp_indian()
     from_time = now.replace(hour=from_hour, minute=from_min, second=0, microsecond=0)
@@ -265,10 +262,10 @@ def get_nearest_time(from_hour: int = 9, from_min: int = 0, to_hour: int = 11, t
     if in_window:
         previous_day = now - timedelta(days=1)
         target_time = previous_day.replace(hour=to_hour, minute=to_min, second=0, microsecond=0)
-        rounded_time = round_to_nearest_interval(target_time, interval)
+        rounded_time = round_down_to_interval(target_time, interval)
         return rounded_time.strftime("%d-%b-%y %H:%M")
     else:
-        rounded_now = round_to_nearest_interval(now, interval)
+        rounded_now = round_down_to_interval(now, interval)
         return rounded_now.strftime("%d-%b-%y %H:%M")
 
 
@@ -303,9 +300,6 @@ def validate_email(email: str) -> bool:
     """Check if email has a valid format."""
     pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return re.match(pattern, email) is not None
-
-
-import re
 
 
 def validate_password_standard(password: str) -> tuple[bool, str]:
@@ -358,19 +352,16 @@ def validate_phone(country_code: str, phone_number: str):
     return True, "", digits_only
 
 
-import re
-
-import re
 
 
-def validate_pin(pin: str) :
+
+def validate_pin(pin: str):
     # Remove all non-numeric characters
     numeric_pin = re.sub(r"\D", "", pin)
 
     # Validate length (assuming valid lengths are 5 or 6 digits)
     if len(numeric_pin) in (5, 6):
-        return           True,"Valid PIN code.",              numeric_pin
+        return True, "Valid PIN code.", numeric_pin
 
     else:
-        return False, "Invalid PIN code length. Expected 5 or 6 digits.",None
-
+        return False, "Invalid PIN code length. Expected 5 or 6 digits.", None
