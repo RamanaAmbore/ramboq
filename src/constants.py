@@ -3,122 +3,142 @@ import streamlit as st
 holdings_config = {
     "tradingsymbol": st.column_config.TextColumn(
         "Symbol", width="small",
-        help="Trading Symbol"
+        help="Trading symbol of the security"
     ),
     "opening_quantity": st.column_config.NumberColumn(
         "Qty", width="small",
-        help="Quantity",
-        default=None  # <- ensures empty shown for NaN
+        help="Opening quantity held",
+        default=None
     ),
     "average_price": st.column_config.NumberColumn(
         "Inv Price", width="small",
-        help="Average Investment Price",
-        default=None  # <- ensures empty shown for NaN
+        help="Average purchase price of the security",
+        default=None
     ),
     "close_price": st.column_config.NumberColumn(
         "Cur Price", width="small",
-        help="Closing Price",
-        default=None  # <- ensures empty shown for NaN
+        help="Latest market closing price",
+        default=None
     ),
     "cash": st.column_config.NumberColumn(
         "Cash", width="small",
-        help="Cash balance"
+        help="Available cash balance"
     ),
-
     "inv_val": st.column_config.NumberColumn(
         "Inv Val", width="small",
-        help="Profit & Loss",
-        default=None  # <- ensures empty shown for NaN
+        help="Total investment value (Quantity × Avg Price)",
+        default=None
     ),
     "cur_val": st.column_config.NumberColumn(
         "Cur Val", width="small",
-        help="Profit & Loss",
-        default=None  # <- ensures empty shown for NaN
+        help="Current market value of the investment",
+        default=None
     ),
     "pnl": st.column_config.NumberColumn(
         "P&L", width="small",
-        help="Profit & Loss",
-        default=None  # <- ensures empty shown for NaN
+        help="Profit or Loss amount",
+        default=None
     ),
     "net": st.column_config.NumberColumn(
         "Hold+Cash", width="small",
-        help="Holdings plus cash"
+        help="Total of holdings and cash balance"
     ),
     "price_change": st.column_config.NumberColumn(
         "Price Δ", width="small",
-        help="Closing Price",
-        default=None  # <- ensures empty shown for NaN
+        help="Price change since last close",
+        default=None
     ),
     "pnl_percentage": st.column_config.NumberColumn(
         "P&L %", width="small",
-        help="Profit & Loss",
-        default=None  # <- ensures empty shown for NaN
+        help="Profit or Loss percentage",
+        default=None
     ),
-
     "day_change": st.column_config.NumberColumn(
         "Day Δ", width="small",
-        help="Day price Change",
-        default=None  # <- ensures empty shown for NaN
+        help="Price change during the current trading day",
+        default=None
     ),
     "day_change_percentage": st.column_config.NumberColumn(
         "DayΔ%", width="small",
-        help="Day price Change Percentage",
-        default=None  # <- ensures empty shown for NaN
+        help="Percentage change during the current trading day",
+        default=None
     ),
     "day_change_val": st.column_config.NumberColumn(
         "Day ΔVal", width="small",
-        help="Profit & Loss",
-        default=None  # <- ensures empty shown for NaN
+        help="Change in investment value during the day",
+        default=None
     ),
     "authorised_date": st.column_config.TextColumn(
         "Date", width="small",
-        help="When it the report generated?"
+        help="Report generation date"
     ),
     "account": st.column_config.TextColumn(
         "Account", width="small",
-        help="Account Number with Broker"
+        help="Broker account number"
     )
 }
+
 
 positions_config = {
     "tradingsymbol": st.column_config.TextColumn(
         "Symbol", width="small",
-        help="Trading Symbol"
+        help="Trading symbol of the security"
     ),
     "quantity": st.column_config.NumberColumn(
         "Qty", width="small",
-        help="Quantity",
+        help="Quantity held",
         default=None
     ),
     "average_price": st.column_config.NumberColumn(
         "Inv Price", width="small",
-        help="Average Investment Price",
+        help="Average investment price",
         default=None
     ),
     "pnl": st.column_config.NumberColumn(
         "P&L", width="small",
-        help="Profit & Loss",
+        help="Profit or Loss amount",
         default=None
     ),
     "close_price": st.column_config.NumberColumn(
         "Cur Price", width="small",
-        help="Closing Price",
+        help="Latest market closing price",
         default=None
     ),
     "account": st.column_config.TextColumn(
         "Account", width="small",
-        help="Account Number with Broker"
+        help="Broker account number"
     ),
 }
 
-margins_config = {
-    "account": st.column_config.TextColumn(label="Account", width="small"),
-    "avail opening_balance": st.column_config.NumberColumn(label="Cash", width="small"),
-    "net": st.column_config.NumberColumn(label="Avail Margin", width="small"),
-    "util debits": st.column_config.NumberColumn(label="Used Margin", width="small"),
-    "avail collateral": st.column_config.NumberColumn(label="Collateral", width="small"),
 
+margins_config = {
+    "account": st.column_config.TextColumn(
+        label="Account",
+        help="Broker account number",
+        width="small"
+    ),
+    "avail opening_balance": st.column_config.NumberColumn(
+        label="Cash",
+        help="Available cash balance at start of day",
+        width="small"
+    ),
+    "net": st.column_config.NumberColumn(
+        label="Avail Margin",
+        help="Available margin amount for trading",
+        width="small"
+    ),
+    "util debits": st.column_config.NumberColumn(
+        label="Used Margin",
+        help="Margin utilized for positions",
+        width="small"
+    ),
+    "avail collateral": st.column_config.NumberColumn(
+        label="Collateral",
+        help="Total margin provided via securities",
+        width="small"
+    ),
 }
+
 
 email_contact_tmpl = """
         <html>
