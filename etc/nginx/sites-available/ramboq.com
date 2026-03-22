@@ -1,5 +1,5 @@
 server {
-    server_name ramboq.com www.ramboq.com localhost;
+    server_name ramboq.com www.ramboq.com webhook.ramboq.com localhost;
 
     location / {
         proxy_pass http://localhost:8502;
