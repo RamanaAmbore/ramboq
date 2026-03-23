@@ -42,7 +42,7 @@ fi
 
     # Pull the latest code
     git --git-dir=.git --work-tree=. fetch origin "$BRANCH"
-    git --git-dir=.git --work-tree=. checkout -f "$BRANCH"
+    git --git-dir=.git --work-tree=. checkout -B "$BRANCH" "origin/$BRANCH"
     git --git-dir=.git --work-tree=. pull origin "$BRANCH"
 
     # Detect changed files since last deploy
