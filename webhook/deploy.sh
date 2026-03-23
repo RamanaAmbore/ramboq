@@ -11,11 +11,20 @@ if [ "$BRANCH" = "main" ]; then
   APP_SERVICE="ramboq.service"
   LOG="/opt/ramboq/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="true"
-else
+elif [ "$BRANCH" = "dev" ]; then
   APP_ROOT="/opt/ramboq_dev"
   APP_SERVICE="ramboq_dev.service"
   LOG="/opt/ramboq/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="false"
+else
+  LOG="/opt/ramboq/.log/hook_debug.log"
+  {
+    echo "[$TS] Webhook triggered"
+    echo "[$TS] Git ref: $REF"
+    echo "[$TS] Branch: $BRANCH"
+    echo "[$TS] Branch is not eligible for deployment. Allowed branches: main, dev"
+  } >> "$LOG" 2>&1
+  exit 0
 fi
 
 
@@ -88,8 +97,6 @@ fi
   #cp /opt/ramboq/setup/images/favicon.png /opt/ramboq/venv/lib/python3.13/site-packages/streamlit/static/favicon.png
   echo "[$TS] Attempting to restart $APP_SERVICE..."
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] Failed to restart $APP_SERVICE"
-  echo "[$TS] Attempting to restart ramboq.service..."
-  sudo systemctl restart ramboq.service || echo "[$TS] Failed to restart ramboq.service"
 
   echo "[$TS] Deployment complete"
 } >> "$LOG" 2>&1
