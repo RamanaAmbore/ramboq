@@ -12,3 +12,4 @@ var/www/.ssh/
 var/www/.gitconfig
 *.pem
 *.key
+ramboq_ssh/
