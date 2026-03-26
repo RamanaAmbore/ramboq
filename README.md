@@ -348,13 +348,65 @@ sudo visudo -c
 
 ### 9. GitHub Webhook Setup
 
+The webhook listener runs as a systemd service (`ramboq_hook.service`) on port `9001` and is proxied via nginx at `https://webhook.ramboq.com/hooks/update`. A single webhook handles both prod and dev deploys — branch routing is done inside `deploy.sh`.
+
+**Prerequisite:** The `webhook.ramboq.com` DNS record must be **grey cloud (DNS only)** in Cloudflare before proceeding. See Step 10.
+
+**Step 1 — Note the webhook secret from hooks.json**
+
+The secret is defined in `webhook/hooks.json` under `payload-hash-sha256.secret`. GitHub will sign every payload with this secret and the listener will reject requests that don't match.
+
+**Step 2 — Add the webhook in GitHub**
+
 1. Go to **GitHub → repo → Settings → Webhooks → Add webhook**
-2. Payload URL: `https://webhook.ramboq.com/hooks/update`
-3. Content type: `application/json`
-4. Secret: (must match `hooks.json` value under `payload-hash-sha256.secret`)
-5. Events: select **Just the push event**
-6. Active: checked
-7. Save
+2. Fill in:
+   - **Payload URL:** `https://webhook.ramboq.com/hooks/update`
+   - **Content type:** `application/json`
+   - **Secret:** value from `hooks.json` → `payload-hash-sha256.secret`
+   - **Which events:** select **Just the push event**
+   - **Active:** checked
+3. Click **Add webhook**
+
+GitHub will immediately send a ping event. A green tick next to the webhook confirms nginx and the listener are reachable.
+
+**Step 3 — Verify the listener is running**
+
+```bash
+sudo systemctl status ramboq_hook.service
+sudo ss -tlnp | grep 9001
+```
+
+**Step 4 — Test by pushing a commit**
+
+```bash
+# From local machine
+git push origin main     # triggers prod deploy
+git push origin dev      # triggers dev deploy
+```
+
+Watch the deploy log:
+```bash
+tail -f /opt/ramboq/.log/hook_debug.log
+```
+
+**Step 5 — Debug if webhook shows a red cross in GitHub**
+
+```bash
+# Check webhook listener errors
+tail -50 /opt/ramboq/.log/hook.err
+
+# Check nginx is proxying correctly
+sudo nginx -t
+curl -I https://webhook.ramboq.com/hooks/update
+
+# Check incoming request log
+tail -20 /opt/ramboq/.log/incoming_requests.log
+```
+
+Common causes:
+- `webhook.ramboq.com` is orange cloud in Cloudflare — switch to grey
+- `ramboq_hook.service` is not running — `sudo systemctl start ramboq_hook.service`
+- Secret in `hooks.json` doesn't match the secret set in GitHub webhook settings
 
 ### 10. Cloudflare DNS Setup
 
