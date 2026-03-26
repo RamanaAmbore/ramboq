@@ -356,32 +356,34 @@ sudo visudo -c
 6. Active: checked
 7. Save
 
-### 10. Cloudflare DNS Setup (if using Cloudflare)
+### 10. Cloudflare DNS Setup
 
-The main `ramboq.com` can stay proxied (orange cloud). The `webhook` subdomain **must be DNS-only** (grey cloud) to avoid Cloudflare intercepting webhook TLS and causing 502 errors:
+Add all DNS records in Cloudflare dashboard → your domain → **DNS → Records**.
 
-1. In Cloudflare dashboard → **DNS → Records**
-2. Add record:
-     - Type: `A`
-     - Name: `webhook`
-     - IPv4: your server's public IP
-     - Proxy status: **DNS only** (grey cloud)
-3. Add record:
-    - Type: `A`
-    - Name: `dev`
-    - IPv4: your server's public IP
-    - Proxy status: DNS only (recommended while validating branch deploy)
-4. Confirm `ramboq.com` and `www.ramboq.com` records remain orange (proxied) as desired
+| Type | Name | IPv4 | Proxy status | Why |
+|---|---|---|---|---|
+| `A` | `ramboq.com` | server IP | Orange (proxied) | Prod site — Cloudflare CDN and DDoS protection |
+| `A` | `www` | server IP | Orange (proxied) | www redirect |
+| `A` | `webhook` | server IP | **Grey (DNS only)** | Must be unproxied — Cloudflare intercepts TLS and breaks webhook HMAC validation |
+| `A` | `dev` | server IP | **Grey (DNS only)** | Must be unproxied — certbot HTTP challenge fails if Cloudflare proxies the request |
 
-Verify `webhook` resolves to your origin (not Cloudflare):
+> **Important:** `webhook` and `dev` must be **DNS only (grey cloud)**. If either is orange (proxied), certbot will fail with `NXDOMAIN` or connection errors and the GitHub webhook will return 502.
+
+**Verify all records resolve to your server IP (not a Cloudflare IP):**
+
 ```bash
+dig +short ramboq.com
 dig +short webhook.ramboq.com
-# Should return your server IP, NOT a Cloudflare IP (104.x.x.x range)
+dig +short dev.ramboq.com
 ```
 
-Verify `dev` resolves to your origin:
+`webhook` and `dev` must return your server's IP directly. If any returns a Cloudflare IP (`104.x.x.x` or `172.x.x.x` range), switch it to grey cloud in Cloudflare and wait for propagation before continuing.
+
+**Verify propagation before running certbot:**
+
 ```bash
-dig +short dev.ramboq.com
+# Wait until this returns your server IP
+watch -n5 dig +short dev.ramboq.com
 ```
 
 ---
@@ -449,6 +451,15 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ### 7. SSL certificate for dev.ramboq.com
+
+Before running certbot, confirm the DNS record exists and resolves to your server IP (not a Cloudflare IP). The `dev` record must be **grey cloud (DNS only)** in Cloudflare:
+
+```bash
+dig +short dev.ramboq.com
+# Must return your server IP before proceeding
+```
+
+Then issue the cert:
 
 ```bash
 sudo certbot --nginx -d dev.ramboq.com
