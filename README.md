@@ -326,19 +326,19 @@ LISTEN  0  511  0.0.0.0:9001  ...  webhook
 
 ### 8. sudoers for `www-data`
 
-The webhook runs as `www-data` and needs passwordless sudo for specific commands. Open sudoers safely:
+The webhook runs as `www-data` and needs passwordless sudo for specific commands. Edit sudoers directly:
 ```bash
-sudo visudo -f /etc/sudoers.d/www-data-ramboq
+sudo visudo
 ```
 
-Add these lines:
+Find or add these lines:
 ```
-www-data ALL=(ALL) NOPASSWD: /bin/cp
-www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq.service
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_dev.service
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_hook.service
+www-data ALL=NOPASSWD: /bin/cp
+www-data ALL=NOPASSWD: /usr/sbin/nginx
+www-data ALL=NOPASSWD: /bin/systemctl reload nginx
+www-data ALL=NOPASSWD: /bin/systemctl restart ramboq.service
+www-data ALL=NOPASSWD: /bin/systemctl restart ramboq_dev.service
+www-data ALL=NOPASSWD: /bin/systemctl restart ramboq_hook.service
 ```
 
 Save and verify:
@@ -386,20 +386,110 @@ dig +short dev.ramboq.com
 
 ---
 
+## First-Time Dev Deployment (Prod Already Running)
+
+These steps set up `/opt/ramboq_dev` on a server where prod (`/opt/ramboq`) is already working.
+
+### 1. Clone the repo into the dev directory
+
+```bash
+sudo mkdir -p /opt/ramboq_dev
+sudo chown www-data:www-data /opt/ramboq_dev
+sudo -u www-data git clone https://github.com/RamanaAmbore/ramboq.git /opt/ramboq_dev
+sudo -u www-data git -C /opt/ramboq_dev checkout dev
+```
+
+The explicit checkout ensures `PREV_HEAD` is correct on the first push — without it the repo starts on `main` and the first deploy diff compares `main` vs the pushed branch instead of just the new changes.
+
+### 2. Create virtualenv and install dependencies
+
+```bash
+cd /opt/ramboq_dev
+python3 -m venv venv
+source venv/bin/activate
+pip install --no-cache-dir -r requirements.txt
+deactivate
+```
+
+### 3. Copy secret config files from prod
+
+```bash
+sudo mkdir -p /opt/ramboq_dev/setup/yaml
+sudo cp /opt/ramboq/setup/yaml/secrets.yaml       /opt/ramboq_dev/setup/yaml/secrets.yaml
+sudo cp /opt/ramboq/setup/yaml/ramboq_deploy.yaml /opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml
+sudo chown -R www-data:www-data /opt/ramboq_dev/setup/yaml/
+```
+
+### 4. Install and start the dev systemd service
+
+```bash
+sudo cp /opt/ramboq_dev/webhook/ramboq_dev.service /etc/systemd/system/ramboq_dev.service
+sudo systemctl daemon-reload
+sudo systemctl enable ramboq_dev.service
+sudo systemctl start ramboq_dev.service
+```
+
+### 5. Add sudoers permission for dev service
+
+```bash
+sudo visudo
+```
+
+Find the existing `www-data` line and add `ramboq_dev.service` alongside `ramboq.service`:
+```
+www-data ALL=NOPASSWD: /bin/systemctl restart ramboq.service, /bin/systemctl restart ramboq_dev.service
+```
+
+### 6. Enable the nginx dev site
+
+```bash
+sudo cp /opt/ramboq_dev/etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-available/dev.ramboq.com
+sudo ln -sf /etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-enabled/dev.ramboq.com
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 7. SSL certificate for dev.ramboq.com
+
+```bash
+sudo certbot --nginx -d dev.ramboq.com
+```
+
+### 8. Push to trigger the first deploy
+
+From your local machine:
+```bash
+git push origin dev
+```
+
+### 9. Verify
+
+```bash
+tail -f /opt/ramboq/.log/hook_debug.log   # deploy log
+tail -f /opt/ramboq/.log/error_file_dev   # app log
+sudo ss -tlnp | grep 8503                 # confirm port 8503 is up
+```
+
+Then visit **https://dev.ramboq.com**.
+
+---
+
 ## Deployment Flow
 
-Every `git push` event triggers webhook validation, but deployment is allowed only for `main` and `dev` branches.
+Every `git push` event triggers webhook validation. Branch routing:
 
-- `main` deploys to `/opt/ramboq` and restarts `ramboq.service` (prod)
-- `dev` deploys to `/opt/ramboq_dev` and restarts `ramboq_dev.service` (dev)
-- Any other branch is logged and skipped (no deployment)
+| Branch | Deploys to | Domain | Port |
+|---|---|---|---|
+| `main` | `/opt/ramboq` | ramboq.com | 8502 |
+| any non-`main` | `/opt/ramboq_dev` | dev.ramboq.com | 8503 |
+
+The deploy script checks out whichever branch was pushed in `/opt/ramboq_dev`, so the last push always wins. There is no isolation between non-main branches — they share one dev directory and one dev service.
 
 ### End-to-End Flow
 
 ```
 Developer (local)
     │
-    │  git push origin main
+    │  git push origin <branch>
     ▼
 GitHub
     │  POST https://ramboq.com/hooks/update
@@ -426,18 +516,15 @@ webhook listener (port 9001, www-data)
     ▼
 deploy.sh (runs as www-data)
     │
-    ├── if ref == refs/heads/main:
+    ├── if branch == main:
     │     APP_ROOT=/opt/ramboq
     │     APP_SERVICE=ramboq.service
     │     sync etc/ and var/www/html to system paths
     │
-    ├── if ref == refs/heads/dev:
-    │     APP_ROOT=/opt/ramboq_dev
-    │     APP_SERVICE=ramboq_dev.service
-    │     no /etc or /var sync
-    │
-    ├── else:
-    │     log and exit 0 (skip deployment)
+    └── else (any non-main branch):
+          APP_ROOT=/opt/ramboq_dev
+          APP_SERVICE=ramboq_dev.service
+          no /etc or /var sync
     │
     ├── cd APP_ROOT
     ├── git config safe.directory
@@ -472,16 +559,18 @@ The GitHub webhook and `hooks.json` share a secret for HMAC-SHA256 signature val
 | `https://ramboq.com/hooks/log` | Manual request logger — triggers `log-request.sh` |
 | `https://dev.ramboq.com` | Dev website served from `/opt/ramboq_dev` |
 
-### Log Files (on prod server)
+### Log Files (on server)
 
 | File | Contents |
 |---|---|
-| `/opt/ramboq/.log/hook_debug.log` | Full deploy script output per run |
+| `/opt/ramboq/.log/hook_debug.log` | Full deploy script output per run (both prod and dev) |
 | `/opt/ramboq/.log/hook.log` | webhook listener stdout |
 | `/opt/ramboq/.log/hook.err` | webhook listener stderr |
 | `/opt/ramboq/.log/incoming_requests.log` | Requests to `/hooks/log` endpoint |
-| `/opt/ramboq/.log/error_file` | Streamlit app errors (full) |
-| `/opt/ramboq/.log/short_error_file` | Streamlit app errors (short) |
+| `/opt/ramboq/.log/error_file` | Prod Streamlit app errors (full) |
+| `/opt/ramboq/.log/short_error_file` | Prod Streamlit app errors (short) |
+| `/opt/ramboq/.log/error_file_dev` | Dev Streamlit app errors (full) |
+| `/opt/ramboq/.log/short_error_file_dev` | Dev Streamlit app errors (short) |
 
 ### Useful Commands (on prod server)
 
