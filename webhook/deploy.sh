@@ -11,20 +11,11 @@ if [ "$BRANCH" = "main" ]; then
   APP_SERVICE="ramboq.service"
   LOG="/opt/ramboq/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="true"
-elif [[ "$BRANCH" == dev* ]]; then
+else
   APP_ROOT="/opt/ramboq_dev"
   APP_SERVICE="ramboq_dev.service"
   LOG="/opt/ramboq/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="false"
-else
-  LOG="/opt/ramboq/.log/hook_debug.log"
-  {
-    echo "[$TS] Webhook triggered"
-    echo "[$TS] Git ref: $REF"
-    echo "[$TS] Branch: $BRANCH"
-    echo "[$TS] Branch is not eligible for deployment. Allowed: main, dev*"
-  } >> "$LOG" 2>&1
-  exit 0
 fi
 
 
