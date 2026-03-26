@@ -136,16 +136,27 @@ Key session state variables:
 
 ## Log Files (on server)
 
-Prod logs at `/opt/ramboq/.log/`, dev logs at `/opt/ramboq_dev/.log/`.
+Prod and dev logs are fully separated. The webhook listener is a shared service so its logs stay under prod.
 
-| File | Path | Source |
-|---|---|---|
-| `hook_debug.log` | `/opt/ramboq/.log/` | `deploy.sh` — prod deploy output |
-| `hook_debug.log` | `/opt/ramboq_dev/.log/` | `deploy.sh` — dev deploy output |
-| `hook.log` / `hook.err` | `/opt/ramboq/.log/` | `ramboq_hook.service` — webhook listener |
-| `error_file` / `short_error_file` | `/opt/ramboq/.log/` | `ramboq.service` — prod app errors |
-| `error_file` / `short_error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` — dev app errors |
-| `incoming_requests.log` | `/opt/ramboq/.log/` | `log-request.sh` — raw webhook requests |
+**Prod `/opt/ramboq/.log/`**
+
+| File | Source |
+|---|---|
+| `hook_debug.log` | `deploy.sh` — prod deploy output (main branch) |
+| `hook.log` / `hook.err` | `ramboq_hook.service` — webhook listener (shared, covers all branches) |
+| `incoming_requests.log` | `log-request.sh` — raw webhook requests |
+| `error_file` / `short_error_file` | `ramboq.service` — Streamlit app errors |
+| `log_file` / `short_log_file` | `ramboq_logger.py` — Python app logs |
+
+**Dev `/opt/ramboq_dev/.log/`**
+
+| File | Source |
+|---|---|
+| `hook_debug.log` | `deploy.sh` — dev deploy output (non-main branches) |
+| `error_file` / `short_error_file` | `ramboq_dev.service` — Streamlit app errors |
+| `log_file` / `short_log_file` | `ramboq_logger.py` — Python app logs |
+
+> Dev log paths are set in `/opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml` (gitignored). This file must be created manually with paths pointing to `/opt/ramboq_dev/.log/` — do not copy prod's version verbatim.
 
 ---
 

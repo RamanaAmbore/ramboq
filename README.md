@@ -173,13 +173,14 @@ pip install --no-cache-dir -r requirements.txt
 deactivate
 ```
 
-### 4. Hand-Place Secret Config Files
+### 4. Hand-Place Secret Config Files and Create Log Directory
 
 These files are gitignored and must be created manually on the server:
 
 ```bash
 mkdir -p /opt/ramboq/setup/yaml
 mkdir -p /opt/ramboq/.log
+sudo chown -R www-data:www-data /opt/ramboq/.log
 
 # Create secrets.yaml
 nano /opt/ramboq/setup/yaml/secrets.yaml
@@ -207,7 +208,7 @@ kite_login_url: https://kite.zerodha.com/api/login
 nano /opt/ramboq/setup/yaml/ramboq_deploy.yaml
 ```
 
-Paste in:
+Paste in (prod paths):
 ```yaml
 file_log_file: /opt/ramboq/.log/log_file
 error_log_file: /opt/ramboq/.log/error_file
@@ -222,18 +223,22 @@ mail: False
 
 ### 5. Nginx Setup
 
-Copy configs and create symlink:
+> **Important:** The default nginx site (`server_name _;`) catches ALL requests that don't match a named server block. If it is enabled in `sites-enabled`, it will intercept requests to `ramboq.com` and `dev.ramboq.com` and show the nginx default HTML page instead of the Streamlit app. It **must be removed** from `sites-enabled`.
+
 ```bash
 sudo cp /opt/ramboq/etc/nginx/sites-available/ramboq.com /etc/nginx/sites-available/ramboq.com
 sudo cp /opt/ramboq/etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-available/dev.ramboq.com
-sudo cp /opt/ramboq/etc/nginx/sites-available/default /etc/nginx/sites-available/default
 
-# Remove default enabled site if present
+# Remove the default site — this is the cause of the nginx default page showing
 sudo rm -f /etc/nginx/sites-enabled/default
 
-# Symlink ramboq.com
+# Symlink the app sites
 sudo ln -sf /etc/nginx/sites-available/ramboq.com /etc/nginx/sites-enabled/ramboq.com
 sudo ln -sf /etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-enabled/dev.ramboq.com
+
+# Verify only the correct sites are enabled
+ls -la /etc/nginx/sites-enabled/
+# Expected: ramboq.com -> ... and dev.ramboq.com -> ... only
 
 # Test and reload
 sudo nginx -t && sudo systemctl reload nginx
@@ -278,10 +283,18 @@ openssl s_client -connect ramboq.com:443 -servername ramboq.com 2>/dev/null \
 
 ### 7. systemd Services
 
-Install service files:
+**Prod service** — runs from `/opt/ramboq`, logs to `/opt/ramboq/.log/`, port 8502:
 ```bash
 sudo cp /opt/ramboq/webhook/ramboq.service /etc/systemd/system/ramboq.service
+```
+
+**Dev service** — runs from `/opt/ramboq_dev`, logs to `/opt/ramboq_dev/.log/`, port 8503:
+```bash
 sudo cp /opt/ramboq/webhook/ramboq_dev.service /etc/systemd/system/ramboq_dev.service
+```
+
+**Webhook listener** — shared service, logs to `/opt/ramboq/.log/`, port 9001:
+```bash
 sudo cp /opt/ramboq/webhook/ramboq_hook.service /etc/systemd/system/ramboq_hook.service
 ```
 
@@ -292,35 +305,27 @@ chmod +x /opt/ramboq/webhook/log-request.sh
 chmod +x /opt/ramboq/webhook/services.sh
 ```
 
-Reload systemd and enable services to start on boot:
+Reload systemd and enable all services:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable ramboq.service
-sudo systemctl enable ramboq_dev.service
-sudo systemctl enable ramboq_hook.service
+sudo systemctl enable ramboq.service ramboq_dev.service ramboq_hook.service
+sudo systemctl start ramboq.service ramboq_dev.service ramboq_hook.service
 ```
 
-Start services:
-```bash
-sudo systemctl start ramboq.service
-sudo systemctl start ramboq_dev.service
-sudo systemctl start ramboq_hook.service
-```
-
-Verify both are running:
+Verify all are running:
 ```bash
 sudo systemctl status ramboq.service
 sudo systemctl status ramboq_dev.service
 sudo systemctl status ramboq_hook.service
 
 # Confirm ports are open
-ss -tlnp | grep -E '8502|8503|9001'
+sudo ss -tlnp | grep -E '8502|8503|9001'
 ```
 
-Expected output:
+Expected:
 ```
-LISTEN  0  511  0.0.0.0:8502  ...  streamlit
-LISTEN  0  511  0.0.0.0:8503  ...  streamlit
+LISTEN  0  511  0.0.0.0:8502  ...  streamlit   (prod)
+LISTEN  0  511  0.0.0.0:8503  ...  streamlit   (dev)
 LISTEN  0  511  0.0.0.0:9001  ...  webhook
 ```
 
@@ -465,16 +470,45 @@ pip install --no-cache-dir -r requirements.txt
 deactivate
 ```
 
-### 3. Copy secret config files from prod
+### 3. Create the dev log directory
+
+```bash
+sudo mkdir -p /opt/ramboq_dev/.log
+sudo chown -R www-data:www-data /opt/ramboq_dev/.log
+```
+
+### 4. Place secret config files
+
+`secrets.yaml` is identical to prod — copy it directly. `ramboq_deploy.yaml` must use **dev-specific log paths**:
 
 ```bash
 sudo mkdir -p /opt/ramboq_dev/setup/yaml
-sudo cp /opt/ramboq/setup/yaml/secrets.yaml       /opt/ramboq_dev/setup/yaml/secrets.yaml
-sudo cp /opt/ramboq/setup/yaml/ramboq_deploy.yaml /opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml
+
+# secrets.yaml — same credentials as prod
+sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_dev/setup/yaml/secrets.yaml
+
+# ramboq_deploy.yaml — dev version with /opt/ramboq_dev/.log/ paths
+sudo nano /opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml
+```
+
+Paste in (note all log paths point to `/opt/ramboq_dev/.log/`):
+```yaml
+file_log_file: /opt/ramboq_dev/.log/log_file
+error_log_file: /opt/ramboq_dev/.log/error_file
+short_file_log_file: /opt/ramboq_dev/.log/short_log_file
+short_error_log_file: /opt/ramboq_dev/.log/short_error_file
+file_log_level: 10
+error_log_level: 40
+console_log_level: 40
+prod: False
+mail: False
+```
+
+```bash
 sudo chown -R www-data:www-data /opt/ramboq_dev/setup/yaml/
 ```
 
-### 4. Install and start the dev systemd service
+### 5. Install and start the dev systemd service
 
 ```bash
 sudo cp /opt/ramboq_dev/webhook/ramboq_dev.service /etc/systemd/system/ramboq_dev.service
@@ -483,7 +517,7 @@ sudo systemctl enable ramboq_dev.service
 sudo systemctl start ramboq_dev.service
 ```
 
-### 5. Add sudoers permission for dev service
+### 6. Add sudoers permission for dev service
 
 ```bash
 sudo visudo
@@ -494,42 +528,42 @@ Find the existing `www-data` line and add `ramboq_dev.service` alongside `ramboq
 www-data ALL=NOPASSWD: /bin/systemctl restart ramboq.service, /bin/systemctl restart ramboq_dev.service
 ```
 
-### 6. Enable the nginx dev site
+### 7. Enable the nginx dev site
+
+> Ensure the default nginx site is **not** in `sites-enabled` — it will intercept all requests and show the nginx default page. See prod Step 5.
 
 ```bash
 sudo cp /opt/ramboq_dev/etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-available/dev.ramboq.com
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo ln -sf /etc/nginx/sites-available/dev.ramboq.com /etc/nginx/sites-enabled/dev.ramboq.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### 7. SSL certificate for dev.ramboq.com
+### 8. SSL certificate for dev.ramboq.com
 
-Before running certbot, confirm the DNS record exists and resolves to your server IP (not a Cloudflare IP). The `dev` record must be **grey cloud (DNS only)** in Cloudflare:
+The `dev` DNS record must be **grey cloud (DNS only)** in Cloudflare — certbot's HTTP challenge fails if proxied.
 
 ```bash
+# Confirm DNS resolves to your server IP before proceeding
 dig +short dev.ramboq.com
-# Must return your server IP before proceeding
-```
 
-Then issue the cert:
-
-```bash
+# Issue the cert
 sudo certbot --nginx -d dev.ramboq.com
 ```
 
-### 8. Push to trigger the first deploy
+### 9. Push to trigger the first deploy
 
 From your local machine:
 ```bash
 git push origin dev
 ```
 
-### 9. Verify
+### 10. Verify
 
 ```bash
-tail -f /opt/ramboq/.log/hook_debug.log   # deploy log
-tail -f /opt/ramboq/.log/error_file_dev   # app log
-sudo ss -tlnp | grep 8503                 # confirm port 8503 is up
+tail -f /opt/ramboq_dev/.log/hook_debug.log   # dev deploy log
+tail -f /opt/ramboq_dev/.log/error_file        # dev app log
+sudo ss -tlnp | grep 8503                      # confirm port 8503 is up
 ```
 
 Then visit **https://dev.ramboq.com**.
@@ -633,19 +667,30 @@ sudo systemctl restart ramboq.service
 
 ### Log Files
 
-All logs are written to `/opt/ramboq/.log/` — this directory is shared by both prod and dev.
+Prod and dev logs are fully separated into their own directories.
 
-| File | Path | Written by | Contents |
-|---|---|---|---|
-| `hook_debug.log` | `/opt/ramboq/.log/` | `deploy.sh` | Prod deploy output |
-| `hook_debug.log` | `/opt/ramboq_dev/.log/` | `deploy.sh` | Dev deploy output |
-| `hook.log` | `/opt/ramboq/.log/` | `ramboq_hook.service` | Webhook listener stdout |
-| `hook.err` | `/opt/ramboq/.log/` | `ramboq_hook.service` | Webhook listener stderr |
-| `incoming_requests.log` | `/opt/ramboq/.log/` | `log-request.sh` | Requests hitting `/hooks/log` |
-| `error_file` | `/opt/ramboq/.log/` | `ramboq.service` | Prod Streamlit full error log |
-| `short_error_file` | `/opt/ramboq/.log/` | `ramboq.service` | Prod Streamlit recent errors |
-| `error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` | Dev Streamlit full error log |
-| `short_error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` | Dev Streamlit recent errors |
+**Prod — `/opt/ramboq/.log/`**
+
+| File | Written by | Contents |
+|---|---|---|
+| `hook_debug.log` | `deploy.sh` | Full deploy output for every push to `main` |
+| `hook.log` | `ramboq_hook.service` | Webhook listener stdout (shared — covers all branches) |
+| `hook.err` | `ramboq_hook.service` | Webhook listener stderr (shared) |
+| `incoming_requests.log` | `log-request.sh` | Requests hitting `/hooks/log` |
+| `error_file` | `ramboq.service` | Streamlit full error log |
+| `short_error_file` | `ramboq.service` | Streamlit recent errors |
+| `log_file` | `ramboq_logger.py` | Python app full log |
+| `short_log_file` | `ramboq_logger.py` | Python app recent log |
+
+**Dev — `/opt/ramboq_dev/.log/`**
+
+| File | Written by | Contents |
+|---|---|---|
+| `hook_debug.log` | `deploy.sh` | Full deploy output for every non-main push |
+| `error_file` | `ramboq_dev.service` | Streamlit full error log |
+| `short_error_file` | `ramboq_dev.service` | Streamlit recent errors |
+| `log_file` | `ramboq_logger.py` | Python app full log |
+| `short_log_file` | `ramboq_logger.py` | Python app recent log |
 
 ### Debug Endpoints
 
@@ -677,22 +722,35 @@ tail -50 /opt/ramboq/.log/incoming_requests.log
 
 **Deploy triggered but app not updated**
 ```bash
-# See exactly what deploy.sh did
+# Prod — see exactly what deploy.sh did
 tail -100 /opt/ramboq/.log/hook_debug.log
 
+# Dev — see exactly what deploy.sh did
+tail -100 /opt/ramboq_dev/.log/hook_debug.log
+
 # Check the service restarted
-sudo systemctl status ramboq.service
-sudo systemctl status ramboq_dev.service
+sudo systemctl status ramboq.service       # prod
+sudo systemctl status ramboq_dev.service   # dev
 ```
 
-**App not loading in browser**
+**App not loading in browser — shows nginx default page**
+```bash
+# The default nginx site is catching the request — remove it
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+
+# Verify only the correct sites are enabled
+ls -la /etc/nginx/sites-enabled/
+```
+
+**App not loading in browser — 502 Bad Gateway**
 ```bash
 # Check Streamlit is running on the correct port
 sudo ss -tlnp | grep -E '8502|8503'
 
 # Check recent app errors
-tail -50 /opt/ramboq/.log/short_error_file        # prod
-tail -50 /opt/ramboq/.log/short_error_file_dev    # dev
+tail -50 /opt/ramboq/.log/short_error_file          # prod
+tail -50 /opt/ramboq_dev/.log/short_error_file      # dev
 
 # Check nginx config and status
 sudo nginx -t
@@ -701,8 +759,8 @@ sudo systemctl status nginx
 
 **Nginx fails to start (e.g. SSL cert missing)**
 ```bash
-sudo nginx -t                          # shows exact error and file
-sudo systemctl status nginx            # shows recent journal entries
+sudo nginx -t                           # shows exact error and file
+sudo systemctl status nginx             # shows recent journal entries
 journalctl -u nginx --since "5 min ago"
 ```
 
@@ -712,12 +770,13 @@ journalctl -u nginx --since "5 min ago"
 # Check all service statuses
 sudo systemctl status ramboq.service ramboq_dev.service ramboq_hook.service
 
-# Tail deploy log live
-tail -f /opt/ramboq/.log/hook_debug.log
+# Tail deploy logs live
+tail -f /opt/ramboq/.log/hook_debug.log         # prod deploys
+tail -f /opt/ramboq_dev/.log/hook_debug.log     # dev deploys
 
 # Tail app logs live
-tail -f /opt/ramboq/.log/short_error_file        # prod
-tail -f /opt/ramboq/.log/short_error_file_dev    # dev
+tail -f /opt/ramboq/.log/short_error_file        # prod app
+tail -f /opt/ramboq_dev/.log/short_error_file    # dev app
 
 # Manually trigger a deploy (bypasses webhook, runs deploy.sh directly)
 bash /opt/ramboq/webhook/deploy.sh refs/heads/main
