@@ -136,15 +136,16 @@ Key session state variables:
 
 ## Log Files (on server)
 
-All logs at `/opt/ramboq/.log/` — shared by prod and dev.
+Prod logs at `/opt/ramboq/.log/`, dev logs at `/opt/ramboq_dev/.log/`.
 
-| File | Source |
-|---|---|
-| `hook_debug.log` | `deploy.sh` — full deploy output per push |
-| `hook.log` / `hook.err` | `ramboq_hook.service` — webhook listener |
-| `error_file` / `short_error_file` | `ramboq.service` — prod app errors |
-| `error_file_dev` / `short_error_file_dev` | `ramboq_dev.service` — dev app errors |
-| `incoming_requests.log` | `log-request.sh` — raw webhook requests |
+| File | Path | Source |
+|---|---|---|
+| `hook_debug.log` | `/opt/ramboq/.log/` | `deploy.sh` — prod deploy output |
+| `hook_debug.log` | `/opt/ramboq_dev/.log/` | `deploy.sh` — dev deploy output |
+| `hook.log` / `hook.err` | `/opt/ramboq/.log/` | `ramboq_hook.service` — webhook listener |
+| `error_file` / `short_error_file` | `/opt/ramboq/.log/` | `ramboq.service` — prod app errors |
+| `error_file` / `short_error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` — dev app errors |
+| `incoming_requests.log` | `/opt/ramboq/.log/` | `log-request.sh` — raw webhook requests |
 
 ---
 

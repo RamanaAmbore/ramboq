@@ -14,7 +14,7 @@ if [ "$BRANCH" = "main" ]; then
 else
   APP_ROOT="/opt/ramboq_dev"
   APP_SERVICE="ramboq_dev.service"
-  LOG="/opt/ramboq/.log/hook_debug.log"
+  LOG="/opt/ramboq_dev/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="false"
 fi
 

@@ -635,16 +635,17 @@ sudo systemctl restart ramboq.service
 
 All logs are written to `/opt/ramboq/.log/` — this directory is shared by both prod and dev.
 
-| File | Written by | Contents |
-|---|---|---|
-| `hook_debug.log` | `deploy.sh` | Full deploy output for every push (prod and dev) |
-| `hook.log` | `ramboq_hook.service` | Webhook listener stdout |
-| `hook.err` | `ramboq_hook.service` | Webhook listener stderr |
-| `incoming_requests.log` | `log-request.sh` | Requests hitting `/hooks/log` |
-| `error_file` | `ramboq.service` | Prod Streamlit full error log |
-| `short_error_file` | `ramboq.service` | Prod Streamlit recent errors |
-| `error_file_dev` | `ramboq_dev.service` | Dev Streamlit full error log |
-| `short_error_file_dev` | `ramboq_dev.service` | Dev Streamlit recent errors |
+| File | Path | Written by | Contents |
+|---|---|---|---|
+| `hook_debug.log` | `/opt/ramboq/.log/` | `deploy.sh` | Prod deploy output |
+| `hook_debug.log` | `/opt/ramboq_dev/.log/` | `deploy.sh` | Dev deploy output |
+| `hook.log` | `/opt/ramboq/.log/` | `ramboq_hook.service` | Webhook listener stdout |
+| `hook.err` | `/opt/ramboq/.log/` | `ramboq_hook.service` | Webhook listener stderr |
+| `incoming_requests.log` | `/opt/ramboq/.log/` | `log-request.sh` | Requests hitting `/hooks/log` |
+| `error_file` | `/opt/ramboq/.log/` | `ramboq.service` | Prod Streamlit full error log |
+| `short_error_file` | `/opt/ramboq/.log/` | `ramboq.service` | Prod Streamlit recent errors |
+| `error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` | Dev Streamlit full error log |
+| `short_error_file` | `/opt/ramboq_dev/.log/` | `ramboq_dev.service` | Dev Streamlit recent errors |
 
 ### Debug Endpoints
 
