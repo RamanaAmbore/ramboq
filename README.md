@@ -614,6 +614,38 @@ The GitHub webhook and `hooks.json` share a secret for HMAC-SHA256 signature val
 - The same secret must be in `webhook/hooks.json` under `payload-hash-sha256.secret`
 - Current secret is `f8b12c3d5e8a4fa19b1749a0c6e9312b` — rotate this periodically
 
+### Service Files
+
+All systemd service files live in the repo under `webhook/` and are installed to `/etc/systemd/system/` on the server.
+
+| Service file | Installed path | Purpose |
+|---|---|---|
+| `webhook/ramboq.service` | `/etc/systemd/system/ramboq.service` | Prod Streamlit app on port 8502 |
+| `webhook/ramboq_dev.service` | `/etc/systemd/system/ramboq_dev.service` | Dev Streamlit app on port 8503 |
+| `webhook/ramboq_hook.service` | `/etc/systemd/system/ramboq_hook.service` | Webhook listener on port 9001 |
+
+If you update a service file in the repo, copy it to the system and reload:
+```bash
+sudo cp /opt/ramboq/webhook/ramboq.service /etc/systemd/system/ramboq.service
+sudo systemctl daemon-reload
+sudo systemctl restart ramboq.service
+```
+
+### Log Files
+
+All logs are written to `/opt/ramboq/.log/` — this directory is shared by both prod and dev.
+
+| File | Written by | Contents |
+|---|---|---|
+| `hook_debug.log` | `deploy.sh` | Full deploy output for every push (prod and dev) |
+| `hook.log` | `ramboq_hook.service` | Webhook listener stdout |
+| `hook.err` | `ramboq_hook.service` | Webhook listener stderr |
+| `incoming_requests.log` | `log-request.sh` | Requests hitting `/hooks/log` |
+| `error_file` | `ramboq.service` | Prod Streamlit full error log |
+| `short_error_file` | `ramboq.service` | Prod Streamlit recent errors |
+| `error_file_dev` | `ramboq_dev.service` | Dev Streamlit full error log |
+| `short_error_file_dev` | `ramboq_dev.service` | Dev Streamlit recent errors |
+
 ### Debug Endpoints
 
 | URL | Purpose |
@@ -622,42 +654,79 @@ The GitHub webhook and `hooks.json` share a secret for HMAC-SHA256 signature val
 | `https://ramboq.com/hooks/log` | Manual request logger — triggers `log-request.sh` |
 | `https://dev.ramboq.com` | Dev website served from `/opt/ramboq_dev` |
 
-### Log Files (on server)
+### Debugging Guide
 
-| File | Contents |
-|---|---|
-| `/opt/ramboq/.log/hook_debug.log` | Full deploy script output per run (both prod and dev) |
-| `/opt/ramboq/.log/hook.log` | webhook listener stdout |
-| `/opt/ramboq/.log/hook.err` | webhook listener stderr |
-| `/opt/ramboq/.log/incoming_requests.log` | Requests to `/hooks/log` endpoint |
-| `/opt/ramboq/.log/error_file` | Prod Streamlit app errors (full) |
-| `/opt/ramboq/.log/short_error_file` | Prod Streamlit app errors (short) |
-| `/opt/ramboq/.log/error_file_dev` | Dev Streamlit app errors (full) |
-| `/opt/ramboq/.log/short_error_file_dev` | Dev Streamlit app errors (short) |
-
-### Useful Commands (on prod server)
-
+**Deploy not triggering after a push**
 ```bash
-# Check service status
-sudo systemctl status ramboq.service
-sudo systemctl status ramboq_dev.service
+# Check webhook listener is running
 sudo systemctl status ramboq_hook.service
 
-# Tail deploy logs
+# Check listener is on port 9001
+sudo ss -tlnp | grep 9001
+
+# Check nginx is proxying to it
+sudo nginx -t
+curl -I https://webhook.ramboq.com/hooks/update
+
+# Check if GitHub delivered the payload (GitHub → repo → Settings → Webhooks → recent deliveries)
+# Then check what the listener received
+tail -50 /opt/ramboq/.log/hook.err
+tail -50 /opt/ramboq/.log/incoming_requests.log
+```
+
+**Deploy triggered but app not updated**
+```bash
+# See exactly what deploy.sh did
+tail -100 /opt/ramboq/.log/hook_debug.log
+
+# Check the service restarted
+sudo systemctl status ramboq.service
+sudo systemctl status ramboq_dev.service
+```
+
+**App not loading in browser**
+```bash
+# Check Streamlit is running on the correct port
+sudo ss -tlnp | grep -E '8502|8503'
+
+# Check recent app errors
+tail -50 /opt/ramboq/.log/short_error_file        # prod
+tail -50 /opt/ramboq/.log/short_error_file_dev    # dev
+
+# Check nginx config and status
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+**Nginx fails to start (e.g. SSL cert missing)**
+```bash
+sudo nginx -t                          # shows exact error and file
+sudo systemctl status nginx            # shows recent journal entries
+journalctl -u nginx --since "5 min ago"
+```
+
+### Useful Commands
+
+```bash
+# Check all service statuses
+sudo systemctl status ramboq.service ramboq_dev.service ramboq_hook.service
+
+# Tail deploy log live
 tail -f /opt/ramboq/.log/hook_debug.log
 
-# Manually trigger a deploy (simulate webhook locally)
-cd /opt/ramboq && bash webhook/deploy.sh refs/heads/main
-cd /opt/ramboq && bash webhook/deploy.sh refs/heads/dev
+# Tail app logs live
+tail -f /opt/ramboq/.log/short_error_file        # prod
+tail -f /opt/ramboq/.log/short_error_file_dev    # dev
 
-# Reload all services (nginx + webhook + app)
+# Manually trigger a deploy (bypasses webhook, runs deploy.sh directly)
+bash /opt/ramboq/webhook/deploy.sh refs/heads/main
+bash /opt/ramboq/webhook/deploy.sh refs/heads/dev
+
+# Reload all services at once (nginx + webhook + app)
 bash /opt/ramboq/webhook/services.sh
 
-# Test nginx config
-sudo nginx -t
-
-# View recent Streamlit errors
-tail -50 /opt/ramboq/.log/short_error_file
+# Confirm ports are open
+sudo ss -tlnp | grep -E '8502|8503|9001'
 ```
 
 ---
