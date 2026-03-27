@@ -5,7 +5,7 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/webhook -hooks /opt/ramboq/webhook/hooks.json -port 9001 -verbose
 StandardOutput=append:/opt/ramboq/.log/hook.log
-StandardError=append:/opt/ramboq/.log/hook.err
+StandardError=append:/opt/ramboq/.log/hook.log
 Restart=always
 User=www-data
 Group=www-data
