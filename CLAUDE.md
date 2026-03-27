@@ -25,7 +25,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
 - For `pod/*` branches: `deploy.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
-- Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; `ramboq_deploy.yaml` for pod uses `/app/.log/` paths (container-internal, mapped to `/opt/ramboq_pod/.log/`)
+- Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
 
 ---
 
@@ -57,8 +57,8 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`decorators.py`** — `@for_all_accounts` iterates all accounts or a single one; `@retry_kite_conn()` retries with `test_conn=True` from attempt 2; `@track_it()` logs execution time; `@lock_it_for_update` / `@update_lock` for thread safety
 - **`singleton_base.py`** — Thread-safe singleton via double-checked locking; `_instances` dict keyed by class
 - **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
-- **`genai_api.py`** — Perplexity AI via OpenAI-compatible client; falls back to `ramboq_config['market']` static content when `prod=False` in `ramboq_deploy.yaml`
-- **`mail_utils.py`** — SMTP via Hostinger; respects `prod` and `mail` flags in `ramboq_deploy.yaml` before sending
+- **`genai_api.py`** — Perplexity AI via OpenAI-compatible client; falls back to `ramboq_config['market']` static content when `prod=False` in `config.yaml`
+- **`mail_utils.py`** — SMTP via Hostinger; respects `prod` and `mail` flags in `config.yaml` before sending
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 
@@ -79,13 +79,12 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 | File | Tracked | Contents |
 |---|---|---|
-| `config.yaml` | Yes | `retry_count` (3), `conn_reset_hours` (23) |
+| `config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `prod`/`mail`/`perplexity` flags (defaults `False`); deploy scripts preserve server overrides across git pulls |
 | `ramboq_config.yaml` | Yes | All page content, nav labels, Perplexity prompts/params, Mermaid diagrams, fallback market report |
 | `ramboq_constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
 | `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, Perplexity API key (`pplx_api_key`) |
-| `ramboq_deploy.yaml` | **No — gitignored** | Log file paths, log levels, `prod`/`mail`/`perplexity` flags, `enforce_password_standard` |
 
-`secrets.yaml` and `ramboq_deploy.yaml` must be **hand-placed on the server** — they are never in git. Copy from prod to dev when setting up `/opt/ramboq_dev`.
+`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys preserve it via backup/restore in the deploy scripts.
 
 ---
 
@@ -122,7 +121,7 @@ Key session state variables:
 - **Do not call `get_nearest_time()` more than once per page render** — use the returned value throughout
 - **Do not touch `ramboq_ssh/`** — it is a frozen reference snapshot of prod server files, not actively maintained. All real work happens in `src/`
 - **Do not mock broker API calls in tests** — the `@for_all_accounts` decorator and `Connections` singleton behaviour differs significantly from mocks
-- **Do not commit `secrets.yaml` or `ramboq_deploy.yaml`** — they are gitignored for good reason
+- **Do not commit `secrets.yaml`** — it is gitignored; contains API keys, SMTP credentials, and cookie secrets
 - **Do not use `st.sidebar`** — sidebar navigation is disabled in `.streamlit/config.toml`; all navigation is via `header.py`
 - **Do not add branch filter rules to hooks.json** — branch routing is handled in `dispatch.sh`, not in `hooks.json`; `hooks.json` only validates the event, repo, and HMAC
 - **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
@@ -167,7 +166,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
 | `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
-> Dev log paths are set in `/opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml` (gitignored). `initial_deploy.sh` creates a template — do not copy prod's version verbatim.
+> Dev log paths use the same relative `.log/` paths as prod — no per-environment config changes needed. The `prod`/`mail`/`perplexity` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
 
 ---
 
@@ -181,6 +180,6 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change Perplexity AI prompt | `setup/yaml/ramboq_config.yaml` — `pplx_system_msg`, `pplx_user_msg`, `pplx_temperature`, `pplx_max_tokens` |
 | Change email template | `src/constants.py` — HTML template strings |
 | Change connection retry behaviour | `setup/yaml/config.yaml` — `retry_count`, `conn_reset_hours` |
-| Change log verbosity | `setup/yaml/ramboq_deploy.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
+| Change log verbosity | `setup/yaml/config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
 | Change deploy branch routing | `webhook/deploy.sh` — the `if/else` at the top |

@@ -1,2 +1,20 @@
+# Connection settings
 retry_count: 3
 conn_reset_hours: 23
+
+# Log file paths (relative to app working directory — works uniformly for prod, dev, and pod)
+file_log_file: .log/log_file
+error_log_file: .log/error_file
+short_file_log_file: .log/short_log_file
+short_error_log_file: .log/short_error_file
+
+# Log levels (Python logging: 10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
+file_log_level: 10
+error_log_level: 40
+console_log_level: 40
+
+# App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
+prod: False
+mail: False
+perplexity: False
+enforce_password_standard: False
