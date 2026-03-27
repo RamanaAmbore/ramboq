@@ -99,16 +99,25 @@ kite_twofa_url: https://kite.zerodha.com/api/twofa
 pplx_api_key: <perplexity-api-key>
 ```
 
-### `setup/yaml/ramboq_deploy.yaml` (gitignored — hand-place on server)
+### `setup/yaml/config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
 ```yaml
-file_log_file: /opt/ramboq/.log/log_file
-error_log_file: /opt/ramboq/.log/error_file
-short_file_log_file: /opt/ramboq/.log/short_log_file
-short_error_log_file: /opt/ramboq/.log/short_error_file
+# Connection settings
+retry_count: 3
+conn_reset_hours: 23
+
+# Log file paths (relative to app working directory — uniform across prod, dev, and pod)
+file_log_file: .log/log_file
+error_log_file: .log/error_file
+short_file_log_file: .log/short_log_file
+short_error_log_file: .log/short_error_file
+
+# Log levels (10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
-prod: True
+
+# App flags — set to True on server by initial_deploy.sh; preserved across deploys
+prod: False
 mail: False
 perplexity: False
 enforce_password_standard: False
@@ -694,18 +703,20 @@ sudo chown -R www-data:www-data /opt/ramboq_pod/.log
 sudo mkdir -p /opt/ramboq_pod/setup/yaml
 # Create secrets.yaml manually — do not copy from another environment
 sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml
+sudo nano /opt/ramboq_pod/setup/yaml/config.yaml
 ```
 ```yaml
-# Log paths are inside the container — mapped to /opt/ramboq_pod/.log/ on host
-file_log_file: /app/.log/log_file
-error_log_file: /app/.log/error_file
-short_file_log_file: /app/.log/short_log_file
-short_error_log_file: /app/.log/short_error_file
+# Log paths are relative — resolve to /app/.log/ inside the container (mapped to /opt/ramboq_pod/.log/ on host)
+retry_count: 3
+conn_reset_hours: 23
+file_log_file: .log/log_file
+error_log_file: .log/error_file
+short_file_log_file: .log/short_log_file
+short_error_log_file: .log/short_error_file
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
-prod: False
+prod: True
 mail: False
 perplexity: False
 enforce_password_standard: False

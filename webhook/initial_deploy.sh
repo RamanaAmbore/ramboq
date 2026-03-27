@@ -223,28 +223,37 @@ setup_environment() {
     chown -R www-data:www-data "$app_root/.log"
     log_ok "Created $app_root/.log with empty log files"
 
-    # ramboq_deploy.yaml template
+    # config.yaml template (connection settings + deploy flags + log paths)
     local yaml_dir="$app_root/setup/yaml"
     mkdir -p "$yaml_dir"
 
-    if [ ! -f "$yaml_dir/ramboq_deploy.yaml" ]; then
-        cat > "$yaml_dir/ramboq_deploy.yaml" << EOF
-file_log_file: $app_root/.log/log_file
-error_log_file: $app_root/.log/error_file
-short_file_log_file: $app_root/.log/short_log_file
-short_error_log_file: $app_root/.log/short_error_file
+    if [ ! -f "$yaml_dir/config.yaml" ]; then
+        cat > "$yaml_dir/config.yaml" << EOF
+# Connection settings
+retry_count: 3
+conn_reset_hours: 23
+
+# Log file paths (relative to app working directory)
+file_log_file: .log/log_file
+error_log_file: .log/error_file
+short_file_log_file: .log/short_log_file
+short_error_log_file: .log/short_error_file
+
+# Log levels (10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
+
+# App flags
 prod: $is_prod
 mail: False
 perplexity: False
 enforce_password_standard: False
 EOF
-        chown www-data:www-data "$yaml_dir/ramboq_deploy.yaml"
-        log_ok "Created ramboq_deploy.yaml"
+        chown www-data:www-data "$yaml_dir/config.yaml"
+        log_ok "Created config.yaml"
     else
-        log_ok "ramboq_deploy.yaml already exists — not overwriting"
+        log_ok "config.yaml already exists — not overwriting"
     fi
 
     # secrets.yaml template

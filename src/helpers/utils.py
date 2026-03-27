@@ -67,13 +67,10 @@ with open('setup/yaml/ramboq_config.yaml', 'r', encoding='utf-8', errors='ignore
 with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     secrets = yaml.safe_load(file)  # Load YAML config file
 
-# Load configuration from YAML file
-with open('setup/yaml/ramboq_deploy.yaml', 'r', encoding='utf-8', errors='ignore') as file:
-    ramboq_deploy = yaml.safe_load(file)
-
-# Load additional configuration data from a YAML file
+# Load configuration from YAML file (merged deploy + connection settings)
 with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
-    config = yaml.safe_load(file)  # Load YAML config file
+    config = yaml.safe_load(file)
+    ramboq_deploy = config  # all deploy keys are now in config.yaml
 
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
