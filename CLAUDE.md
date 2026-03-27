@@ -66,7 +66,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`deploy.sh`** — Main deploy script; `main` → `/opt/ramboq` with nginx/static sync; non-main → `/opt/ramboq_dev` without sync
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
-- **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; passes `ref` to `deploy.sh`. **Read from `/opt/ramboq/webhook/hooks.json` only** — the shared prod directory, never from `/opt/ramboq_dev`. After `git pull`, if this file was locally modified on the server, force reset with `git checkout HEAD -- webhook/hooks.json`
+- **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; 3 separate hook entries route by branch (`deploy-prod` → main, `deploy-dev` → non-main/non-pod, `deploy-pod` → pod/*). Each hook calls its own env's deploy script. **Deployed to `/etc/webhook/hooks.json`** on the server (not tied to any deployment directory). Copy manually after changes: `sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
 - **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only
 - **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches; all output (stdout+stderr) goes to `hook.log`
@@ -123,7 +123,7 @@ Key session state variables:
 - **Do not mock broker API calls in tests** — the `@for_all_accounts` decorator and `Connections` singleton behaviour differs significantly from mocks
 - **Do not commit `secrets.yaml` or `ramboq_deploy.yaml`** — they are gitignored for good reason
 - **Do not use `st.sidebar`** — sidebar navigation is disabled in `.streamlit/config.toml`; all navigation is via `header.py`
-- **Do not add `refs/heads/main` to hooks.json trigger rules** — this blocks all non-main branch deploys; branch routing is handled inside `deploy.sh`, not in `hooks.json`
+- **Do not add a catch-all branch rule to hooks.json** — each hook entry already has an explicit branch filter; adding a broad rule breaks the per-env routing
 - **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
 
 ---
