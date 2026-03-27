@@ -90,11 +90,22 @@ Create `secrets.yaml` manually with the required credentials:
 
 ```bash
 sudo tee /opt/ramboq_pod/setup/yaml/secrets.yaml <<'EOF'
-# Kite API credentials, SMTP, cookie secret — fill in actual values
-cookie_secret: ""
+# FILL IN REAL VALUES before starting the service
+smtp_server: smtp.hostinger.com
+smtp_port: 587
+smtp_user_name: RamboQ Team
+smtp_user: <your-email>
+smtp_pass: <your-smtp-password>
 kite_accounts:
-  - ...
-smtp: ...
+    <USER_ID>:
+        password: <password>
+        totp_token: <totp>
+        api_key: <api_key>
+        api_secret: <api_secret>
+cookie_secret: <random-strong-string>
+kite_login_url: https://kite.zerodha.com/api/login
+kite_twofa_url: https://kite.zerodha.com/api/twofa
+pplx_api_key: <perplexity-api-key>
 EOF
 sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/secrets.yaml
 sudo chmod 600 /opt/ramboq_pod/setup/yaml/secrets.yaml
@@ -113,9 +124,6 @@ error_log_level: 40
 short_file_log_file: /app/.log/short_log_file
 short_error_log_file: /app/.log/short_error_file
 console_log_level: 40
-twilio_alert: ''
-twilio_account_sid: ''
-twilio_auth_token: ''
 prod: True
 mail: False
 perplexity: False

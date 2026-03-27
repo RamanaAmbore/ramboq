@@ -9,7 +9,7 @@ import yaml
 with open('setup/yaml/ramboq_deploy.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     deploy = yaml.safe_load(file)
 
-# Extract log and Twilio settings from config
+# Extract log settings from config
 FILE_LOG_FILE = deploy['file_log_file']
 ERROR_LOG_FILE = deploy['error_log_file']
 FILE_LOG_LEVEL = int(deploy['file_log_level'])
@@ -17,24 +17,6 @@ ERROR_LOG_LEVEL = int(deploy['error_log_level'])
 SHORT_FILE_LOG_FILE = deploy['short_file_log_file']
 SHORT_ERROR_LOG_FILE = deploy['short_error_log_file']
 CONSOLE_LOG_LEVEL = int(deploy['console_log_level'])
-TWILIO_ALERT = deploy['twilio_alert']
-TWILIO_ACCOUNT_SID = deploy['twilio_account_sid']
-TWILIO_AUTH_TOKEN = deploy['twilio_auth_token']
-
-# def send_twilio_alert(message):
-#     """Send an alert via Twilio if enabled in configuration."""
-#     if not TWILIO_ALERT:
-#         return
-#     try:
-#         from twilio.rest import Client  # Import here to avoid dependency if not used
-#         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-#         client.messages.create(
-#             body=message,
-#             from_=f'{TWILIO_FROM_NUMBER}',
-#             to=f'{TWILIO_TO_NUMBER}'
-#         )
-#     except Exception as e:
-#         print(f"[TwilioHandler] Failed to send alert: {e}")
 
 
 # Ensure log directory exists
@@ -112,17 +94,6 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(CONSOLE_LOG_LEVEL)
 console_handler.setFormatter(formatter)
 
-# # --- Twilio Handler ---
-# class TwilioHandler(logging.Handler):
-#     """Custom handler that sends Twilio alerts for error-level logs."""
-#     def emit(self, record):
-#         if record.levelno >= logging.ERROR:
-#             send_twilio_alert(self.format(record))
-# twilio_handler = TwilioHandler()
-# twilio_handler.setLevel(logging.ERROR)
-# twilio_handler.setFormatter(formatter)
-
-
 # --- Queue Listener ---
 # Processes logs asynchronously from queue to all handlers
 queue_listener = QueueListener(
@@ -132,7 +103,6 @@ queue_listener = QueueListener(
     error_file_handler,
     short_log_file_handler,
     short_error_file_handler,
-    # twilio_handler,
     respect_handler_level=True
 )
 queue_listener.start()
@@ -165,6 +135,6 @@ if __name__ == "__main__":
     logger1.debug("Module 1 → Debug message (useful for developers)")
     logger2.info("Module 2 → Info message (general updates)")
     logger1.warning("Module 1 → Warning (potential issue)")
-    logger2.error("Module 2 → Error occurred! (This will trigger Twilio alert if enabled)")
+    logger2.error("Module 2 → Error occurred!")
 
     shutdown_logger()
