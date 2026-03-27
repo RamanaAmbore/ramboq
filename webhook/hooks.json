@@ -1,13 +1,47 @@
 [
   {
-    "id": "ramboq-deploy",
+    "id": "deploy-prod",
     "execute-command": "/opt/ramboq/webhook/deploy.sh",
     "command-working-directory": "/opt/ramboq",
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "push",
+            "parameter": { "source": "header", "name": "X-GitHub-Event" }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "ramboq",
+            "parameter": { "source": "payload", "name": "repository.name" }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "refs/heads/main",
+            "parameter": { "source": "payload", "name": "ref" }
+          }
+        },
+        {
+          "match": {
+            "type": "payload-hmac-sha256",
+            "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b",
+            "parameter": { "source": "header", "name": "X-Hub-Signature-256" }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "deploy-dev",
+    "execute-command": "/opt/ramboq_dev/webhook/deploy_dev.sh",
+    "command-working-directory": "/opt/ramboq_dev",
     "pass-arguments-to-command": [
-      {
-        "source": "payload",
-        "name": "ref"
-      }
+      { "source": "payload", "name": "ref" }
     ],
     "trigger-rule": {
       "and": [
@@ -15,19 +49,31 @@
           "match": {
             "type": "value",
             "value": "push",
-            "parameter": {
-              "source": "header",
-              "name": "X-GitHub-Event"
-            }
+            "parameter": { "source": "header", "name": "X-GitHub-Event" }
           }
         },
         {
           "match": {
             "type": "value",
             "value": "ramboq",
-            "parameter": {
-              "source": "payload",
-              "name": "repository.name"
+            "parameter": { "source": "payload", "name": "repository.name" }
+          }
+        },
+        {
+          "not": {
+            "match": {
+              "type": "value",
+              "value": "refs/heads/main",
+              "parameter": { "source": "payload", "name": "ref" }
+            }
+          }
+        },
+        {
+          "not": {
+            "match": {
+              "type": "regex",
+              "regex": "^refs/heads/pod/",
+              "parameter": { "source": "payload", "name": "ref" }
             }
           }
         },
@@ -35,19 +81,56 @@
           "match": {
             "type": "payload-hmac-sha256",
             "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b",
-            "parameter": {
-              "source": "header",
-              "name": "X-Hub-Signature-256"
-            }
+            "parameter": { "source": "header", "name": "X-Hub-Signature-256" }
           }
         }
       ]
     }
   },
   {
-  "id": "log-incoming",
-  "execute-command": "/opt/ramboq/webhook/log-request.sh",
-  "command-working-directory": "/opt/ramboq",
-  "include-command-output-in-response": true
-}
+    "id": "deploy-pod",
+    "execute-command": "/opt/ramboq_pod/webhook/deploy_pod.sh",
+    "command-working-directory": "/opt/ramboq_pod",
+    "pass-arguments-to-command": [
+      { "source": "payload", "name": "ref" }
+    ],
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "push",
+            "parameter": { "source": "header", "name": "X-GitHub-Event" }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "ramboq",
+            "parameter": { "source": "payload", "name": "repository.name" }
+          }
+        },
+        {
+          "match": {
+            "type": "regex",
+            "regex": "^refs/heads/pod/",
+            "parameter": { "source": "payload", "name": "ref" }
+          }
+        },
+        {
+          "match": {
+            "type": "payload-hmac-sha256",
+            "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b",
+            "parameter": { "source": "header", "name": "X-Hub-Signature-256" }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "log-incoming",
+    "execute-command": "/opt/ramboq/webhook/log-request.sh",
+    "command-working-directory": "/opt/ramboq",
+    "include-command-output-in-response": true
+  }
 ]
