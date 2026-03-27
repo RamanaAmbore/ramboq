@@ -61,10 +61,11 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ### Webhook / Deployment (`webhook/`)
 - **`deploy.sh`** — Main deploy script; `main` → `/opt/ramboq` with nginx/static sync; non-main → `/opt/ramboq_dev` without sync
+- **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; passes `ref` to `deploy.sh`. **Read from `/opt/ramboq/webhook/hooks.json` only** — the shared prod directory, never from `/opt/ramboq_dev`. After `git pull`, if this file was locally modified on the server, force reset with `git checkout HEAD -- webhook/hooks.json`
-- **`ramboq.service`** — Prod systemd unit, port 8502
-- **`ramboq_dev.service`** — Dev systemd unit, port 8503
-- **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches
+- **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
+- **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only
+- **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches; all output (stdout+stderr) goes to `hook.log`
 - **`log-request.sh`** — Logs raw incoming webhook requests
 
 ---
@@ -142,23 +143,27 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 **Prod `/opt/ramboq/.log/`**
 
-| File | Source |
-|---|---|
-| `hook_debug.log` | `deploy.sh` — prod deploy output (main branch) |
-| `hook.log` / `hook.err` | `ramboq_hook.service` — webhook listener (shared, covers all branches) |
-| `incoming_requests.log` | `log-request.sh` — raw webhook requests |
-| `error_file` / `short_error_file` | `ramboq.service` — Streamlit app errors |
-| `log_file` / `short_log_file` | `ramboq_logger.py` — Python app logs |
+| File | Source | Notes |
+|---|---|---|
+| `hook_debug.log` | `deploy.sh` | Prod deploy output (main branch) |
+| `hook.log` | `ramboq_hook.service` | All webhook listener output (stdout+stderr combined) |
+| `incoming_requests.log` | `log-request.sh` | Raw webhook requests |
+| `error_file` | `ramboq.service` tee | All Streamlit stdout+stderr |
+| `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines (not written by service) |
+| `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
+| `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
 **Dev `/opt/ramboq_dev/.log/`**
 
-| File | Source |
-|---|---|
-| `hook_debug.log` | `deploy.sh` — dev deploy output (non-main branches) |
-| `error_file` / `short_error_file` | `ramboq_dev.service` — Streamlit app errors |
-| `log_file` / `short_log_file` | `ramboq_logger.py` — Python app logs |
+| File | Source | Notes |
+|---|---|---|
+| `hook_debug.log` | `deploy.sh` | Dev deploy output (non-main branches) |
+| `error_file` | `ramboq_dev.service` tee | All Streamlit stdout+stderr |
+| `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines (not written by service) |
+| `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
+| `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
-> Dev log paths are set in `/opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml` (gitignored). This file must be created manually with paths pointing to `/opt/ramboq_dev/.log/` — do not copy prod's version verbatim.
+> Dev log paths are set in `/opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml` (gitignored). `initial_deploy.sh` creates a template — do not copy prod's version verbatim.
 
 ---
 
