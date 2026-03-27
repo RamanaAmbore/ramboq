@@ -1,6 +1,6 @@
-# RamboQ — Rambo Quant Strategies
+# RamboQ — RamboQuant Analytics
 
-A production Streamlit web application for **Rambo Quant Strategies LLP**, serving as the public-facing website at [ramboq.com](https://ramboq.com). The app provides investment strategy information, partner onboarding, market data, performance tracking, and user authentication with cookie-based sessions.
+A production Streamlit web application for **RamboQuant Analytics LLP**, serving as the public-facing website at [ramboq.com](https://ramboq.com). The app provides investment strategy information, partner onboarding, market data, performance tracking, and user authentication with cookie-based sessions.
 
 ## Features
 
