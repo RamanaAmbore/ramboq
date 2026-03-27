@@ -11,11 +11,19 @@ if [ "$BRANCH" = "main" ]; then
   APP_SERVICE="ramboq.service"
   LOG="/opt/ramboq/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="true"
+  IS_PODMAN="false"
+elif echo "$BRANCH" | grep -q "^pod"; then
+  APP_ROOT="/opt/ramboq_pod"
+  APP_SERVICE="ramboq_pod.service"
+  LOG="/opt/ramboq_pod/.log/hook_debug.log"
+  SYNC_SYSTEM_PATHS="false"
+  IS_PODMAN="true"
 else
   APP_ROOT="/opt/ramboq_dev"
   APP_SERVICE="ramboq_dev.service"
   LOG="/opt/ramboq_dev/.log/hook_debug.log"
   SYNC_SYSTEM_PATHS="false"
+  IS_PODMAN="false"
 fi
 
 
@@ -75,17 +83,22 @@ fi
     echo "[$TS] ❌ Not a Git directory: .git missing in $APP_ROOT"
   fi
 
-  # Activate virtualenv
-  if [ -f venv/bin/activate ]; then
-    source venv/bin/activate
-    # Use pip safely in script
-    pip install --no-cache-dir -r requirements.txt
+  if [ "$IS_PODMAN" = "true" ]; then
+    # Build Podman image from Containerfile
+    echo "[$TS] Building Podman image ramboq-pod:latest..."
+    podman build -t ramboq-pod:latest "$APP_ROOT" \
+      && echo "[$TS] Podman image built successfully" \
+      || { echo "[$TS] ❌ Podman image build failed"; exit 1; }
   else
-    echo "[$TS] Virtualenv not found at venv/bin/activate"
+    # Activate virtualenv and install Python dependencies
+    if [ -f venv/bin/activate ]; then
+      source venv/bin/activate
+      pip install --no-cache-dir -r requirements.txt
+    else
+      echo "[$TS] Virtualenv not found at venv/bin/activate"
+    fi
   fi
 
-  #cp /opt/ramboq/index.html /opt/ramboq/venv/lib/python3.13/site-packages/streamlit/static/index.html
-  #cp /opt/ramboq/setup/images/favicon.png /opt/ramboq/venv/lib/python3.13/site-packages/streamlit/static/favicon.png
   echo "[$TS] Attempting to restart $APP_SERVICE..."
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] Failed to restart $APP_SERVICE"
 
