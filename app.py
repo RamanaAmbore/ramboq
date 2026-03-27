@@ -30,10 +30,6 @@ from src.utils_streamlit import get_image_bin_file
 
 logger = get_logger(__name__)
 
-# Monkey patch st.cache → st.cache_data if any package still uses it
-if hasattr(st, "cache") and hasattr(st, "cache_data"):
-    st.cache = st.cache_data
-
 # Create cookie manager
 cookies = EncryptedCookieManager(
     prefix="ramboq_",  # prefix for your app cookies
