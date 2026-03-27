@@ -32,11 +32,8 @@ def performance():
 
         # Generate and style data outside the tab context
         df_margins = fetch_margins(refresh_time)
-        fetch_holdings(refresh_time, df_margins)
-        fetch_positions(refresh_time)
-
-        df_holdings, sum_holdings = fetch_holdings(get_nearest_time(), df_margins)
-        df_positions, sum_positions = fetch_positions(get_nearest_time())
+        df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
+        df_positions, sum_positions = fetch_positions(refresh_time)
 
         styled_margins = style_dataframe(add_comma_to_df_numbers(df_margins))
         styled_sum_holdings = style_dataframe(add_comma_to_df_numbers(sum_holdings))

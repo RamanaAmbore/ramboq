@@ -86,7 +86,7 @@ fi
   if [ "$IS_PODMAN" = "true" ]; then
     # Build Podman image from Containerfile
     echo "[$TS] Building Podman image ramboq-pod:latest..."
-    podman build -t ramboq-pod:latest "$APP_ROOT" \
+    sudo podman build -t ramboq-pod:latest "$APP_ROOT" \
       && echo "[$TS] Podman image built successfully" \
       || { echo "[$TS] ❌ Podman image build failed"; exit 1; }
   else
