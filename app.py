@@ -7,6 +7,7 @@ from src.market import market
 from src.performance import performance
 from src.post import post
 from src.profile import profile
+from src.testimonials import testimonials
 from src.user import user
 
 # Patch before anything else touches st.cache
@@ -115,6 +116,7 @@ if __name__ == '__main__':
         "faq": faq,
         "post": post,
         "contact": contact,
+        "testimonials": testimonials,
         "profile": profile
     }
 

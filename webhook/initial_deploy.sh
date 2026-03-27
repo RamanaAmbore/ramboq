@@ -243,6 +243,7 @@ twilio_alert: False
 twilio_account_sid: ""
 twilio_auth_token: ""
 enforce_password_standard: False
+testimonials_admin_pin: ""
 EOF
         chown www-data:www-data "$yaml_dir/ramboq_deploy.yaml"
         log_ok "Created ramboq_deploy.yaml"
