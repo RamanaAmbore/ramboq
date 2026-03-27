@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/ramboq_dev
-ExecStart=/bin/bash -c 'source /opt/ramboq_dev/venv/bin/activate && streamlit run app.py --server.port=8503 --server.address=0.0.0.0 2>&1 | tee -a /opt/ramboq_dev/.log/short_error_file /opt/ramboq_dev/.log/error_file'
+ExecStart=/bin/bash -c 'source /opt/ramboq_dev/venv/bin/activate && streamlit run app.py --server.port=8503 --server.address=0.0.0.0 2>&1 | tee -a /opt/ramboq_dev/.log/error_file'
 Restart=always
 RestartSec=5
 
