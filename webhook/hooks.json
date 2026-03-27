@@ -34,7 +34,11 @@
         {
           "match": {
             "type": "payload-hash-sha256",
-            "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b"
+            "secret": "f8b12c3d5e8a4fa19b1749a0c6e9312b",
+            "parameter": {
+              "source": "header",
+              "name": "X-Hub-Signature-256"
+            }
           }
         }
       ]
