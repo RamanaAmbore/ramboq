@@ -61,10 +61,10 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ### Webhook / Deployment (`webhook/`)
 - **`deploy.sh`** — Main deploy script; `main` → `/opt/ramboq` with nginx/static sync; non-main → `/opt/ramboq_dev` without sync
-- **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; passes `ref` to `deploy.sh`
+- **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; passes `ref` to `deploy.sh`. **Read from `/opt/ramboq/webhook/hooks.json` only** — the shared prod directory, never from `/opt/ramboq_dev`. After `git pull`, if this file was locally modified on the server, force reset with `git checkout HEAD -- webhook/hooks.json`
 - **`ramboq.service`** — Prod systemd unit, port 8502
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503
-- **`ramboq_hook.service`** — Webhook listener, port 9001
+- **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches
 - **`log-request.sh`** — Logs raw incoming webhook requests
 
 ---
@@ -118,6 +118,8 @@ Key session state variables:
 - **Do not mock broker API calls in tests** — the `@for_all_accounts` decorator and `Connections` singleton behaviour differs significantly from mocks
 - **Do not commit `secrets.yaml` or `ramboq_deploy.yaml`** — they are gitignored for good reason
 - **Do not use `st.sidebar`** — sidebar navigation is disabled in `.streamlit/config.toml`; all navigation is via `header.py`
+- **Do not add `refs/heads/main` to hooks.json trigger rules** — this blocks all non-main branch deploys; branch routing is handled inside `deploy.sh`, not in `hooks.json`
+- **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
 
 ---
 

@@ -359,7 +359,7 @@ The webhook listener runs as a systemd service (`ramboq_hook.service`) on port `
 
 **Step 1 — Note the webhook secret from hooks.json**
 
-The secret is defined in `webhook/hooks.json` under `payload-hash-sha256.secret`. GitHub will sign every payload with this secret and the listener will reject requests that don't match.
+The secret is defined in `webhook/hooks.json` under `payload-hmac-sha256.secret`. GitHub will sign every payload with this secret and the listener will reject requests that don't match.
 
 **Step 2 — Add the webhook in GitHub**
 
@@ -367,7 +367,7 @@ The secret is defined in `webhook/hooks.json` under `payload-hash-sha256.secret`
 2. Fill in:
    - **Payload URL:** `https://webhook.ramboq.com/hooks/update`
    - **Content type:** `application/json`
-   - **Secret:** value from `hooks.json` → `payload-hash-sha256.secret`
+   - **Secret:** value from `hooks.json` → `payload-hmac-sha256.secret`
    - **Which events:** select **Just the push event**
    - **Active:** checked
 3. Click **Add webhook**
@@ -645,7 +645,8 @@ Target environment updated ✅
 
 The GitHub webhook and `hooks.json` share a secret for HMAC-SHA256 signature validation:
 - Set the secret in **GitHub → repo → Settings → Webhooks → Secret**
-- The same secret must be in `webhook/hooks.json` under `payload-hash-sha256.secret`
+- The same secret must be in `webhook/hooks.json` under `payload-hmac-sha256.secret`
+- The HMAC rule must include `"parameter": {"source": "header", "name": "X-Hub-Signature-256"}` — without this the webhook listener throws `no source for value retrieval` and returns 500
 - Current secret is `f8b12c3d5e8a4fa19b1749a0c6e9312b` — rotate this periodically
 
 ### Service Files
@@ -719,6 +720,26 @@ curl -I https://webhook.ramboq.com/hooks/update
 tail -50 /opt/ramboq/.log/hook.err
 tail -50 /opt/ramboq/.log/incoming_requests.log
 ```
+
+**Webhook received but "trigger rules were not satisfied"**
+```bash
+# Check what's in the server's hooks.json — it may have diverged from the repo
+cat /opt/ramboq/webhook/hooks.json
+
+# If it still has refs/heads/main restriction or is missing the HMAC parameter field,
+# force reset it to the repo version:
+cd /opt/ramboq
+git diff webhook/hooks.json          # see what differs
+git checkout HEAD -- webhook/hooks.json
+sudo systemctl restart ramboq_hook.service
+```
+
+Common causes:
+- `refs/heads/main` restriction in trigger rules — blocks all non-main branch deploys; remove it
+- HMAC rule missing `"parameter": {"source": "header", "name": "X-Hub-Signature-256"}` — causes `500 no source for value retrieval`
+- Secret in `hooks.json` doesn't match the secret in GitHub webhook settings
+
+> **Note:** `hooks.json` is read from `/opt/ramboq/webhook/hooks.json` (the shared prod directory), not from `/opt/ramboq_dev`. The webhook service is shared — it handles both prod and dev branches.
 
 **Deploy triggered but app not updated**
 ```bash
