@@ -82,7 +82,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | `config.yaml` | Yes | `retry_count` (3), `conn_reset_hours` (23) |
 | `ramboq_config.yaml` | Yes | All page content, nav labels, Perplexity prompts/params, Mermaid diagrams, fallback market report |
 | `ramboq_constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
-| `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, Perplexity API key |
+| `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, Perplexity API key (`pplx_api_key`) |
 | `ramboq_deploy.yaml` | **No — gitignored** | Log file paths, log levels, `prod`/`mail`/`perplexity` flags, `enforce_password_standard` |
 
 `secrets.yaml` and `ramboq_deploy.yaml` must be **hand-placed on the server** — they are never in git. Copy from prod to dev when setting up `/opt/ramboq_dev`.
@@ -134,7 +134,6 @@ Key session state variables:
 | Area | Note |
 |---|---|
 | `user.py` auth | Backend validation is stubbed — `validate_user()` always returns `(True, "nop")`. Real auth needs implementing before production user login |
-| Twilio alerts | Fully implemented in `ramboq_logger.py` but commented out. Re-enable by uncommenting the `TwilioHandler` class and adding `TWILIO_FROM_NUMBER` / `TWILIO_TO_NUMBER` to config |
 | `ramboq_ssh/` | Entire codebase is duplicated here. Can be removed once dev deployment is stable and no longer needed as a reference |
 | Regex validators | `validate_email()`, `validate_phone()` etc. in `utils.py` recompile regex on every call. Worth precompiling to module-level constants if form submissions become a bottleneck |
 | Parallel broker calls | `fetch_holdings`, `fetch_positions`, `fetch_margins` are called sequentially. Could be parallelised with `concurrent.futures.ThreadPoolExecutor` for faster page load |

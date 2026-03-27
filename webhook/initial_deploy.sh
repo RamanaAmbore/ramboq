@@ -239,11 +239,7 @@ console_log_level: 40
 prod: $is_prod
 mail: False
 perplexity: False
-twilio_alert: False
-twilio_account_sid: ""
-twilio_auth_token: ""
 enforce_password_standard: False
-testimonials_admin_pin: ""
 EOF
         chown www-data:www-data "$yaml_dir/ramboq_deploy.yaml"
         log_ok "Created ramboq_deploy.yaml"
@@ -268,6 +264,8 @@ kite_accounts:
         api_secret: <api_secret>
 cookie_secret: <random-strong-string>
 kite_login_url: https://kite.zerodha.com/api/login
+kite_twofa_url: https://kite.zerodha.com/api/twofa
+pplx_api_key: <perplexity-api-key>
 EOF
         chown www-data:www-data "$yaml_dir/secrets.yaml"
         log_warn "Created secrets.yaml TEMPLATE — fill in real values at $yaml_dir/secrets.yaml"
