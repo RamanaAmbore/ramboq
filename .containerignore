@@ -1,0 +1,9 @@
+venv/
+.git/
+ramboq_ssh/
+.log/
+__pycache__/
+*.pyc
+*.pyo
+setup/yaml/secrets.yaml
+setup/yaml/ramboq_deploy.yaml

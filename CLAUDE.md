@@ -16,13 +16,16 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ## Deployment Architecture
 
-| Environment | Branch | Server path | Port | Domain |
-|---|---|---|---|---|
-| Production | `main` | `/opt/ramboq` | 8502 | ramboq.com |
-| Development | any non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com |
+| Environment | Branch | Server path | Port | Domain | Runtime |
+|---|---|---|---|---|---|
+| Production | `main` | `/opt/ramboq` | 8502 | ramboq.com | Python venv |
+| Podman (container dev) | `pod/*` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com | Podman container |
+| Development | any other non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com | Python venv |
 
-- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → git pull + pip install + systemctl restart
-- `webhook.ramboq.com` and `dev.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare — certbot and webhook HMAC validation both break if proxied
+- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
+- `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
+- For `pod/*` branches: `deploy.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
+- Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; `ramboq_deploy.yaml` for pod uses `/app/.log/` paths (container-internal, mapped to `/opt/ramboq_pod/.log/`)
 
 ---
 
@@ -62,6 +65,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 ### Webhook / Deployment (`webhook/`)
 - **`deploy.sh`** — Main deploy script; `main` → `/opt/ramboq` with nginx/static sync; non-main → `/opt/ramboq_dev` without sync
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
+- **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
 - **`hooks.json`** — Validates GitHub push event + repo name + HMAC-SHA256 secret; passes `ref` to `deploy.sh`. **Read from `/opt/ramboq/webhook/hooks.json` only** — the shared prod directory, never from `/opt/ramboq_dev`. After `git pull`, if this file was locally modified on the server, force reset with `git checkout HEAD -- webhook/hooks.json`
 - **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only

@@ -387,12 +387,13 @@ Then visit **https://dev.ramboq.com**.
 
 Every `git push` event triggers webhook validation. Branch routing:
 
-| Branch | Deploys to | Domain | Port |
-|---|---|---|---|
-| `main` | `/opt/ramboq` | ramboq.com | 8502 |
-| any non-`main` | `/opt/ramboq_dev` | dev.ramboq.com | 8503 |
+| Branch | Deploys to | Domain | Port | Runtime |
+|---|---|---|---|---|
+| `main` | `/opt/ramboq` | ramboq.com | 8502 | Python venv |
+| `pod/*` | `/opt/ramboq_pod` | pod.ramboq.com | 8504 | Podman container |
+| any other non-`main` | `/opt/ramboq_dev` | dev.ramboq.com | 8503 | Python venv |
 
-The deploy script checks out whichever branch was pushed in `/opt/ramboq_dev`, so the last push always wins. There is no isolation between non-main branches — they share one dev directory and one dev service.
+For `pod/*` branches, `deploy.sh` builds a Podman image (`ramboq-pod:latest`) from `Containerfile` before restarting the service. For all other branches, it activates the venv and runs `pip install`. The last push to each environment always wins.
 
 ### End-to-End Flow
 
@@ -623,6 +624,141 @@ bash /opt/ramboq/webhook/services.sh
 # Confirm ports are open
 sudo ss -tlnp | grep -E '8502|8503|9001'
 ```
+
+---
+
+## Podman (Containerised) Deployment
+
+The `pod/*` branches deploy to `pod.ramboq.com` as a Podman container. This reuses the same webhook, nginx, systemd, and certbot infrastructure as the other environments.
+
+### Architecture
+
+```
+git push origin pod/feature
+    ↓
+webhook → deploy.sh
+    ↓ podman build -t ramboq-pod:latest /opt/ramboq_pod
+    ↓ systemctl restart ramboq_pod.service
+    ↓
+podman run ramboq-pod:latest -p 8504:8504
+  -v /opt/ramboq_pod/setup/yaml:/app/setup/yaml:ro
+  -v /opt/ramboq_pod/.log:/app/.log:rw
+    ↓
+nginx pod.ramboq.com → localhost:8504
+```
+
+### Key files
+
+| File | Purpose |
+|---|---|
+| `Containerfile` | Podman image definition (python:3.13-slim, installs requirements, runs Streamlit on 8504) |
+| `.containerignore` | Excludes venv, .git, secrets, logs from image build |
+| `etc/nginx/sites-available/pod.ramboq.com` | nginx reverse proxy → port 8504 |
+| `webhook/ramboq_pod.service` | systemd unit that runs the Podman container |
+
+### Secrets handling
+
+`secrets.yaml` and `ramboq_deploy.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. The `ramboq_deploy.yaml` for the pod environment must point log paths to `/app/.log/` (the container's internal path, mapped to `/opt/ramboq_pod/.log/` on the host).
+
+### First-time pod environment setup (on server)
+
+**1. Install Podman:**
+```bash
+sudo apt install -y podman
+podman --version
+```
+
+**2. Add Cloudflare DNS record** — grey cloud (DNS only):
+```
+pod.ramboq.com → <server-IP>
+```
+
+**3. Expand SSL cert to include pod subdomain:**
+```bash
+sudo certbot --nginx -d ramboq.com -d www.ramboq.com -d webhook.ramboq.com -d dev.ramboq.com -d pod.ramboq.com
+# Select "Expand" when prompted
+```
+
+**4. Clone repo and set up directories:**
+```bash
+sudo mkdir -p /opt/ramboq_pod
+sudo chown www-data:www-data /opt/ramboq_pod
+sudo -u www-data git clone https://github.com/RamanaAmbore/ramboq.git /opt/ramboq_pod
+sudo -u www-data git -C /opt/ramboq_pod checkout pod   # or your pod/* branch
+sudo mkdir -p /opt/ramboq_pod/.log
+sudo chown -R www-data:www-data /opt/ramboq_pod/.log
+```
+
+**5. Place secret config files:**
+```bash
+sudo mkdir -p /opt/ramboq_pod/setup/yaml
+sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_pod/setup/yaml/secrets.yaml
+sudo nano /opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml
+```
+```yaml
+# Log paths are inside the container — mapped to /opt/ramboq_pod/.log/ on host
+file_log_file: /app/.log/log_file
+error_log_file: /app/.log/error_file
+short_file_log_file: /app/.log/short_log_file
+short_error_log_file: /app/.log/short_error_file
+file_log_level: 10
+error_log_level: 40
+console_log_level: 40
+prod: False
+mail: False
+perplexity: False
+twilio_alert: False
+twilio_account_sid: ""
+twilio_auth_token: ""
+enforce_password_standard: False
+```
+```bash
+sudo chown -R www-data:www-data /opt/ramboq_pod/setup/yaml/
+```
+
+**6. Build initial Podman image:**
+```bash
+cd /opt/ramboq_pod
+podman build -t ramboq-pod:latest .
+```
+
+**7. Install and start systemd service:**
+```bash
+sudo cp /opt/ramboq_pod/webhook/ramboq_pod.service /etc/systemd/system/ramboq_pod.service
+sudo systemctl daemon-reload
+sudo systemctl enable ramboq_pod.service
+sudo systemctl start ramboq_pod.service
+sudo systemctl status ramboq_pod.service
+```
+
+**8. Enable nginx site:**
+```bash
+sudo cp /opt/ramboq_pod/etc/nginx/sites-available/pod.ramboq.com /etc/nginx/sites-available/pod.ramboq.com
+sudo ln -sf /etc/nginx/sites-available/pod.ramboq.com /etc/nginx/sites-enabled/pod.ramboq.com
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**9. Add sudoers entry for pod service:**
+```bash
+sudo visudo
+# Add to existing www-data line:
+# www-data ALL=NOPASSWD: ... /bin/systemctl restart ramboq_pod.service
+```
+
+**10. Verify:**
+```bash
+sudo ss -tlnp | grep 8504          # Podman container listening
+curl -I https://pod.ramboq.com     # nginx forwarding
+tail -f /opt/ramboq_pod/.log/hook_debug.log   # deploy log
+```
+
+### Ongoing deployment
+
+Push to any `pod/*` branch:
+```bash
+git push origin pod/my-feature
+```
+`deploy.sh` runs `podman build` then restarts the service automatically.
 
 ---
 
