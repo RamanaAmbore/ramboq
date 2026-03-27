@@ -151,16 +151,19 @@ www-data ALL=(ALL) NOPASSWD: /usr/bin/podman build -t ramboq-pod\:latest *
 EOF
 ```
 
-### Step 9 — Update hooks.json
+### Step 9 — Deploy hooks.json and dispatch.sh
 
-Add the `deploy-pod` hook entry to `/etc/webhook/hooks.json` (or confirm it is already present). After any change to `hooks.json`, copy it and restart the listener:
+`hooks.json` and `dispatch.sh` live at `/etc/webhook/` — independent of all deployment directories. Copy from the pod repo and restart the listener:
 
 ```bash
+sudo mkdir -p /etc/webhook
 sudo cp /opt/ramboq_pod/webhook/hooks.json /etc/webhook/hooks.json
+sudo cp /opt/ramboq_pod/webhook/dispatch.sh /etc/webhook/dispatch.sh
+sudo chmod +x /etc/webhook/dispatch.sh
 sudo systemctl restart ramboq_hook.service
 ```
 
-> `hooks.json` lives at `/etc/webhook/hooks.json` on the server — independent of all deployment directories. The copy in `webhook/hooks.json` in the repo is the source of truth; deploy it manually after changes.
+> `dispatch.sh` is the single entry point called by the webhook listener. It reads the branch name from the git ref and routes to the correct environment's deploy script. After any change to either file, repeat the copy and restart.
 
 ### Step 10 — Configure nginx
 
@@ -249,7 +252,8 @@ curl -I https://pod.ramboq.com
 | `.containerignore` | `/opt/ramboq_pod/.containerignore` | Files excluded from image build |
 | `webhook/deploy_pod.sh` | `/opt/ramboq_pod/webhook/deploy_pod.sh` | Pod deploy script — self-contained, no cross-env references |
 | `webhook/ramboq_pod.service` | `/etc/systemd/system/ramboq_pod.service` | systemd service — runs `podman run` on port 8504 |
-| `webhook/hooks.json` | `/etc/webhook/hooks.json` | Webhook routing — deploy-pod hook triggers on `pod/*` branches |
+| `webhook/hooks.json` | `/etc/webhook/hooks.json` | Webhook config — validates push event, HMAC; calls dispatch.sh |
+| `webhook/dispatch.sh` | `/etc/webhook/dispatch.sh` | Routes branch to correct env deploy script |
 | `etc/nginx/sites-available/pod.ramboq.com` | `/etc/nginx/sites-available/pod.ramboq.com` | nginx reverse proxy config |
 | `setup/yaml/secrets.yaml` | `/opt/ramboq_pod/setup/yaml/secrets.yaml` | Kite API keys, SMTP, cookie secret — gitignored, server only |
 | `setup/yaml/ramboq_deploy.yaml` | `/opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml` | Log paths (must use `/app/.log/`), feature flags — gitignored, server only |
@@ -260,7 +264,7 @@ curl -I https://pod.ramboq.com
 
 - **Log paths in `ramboq_deploy.yaml` must use `/app/.log/`**, not `/opt/ramboq_pod/.log/`. The container sees `/app/.log/` internally; the host volume mount maps it to `/opt/ramboq_pod/.log/`.
 - **`deploy_pod.sh` is self-contained** — it only operates on `/opt/ramboq_pod`. It has no reference to prod or dev directories. Pushing to `pod/*` never touches any other environment.
-- **`hooks.json` lives at `/etc/webhook/hooks.json`** — not inside any deployment directory. After updating `webhook/hooks.json` in the repo and pushing to any branch, copy it manually: `sudo cp /opt/ramboq_pod/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
+- **`hooks.json` and `dispatch.sh` live at `/etc/webhook/`** — not inside any deployment directory. After updating either file in the repo, copy manually: `sudo cp /opt/ramboq_pod/webhook/hooks.json /etc/webhook/hooks.json && sudo cp /opt/ramboq_pod/webhook/dispatch.sh /etc/webhook/dispatch.sh && sudo systemctl restart ramboq_hook.service`
 - **Podman runs as root** (no `User=` in the service file). The image is stored in root's container storage. Always build with `sudo podman build`.
 - **`pod.ramboq.com` must be grey cloud in Cloudflare** (DNS only). Orange cloud breaks Streamlit WebSocket connections.
 - **Secrets survive deploys** because they are volume-mounted, not baked into the image. The `Containerfile` also explicitly removes them during build as a defence-in-depth measure.

@@ -393,7 +393,7 @@ Every `git push` event triggers webhook validation. Branch routing:
 | `pod/*` | `/opt/ramboq_pod` | pod.ramboq.com | 8504 | Podman container |
 | any other non-`main` | `/opt/ramboq_dev` | dev.ramboq.com | 8503 | Python venv |
 
-For `pod/*` branches, `deploy.sh` builds a Podman image (`ramboq-pod:latest`) from `Containerfile` before restarting the service. For all other branches, it activates the venv and runs `pip install`. The last push to each environment always wins.
+Each environment has its own self-contained deploy script. `dispatch.sh` (at `/etc/webhook/`) is the single entry point — it reads the branch name and calls the right script. No env-specific logic exists outside its own directory.
 
 ### End-to-End Flow
 
@@ -403,7 +403,7 @@ Developer (local)
     │  git push origin <branch>
     ▼
 GitHub
-    │  POST https://ramboq.com/hooks/update
+    │  POST https://webhook.ramboq.com/hooks/update
     │  Headers:
     │    X-GitHub-Event: push
     │    X-Hub-Signature-256: sha256=<HMAC of payload>
@@ -411,46 +411,36 @@ GitHub
     │    ref: refs/heads/<branch>
     │    repository.name: ramboq
     ▼
-Nginx (port 443, ramboq.com)
+Nginx (port 443, webhook.ramboq.com)
     │  location /hooks/update {
     │      proxy_pass http://127.0.0.1:9001/hooks/ramboq-deploy;
     │      proxy_set_header X-Hub-Signature-256 ...;
     │  }
     ▼
 webhook listener (port 9001, www-data)
-    │  Validates ALL trigger rules in hooks.json:
+    │  /etc/webhook/hooks.json — validates trigger rules:
     │    1. X-GitHub-Event header == "push"
     │    2. payload.repository.name == "ramboq"
     │    3. HMAC SHA256 signature matches secret
     │
-    │  If all pass → executes deploy.sh with payload ref as argument
+    │  If all pass → executes /etc/webhook/dispatch.sh <ref>
     ▼
-deploy.sh (runs as www-data)
+/etc/webhook/dispatch.sh (runs as www-data)
     │
-    ├── if branch == main:
-    │     APP_ROOT=/opt/ramboq
-    │     APP_SERVICE=ramboq.service
-    │     sync etc/ and var/www/html to system paths
-    │
-    └── else (any non-main branch):
-          APP_ROOT=/opt/ramboq_dev
-          APP_SERVICE=ramboq_dev.service
-          no /etc or /var sync
-    │
-    ├── cd APP_ROOT
-    ├── git config safe.directory
-    ├── PREV_HEAD = current commit hash
-    ├── git fetch/checkout/pull origin <branch>
-    ├── CHANGED = git diff --name-only PREV_HEAD HEAD
-    │
-    ├── source venv/bin/activate
-    ├── pip install -r requirements.txt
-    └── systemctl restart APP_SERVICE
+    ├── branch == main  → /opt/ramboq/webhook/deploy.sh
+    ├── branch == pod/* → /opt/ramboq_pod/webhook/deploy_pod.sh <ref>
+    └── any other       → /opt/ramboq_dev/webhook/deploy_dev.sh <ref>
     ▼
-ramboq.service or ramboq_dev.service
-    Streamlit restarts on port 8502 (prod) or 8503 (dev)
+Per-environment deploy script (self-contained, no cross-env references)
+    ├── git pull origin <branch> into its own APP_ROOT
+    ├── prod/dev: pip install -r requirements.txt
+    │   pod:     sudo podman build -t ramboq-pod:latest
+    └── sudo systemctl restart <APP_SERVICE>
     ▼
-Nginx proxies ramboq.com → localhost:8502 and dev.ramboq.com → localhost:8503
+ramboq.service / ramboq_dev.service / ramboq_pod.service
+    Streamlit on port 8502 (prod), 8503 (dev), 8504 (pod container)
+    ▼
+Nginx proxies each domain to its port
     ▼
 Target environment updated ✅
 ```
@@ -634,10 +624,11 @@ The `pod/*` branches deploy to `pod.ramboq.com` as a Podman container. This reus
 ### Architecture
 
 ```
-git push origin pod/feature
+git push origin pod/<branch>
     ↓
-webhook → deploy.sh
-    ↓ podman build -t ramboq-pod:latest /opt/ramboq_pod
+webhook → /etc/webhook/dispatch.sh → /opt/ramboq_pod/webhook/deploy_pod.sh
+    ↓ git pull into /opt/ramboq_pod
+    ↓ sudo podman build -t ramboq-pod:latest /opt/ramboq_pod
     ↓ systemctl restart ramboq_pod.service
     ↓
 podman run ramboq-pod:latest -p 8504:8504
@@ -692,7 +683,8 @@ sudo chown -R www-data:www-data /opt/ramboq_pod/.log
 **5. Place secret config files:**
 ```bash
 sudo mkdir -p /opt/ramboq_pod/setup/yaml
-sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_pod/setup/yaml/secrets.yaml
+# Create secrets.yaml manually — do not copy from another environment
+sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
 sudo nano /opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml
 ```
 ```yaml

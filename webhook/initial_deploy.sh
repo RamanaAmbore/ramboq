@@ -297,8 +297,12 @@ SRC="/opt/ramboq/webhook"
 if [[ "$ENV" == "prod" || "$ENV" == "both" ]]; then
     cp "$SRC/ramboq.service" /etc/systemd/system/ramboq.service
     cp "$SRC/ramboq_hook.service" /etc/systemd/system/ramboq_hook.service
-    chmod +x "$SRC/deploy.sh" "$SRC/log-request.sh" 2>/dev/null || true
-    log_ok "Installed ramboq.service and ramboq_hook.service"
+    chmod +x "$SRC/deploy.sh" "$SRC/log-request.sh" "$SRC/dispatch.sh" 2>/dev/null || true
+    mkdir -p /etc/webhook
+    cp "$SRC/hooks.json" /etc/webhook/hooks.json
+    cp "$SRC/dispatch.sh" /etc/webhook/dispatch.sh
+    chmod +x /etc/webhook/dispatch.sh
+    log_ok "Installed ramboq.service, ramboq_hook.service, hooks.json, dispatch.sh"
 fi
 if [[ "$ENV" == "dev" || "$ENV" == "both" ]]; then
     cp "$SRC/ramboq_dev.service" /etc/systemd/system/ramboq_dev.service
@@ -313,14 +317,21 @@ log_ok "systemd daemon reloaded"
 # ============================================================
 log_step "5. Configuring sudoers for www-data"
 
-SUDOERS_ENTRY="www-data ALL=NOPASSWD: /bin/cp, /usr/sbin/nginx, /bin/systemctl reload nginx, /bin/systemctl restart ramboq.service, /bin/systemctl restart ramboq_dev.service, /bin/systemctl restart ramboq_hook.service"
+SUDOERS_FILE="/etc/sudoers.d/ramboq"
 
-if grep -q "www-data ALL=NOPASSWD" /etc/sudoers; then
-    log_ok "www-data sudoers entry already exists"
-else
-    echo "$SUDOERS_ENTRY" >> /etc/sudoers
-    visudo -c > /dev/null && log_ok "Added www-data sudoers entry" || log_err "sudoers syntax error — check manually"
-fi
+tee "$SUDOERS_FILE" > /dev/null <<'EOF'
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_dev.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_pod.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_hook.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx
+www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/etc/nginx/sites-available/. /etc/nginx/sites-available/
+www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/var/www/html/. /var/www/html/
+www-data ALL=(ALL) NOPASSWD: /usr/bin/podman build -t ramboq-pod\:latest *
+EOF
+chmod 440 "$SUDOERS_FILE"
+visudo -c > /dev/null && log_ok "Configured sudoers at $SUDOERS_FILE" || log_err "sudoers syntax error — check $SUDOERS_FILE manually"
 
 # ============================================================
 # STEP 6: nginx
