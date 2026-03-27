@@ -17,9 +17,17 @@ LOG="$APP_ROOT/.log/hook_debug.log"
 
   git --git-dir="$APP_ROOT/.git" --work-tree="$APP_ROOT" config --add safe.directory "$APP_ROOT"
 
+  # Preserve server-specific config.yaml (prod/mail/perplexity flags) across git pull
+  CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
+  [ -f "setup/yaml/config.yaml" ] && cp "setup/yaml/config.yaml" "$CONFIG_BAK"
+
   PREV_HEAD=$(git rev-parse HEAD)
   git pull origin main
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)
+
+  # Restore server-specific config.yaml
+  [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/config.yaml"
+
   echo "[$TS] Changed files:"
   echo "$CHANGED"
 

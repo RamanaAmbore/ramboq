@@ -111,25 +111,34 @@ sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/secrets.yaml
 sudo chmod 600 /opt/ramboq_pod/setup/yaml/secrets.yaml
 ```
 
-### Step 6 — Create ramboq_deploy.yaml
+### Step 6 — Create config.yaml
 
 Log paths must use `/app/.log/` (container-internal paths, mapped to `/opt/ramboq_pod/.log/` at runtime):
 
 ```bash
-sudo tee /opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml <<'EOF'
-file_log_file: /app/.log/log_file
-error_log_file: /app/.log/error_file
+sudo tee /opt/ramboq_pod/setup/yaml/config.yaml <<'EOF'
+# Connection settings
+retry_count: 3
+conn_reset_hours: 23
+
+# Log file paths (relative to app working directory — resolves to /app/.log/ inside container)
+file_log_file: .log/log_file
+error_log_file: .log/error_file
+short_file_log_file: .log/short_log_file
+short_error_log_file: .log/short_error_file
+
+# Log levels (10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10
 error_log_level: 40
-short_file_log_file: /app/.log/short_log_file
-short_error_log_file: /app/.log/short_error_file
 console_log_level: 40
+
+# App flags
 prod: True
 mail: False
 perplexity: False
 enforce_password_standard: False
 EOF
-sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/ramboq_deploy.yaml
+sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/config.yaml
 ```
 
 > Note: set `perplexity: True` when ready to enable live Perplexity AI market reports.
