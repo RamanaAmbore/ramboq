@@ -63,7 +63,7 @@ def profile_update_form(disabled=None, must=True, called=False):
             return
 
     with st.spinner("📨 Sending acknowledgement email..."):
-        v_xref['subject'] = f"Registration Acknowledgement: Your registration in RamboQ on {date.today()}"
+        v_xref['subject'] = f"Registration Acknowledgement: Your registration in RamboQuant on {date.today()}"
         html_body = email_prof_updated_tmpl.format(**v_xref)
 
         status, msg = send_email("", v_xref['email_id'], v_xref['subject'], html_body)

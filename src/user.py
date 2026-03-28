@@ -52,7 +52,7 @@ def signup_form():
             return
 
     with st.spinner("📨 Sending acknowledgement email..."):
-        v_xref['subject'] = f"Registration Acknowledgement: Your registration in RamboQ on {date.today()}"
+        v_xref['subject'] = f"Registration Acknowledgement: Your registration in RamboQuant on {date.today()}"
         html_body = email_reg_tmpl.format(**v_xref)
 
         status, msg = send_email("", v_xref['email_id'], v_xref['subject'], html_body)
@@ -119,7 +119,7 @@ def update_form():
 
     with (st.spinner("📨 Sending confirmation email...")):
         v_xref['subject'] = \
-            f"Password Reset: Your password reset on RamboQ for {v_xref['email_id']} {v_xref['account_no']}on {date.today()}"
+            f"Password Reset: Your password reset on RamboQuant for {v_xref['email_id']} {v_xref['account_no']}on {date.today()}"
         html_body = email_update_tmpl.format(**v_xref)
         status, msg = send_email('', v_xref['email_id'], v_xref['subject'], html_body)
         if status:
