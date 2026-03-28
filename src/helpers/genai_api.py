@@ -14,44 +14,37 @@ def get_market_update():
     now = timestamp_indian()
     formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
     logger.info(f'GenAI for market updated invoked at {formatted_datetime}')
-    if not (ramboq_deploy['prod'] or ramboq_deploy['perplexity']):
-        # Prepare the message text
-        message = f"Market Report — {formatted_datetime} IST"
-        report = ramboq_config['market'].replace("Market Report", message)
-        return report
+    message = f"Market Report — {formatted_datetime} IST"
+    fallback = ramboq_config['market'].replace("Market Report", message)
 
-    client = OpenAI(
-        api_key=secrets["pplx_api_key"],
-        base_url="https://api.perplexity.ai",  # Perplexity OpenAI-compatible endpoint
-    )
+    if not ramboq_deploy['perplexity']:
+        return fallback
 
-    # Optional: You may include a system message for consistent persona
-    system_message = {
-        "role": "system",
-        "content": ramboq_config["pplx_system_msg"]
-    }
+    try:
+        client = OpenAI(
+            api_key=secrets["pplx_api_key"],
+            base_url="https://api.perplexity.ai",
+        )
 
-    # Your market report prompt (user message)
-    user_message = {
-        "role": "user",
-        "content": ramboq_config["pplx_user_msg"]  # Paste your full portfolio as in the previous message
-    }
+        messages = [
+            {"role": "system", "content": ramboq_config["pplx_system_msg"]},
+            {"role": "user", "content": ramboq_config["pplx_user_msg"]},
+        ]
 
-    # Compose the messages list (system message optional)
-    messages = [system_message, user_message]
+        response = client.chat.completions.create(
+            model="sonar-pro",
+            messages=messages,
+            temperature=float(ramboq_config['pplx_temperature']),
+            max_tokens=int(ramboq_config['pplx_max_tokens'])
+        )
 
-    # Call the Perplexity API via the OpenAI-compatible client
-    response = client.chat.completions.create(
-        model="sonar-pro",  # Or another supported Perplexity model
-        messages=messages,
-        temperature=float(ramboq_config['pplx_temperature']),
-        max_tokens=int(ramboq_config['pplx_max_tokens'])
-    )
+        resp = response.choices[0].message.content
+        logger.info(resp)
+        return resp
 
-    # Print only the response text
-    resp = response.choices[0].message.content
-    logger.info(resp)
-    return resp
+    except Exception as e:
+        logger.error(f"Perplexity API call failed: {e}")
+        return fallback
 
 
 if __name__ == "__main__":
