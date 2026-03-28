@@ -53,10 +53,9 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 │   ├── resume/                     # PDF resume files
 │   ├── style/style.css             # Base CSS
 │   └── yaml/
-│       ├── config.yaml             # General app config (retry, ISD codes, etc.)
+│       ├── config.yaml             # Connection settings, log paths (relative), app flags — tracked in git
 │       ├── ramboq_config.yaml      # Page content (about, faq, contact text)
 │       ├── ramboq_constants.yaml   # App-wide constants
-│       ├── ramboq_deploy.yaml      # ⛔ Prod-only logging paths & flags (gitignored)
 │       └── secrets.yaml            # ⛔ SMTP + broker credentials (gitignored)
 ├── etc/
 │   └── nginx/sites-available/
@@ -143,7 +142,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Hand-place `setup/yaml/secrets.yaml` and `setup/yaml/ramboq_deploy.yaml` (not in git).
+Hand-place `setup/yaml/secrets.yaml` (not in git). `config.yaml` is tracked in git with safe defaults — update `prod`, `mail`, `perplexity` flags on the server after first deploy.
 
 Run locally:
 ```bash
@@ -172,7 +171,7 @@ sudo bash /opt/ramboq/webhook/initial_deploy.sh \
   --branch-dev dev
 ```
 
-The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `ramboq_deploy.yaml` templates, systemd service install, nginx config, sudoers, and service startup.
+The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `config.yaml` template, systemd service install, nginx config, sudoers, and service startup.
 
 **After the script completes, you still need to do manually:**
 1. Fill in `secrets.yaml` with real SMTP/Kite credentials
@@ -354,21 +353,11 @@ sudo mkdir -p /opt/ramboq_dev/.log
 sudo chown -R www-data:www-data /opt/ramboq_dev/.log
 ```
 
-**3. Place secret config files** (`ramboq_deploy.yaml` must use dev paths, `prod: False`):
+**3. Place secrets and set dev flags in config.yaml:**
 ```bash
 sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_dev/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_dev/setup/yaml/ramboq_deploy.yaml
-```
-```yaml
-file_log_file: /opt/ramboq_dev/.log/log_file
-error_log_file: /opt/ramboq_dev/.log/error_file
-short_file_log_file: /opt/ramboq_dev/.log/short_log_file
-short_error_log_file: /opt/ramboq_dev/.log/short_error_file
-file_log_level: 10
-error_log_level: 40
-console_log_level: 40
-prod: False
-mail: False
+# config.yaml is already present from git — just set prod: False (it is by default)
+# Log paths use relative .log/ paths — no changes needed
 ```
 
 **4. Install service, enable nginx dev site, remove default site:**
@@ -667,7 +656,7 @@ nginx pod.ramboq.com → localhost:8504
 
 ### Secrets handling
 
-`secrets.yaml` and `ramboq_deploy.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. The `ramboq_deploy.yaml` for the pod environment must point log paths to `/app/.log/` (the container's internal path, mapped to `/opt/ramboq_pod/.log/` on the host).
+`secrets.yaml` and `config.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. Log paths in `config.yaml` use relative paths (`.log/`), which resolve to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host) — identical format to prod and dev.
 
 ### First-time pod environment setup (on server)
 
@@ -774,7 +763,7 @@ git push origin pod/my-feature
 ## Security Notes
 
 - `setup/yaml/secrets.yaml` — contains SMTP and broker credentials, **gitignored**, hand-place on server only
-- `setup/yaml/ramboq_deploy.yaml` — prod config flags, **gitignored**
+- `setup/yaml/config.yaml` — tracked in git with safe defaults; server-specific flag overrides (`prod: True` etc.) are preserved across deploys by the deploy scripts
 - `var/www/.ssh/` — SSH keys, **gitignored**, never commit
 - The webhook secret in `hooks.json` should be rotated periodically and kept in sync with the GitHub webhook settings
 - Port `9001` (webhook listener) is not directly exposed — only accessible via nginx proxy
