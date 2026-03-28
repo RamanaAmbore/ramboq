@@ -83,7 +83,7 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 ```yaml
 smtp_server: smtp.hostinger.com
 smtp_port: 587
-smtp_user_name: RamboQ Team
+smtp_user_name: RamboQuant Team
 smtp_user: <email>
 smtp_pass: <password>
 kite_accounts:
