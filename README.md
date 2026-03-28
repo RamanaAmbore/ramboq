@@ -397,10 +397,10 @@ Every `git push` event triggers webhook validation. Branch routing:
 | Branch | Deploys to | Domain | Port | Runtime |
 |---|---|---|---|---|
 | `main` | `/opt/ramboq` | ramboq.com | 8502 | Python venv |
-| `pod/*` | `/opt/ramboq_pod` | pod.ramboq.com | 8504 | Podman container |
+| `pod` | `/opt/ramboq_pod` | pod.ramboq.com | 8504 | Podman container |
 | any other non-`main` | `/opt/ramboq_dev` | dev.ramboq.com | 8503 | Python venv |
 
-Each environment has its own self-contained deploy script. `dispatch.sh` (at `/etc/webhook/`) is the single entry point — it reads the branch name and calls the right script. No env-specific logic exists outside its own directory.
+Each environment has its own self-contained deploy script. `dispatch.sh` (at `/etc/webhook/`) is the single entry point — it reads the branch name and calls the right script. No env-specific logic exists outside its own directory. `dispatch.sh` is copied from the repo to `/etc/webhook/dispatch.sh` manually after changes — it is **not** auto-deployed.
 
 ### End-to-End Flow
 
@@ -434,9 +434,9 @@ webhook listener (port 9001, www-data)
     ▼
 /etc/webhook/dispatch.sh (runs as www-data)
     │
-    ├── branch == main  → /opt/ramboq/webhook/deploy.sh
-    ├── branch == pod/* → /opt/ramboq_pod/webhook/deploy_pod.sh <ref>
-    └── any other       → /opt/ramboq_dev/webhook/deploy_dev.sh <ref>
+    ├── branch == main        → /opt/ramboq/webhook/deploy.sh
+    ├── branch starts with pod → /opt/ramboq_pod/webhook/deploy_pod.sh <ref>
+    └── any other              → /opt/ramboq_dev/webhook/deploy_dev.sh <ref>
     ▼
 Per-environment deploy script (self-contained, no cross-env references)
     ├── git pull origin <branch> into its own APP_ROOT
@@ -497,8 +497,18 @@ Prod and dev logs are fully separated into their own directories.
 
 | File | Written by | Contents |
 |---|---|---|
-| `hook_debug.log` | `deploy.sh` | Full deploy output for every non-main push |
+| `hook_debug.log` | `deploy_dev.sh` | Full deploy output for every non-main, non-pod push |
 | `error_file` | `ramboq_dev.service` tee | All Streamlit stdout+stderr (full app output) |
+| `short_error_file` | `ramboq_logger.py` | Python error log, last 50 lines (errors only) |
+| `log_file` | `ramboq_logger.py` | Python app full log (5MB rotating) |
+| `short_log_file` | `ramboq_logger.py` | Python app log, last 50 lines |
+
+**Pod — `/opt/ramboq_pod/.log/`**
+
+| File | Written by | Contents |
+|---|---|---|
+| `hook_debug.log` | `deploy_pod.sh` | Full deploy output for every `pod` branch push |
+| `error_file` | `ramboq_pod.service` tee | All Streamlit stdout+stderr from container |
 | `short_error_file` | `ramboq_logger.py` | Python error log, last 50 lines (errors only) |
 | `log_file` | `ramboq_logger.py` | Python app full log (5MB rotating) |
 | `short_log_file` | `ramboq_logger.py` | Python app log, last 50 lines |
@@ -509,9 +519,10 @@ Prod and dev logs are fully separated into their own directories.
 
 | URL | Purpose |
 |---|---|
-| `https://ramboq.com/hooks/update` | GitHub webhook endpoint (POST only) |
-| `https://ramboq.com/hooks/log` | Manual request logger — triggers `log-request.sh` |
+| `https://webhook.ramboq.com/hooks/update` | GitHub webhook endpoint (POST only) |
+| `https://webhook.ramboq.com/hooks/log` | Manual request logger — triggers `log-request.sh` |
 | `https://dev.ramboq.com` | Dev website served from `/opt/ramboq_dev` |
+| `https://pod.ramboq.com` | Pod website served from Podman container |
 
 ### Debugging Guide
 
@@ -561,9 +572,34 @@ tail -100 /opt/ramboq/.log/hook_debug.log
 # Dev — see exactly what deploy.sh did
 tail -100 /opt/ramboq_dev/.log/hook_debug.log
 
+# Pod — see exactly what deploy_pod.sh did
+tail -100 /opt/ramboq_pod/.log/hook_debug.log
+
 # Check the service restarted
 sudo systemctl status ramboq.service       # prod
 sudo systemctl status ramboq_dev.service   # dev
+sudo systemctl status ramboq_pod.service   # pod
+```
+
+**Deploy script fails silently — log file shows no output after trigger line**
+
+Root cause: log files or `.git/` objects are owned by `root` instead of `www-data` (caused by manual git/ssh operations run as root). The deploy script's `{ ... } >> $LOG` block fails to open the log file and exits without executing.
+
+```bash
+# Find root-owned files in .log/ and .git/
+sudo find /opt/ramboq/.log /opt/ramboq/.git -not -user www-data
+sudo find /opt/ramboq_dev/.log /opt/ramboq_dev/.git -not -user www-data
+sudo find /opt/ramboq_pod/.log /opt/ramboq_pod/.git -not -user www-data
+
+# Fix — run after any manual server operation
+sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log
+sudo chown -R www-data:www-data /opt/ramboq_dev/.git /opt/ramboq_dev/.log
+sudo chown -R www-data:www-data /opt/ramboq_pod/.git /opt/ramboq_pod/.log
+```
+
+Also watch for stale remote refs blocking `git fetch` (can happen if old feature branches like `pod/testimonials` conflict with a branch named `pod`):
+```bash
+cd /opt/ramboq_pod && sudo -u www-data git remote prune origin
 ```
 
 **App not loading in browser — shows nginx default page**
@@ -752,11 +788,11 @@ tail -f /opt/ramboq_pod/.log/hook_debug.log   # deploy log
 
 ### Ongoing deployment
 
-Push to any `pod/*` branch:
+Push to the `pod` branch:
 ```bash
-git push origin pod/my-feature
+git push origin pod
 ```
-`deploy.sh` runs `podman build` then restarts the service automatically.
+`deploy_pod.sh` runs `podman build` then restarts the service automatically.
 
 ---
 

@@ -19,12 +19,12 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | Environment | Branch | Server path | Port | Domain | Runtime |
 |---|---|---|---|---|---|
 | Production | `main` | `/opt/ramboq` | 8502 | ramboq.com | Python venv |
-| Podman (container dev) | `pod/*` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com | Podman container |
+| Podman (container dev) | `pod` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com | Podman container |
 | Development | any other non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com | Python venv |
 
 - GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
-- For `pod/*` branches: `deploy.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
+- For the `pod` branch: `deploy_pod.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
 - Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
 
 ---
@@ -57,7 +57,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`decorators.py`** — `@for_all_accounts` iterates all accounts or a single one; `@retry_kite_conn()` retries with `test_conn=True` from attempt 2; `@track_it()` logs execution time; `@lock_it_for_update` / `@update_lock` for thread safety
 - **`singleton_base.py`** — Thread-safe singleton via double-checked locking; `_instances` dict keyed by class
 - **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
-- **`genai_api.py`** — Perplexity AI via OpenAI-compatible client; falls back to `ramboq_config['market']` static content when `prod=False` in `config.yaml`
+- **`genai_api.py`** — Gemini 2.5 Flash via `google-genai` with Google Search grounding; falls back to `ramboq_config['market']` static content when `perplexity: False` in `config.yaml`
 - **`mail_utils.py`** — SMTP via Hostinger; respects `prod` and `mail` flags in `config.yaml` before sending
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
@@ -67,7 +67,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
 - **`hooks.json`** — Single `ramboq-deploy` hook; validates push event, repo name, and HMAC-SHA256 signature; passes `ref` to `dispatch.sh`. **Deployed to `/etc/webhook/hooks.json`** (independent of all deployment directories). Copy manually after changes: `sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
-- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls the correct env's deploy script (`deploy.sh` for main, `deploy_pod.sh` for pod/*, `deploy_dev.sh` for everything else). No env-specific logic here. Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
+- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls the correct env's deploy script (`deploy.sh` for `main`, `deploy_pod.sh` for any branch starting with `pod`, `deploy_dev.sh` for everything else). No env-specific logic here. Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
 - **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only
 - **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches; all output (stdout+stderr) goes to `hook.log`
@@ -125,6 +125,7 @@ Key session state variables:
 - **Do not use `st.sidebar`** — sidebar navigation is disabled in `.streamlit/config.toml`; all navigation is via `header.py`
 - **Do not add branch filter rules to hooks.json** — branch routing is handled in `dispatch.sh`, not in `hooks.json`; `hooks.json` only validates the event, repo, and HMAC
 - **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
+- **Always `chown www-data` after manual server operations** — any file created or modified on the server via SSH (git commands, scp, manual edits) must be owned by `www-data` or deploy scripts will fail silently. After any manual work run: `sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log /opt/ramboq_dev/.git /opt/ramboq_dev/.log /opt/ramboq_pod/.git /opt/ramboq_pod/.log`
 
 ---
 
@@ -160,13 +161,23 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy.sh` | Dev deploy output (non-main branches) |
+| `hook_debug.log` | `deploy_dev.sh` | Dev deploy output (non-main, non-pod branches) |
 | `error_file` | `ramboq_dev.service` tee | All Streamlit stdout+stderr |
 | `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines (not written by service) |
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
 | `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
-> Dev log paths use the same relative `.log/` paths as prod — no per-environment config changes needed. The `prod`/`mail`/`perplexity` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
+**Pod `/opt/ramboq_pod/.log/`**
+
+| File | Source | Notes |
+|---|---|---|
+| `hook_debug.log` | `deploy_pod.sh` | Pod deploy output (`pod` branch) |
+| `error_file` | `ramboq_pod.service` tee | All Streamlit stdout+stderr from container |
+| `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines |
+| `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
+| `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
+
+> All three environments use the same relative `.log/` paths — no per-environment config changes needed. The `prod`/`mail`/`perplexity` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
 
 ---
 
@@ -177,9 +188,9 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Add a new page | Create `src/newpage.py`, add to `page_functions` dict in `app.py`, add nav label to `ramboq_config.yaml` |
 | Change page content (text, FAQs, etc.) | `setup/yaml/ramboq_config.yaml` |
 | Change broker data columns shown | `src/constants.py` — update `holdings_config`, `positions_config`, or `margins_config` |
-| Change Perplexity AI prompt | `setup/yaml/ramboq_config.yaml` — `pplx_system_msg`, `pplx_user_msg`, `pplx_temperature`, `pplx_max_tokens` |
+| Change AI market report prompt | `setup/yaml/ramboq_config.yaml` — `pplx_system_msg`, `pplx_user_msg`, `pplx_temperature`, `pplx_max_tokens`, `genai_model` |
 | Change email template | `src/constants.py` — HTML template strings |
 | Change connection retry behaviour | `setup/yaml/config.yaml` — `retry_count`, `conn_reset_hours` |
 | Change log verbosity | `setup/yaml/config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
-| Change deploy branch routing | `webhook/deploy.sh` — the `if/else` at the top |
+| Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else` at the bottom; copy to server after changes |
