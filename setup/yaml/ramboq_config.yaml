@@ -276,7 +276,7 @@ pplx_user_msg: |
     • Websol Energy System
     • SOFI  
 pplx_temperature: 0.8
-pplx_max_tokens: 4000
+pplx_max_tokens: 8000
 genai_model: gemini-2.5-flash
 post: |
   ### ⚡ Energy Storage Potential in India: Pumped Hydro vs. Battery Storage
