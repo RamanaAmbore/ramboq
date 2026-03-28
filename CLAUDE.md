@@ -1,4 +1,4 @@
-# CLAUDE.md — RamboQ Project Reference
+# CLAUDE.md — RamboQuant Project Reference
 
 This file is for Claude Code. It provides project context, file map, patterns, and refactoring notes to avoid re-exploring the codebase from scratch each session.
 
@@ -6,7 +6,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ## Project Overview
 
-**RamboQ** is a production Streamlit web app for RamboQuant Analytics LLP at [ramboq.com](https://ramboq.com). It provides portfolio performance tracking, market updates (via Perplexity AI), user onboarding, and investment information.
+**RamboQuant** is a production Streamlit web app for RamboQuant Analytics LLP at [ramboq.com](https://ramboq.com). It provides portfolio performance tracking, market updates (via Perplexity AI), user onboarding, and investment information.
 
 - **Single codebase**, two deployments: prod (`main` branch) and dev (any non-main branch)
 - **No database** — all data comes from Zerodha Kite broker API and YAML config files

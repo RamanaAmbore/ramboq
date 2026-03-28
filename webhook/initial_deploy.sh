@@ -74,7 +74,7 @@ if [[ "$ENV" != "prod" && "$ENV" != "dev" && "$ENV" != "both" ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}RamboQ Initial Deployment Setup${NC}"
+echo -e "${BOLD}RamboQuant Initial Deployment Setup${NC}"
 echo -e "  Environment : $ENV"
 echo -e "  Dev branch  : $BRANCH_DEV"
 echo -e "  SSH prod key: ${SSH_KEY_PROD:-none (will use HTTPS)}"
