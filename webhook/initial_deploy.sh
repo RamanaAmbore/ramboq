@@ -262,7 +262,7 @@ EOF
 # FILL IN REAL VALUES before starting the service
 smtp_server: smtp.hostinger.com
 smtp_port: 587
-smtp_user_name: RamboQ Team
+smtp_user_name: RamboQuant Team
 smtp_user: <your-email>
 smtp_pass: <your-smtp-password>
 kite_accounts:
