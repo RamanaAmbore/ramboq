@@ -28,7 +28,7 @@ def get_path(file):
             'pdf': 'resume/',
             'certificate': 'static/certificates/',
             'yaml': 'yaml/'}
-    return f"setup/{dirs[typ]}/{file}"
+    return f"setup/{dirs[typ]}{file}"
     # Custom dictionary class to handle keys with suffix matching
 
 
