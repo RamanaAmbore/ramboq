@@ -56,7 +56,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`connections.py`** — `Connections` singleton (extends `SingletonBase`) holds one `KiteConnection` per account; handles Kite 2FA login, TOTP, and access token refresh. Re-authenticates after 23 hours (`conn_reset_hours` in `config.yaml`)
 - **`decorators.py`** — `@for_all_accounts` iterates all accounts or a single one; `@retry_kite_conn()` retries with `test_conn=True` from attempt 2; `@track_it()` logs execution time; `@lock_it_for_update` / `@update_lock` for thread safety
 - **`singleton_base.py`** — Thread-safe singleton via double-checked locking; `_instances` dict keyed by class
-- **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`. `get_path()` maps image extensions to `setup/static/`
+- **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
 - **`genai_api.py`** — Gemini 2.5 Flash via `google-genai` with Google Search grounding; falls back to `ramboq_config['market']` static content when `perplexity: False` in `config.yaml`
 - **`mail_utils.py`** — SMTP via Hostinger; respects `prod` and `mail` flags in `config.yaml` before sending
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`

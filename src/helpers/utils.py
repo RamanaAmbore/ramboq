@@ -20,15 +20,15 @@ def get_path(file):
     # Return the appropriate path based on whether the image is a certificate
     if 'http' in file: return file
     typ = file.split('.')[1]
-    dirs = {'jpg': 'static/',
-            'ico': 'static/',
-            'png': 'static/',
-            'jpeg': 'static/',
+    dirs = {'jpg': 'images/',
+            'ico': 'images/',
+            'png': 'images/',
+            'jpeg': 'images/',
             'css': 'style/',
             'pdf': 'resume/',
-            'certificate': 'static/certificates/',
+            'certificate': 'images/certificates/',
             'yaml': 'yaml/'}
-    return f"setup/{dirs[typ]}{file}"
+    return f"setup/{dirs[typ]}/{file}"
     # Custom dictionary class to handle keys with suffix matching
 
 
