@@ -278,6 +278,7 @@ pplx_user_msg: |
     • SOFI  
 pplx_temperature: 0.8
 pplx_max_tokens: 4000
+genai_model: gemini-2.5-flash
 post: |
   ### ⚡ Energy Storage Potential in India: Pumped Hydro vs. Battery Storage
   

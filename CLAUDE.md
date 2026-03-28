@@ -82,7 +82,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | `config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `prod`/`mail`/`perplexity` flags (defaults `False`); deploy scripts preserve server overrides across git pulls |
 | `ramboq_config.yaml` | Yes | All page content, nav labels, Perplexity prompts/params, Mermaid diagrams, fallback market report |
 | `ramboq_constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
-| `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, Perplexity API key (`pplx_api_key`) |
+| `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, Gemini API key (`gemini_api_key`) |
 
 `secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys preserve it via backup/restore in the deploy scripts.
 

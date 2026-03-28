@@ -95,7 +95,7 @@ kite_accounts:
 cookie_secret: <random-string>
 kite_login_url: https://kite.zerodha.com/api/login
 kite_twofa_url: https://kite.zerodha.com/api/twofa
-pplx_api_key: <perplexity-api-key>
+gemini_api_key: <gemini-api-key>
 ```
 
 ### `setup/yaml/config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
