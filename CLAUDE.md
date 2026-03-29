@@ -32,7 +32,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 ## Key File Map
 
 ### Entry Point
-- **`app.py`** — Sets page config, loads CSS/favicon, initialises session state, renders header, routes to page function, renders footer. Page routing is a dict `page_functions = {"about": about, "market": market, ...}` keyed on `st.session_state.active_nav`.
+- **`app.py`** — Sets page config, loads CSS/favicon, initialises session state, renders header, routes to page function, renders footer. Page routing is a dict `page_functions = {"about": about, "market": market, ...}` keyed on `st.session_state.active_nav`. On every startup, copies `setup/images/favicon.png` and `setup/streamlit/index.html` into the Streamlit static folder so they survive pip upgrades.
 
 ### Pages (`src/`)
 - **`about.py`** — Static content from `ramboq_config['about']`
@@ -44,7 +44,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`contact.py`** — Contact form with SMTP notification
 - **`faq.py`** — FAQ + Mermaid.js flow diagrams (nav/redemption/succession)
 - **`header.py`** — Desktop and mobile nav bars; updates `st.query_params["page"]` and `st.session_state.active_nav`
-- **`footer.py`** — Copyright, LLDIN, disclaimer; separate mobile/desktop layouts
+- **`footer.py`** — Copyright, registration number, disclaimer; separate mobile/desktop layouts. Keys: `footer_name`, `footer_text2` (shown on both desktop and mobile), `footer_mobile_text3` (mobile only), `footer_desktop_text3` (desktop only)
 
 ### Shared UI (`src/`)
 - **`components.py`** — `render_form()`, `write_section_heading()`, `disp_icon_text()`, `write_columns()`
@@ -62,8 +62,14 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 
+### Static Assets (`setup/streamlit/`)
+- **`index.html`** — Custom Streamlit entry HTML with RamboQuant meta tags, OG/Twitter cards, and favicon link. Copied into the Streamlit venv static folder on every deploy and app startup to survive pip upgrades.
+- **`favicon.png`** — Reference copy of the Streamlit default favicon (not deployed — source favicon is `setup/images/favicon.png`)
+
 ### Webhook / Deployment (`webhook/`)
-- **`deploy.sh`** — Main deploy script; `main` → `/opt/ramboq` with nginx/static sync; non-main → `/opt/ramboq_dev` without sync
+- **`deploy.sh`** — Prod deploy script (`main` branch); git pull, pip install, copies `setup/images/favicon.png` and `setup/streamlit/index.html` into Streamlit static folder, syncs nginx/static files, restarts service
+- **`deploy_dev.sh`** — Dev deploy script (non-main, non-pod branches); same as deploy.sh but without nginx/static sync
+- **`deploy_pod.sh`** — Pod deploy script (`pod` branch); runs `podman build` then restarts service. Favicon and index.html are copied inside the container via `Containerfile` (no venv on host)
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
 - **`hooks.json`** — Single `ramboq-deploy` hook; validates push event, repo name, and HMAC-SHA256 signature; passes `ref` to `dispatch.sh`. **Deployed to `/etc/webhook/hooks.json`** (independent of all deployment directories). Copy manually after changes: `sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
@@ -194,3 +200,5 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change log verbosity | `setup/yaml/config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
 | Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else` at the bottom; copy to server after changes |
+| Change browser tab title or SEO meta tags | `setup/streamlit/index.html` — update `<title>`, OG/Twitter meta tags |
+| Change footer text | `setup/yaml/ramboq_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
