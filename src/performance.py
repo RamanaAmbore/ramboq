@@ -80,6 +80,13 @@ def performance():
         var btns = container.querySelectorAll('[role="tab"]');
         if (btns.length < tabKeys.length) {{ setTimeout(init, 50); return; }}
 
+        // Ensure ?tab= is always present in the URL on page load
+        var url = new URL(window.parent.location.href);
+        if (!url.searchParams.has('tab')) {{
+            url.searchParams.set('tab', tabKeys[targetIdx]);
+            window.parent.history.replaceState(null, '', url.toString());
+        }}
+
         // Auto-select correct tab on page load (aria-selected check prevents infinite loop)
         if (btns[targetIdx] && btns[targetIdx].getAttribute('aria-selected') !== 'true') {{
             btns[targetIdx].click();

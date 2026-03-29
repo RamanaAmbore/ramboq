@@ -64,6 +64,10 @@ def set_active_nav(label):
     else:
         st.session_state.active_nav = label
     st.query_params["page"] = st.session_state.active_nav
+    if st.session_state.active_nav == "performance":
+        st.query_params["tab"] = "funds"
+    elif "tab" in st.query_params:
+        del st.query_params["tab"]
 
 
 def validate_parms():
