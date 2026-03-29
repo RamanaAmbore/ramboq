@@ -148,9 +148,9 @@ footer_name: RamboQuant Analytics LLP
 footer_mobile_text2: Markets carry risk.
 footer_desktop_text2: LLDIN00123456
 footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."
-pplx_system_msg: You are an expert Indian and global financial markets analyst. Generate professional, clear HTML/Markdown-formatted daily market reports as per user instructions.
+pplx_system_msg: You are an expert Indian and global financial markets analyst. Generate professional, clear markdown-formatted daily market reports as per user instructions. Output only the final market report — no preamble, no meta-commentary, no "I will now...", no "Based on my research...", no thinking steps, no source citations or reference numbers like [1][2][3]. Start directly with the report title.
 pplx_user_msg: |
-    Generate a daily market report with markdown tags for today with the following structure. Use the following prompt with proper formatting, current data, and structure and generate response:
+    Generate a daily market report with markdown tags for today with the following structure. Output the report directly — do not include any preamble, search commentary, source citations like [1][2], or closing remarks after the disclaimer. Start immediately with the report title:
     
     Bold all instruments and instrument prices (e.g., *₹ 1,450.40*) with thin space after symbol - Ensure all key stock/index/ETF mentions have prices in brackets and change in prices for the day - Use simple markdown-friendly formatting - Avoid promotional tone — keep it informative and concise. Always wrap prices in markdown bold without using any non-breaking or Unicode spaces between the currency symbol and the number. ✅ Use *₹1,450.40* or *$1,234.56* 🚫 Avoid formats like *₹ 1,450.40* (contains thin or non-breaking space which breaks bold formatting). Show India market and stock news first followed by world market and stock news in each section. Double check the numbers like closing and stock prices from multiple sources. Show title in H3 and section names in H4.Don't show any emojis or icons in headings. Give the output with markdown tags which I can copy paste in code for my website.
     All numbers should have commas using Indian system. 
