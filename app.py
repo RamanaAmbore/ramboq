@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+from PIL import Image
 import streamlit as st
 
 from src.about import about
@@ -50,13 +51,10 @@ if not cookies.ready():
 
 # Define the initial setup function to configure the Streamlit app
 def initial_setup():
-    # Load the favicon image from the specified file path
-    favicon_path = get_path(ramboq_config['favicon'])
-
     # Set the page configuration for the Streamlit app
     st.set_page_config(
         page_title="RamboQuant Analytics",  # Set the page title dynamically
-        page_icon=favicon_path,  # Use the favicon image
+        page_icon=Image.open(get_path(ramboq_config['favicon'])),  # Use the favicon image
         layout="centered"  # Use a wide layout for the app
     )
 
