@@ -41,6 +41,9 @@ def get_market_update():
         )
 
         resp = response.text
+        if not resp:
+            logger.warning("Gemini returned empty response — using fallback")
+            return fallback
         logger.info(resp)
         return resp
 
