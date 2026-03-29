@@ -274,7 +274,7 @@ kite_accounts:
 cookie_secret: <random-strong-string>
 kite_login_url: https://kite.zerodha.com/api/login
 kite_twofa_url: https://kite.zerodha.com/api/twofa
-pplx_api_key: <perplexity-api-key>
+gemini_api_key: <gemini-api-key>
 EOF
         chown www-data:www-data "$yaml_dir/secrets.yaml"
         log_warn "Created secrets.yaml TEMPLATE — fill in real values at $yaml_dir/secrets.yaml"

@@ -1,5 +1,5 @@
-
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 from src.helpers.date_time_utils import timestamp_indian
 from src.helpers.ramboq_logger import get_logger
@@ -8,12 +8,11 @@ from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
 logger = get_logger(__name__)
 
 
-# --- Replace this with your actual Perplexity API key ---
 def get_market_update():
-    # Get current day, date, and time in formatted string
     now = timestamp_indian()
     formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
-    logger.info(f'GenAI for market updated invoked at {formatted_datetime}')
+    logger.info(f'GenAI for market update invoked at {formatted_datetime}')
+
     message = f"Market Report — {formatted_datetime} IST"
     fallback = ramboq_config['market'].replace("Market Report", message)
 
@@ -21,29 +20,30 @@ def get_market_update():
         return fallback
 
     try:
-        client = OpenAI(
-            api_key=secrets["pplx_api_key"],
-            base_url="https://api.perplexity.ai",
+        client = genai.Client(api_key=secrets["gemini_api_key"])
+
+        prompt = (
+            f"Current date and time: {formatted_datetime} IST\n\n"
+            f"{ramboq_config['pplx_user_msg']}"
         )
 
-        messages = [
-            {"role": "system", "content": ramboq_config["pplx_system_msg"]},
-            {"role": "user", "content": ramboq_config["pplx_user_msg"]},
-        ]
-
-        response = client.chat.completions.create(
-            model="sonar-pro",
-            messages=messages,
-            temperature=float(ramboq_config['pplx_temperature']),
-            max_tokens=int(ramboq_config['pplx_max_tokens'])
+        response = client.models.generate_content(
+            model=ramboq_config.get('genai_model', 'gemini-2.5-flash'),
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=ramboq_config['pplx_system_msg'],
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=float(ramboq_config['pplx_temperature']),
+                max_output_tokens=int(ramboq_config['pplx_max_tokens']),
+            ),
         )
 
-        resp = response.choices[0].message.content
+        resp = response.text
         logger.info(resp)
         return resp
 
     except Exception as e:
-        logger.error(f"Perplexity API call failed: {e}")
+        logger.error(f"Gemini market update failed: {e}")
         return fallback
 
 

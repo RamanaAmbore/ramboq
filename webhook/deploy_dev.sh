@@ -38,6 +38,10 @@ BRANCH="${REF#refs/heads/}"
   source venv/bin/activate
   pip install --no-cache-dir -r requirements.txt
 
+  # Copy custom favicon into Streamlit static folder (survives pip upgrades)
+  STREAMLIT_STATIC=$(python -c "import streamlit; import os; print(os.path.join(os.path.dirname(streamlit.__file__), 'static'))")
+  cp "$APP_ROOT/setup/images/favicon.png" "$STREAMLIT_STATIC/favicon.png"
+
   echo "[$TS] Restarting $APP_SERVICE..."
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
 
