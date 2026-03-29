@@ -22,16 +22,21 @@ from streamlit_cookies_manager import EncryptedCookieManager
 from src.components import markdown  # Functions for setting background and styling
 from src.footer import footer
 from src.header import create_navbar
+from src.helpers import background_refresh
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import get_path, css_style, \
     ramboq_config, nav_plus_signin, \
     default_nav_label, nav_plus_signin_out, \
     capitalize, signin_label, signout_label, \
     signin_label_val, signout_label_val, \
-    secrets, isd_codes  # Utility functions for styling, accessing profile data, and image paths
+    secrets, isd_codes, config  # Utility functions for styling, accessing profile data, and image paths
 from src.utils_streamlit import get_image_bin_file
 
 logger = get_logger(__name__)
+
+# Start background refresh thread (daemon — pre-warms cache for performance and market pages)
+if config.get('background_refresh', True):
+    background_refresh.start(config)
 
 # Copy custom favicon and index.html into Streamlit static folder on every startup
 _streamlit_static = Path(st.__file__).parent / "static"
