@@ -146,7 +146,7 @@ favicon: favicon.png
 logo: logo.png
 footer_name: RamboQuant Analytics LLP
 footer_mobile_text2: Markets carry risk.
-footer_desktop_text2: LLDIN00123456
+footer_desktop_text2: ACU-5195
 footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."
 pplx_system_msg: You are an expert Indian and global financial markets analyst. Generate professional, clear markdown-formatted daily market reports as per user instructions. Output only the final market report — no preamble, no meta-commentary, no "I will now...", no "Based on my research...", no thinking steps, no source citations or reference numbers like [1][2][3]. Start directly with the report title.
 pplx_user_msg: |
