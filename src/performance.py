@@ -5,33 +5,16 @@ import streamlit as st
 from src.constants import holdings_config, margins_config, positions_config
 from src.helpers.date_time_utils import timestamp_est
 from src.helpers.utils import get_nearest_time, add_comma_to_df_numbers, config
-from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins
+from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins, style_dataframe
 
 
 def performance():
     with st.container(key="body-container"):
-        # Apply custom styles
-        def style_dataframe(df):
-            return (
-                df.style
-                .set_properties(**{"background-color": "#fcfeff"})  # cell background
-            )
-
         refresh_time = get_nearest_time(interval=config.get('performance_refresh_interval', 5))
         est_time = timestamp_est().strftime("%d-%b-%y %H:%M")
         st.write(f"**Refreshed at {refresh_time} IST | {est_time} EST**")
         # Create tabs
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
-
-        # Create empty placeholders inside each tab for dataframes
-        with tabs[0]:
-            margin_df_placeholder = st.empty()
-        with tabs[1]:
-            sum_df_placeholder = st.empty()
-            holdings_df_placeholder = st.empty()
-        with tabs[2]:
-            sum_pos_df_placeholder = st.empty()
-            pos_df_placeholder = st.empty()
 
         # Fetch margins and positions in parallel; holdings depends on margins result
         with ThreadPoolExecutor(max_workers=2) as ex:
@@ -41,15 +24,26 @@ def performance():
             df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
             df_positions, sum_positions = f_positions.result()
 
-        styled_margins = style_dataframe(add_comma_to_df_numbers(df_margins))
-        styled_sum_holdings = style_dataframe(add_comma_to_df_numbers(sum_holdings))
-        styled_holdings = style_dataframe(add_comma_to_df_numbers(df_holdings))
-        styled_sum_positions = style_dataframe(add_comma_to_df_numbers(sum_positions))
-        styled_positions = style_dataframe(add_comma_to_df_numbers(df_positions))
+        with tabs[0]:
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_margins)),
+                         hide_index=True, column_config=margins_config)
 
-        # Update placeholders with generated content
-        margin_df_placeholder.dataframe(styled_margins, hide_index=True, column_config=margins_config)
-        sum_df_placeholder.dataframe(styled_sum_holdings, hide_index=True, column_config=holdings_config)
-        holdings_df_placeholder.dataframe(styled_holdings, hide_index=True, column_config=holdings_config)
-        sum_pos_df_placeholder.dataframe(styled_sum_positions, hide_index=True, column_config=positions_config)
-        pos_df_placeholder.dataframe(styled_positions, hide_index=True, column_config=positions_config)
+        with tabs[1]:
+            for account in df_holdings['account'].unique():
+                st.write(f"**{account}**")
+                acct_df = df_holdings[df_holdings['account'] == account]
+                st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
+                             hide_index=True, column_config=holdings_config)
+            st.write("**Summary**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_holdings)),
+                         hide_index=True, column_config=holdings_config)
+
+        with tabs[2]:
+            for account in df_positions['account'].unique():
+                st.write(f"**{account}**")
+                acct_df = df_positions[df_positions['account'] == account]
+                st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
+                             hide_index=True, column_config=positions_config)
+            st.write("**Summary**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_positions)),
+                         hide_index=True, column_config=positions_config)
