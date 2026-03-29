@@ -29,21 +29,21 @@ def performance():
                          hide_index=True, column_config=margins_config)
 
         with tabs[1]:
+            st.write("**Summary**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_holdings)),
+                         hide_index=True, column_config=holdings_config)
             for account in df_holdings['account'].unique():
                 st.write(f"**{account}**")
                 acct_df = df_holdings[df_holdings['account'] == account]
                 st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                              hide_index=True, column_config=holdings_config)
-            st.write("**Summary**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_holdings)),
-                         hide_index=True, column_config=holdings_config)
 
         with tabs[2]:
+            st.write("**Summary**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_positions)),
+                         hide_index=True, column_config=positions_config)
             for account in df_positions['account'].unique():
                 st.write(f"**{account}**")
                 acct_df = df_positions[df_positions['account'] == account]
                 st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                              hide_index=True, column_config=positions_config)
-            st.write("**Summary**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_positions)),
-                         hide_index=True, column_config=positions_config)
