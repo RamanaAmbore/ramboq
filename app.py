@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 import streamlit as st
 
 from src.about import about
@@ -29,6 +32,11 @@ from src.helpers.utils import get_path, css_style, \
 from src.utils_streamlit import get_image_bin_file
 
 logger = get_logger(__name__)
+
+# Copy custom favicon and index.html into Streamlit static folder on every startup
+_streamlit_static = Path(st.__file__).parent / "static"
+shutil.copy(get_path("favicon.png"), _streamlit_static / "favicon.png")
+shutil.copy(Path("setup/streamlit/index.html"), _streamlit_static / "index.html")
 
 # Create cookie manager
 cookies = EncryptedCookieManager(
