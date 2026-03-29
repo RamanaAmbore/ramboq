@@ -11,8 +11,8 @@ logger = get_logger(__name__)
 def get_market_update():
     now = timestamp_indian()
     now_est = timestamp_est()
-    formatted_ist = now.strftime('%A, %B %d, %Y, %I:%M %p')
-    formatted_est = now_est.strftime('%I:%M %p')
+    formatted_ist = now.strftime('%a, %B %d, %Y, %I:%M %p')
+    formatted_est = now_est.strftime('%a, %B %d, %Y, %I:%M %p')
     logger.info(f'GenAI for market update invoked at {formatted_ist} IST')
 
     message = f"Market Report — {formatted_ist} IST | {formatted_est} EST"

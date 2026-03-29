@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import streamlit as st
 
@@ -11,8 +12,9 @@ from src.utils_streamlit import fetch_positions, fetch_holdings, fetch_margins, 
 def performance():
     with st.container(key="body-container"):
         refresh_time = get_nearest_time(interval=config.get('performance_refresh_interval', 5))
-        est_time = timestamp_est().strftime("%d-%b-%y %H:%M")
-        st.write(f"**Refreshed at {refresh_time} IST | {est_time} EST**")
+        ist_display = datetime.strptime(refresh_time, "%d-%b-%y %H:%M").strftime("%a, %B %d, %Y, %I:%M %p")
+        est_display = timestamp_est().strftime("%a, %B %d, %Y, %I:%M %p")
+        st.write(f"**Refreshed at {ist_display} IST | {est_display} EST**")
         # Create tabs
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
 
