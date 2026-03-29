@@ -23,6 +23,9 @@ BRANCH="${REF#refs/heads/}"
   CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
   [ -f "setup/yaml/config.yaml" ] && cp "setup/yaml/config.yaml" "$CONFIG_BAK"
 
+  # Reset config.yaml to git-tracked version so checkout proceeds cleanly
+  git checkout -- setup/yaml/config.yaml
+
   PREV_HEAD=$(git rev-parse HEAD)
   git fetch origin "$BRANCH"
   git checkout -B "$BRANCH" "origin/$BRANCH"
