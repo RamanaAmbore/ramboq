@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 
-from src.helpers.date_time_utils import timestamp_indian
+from src.helpers.date_time_utils import timestamp_indian, timestamp_est
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
 
@@ -10,10 +10,12 @@ logger = get_logger(__name__)
 
 def get_market_update():
     now = timestamp_indian()
-    formatted_datetime = now.strftime('%A, %B %d, %Y, %I:%M %p')
-    logger.info(f'GenAI for market update invoked at {formatted_datetime}')
+    now_est = timestamp_est()
+    formatted_ist = now.strftime('%A, %B %d, %Y, %I:%M %p')
+    formatted_est = now_est.strftime('%I:%M %p')
+    logger.info(f'GenAI for market update invoked at {formatted_ist} IST')
 
-    message = f"Market Report — {formatted_datetime} IST"
+    message = f"Market Report — {formatted_ist} IST | {formatted_est} EST"
     fallback = ramboq_config['market'].replace("Market Report", message)
 
     if not ramboq_deploy['perplexity']:
@@ -23,7 +25,7 @@ def get_market_update():
         client = genai.Client(api_key=secrets["gemini_api_key"])
 
         prompt = (
-            f"Current date and time: {formatted_datetime} IST\n\n"
+            f"Current date and time: {formatted_ist} IST | {formatted_est} EST\n\n"
             f"{ramboq_config['pplx_user_msg']}"
         )
 
