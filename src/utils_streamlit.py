@@ -14,7 +14,7 @@ def get_image_bin_file(file):
     return get_image_file(file)
 
 
-@st.cache_data(show_spinner="Connecting to broker platform and loading data…")
+@st.cache_data
 def fetch_holdings(dt, df_sum_margins=None):
     df = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
     lst = list(holdings_config.keys())
@@ -57,7 +57,7 @@ def fetch_holdings(dt, df_sum_margins=None):
     return df, total_df
 
 
-@st.cache_data(show_spinner="Connecting to broker platform and loading data…")
+@st.cache_data
 def fetch_positions(dt, df_sum_margins=None):
     df = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
     df = df[list(positions_config.keys())]
@@ -78,7 +78,7 @@ def fetch_positions(dt, df_sum_margins=None):
     return df, total_df
 
 
-@st.cache_data(show_spinner="Connecting to broker platform and loading data…")
+@st.cache_data
 def fetch_margins(dt):
     df = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
     df = df[list(margins_config.keys())]
@@ -94,7 +94,7 @@ def fetch_margins(dt):
     return df
 
 
-@st.cache_data(show_spinner="Connecting to GenAI for market update…")
+@st.cache_data
 def get_market_update(dt):
     return genai_api.get_market_update()
 
