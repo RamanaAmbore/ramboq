@@ -21,6 +21,9 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
   [ -f "setup/yaml/config.yaml" ] && cp "setup/yaml/config.yaml" "$CONFIG_BAK"
 
+  # Reset config.yaml to git-tracked version so pull proceeds cleanly
+  git checkout -- setup/yaml/config.yaml
+
   PREV_HEAD=$(git rev-parse HEAD)
   git pull origin main
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)

@@ -41,6 +41,15 @@ def _loop(cfg):
     last_market_date = None
     last_perf_key = None
 
+    # Warm market update cache immediately at startup — avoids first-user wait after app restart
+    logger.info("Background: warming market update cache at startup")
+    try:
+        get_market_update(get_cycle_date())
+        last_market_date = timestamp_indian().date()
+        logger.info("Background: market update cache warmed at startup")
+    except Exception as e:
+        logger.error(f"Background: startup market update failed: {e}")
+
     while True:
         try:
             now = timestamp_indian()
