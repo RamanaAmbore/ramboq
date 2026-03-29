@@ -39,6 +39,9 @@ def performance():
                 acct_df = df_holdings[df_holdings['account'] == account]
                 st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                              hide_index=True, column_config=holdings_config)
+            st.write("**All Accounts — Holdings**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_holdings)),
+                         hide_index=True, column_config=holdings_config)
 
         with tabs[2]:
             st.write("**Summary**")
@@ -49,3 +52,6 @@ def performance():
                 acct_df = df_positions[df_positions['account'] == account]
                 st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                              hide_index=True, column_config=positions_config)
+            st.write("**All Accounts — Positions**")
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_positions)),
+                         hide_index=True, column_config=positions_config)
