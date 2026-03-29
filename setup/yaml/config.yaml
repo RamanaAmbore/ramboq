@@ -18,3 +18,10 @@ prod: False
 mail: False
 perplexity: False
 enforce_password_standard: False
+
+# Background refresh settings (all times in India IST)
+background_refresh: True
+performance_refresh_interval: 10   # minutes — must match get_nearest_time interval
+market_refresh_time: "08:30"       # IST — pre-fetch market update once per day before market opens
+market_hours_start: "09:00"        # IST — start background broker data refresh
+market_hours_end: "15:30"          # IST — stop background broker data refresh

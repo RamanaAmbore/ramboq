@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import streamlit as st
 
 from src.constants import holdings_config, margins_config, positions_config
@@ -19,7 +21,6 @@ def performance():
         # Create tabs
         tabs = st.tabs(["Funds", "Holdings", "Positions"])
 
-
         # Create empty placeholders inside each tab for dataframes
         with tabs[0]:
             margin_df_placeholder = st.empty()
@@ -30,10 +31,13 @@ def performance():
             sum_pos_df_placeholder = st.empty()
             pos_df_placeholder = st.empty()
 
-        # Generate and style data outside the tab context
-        df_margins = fetch_margins(refresh_time)
-        df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
-        df_positions, sum_positions = fetch_positions(refresh_time)
+        # Fetch margins and positions in parallel; holdings depends on margins result
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_margins = ex.submit(fetch_margins, refresh_time)
+            f_positions = ex.submit(fetch_positions, refresh_time)
+            df_margins = f_margins.result()
+            df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
+            df_positions, sum_positions = f_positions.result()
 
         styled_margins = style_dataframe(add_comma_to_df_numbers(df_margins))
         styled_sum_holdings = style_dataframe(add_comma_to_df_numbers(sum_holdings))
