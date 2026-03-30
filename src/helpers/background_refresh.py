@@ -34,10 +34,11 @@ def _loop(cfg):
     from src.helpers.utils import get_nearest_time, get_cycle_date
     from src.helpers.alert_utils import check_and_alert, send_summary
 
-    interval      = cfg.get('performance_refresh_interval', 10)
-    mkt_refresh_h, mkt_refresh_m = _parse_time(cfg.get('market_refresh_time', '08:30'))
-    mkt_start_h,  mkt_start_m   = _parse_time(cfg.get('market_hours_start', '09:00'))
-    mkt_end_h,    mkt_end_m     = _parse_time(cfg.get('market_hours_end', '15:30'))
+    interval           = cfg.get('performance_refresh_interval', 10)
+    mkt_refresh_h, mkt_refresh_m   = _parse_time(cfg.get('market_refresh_time', '08:30'))
+    mkt_start_h,  mkt_start_m      = _parse_time(cfg.get('market_hours_start', '09:00'))
+    mkt_end_h,    mkt_end_m        = _parse_time(cfg.get('market_hours_end', '15:30'))
+    open_summary_h, open_summary_m = _parse_time(cfg.get('market_open_summary_time', '09:30'))
 
     last_market_date  = None
     last_perf_key     = None
@@ -87,8 +88,10 @@ def _loop(cfg):
 
                         ist_display = now.strftime("%a, %B %d, %Y, %I:%M %p")
 
-                        # Open summary — first fetch of the day at/after market open
-                        if last_open_date != today:
+                        # Open summary — first fetch at/after open_summary_time (default 09:30)
+                        open_summary_dt = now.replace(hour=open_summary_h, minute=open_summary_m,
+                                                      second=0, microsecond=0)
+                        if last_open_date != today and now >= open_summary_dt:
                             send_summary(sum_holdings, sum_positions, ist_display, 'open')
                             last_open_date = today
 
