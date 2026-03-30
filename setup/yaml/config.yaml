@@ -29,6 +29,19 @@ alert_cooldown_minutes: 30     # minimum minutes between repeat alerts for the s
 background_refresh: True
 performance_refresh_interval: 5    # minutes — must match get_nearest_time interval
 market_refresh_time: "08:30"       # IST — pre-fetch market update once per day before market opens
-market_hours_start: "09:15"        # IST — NSE market open (pre-open ends)
-market_hours_end: "15:30"          # IST — NSE market close
-open_summary_offset_minutes: 15    # minutes after market open to send open summary
+open_summary_offset_minutes: 15    # minutes after segment open to send open summary
+
+# Market segments — used to determine fetch window and open/close summaries
+# holiday_exchange: exchange name passed to kite.holidays()
+# exchanges: list of kite position exchange values belonging to this segment
+market_segments:
+  equity:
+    hours_start: "09:15"
+    hours_end: "15:30"
+    holiday_exchange: "NSE"
+    exchanges: ["NSE", "BSE", "NFO", "CDS"]
+  commodity:
+    hours_start: "09:00"
+    hours_end: "23:30"
+    holiday_exchange: "MCX"
+    exchanges: ["MCX"]

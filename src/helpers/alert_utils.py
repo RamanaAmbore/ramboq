@@ -97,7 +97,7 @@ def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
 # Open / Close summary
 # ---------------------------------------------------------------------------
 
-def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str):
+def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, label: str = ""):
     """
     Send holdings + positions summary at market open or close.
     msg_type: 'open' or 'close'
@@ -132,8 +132,9 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str):
     holdings_table  = _fixed_table(h_headers, h_rows) if h_rows else "No holdings data"
     positions_table = _fixed_table(p_headers, p_rows) if p_rows else "No positions data"
 
-    table = f"Holdings\n{holdings_table}\n\nPositions\n{positions_table}"
-    subject_detail = f"{ist_display} IST"
+    segment_label = f" — {label}" if label else ""
+    table = f"Holdings{segment_label}\n{holdings_table}\n\nPositions{segment_label}\n{positions_table}"
+    subject_detail = f"{label + ' — ' if label else ''}{ist_display} IST"
 
     _dispatch(msg_type, ist_display, table, subject_detail)
     logger.info(f"Background: {msg_type} summary sent")

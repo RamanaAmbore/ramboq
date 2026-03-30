@@ -82,11 +82,11 @@ def fetch_margins(connections=Connections, account=None, kite=None):
     return df_margins
 
 
-def fetch_nse_holidays():
-    """Fetch NSE trading holidays for the current year via the first available Kite connection."""
+def fetch_holidays(exchange="NSE"):
+    """Fetch trading holidays for the given exchange via the first available Kite connection."""
     conn = Connections().conn
     kite = next(iter(conn.values())).get_kite_conn()
-    holidays = kite.holidays(exchange="NSE")
+    holidays = kite.holidays(exchange=exchange)
     return {h['date'] for h in holidays}
 
 
