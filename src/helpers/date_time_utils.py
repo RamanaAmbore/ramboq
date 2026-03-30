@@ -57,10 +57,12 @@ def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),
     Returns True if the market is currently open.
     - now: timezone-aware datetime in IST
     - holiday_set: set of date objects from fetch_nse_holidays()
-    - Falls back to time-window check if holiday_set is empty
+    - Weekends are NOT hardcoded as closed — special trading sessions on
+      Saturdays/Sundays are handled correctly since they won't appear in
+      the NSE holiday list. Regular weekends will run the broker fetch but
+      return stale closing data (day change = 0, no alerts fire).
+    - Falls back to time-window-only check if holiday_set is empty.
     """
-    if now.weekday() >= 5:          # Saturday=5, Sunday=6
-        return False
     if holiday_set and now.date() in holiday_set:
         return False
     t = now.time().replace(second=0, microsecond=0)

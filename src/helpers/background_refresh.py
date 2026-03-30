@@ -131,9 +131,7 @@ def _loop(cfg):
             elif last_close_date != today and not market_open:
                 mkt_end_dt = now.replace(hour=mkt_end_h, minute=mkt_end_m, second=0, microsecond=0)
                 # Only send close if it's a trading day (not weekend/holiday) and past close time
-                if (now.weekday() < 5
-                        and today not in current_holidays
-                        and now > mkt_end_dt):
+                if today not in current_holidays and now > mkt_end_dt:
                     logger.info("Background: fetching close summary")
                     try:
                         close_key        = get_nearest_time(interval=interval)
