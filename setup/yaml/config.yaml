@@ -19,6 +19,12 @@ mail: False
 perplexity: False
 enforce_password_standard: False
 
+# Loss alert thresholds — checked after every background performance refresh (during market hours)
+# Set to 0 to disable a threshold. alert_emails and telegram credentials go in secrets.yaml.
+alert_loss_abs: 10000          # alert if day loss > ₹10,000 for any account or TOTAL
+alert_loss_pct: 2.0            # alert if day loss % > 2% for any account or TOTAL
+alert_cooldown_minutes: 30     # minimum minutes between repeat alerts for the same account
+
 # Background refresh settings (all times in India IST)
 background_refresh: True
 performance_refresh_interval: 5    # minutes — must match get_nearest_time interval

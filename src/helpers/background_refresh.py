@@ -32,6 +32,7 @@ def _loop(cfg):
     # Deferred imports to avoid circular imports at module load
     from src.utils_streamlit import fetch_margins, fetch_holdings, fetch_positions, get_market_update
     from src.helpers.utils import get_nearest_time, get_cycle_date
+    from src.helpers.alert_utils import check_and_alert
 
     interval = cfg.get('performance_refresh_interval', 10)
     mkt_refresh_h, mkt_refresh_m = _parse_time(cfg.get('market_refresh_time', '08:30'))
@@ -40,6 +41,7 @@ def _loop(cfg):
 
     last_market_date = None
     last_perf_key = None
+    alert_state = {}  # tracks last alert time per account to enforce cooldown
 
     # Warm market update cache immediately at startup — avoids first-user wait after app restart
     logger.info("Background: warming market update cache at startup")
@@ -76,10 +78,12 @@ def _loop(cfg):
                     logger.info(f"Background: pre-fetching performance data for {perf_key}")
                     try:
                         df_margins = fetch_margins(perf_key)
-                        fetch_holdings(perf_key, df_margins)
-                        fetch_positions(perf_key)
+                        _, sum_holdings = fetch_holdings(perf_key, df_margins)
+                        _, sum_positions = fetch_positions(perf_key)
                         last_perf_key = perf_key
                         logger.info(f"Background: performance data cached for {perf_key}")
+                        ist_display = now.strftime("%a, %B %d, %Y, %I:%M %p")
+                        alert_state = check_and_alert(sum_holdings, sum_positions, alert_state, ist_display)
                     except Exception as e:
                         logger.error(f"Background: performance fetch failed: {e}")
 
