@@ -2,10 +2,13 @@
 Loss alert utilities — checks day P&L thresholds after each background refresh
 and fires email + Telegram notifications when breached.
 
+One row per triggered threshold. If both abs and pct breach for the same
+account/type, two rows are emitted.
+
 Thresholds (config.yaml):
-  alert_loss_abs:        alert if day loss > this absolute INR value (0 = disabled)
-  alert_loss_pct:        alert if day loss > this % of current value  (0 = disabled)
-  alert_cooldown_minutes: minimum minutes between repeat alerts for same account
+  alert_loss_abs:         alert if day loss > this absolute INR value (0 = disabled)
+  alert_loss_pct:         alert if day loss > this % of current value  (0 = disabled)
+  alert_cooldown_minutes: minimum minutes between repeat alerts for same account+type
 
 Secrets (secrets.yaml):
   telegram_bot_token:  bot token from @BotFather
@@ -45,110 +48,127 @@ def _send_telegram(message: str):
         logger.error(f"Telegram error: {e}")
 
 
-def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display: str):
+def _build_rows(sum_holdings, sum_positions, alert_loss_abs, alert_loss_pct,
+                alert_state, cooldown_mins):
     """
-    Check day P&L thresholds for holdings and positions.
-
-    alert_state: dict persisted across calls in background_refresh, keyed by account.
-                 Stores datetime of last alert to enforce cooldown.
-
-    Returns alert_state (modified in place, also returned for clarity).
+    Returns (rows, alert_state).
+    Each row: (type, account, day_loss_str, day_pct_str, abs_str, pct_str)
+    Cooldown is per account+type — if either threshold fires, both share the cooldown key.
     """
-    alert_loss_abs = config.get('alert_loss_abs', 0)
-    alert_loss_pct = config.get('alert_loss_pct', 0)
-    cooldown_mins = config.get('alert_cooldown_minutes', 30)
-    alert_emails = secrets.get('alert_emails', [])
-
-    if not alert_loss_abs and not alert_loss_pct:
-        return alert_state  # both thresholds disabled
-
     now = datetime.now()
-    triggered = []
+    rows = []
 
-    # --- Check holdings day change ---
+    def _cooldown_ok(key):
+        last = alert_state.get(key)
+        return not last or (now - last) >= timedelta(minutes=cooldown_mins)
+
+    # --- Holdings ---
     for _, row in sum_holdings.iterrows():
         account = str(row.get('account', ''))
         day_val = float(row.get('day_change_val', 0) or 0)
         day_pct = float(row.get('day_change_percentage', 0) or 0)
-        cur_val = float(row.get('cur_val', 0) or 0)
 
-        reasons = []
-        if alert_loss_abs > 0 and day_val < -alert_loss_abs:
-            reasons.append(f"Day loss ₹{abs(day_val):,.0f} exceeds threshold ₹{alert_loss_abs:,.0f}")
-        if alert_loss_pct > 0 and day_pct < -alert_loss_pct:
-            reasons.append(f"Day loss {abs(day_pct):.2f}% exceeds threshold {alert_loss_pct:.2f}%")
-
-        if not reasons:
-            continue
+        day_loss_str = f"₹{day_val:,.0f}"
+        day_pct_str  = f"{day_pct:.2f}%"
 
         key = f"holdings_{account}"
-        last_alert = alert_state.get(key)
-        if last_alert and (now - last_alert) < timedelta(minutes=cooldown_mins):
-            logger.info(f"Loss alert suppressed for {account} (cooldown)")
-            continue
+        fired = False
 
-        alert_state[key] = now
-        triggered.append({
-            'source': 'Holdings',
-            'account': account,
-            'day_val': day_val,
-            'day_pct': day_pct,
-            'cur_val': cur_val,
-            'reasons': reasons,
-        })
+        if alert_loss_abs > 0 and day_val < -alert_loss_abs and _cooldown_ok(key):
+            rows.append(("Holdings", account, day_loss_str, day_pct_str,
+                         f"₹{alert_loss_abs:,.0f}", "—"))
+            fired = True
 
-    # --- Check positions P&L ---
+        if alert_loss_pct > 0 and day_pct < -alert_loss_pct and _cooldown_ok(key):
+            rows.append(("Holdings", account, day_loss_str, day_pct_str,
+                         "—", f"{alert_loss_pct:.1f}%"))
+            fired = True
+
+        if fired:
+            alert_state[key] = now
+        elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
+            logger.info(f"Holdings alert suppressed for {account} (cooldown)")
+
+    # --- Positions ---
     for _, row in sum_positions.iterrows():
         account = str(row.get('account', ''))
         pnl = float(row.get('pnl', 0) or 0)
 
-        reasons = []
-        if alert_loss_abs > 0 and pnl < -alert_loss_abs:
-            reasons.append(f"Positions P&L ₹{abs(pnl):,.0f} exceeds threshold ₹{alert_loss_abs:,.0f}")
-
-        if not reasons:
-            continue
-
         key = f"positions_{account}"
-        last_alert = alert_state.get(key)
-        if last_alert and (now - last_alert) < timedelta(minutes=cooldown_mins):
-            logger.info(f"Position loss alert suppressed for {account} (cooldown)")
-            continue
 
-        alert_state[key] = now
-        triggered.append({
-            'source': 'Positions',
-            'account': account,
-            'day_val': pnl,
-            'day_pct': None,
-            'cur_val': None,
-            'reasons': reasons,
-        })
+        if alert_loss_abs > 0 and pnl < -alert_loss_abs and _cooldown_ok(key):
+            rows.append(("Positions", account, f"₹{pnl:,.0f}", "—",
+                         f"₹{alert_loss_abs:,.0f}", "—"))
+            alert_state[key] = now
+        elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
+            logger.info(f"Positions alert suppressed for {account} (cooldown)")
 
-    if not triggered:
+    return rows, alert_state
+
+
+def _format_table(rows):
+    """Render rows as a fixed-width monospace table string."""
+    headers = ("Type", "Account", "Day Loss", "Day Loss%", "Abs", "Pct")
+    col_widths = [max(len(h), max(len(r[i]) for r in rows)) for i, h in enumerate(headers)]
+
+    def fmt_row(r):
+        return "  ".join(str(v).ljust(col_widths[i]) for i, v in enumerate(r))
+
+    sep = "  ".join("─" * w for w in col_widths)
+    lines = [fmt_row(headers), sep]
+    for r in rows:
+        lines.append(fmt_row(r))
+    return "\n".join(lines)
+
+
+def _build_subject(rows):
+    """Concise email subject line summarising triggered rows."""
+    parts = []
+    for typ, account, day_loss, day_pct, abs_thr, pct_thr in rows:
+        thr = "+".join(t for t in [
+            f"Abs {abs_thr}" if abs_thr != "—" else "",
+            f"Pct {pct_thr}" if pct_thr != "—" else "",
+        ] if t)
+        parts.append(f"{typ} {account} {day_loss} ({day_pct}) [{thr}]")
+    return "RamboQuantAlert: " + " | ".join(parts)
+
+
+def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display: str):
+    """
+    Check day P&L thresholds. Fires Telegram + email for each breached threshold row.
+    Returns alert_state (modified in place).
+    """
+    alert_loss_abs = config.get('alert_loss_abs', 0)
+    alert_loss_pct = config.get('alert_loss_pct', 0)
+    cooldown_mins  = config.get('alert_cooldown_minutes', 30)
+    alert_emails   = secrets.get('alert_emails', [])
+
+    if not alert_loss_abs and not alert_loss_pct:
         return alert_state
 
-    # --- Build messages ---
+    rows, alert_state = _build_rows(
+        sum_holdings, sum_positions,
+        alert_loss_abs, alert_loss_pct,
+        alert_state, cooldown_mins
+    )
+
+    if not rows:
+        return alert_state
+
+    table = _format_table(rows)
+    subject = _build_subject(rows)
     header = f"⚠️ <b>RamboQuant Loss Alert — {ist_display} IST</b>"
-    lines = [header, ""]
-    for t in triggered:
-        lines.append(f"<b>{t['source']} | Account: {t['account']}</b>")
-        if t['day_pct'] is not None:
-            lines.append(f"  Day Change: ₹{t['day_val']:,.0f}  ({t['day_pct']:.2f}%)")
-        else:
-            lines.append(f"  P&L: ₹{t['day_val']:,.0f}")
-        for r in t['reasons']:
-            lines.append(f"  • {r}")
-        lines.append("")
 
-    telegram_msg = "\n".join(lines)
-    plain_msg = telegram_msg.replace("<b>", "").replace("</b>", "")
-
+    # Telegram — header bold, table in monospace code block
+    telegram_msg = f"{header}\n\n<code>{table}</code>"
     _send_telegram(telegram_msg)
 
+    # Email — monospace table in HTML
     if alert_emails:
-        subject = f"RamboQuant Loss Alert — {ist_display}"
-        html_body = f"<html><body><pre style='font-family:monospace'>{plain_msg}</pre></body></html>"
+        html_body = f"""<html><body>
+<p><b>RamboQuant Loss Alert — {ist_display} IST</b></p>
+<pre style="font-family:monospace;font-size:13px">{table}</pre>
+</body></html>"""
         for email in alert_emails:
             try:
                 send_email("", email, subject, html_body)
@@ -156,5 +176,5 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
             except Exception as e:
                 logger.error(f"Failed to send loss alert email to {email}: {e}")
 
-    logger.warning(f"Loss alerts fired for: {[t['account'] for t in triggered]}")
+    logger.warning(f"Loss alerts fired: {[(r[0], r[1]) for r in rows]}")
     return alert_state
