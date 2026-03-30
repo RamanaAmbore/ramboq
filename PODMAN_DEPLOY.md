@@ -106,6 +106,10 @@ cookie_secret: <random-strong-string>
 kite_login_url: https://kite.zerodha.com/api/login
 kite_twofa_url: https://kite.zerodha.com/api/twofa
 gemini_api_key: <gemini-api-key>
+telegram_bot_token: <bot-token-from-botfather>
+telegram_chat_id: <group-chat-id>
+alert_emails:
+  - <email-to-notify>
 EOF
 sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/secrets.yaml
 sudo chmod 600 /opt/ramboq_pod/setup/yaml/secrets.yaml
@@ -137,11 +141,35 @@ prod: True
 mail: False
 perplexity: False
 enforce_password_standard: False
+
+# Loss alert thresholds
+alert_loss_abs: 10000
+alert_loss_pct: 2.0
+alert_cooldown_minutes: 30
+
+# Background refresh
+background_refresh: True
+performance_refresh_interval: 5
+market_refresh_time: "08:30"
+open_summary_offset_minutes: 15
+
+# Market segments
+market_segments:
+  equity:
+    hours_start: "09:15"
+    hours_end: "15:30"
+    holiday_exchange: "NSE"
+    exchanges: ["NSE", "BSE", "NFO", "CDS"]
+  commodity:
+    hours_start: "09:00"
+    hours_end: "23:30"
+    holiday_exchange: "MCX"
+    exchanges: ["MCX"]
 EOF
 sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/config.yaml
 ```
 
-> Note: set `perplexity: True` when ready to enable live Perplexity AI market reports.
+> Note: set `perplexity: True` when ready to enable live Gemini AI market reports.
 
 ### Step 7 — Install the systemd service
 
