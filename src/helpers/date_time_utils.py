@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time as dtime
 from zoneinfo import ZoneInfo
 
 
@@ -49,6 +49,22 @@ def current_time_est():
 
 def current_time_indian():
     return datetime.now(tz=INDIAN_TIMEZONE).time()
+
+
+def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),
+                   market_end: dtime = dtime(15, 30)) -> bool:
+    """
+    Returns True if the market is currently open.
+    - now: timezone-aware datetime in IST
+    - holiday_set: set of date objects from fetch_nse_holidays()
+    - Falls back to time-window check if holiday_set is empty
+    """
+    if now.weekday() >= 5:          # Saturday=5, Sunday=6
+        return False
+    if holiday_set and now.date() in holiday_set:
+        return False
+    t = now.time().replace(second=0, microsecond=0)
+    return market_start <= t <= market_end
 
 
 def convert_to_timezone(date_str, format='%Y-%m-%d', return_date=True, tz=INDIAN_TIMEZONE):

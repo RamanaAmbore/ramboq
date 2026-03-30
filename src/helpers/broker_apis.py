@@ -82,6 +82,14 @@ def fetch_margins(connections=Connections, account=None, kite=None):
     return df_margins
 
 
+def fetch_nse_holidays():
+    """Fetch NSE trading holidays for the current year via the first available Kite connection."""
+    conn = Connections().conn
+    kite = next(iter(conn.values())).get_kite_conn()
+    holidays = kite.holidays(exchange="NSE")
+    return {h['date'] for h in holidays}
+
+
 def update_books(holdings, positions, margins):
     """Return all data combined into one DataFrame (optional)."""
     dfs = [holdings, positions, margins]

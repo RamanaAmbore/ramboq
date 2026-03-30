@@ -29,6 +29,6 @@ alert_cooldown_minutes: 30     # minimum minutes between repeat alerts for the s
 background_refresh: True
 performance_refresh_interval: 5    # minutes — must match get_nearest_time interval
 market_refresh_time: "08:30"       # IST — pre-fetch market update once per day before market opens
-market_hours_start: "09:00"        # IST — start background broker data refresh
-market_open_summary_time: "09:30"  # IST — send open summary (after market settles)
-market_hours_end: "15:30"          # IST — stop background broker data refresh
+market_hours_start: "09:15"        # IST — NSE market open (pre-open ends)
+market_hours_end: "15:30"          # IST — NSE market close
+open_summary_offset_minutes: 15    # minutes after market open to send open summary
