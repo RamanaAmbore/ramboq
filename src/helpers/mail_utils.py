@@ -35,7 +35,7 @@ def send_email(name, email_id, subject, html_body):
     recipients = email_id
 
     try:
-        if ramboq_deploy['prod'] or ramboq_deploy['mail']:
+        if ramboq_deploy['prod'] or ramboq_deploy['mail'] or ramboq_deploy.get('prod_test_in_dev', False):
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(smtp_user, smtp_pass)

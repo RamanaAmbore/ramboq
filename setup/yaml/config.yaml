@@ -18,6 +18,7 @@ prod: False
 mail: False
 perplexity: False
 enforce_password_standard: False
+prod_test_in_dev: False    # When True: enables GenAI, Telegram, and email in dev (ignored in prod/pod)
 
 # Loss alert thresholds — checked after every background performance refresh (during market hours)
 # Set to 0 to disable a threshold. alert_emails and telegram credentials go in secrets.yaml.

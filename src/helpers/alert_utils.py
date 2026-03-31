@@ -34,6 +34,9 @@ _MSG_TYPES = {
 
 
 def _send_telegram(message: str):
+    if not (config.get('prod', False) or config.get('prod_test_in_dev', False)):
+        logger.info("Telegram skipped — not in live mode (set prod or prod_test_in_dev to True)")
+        return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')
     if not token or not chat_id:

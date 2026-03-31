@@ -20,6 +20,9 @@ def get_market_update():
 
     if not ramboq_deploy['perplexity']:
         return fallback
+    if not (ramboq_deploy.get('prod', False) or ramboq_deploy.get('prod_test_in_dev', False)):
+        logger.info("GenAI skipped — not in live mode (set prod or prod_test_in_dev to True)")
+        return fallback
 
     try:
         client = genai.Client(api_key=secrets["gemini_api_key"])

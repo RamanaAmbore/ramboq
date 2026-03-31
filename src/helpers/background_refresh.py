@@ -81,16 +81,17 @@ def _loop(cfg):
     seg_state = {s['name']: {'last_open_date': None, 'last_close_date': None}
                  for s in segments}
 
-    last_market_date = None
-    last_perf_key    = None
-    alert_state      = {}
-    holiday_cache    = {}   # holiday_cache[exchange][year] = set of dates
+    last_market_cycle_date = None
+    last_perf_key          = None
+    alert_state            = {}
+    holiday_cache          = {}   # holiday_cache[exchange][year] = set of dates
 
     # Warm market update + load holidays at startup
     logger.info("Background: warming market update cache at startup")
     try:
-        get_market_update(get_cycle_date())
-        last_market_date = timestamp_indian().date()
+        cycle_date = get_cycle_date()
+        get_market_update(cycle_date)
+        last_market_cycle_date = cycle_date
         logger.info("Background: market update cache warmed at startup")
     except Exception as e:
         logger.error(f"Background: startup market update failed: {e}")
@@ -107,13 +108,16 @@ def _loop(cfg):
                    for s in segments):
                 _load_holidays(segments, holiday_cache, now.year)
 
-            # --- Market update: once per day at market_refresh_time IST ---
+            # --- Market update: re-fetch when cycle_date advances past mkt_refresh_time ---
+            # get_cycle_date() flips from yesterday→today at 08:00 IST. Waiting until
+            # mkt_refresh_time (08:30) ensures pre-market data is available before fetching.
             mkt_refresh_dt = now.replace(hour=mkt_refresh_h, minute=mkt_refresh_m,
                                          second=0, microsecond=0)
-            if last_market_date != today and now >= mkt_refresh_dt:
+            cycle_date = get_cycle_date()
+            if last_market_cycle_date != cycle_date and now >= mkt_refresh_dt:
                 try:
-                    get_market_update(get_cycle_date())
-                    last_market_date = today
+                    get_market_update(cycle_date)
+                    last_market_cycle_date = cycle_date
                     logger.info("Background: market update cached")
                 except Exception as e:
                     logger.error(f"Background: market update failed: {e}")
