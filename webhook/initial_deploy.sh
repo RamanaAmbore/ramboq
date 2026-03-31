@@ -178,7 +178,11 @@ setup_environment() {
 
     local clone_url="${ssh_clone_url:-$REPO_HTTPS}"
     local is_prod="False"
-    [ "$branch" = "main" ] && is_prod="True"
+    local capabilities="False"
+    if [ "$branch" = "main" ]; then
+        is_prod="True"
+        capabilities="True"
+    fi
 
     log_step "3. Setting up $app_root (branch: $branch)"
 
@@ -246,9 +250,15 @@ console_log_level: 40
 
 # App flags
 prod: $is_prod
-mail: False
-perplexity: False
 enforce_password_standard: False
+
+# prod_test_in_dev: master switch — True on prod/pod, False on dev by default
+prod_test_in_dev: $capabilities
+
+# Production capability flags (each independently toggleable when prod_test_in_dev is True)
+perplexity: $capabilities
+telegram: $capabilities
+mail: $capabilities
 EOF
         chown www-data:www-data "$yaml_dir/config.yaml"
         log_ok "Created config.yaml"

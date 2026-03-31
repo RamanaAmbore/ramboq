@@ -31,7 +31,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   # Merge: keep new repo config as base (picks up any new fields), overlay only
   # env-specific flags from the server's saved config so they survive deploys.
   if [ -f "$CONFIG_BAK" ]; then
-    for key in prod mail perplexity enforce_password_standard prod_test_in_dev; do
+    for key in prod enforce_password_standard prod_test_in_dev perplexity telegram mail; do
       val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
       [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/config.yaml"
     done

@@ -77,16 +77,19 @@ isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_co
 
 def is_prod_capable():
     """
-    Returns True if this environment should run production capabilities
-    (GenAI market update, Telegram alerts, email notifications).
+    Returns True if production capabilities are enabled for this environment.
 
-    Prod/pod: always True (prod: True in config).
-    Dev: True only when prod_test_in_dev: True — avoids consuming CPU/bandwidth
-    when prod is running in parallel on the same server.
+    Controlled solely by prod_test_in_dev in config.yaml — no code changes needed
+    to enable or disable capabilities. Set to True on prod/pod servers. Set to False
+    on dev to avoid consuming CPU/bandwidth when prod is running in parallel.
 
-    To add a new production capability, gate it with is_prod_capable().
+    Each capability also has its own flag (perplexity, telegram, mail). Both this
+    function AND the capability flag must be True for a capability to run.
+
+    To add a new production capability: add its flag to config.yaml, gate with
+    is_prod_capable() AND config.get('<flag>'). No other code changes required.
     """
-    return bool(config.get('prod', False) or config.get('prod_test_in_dev', False))
+    return bool(config.get('prod_test_in_dev', False))
 
 
 def get_image_bin_file(file):

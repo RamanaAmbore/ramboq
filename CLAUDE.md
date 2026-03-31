@@ -94,14 +94,24 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 `secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `prod`/`mail`/`perplexity`/`enforce_password_standard`/`prod_test_in_dev` are overlaid from the server's saved copy.
 
-### `prod_test_in_dev` flag and `is_prod_capable()`
-`prod_test_in_dev` is the master switch for **production capabilities** (GenAI, Telegram, email) in dev. In prod/pod, `prod: True` already enables them. In dev, they are off by default to avoid consuming CPU/bandwidth when prod is running in parallel on the same server.
+### Production capabilities — `prod_test_in_dev` and individual flags
 
-- `prod_test_in_dev: False` (default in repo) — all capabilities silenced in dev
-- `prod_test_in_dev: True` — capabilities run in dev based on their individual flags (`perplexity` for GenAI, etc.)
-- Prod/pod (`prod: True`) — unaffected; capabilities always run per their individual flags
+Production capabilities (GenAI, Telegram, email) are controlled by two config.yaml flags that must both be True:
 
-**Adding a new production capability:** gate it with `is_prod_capable()` from `src/helpers/utils.py`. That function returns `prod or prod_test_in_dev`. No other files need changing.
+| Flag | Purpose | Prod/pod | Dev (testing) | Dev (idle) |
+|---|---|---|---|---|
+| `prod_test_in_dev` | Environment master switch | `True` | `True` | `False` |
+| `perplexity` | GenAI market update (Gemini) | `True` | `True`/`False` | — |
+| `telegram` | Telegram alert notifications | `True` | `True`/`False` | — |
+| `mail` | Email notifications (SMTP) | `True` | `True`/`False` | — |
+
+**Gate logic:** `is_prod_capable() AND config.get('<flag>')` where `is_prod_capable()` = `prod_test_in_dev`.
+
+- When `prod_test_in_dev: False` — all capabilities skip, no CPU/bandwidth used (dev running alongside prod)
+- When `prod_test_in_dev: True` — each capability fires or skips based on its own flag independently
+- No code change ever needed — flip flags in config.yaml on the server
+
+**Adding a new production capability:** add its flag to `config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy_dev.sh` and `deploy.sh`. Set it to `True` on prod/pod servers.
 
 ---
 
