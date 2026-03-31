@@ -4,7 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
-from src.helpers.utils import secrets, ramboq_deploy
+from src.helpers.utils import secrets, ramboq_deploy, is_prod_capable
 
 
 def send_email(name, email_id, subject, html_body):
@@ -35,7 +35,7 @@ def send_email(name, email_id, subject, html_body):
     recipients = email_id
 
     try:
-        if ramboq_deploy['prod'] or ramboq_deploy['mail']:
+        if is_prod_capable() and ramboq_deploy.get('mail', False):
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
