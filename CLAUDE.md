@@ -94,11 +94,14 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 `secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `prod`/`mail`/`perplexity`/`enforce_password_standard`/`prod_test_in_dev` are overlaid from the server's saved copy.
 
-### `prod_test_in_dev` flag
-Controls whether GenAI, Telegram, and email fire in dev. Has no effect in prod/pod (where `prod: True` already enables everything).
-- `prod_test_in_dev: True` — GenAI market update, Telegram alerts, and email all fire in dev
-- `prod_test_in_dev: False` — all three are silenced in dev (fallback static market content, no notifications)
-- Default in repo: `False`; set to `True` on the dev server to test notifications end-to-end
+### `prod_test_in_dev` flag and `is_prod_capable()`
+`prod_test_in_dev` is the master switch for **production capabilities** (GenAI, Telegram, email) in dev. In prod/pod, `prod: True` already enables them. In dev, they are off by default to avoid consuming CPU/bandwidth when prod is running in parallel on the same server.
+
+- `prod_test_in_dev: False` (default in repo) — all capabilities silenced in dev
+- `prod_test_in_dev: True` — capabilities run in dev based on their individual flags (`perplexity` for GenAI, etc.)
+- Prod/pod (`prod: True`) — unaffected; capabilities always run per their individual flags
+
+**Adding a new production capability:** gate it with `is_prod_capable()` from `src/helpers/utils.py`. That function returns `prod or prod_test_in_dev`. No other files need changing.
 
 ---
 

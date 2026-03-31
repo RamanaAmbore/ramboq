@@ -75,6 +75,20 @@ with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as f
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
 
+def is_prod_capable():
+    """
+    Returns True if this environment should run production capabilities
+    (GenAI market update, Telegram alerts, email notifications).
+
+    Prod/pod: always True (prod: True in config).
+    Dev: True only when prod_test_in_dev: True — avoids consuming CPU/bandwidth
+    when prod is running in parallel on the same server.
+
+    To add a new production capability, gate it with is_prod_capable().
+    """
+    return bool(config.get('prod', False) or config.get('prod_test_in_dev', False))
+
+
 def get_image_bin_file(file):
     """
     Encodes an image file as a Base64 string for embedding in HTML.

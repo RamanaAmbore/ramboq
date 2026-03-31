@@ -22,7 +22,7 @@ import requests
 
 from src.helpers.mail_utils import send_email
 from src.helpers.ramboq_logger import get_logger
-from src.helpers.utils import secrets, config
+from src.helpers.utils import secrets, config, is_prod_capable
 
 logger = get_logger(__name__)
 
@@ -34,8 +34,8 @@ _MSG_TYPES = {
 
 
 def _send_telegram(message: str):
-    if not (config.get('prod', False) or config.get('prod_test_in_dev', False)):
-        logger.info("Telegram skipped — not in live mode (set prod or prod_test_in_dev to True)")
+    if not is_prod_capable():
+        logger.info("Telegram skipped — not prod-capable (set prod or prod_test_in_dev to True)")
         return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')

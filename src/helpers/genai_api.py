@@ -3,7 +3,7 @@ from google.genai import types
 
 from src.helpers.date_time_utils import timestamp_indian, timestamp_est
 from src.helpers.ramboq_logger import get_logger
-from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
+from src.helpers.utils import secrets, ramboq_config, ramboq_deploy, is_prod_capable
 
 logger = get_logger(__name__)
 
@@ -20,8 +20,8 @@ def get_market_update():
 
     if not ramboq_deploy['perplexity']:
         return fallback
-    if not (ramboq_deploy.get('prod', False) or ramboq_deploy.get('prod_test_in_dev', False)):
-        logger.info("GenAI skipped — not in live mode (set prod or prod_test_in_dev to True)")
+    if not is_prod_capable():
+        logger.info("GenAI skipped — not prod-capable (set prod or prod_test_in_dev to True)")
         return fallback
 
     try:
