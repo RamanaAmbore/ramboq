@@ -87,12 +87,18 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 | File | Tracked | Contents |
 |---|---|---|
-| `config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `prod`/`mail`/`perplexity` flags (defaults `False`), alert thresholds, market segment definitions; deploy scripts preserve server overrides across git pulls |
+| `config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `prod`/`mail`/`perplexity`/`prod_test_in_dev` flags (defaults `False`), alert thresholds, market segment definitions; deploy scripts merge new repo config with server's preserved flags |
 | `ramboq_config.yaml` | Yes | All page content, nav labels, Gemini prompts/params, Mermaid diagrams, fallback market report |
 | `ramboq_constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
 | `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, `gemini_api_key`, `telegram_bot_token`, `telegram_chat_id`, `alert_emails` |
 
-`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys preserve it via backup/restore in the deploy scripts.
+`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `prod`/`mail`/`perplexity`/`enforce_password_standard`/`prod_test_in_dev` are overlaid from the server's saved copy.
+
+### `prod_test_in_dev` flag
+Controls whether GenAI, Telegram, and email fire in dev. Has no effect in prod/pod (where `prod: True` already enables everything).
+- `prod_test_in_dev: True` — GenAI market update, Telegram alerts, and email all fire in dev
+- `prod_test_in_dev: False` — all three are silenced in dev (fallback static market content, no notifications)
+- Default in repo: `False`; set to `True` on the dev server to test notifications end-to-end
 
 ---
 
