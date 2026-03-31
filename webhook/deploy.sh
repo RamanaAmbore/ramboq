@@ -17,7 +17,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
 
   git --git-dir="$APP_ROOT/.git" --work-tree="$APP_ROOT" config --add safe.directory "$APP_ROOT"
 
-  # Preserve server-specific config.yaml (prod/mail/perplexity flags) across git pull
+  # Save server-specific config.yaml flags before git pull overwrites it
   CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
   [ -f "setup/yaml/config.yaml" ] && cp "setup/yaml/config.yaml" "$CONFIG_BAK"
 
@@ -28,8 +28,15 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   git pull origin main
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)
 
-  # Restore server-specific config.yaml
-  [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/config.yaml"
+  # Merge: keep new repo config as base (picks up any new fields), overlay only
+  # env-specific flags from the server's saved config so they survive deploys.
+  if [ -f "$CONFIG_BAK" ]; then
+    for key in prod mail perplexity enforce_password_standard; do
+      val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
+      [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/config.yaml"
+    done
+    rm -f "$CONFIG_BAK"
+  fi
 
   echo "[$TS] Changed files:"
   echo "$CHANGED"
