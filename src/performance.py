@@ -15,60 +15,65 @@ _TAB_LABELS = ["Funds", "Holdings", "Positions"]
 
 def performance():
     with st.container(key="body-container"):
-        refresh_time = get_nearest_time(interval=config.get('performance_refresh_interval', 5))
-        ist_display = datetime.strptime(refresh_time, "%d-%b-%y %H:%M").strftime("%a, %B %d, %Y, %I:%M %p")
-        est_display = timestamp_est().strftime("%a, %B %d, %Y, %I:%M %p")
-        st.write(f"**Refreshed at {ist_display} IST | {est_display} EST**")
+        _performance_content()
 
-        # Determine active tab from URL param
-        url_tab = st.query_params.get("tab", _TAB_KEYS[0])
-        if url_tab not in _TAB_KEYS:
-            url_tab = _TAB_KEYS[0]
-        tab_index = _TAB_KEYS.index(url_tab)
 
-        tabs = st.tabs(_TAB_LABELS)
+@st.fragment(run_every=60)
+def _performance_content():
+    refresh_time = get_nearest_time(interval=config.get('performance_refresh_interval', 5))
+    ist_display = datetime.strptime(refresh_time, "%d-%b-%y %H:%M").strftime("%a, %B %d, %Y, %I:%M %p")
+    est_display = timestamp_est().strftime("%a, %B %d, %Y, %I:%M %p")
+    st.write(f"**Refreshed at {ist_display} IST | {est_display} EST**")
 
-        # Fetch margins and positions in parallel; holdings depends on margins result
-        with ThreadPoolExecutor(max_workers=2) as ex:
-            f_margins = ex.submit(fetch_margins, refresh_time)
-            f_positions = ex.submit(fetch_positions, refresh_time)
-            df_margins = f_margins.result()
-            df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
-            df_positions, sum_positions = f_positions.result()
+    # Determine active tab from URL param
+    url_tab = st.query_params.get("tab", _TAB_KEYS[0])
+    if url_tab not in _TAB_KEYS:
+        url_tab = _TAB_KEYS[0]
+    tab_index = _TAB_KEYS.index(url_tab)
 
-        with tabs[0]:
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_margins)),
-                         hide_index=True, column_config=margins_config)
+    tabs = st.tabs(_TAB_LABELS)
 
-        with tabs[1]:
-            st.write("**Summary**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_holdings)),
+    # Fetch margins and positions in parallel; holdings depends on margins result
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f_margins = ex.submit(fetch_margins, refresh_time)
+        f_positions = ex.submit(fetch_positions, refresh_time)
+        df_margins = f_margins.result()
+        df_holdings, sum_holdings = fetch_holdings(refresh_time, df_margins)
+        df_positions, sum_positions = f_positions.result()
+
+    with tabs[0]:
+        st.dataframe(style_dataframe(add_comma_to_df_numbers(df_margins)),
+                     hide_index=True, column_config=margins_config)
+
+    with tabs[1]:
+        st.write("**Summary**")
+        st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_holdings)),
+                     hide_index=True, column_config=holdings_config)
+        for account in df_holdings['account'].unique():
+            st.write(f"**{account}**")
+            acct_df = df_holdings[df_holdings['account'] == account]
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                          hide_index=True, column_config=holdings_config)
-            for account in df_holdings['account'].unique():
-                st.write(f"**{account}**")
-                acct_df = df_holdings[df_holdings['account'] == account]
-                st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
-                             hide_index=True, column_config=holdings_config)
-            st.write("**All Accounts — Holdings**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_holdings)),
-                         hide_index=True, column_config=holdings_config)
+        st.write("**All Accounts — Holdings**")
+        st.dataframe(style_dataframe(add_comma_to_df_numbers(df_holdings)),
+                     hide_index=True, column_config=holdings_config)
 
-        with tabs[2]:
-            st.write("**Summary**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_positions)),
+    with tabs[2]:
+        st.write("**Summary**")
+        st.dataframe(style_dataframe(add_comma_to_df_numbers(sum_positions)),
+                     hide_index=True, column_config=positions_config)
+        for account in df_positions['account'].unique():
+            st.write(f"**{account}**")
+            acct_df = df_positions[df_positions['account'] == account]
+            st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
                          hide_index=True, column_config=positions_config)
-            for account in df_positions['account'].unique():
-                st.write(f"**{account}**")
-                acct_df = df_positions[df_positions['account'] == account]
-                st.dataframe(style_dataframe(add_comma_to_df_numbers(acct_df)),
-                             hide_index=True, column_config=positions_config)
-            st.write("**All Accounts — Positions**")
-            st.dataframe(style_dataframe(add_comma_to_df_numbers(df_positions)),
-                         hide_index=True, column_config=positions_config)
+        st.write("**All Accounts — Positions**")
+        st.dataframe(style_dataframe(add_comma_to_df_numbers(df_positions)),
+                     hide_index=True, column_config=positions_config)
 
-        # Sync tab selection with URL ?tab= param
-        tab_keys_json = str(_TAB_KEYS).replace("'", '"')
-        components.html(f"""
+    # Sync tab selection with URL ?tab= param
+    tab_keys_json = str(_TAB_KEYS).replace("'", '"')
+    components.html(f"""
 <script>
 (function() {{
     var tabKeys = {tab_keys_json};

@@ -3,7 +3,7 @@ from google.genai import types
 
 from src.helpers.date_time_utils import timestamp_indian, timestamp_est
 from src.helpers.ramboq_logger import get_logger
-from src.helpers.utils import secrets, ramboq_config, ramboq_deploy
+from src.helpers.utils import secrets, ramboq_config, ramboq_deploy, is_prod_capable
 
 logger = get_logger(__name__)
 
@@ -11,14 +11,17 @@ logger = get_logger(__name__)
 def get_market_update():
     now = timestamp_indian()
     now_est = timestamp_est()
-    formatted_ist = now.strftime('%a, %B %d, %Y, %I:%M %p')
-    formatted_est = now_est.strftime('%a, %B %d, %Y, %I:%M %p')
-    logger.info(f'GenAI for market update invoked at {formatted_ist} IST')
+    formatted_ist = now.strftime('%a, %B %d, %Y, %I:%M %p IST')
+    formatted_est = now_est.strftime('%a, %B %d, %Y, %I:%M %p %Z')
+    logger.info(f'GenAI for market update invoked at {formatted_ist}')
 
-    message = f"Market Report — {formatted_ist} IST | {formatted_est} EST"
+    message = f"Market Report — {formatted_ist} | {formatted_est}"
     fallback = ramboq_config['market'].replace("Market Report", message)
 
-    if not ramboq_deploy['perplexity']:
+    if not ramboq_deploy['genai']:
+        return fallback
+    if not is_prod_capable():
+        logger.info("GenAI skipped — not prod-capable (set cap_in_dev to True)")
         return fallback
 
     try:
@@ -26,17 +29,17 @@ def get_market_update():
 
         prompt = (
             f"Current date and time: {formatted_ist} IST | {formatted_est} EST\n\n"
-            f"{ramboq_config['pplx_user_msg']}"
+            f"{ramboq_config['genai_user_msg']}"
         )
 
         response = client.models.generate_content(
             model=ramboq_config.get('genai_model', 'gemini-2.5-flash'),
             contents=prompt,
             config=types.GenerateContentConfig(
-                system_instruction=ramboq_config['pplx_system_msg'],
+                system_instruction=ramboq_config['genai_system_msg'],
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=float(ramboq_config['pplx_temperature']),
-                max_output_tokens=int(ramboq_config['pplx_max_tokens']),
+                temperature=float(ramboq_config['genai_temperature']),
+                max_output_tokens=int(ramboq_config['genai_max_tokens']),
             ),
         )
 

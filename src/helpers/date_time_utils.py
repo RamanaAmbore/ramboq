@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time as dtime
 from zoneinfo import ZoneInfo
 
 
@@ -49,6 +49,36 @@ def current_time_est():
 
 def current_time_indian():
     return datetime.now(tz=INDIAN_TIMEZONE).time()
+
+
+def timestamp_display() -> str:
+    """
+    Returns a formatted dual-timezone timestamp string for alerts and emails.
+    Example: Mon, March 30, 2026, 09:30 AM IST | Mon, March 30, 2026, 10:00 PM EDT
+    """
+    now_ist = timestamp_indian()
+    now_est = timestamp_est()
+    ist_str = now_ist.strftime('%a, %B %d, %Y, %I:%M %p IST')
+    est_str = now_est.strftime('%a, %B %d, %Y, %I:%M %p %Z')
+    return f"{ist_str} | {est_str}"
+
+
+def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),
+                   market_end: dtime = dtime(15, 30)) -> bool:
+    """
+    Returns True if the market is currently open.
+    - now: timezone-aware datetime in IST
+    - holiday_set: set of date objects from fetch_nse_holidays()
+    - Weekends are NOT hardcoded as closed — special trading sessions on
+      Saturdays/Sundays are handled correctly since they won't appear in
+      the NSE holiday list. Regular weekends will run the broker fetch but
+      return stale closing data (day change = 0, no alerts fire).
+    - Falls back to time-window-only check if holiday_set is empty.
+    """
+    if holiday_set and now.date() in holiday_set:
+        return False
+    t = now.time().replace(second=0, microsecond=0)
+    return market_start <= t <= market_end
 
 
 def convert_to_timezone(date_str, format='%Y-%m-%d', return_date=True, tz=INDIAN_TIMEZONE):

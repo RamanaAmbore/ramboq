@@ -6,12 +6,15 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 
 - **Multi-page Streamlit app**: About, Market, Performance, Profile, FAQ, Contact, Post
 - **User authentication**: Sign-in / sign-out / registration with encrypted cookies (`streamlit-cookies-manager`)
-- **Broker integration**: Zerodha Kite API connectivity via `broker_apis.py`
-- **GenAI integration**: AI-powered content via `genai_api.py`
+- **Broker integration**: Zerodha Kite API connectivity via `broker_apis.py` — equity, F&O, and MCX commodity positions
+- **GenAI integration**: Gemini 2.5 Flash AI market reports with Google Search grounding via `genai_api.py`
 - **Email notifications**: SMTP via Hostinger (`mail_utils.py`)
+- **Telegram alerts**: Loss alerts and market open/close summaries via Telegram Bot API (`alert_utils.py`)
+- **Background refresh**: Daemon thread pre-warms broker data and market update caches; sends market open/close summaries and loss alerts during market hours (`background_refresh.py`)
+- **Segment-aware market hours**: Equity (NSE/NFO 09:15–15:30) and Commodity (MCX 09:00–23:30) handled independently with Kite holiday calendars
 - **Custom styling**: Full CSS override with background images and favicon
 - **Structured logging**: Multi-level file and console logging via `ramboq_logger.py`
-- **Config-driven**: All content, secrets, and deploy settings managed via YAML files
+- **Config-driven**: All content, secrets, deploy settings, alert thresholds, and market segment definitions managed via YAML files
 
 ## Tech Stack
 
@@ -39,12 +42,14 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 │   ├── post.py, profile.py, user.py, footer.py, header.py
 │   ├── components.py, constants.py, utils_streamlit.py
 │   └── helpers/
-│       ├── broker_apis.py          # Zerodha Kite integration
-│       ├── connections.py          # DB / API connection management
-│       ├── date_time_utils.py      # Indian timezone utilities
+│       ├── broker_apis.py          # Zerodha Kite integration + fetch_holidays()
+│       ├── connections.py          # Kite connection management (singleton, TOTP, token refresh)
+│       ├── date_time_utils.py      # Indian/EST timezone utilities + is_market_open()
 │       ├── decorators.py           # Retry / logging decorators
-│       ├── genai_api.py            # GenAI API wrapper
+│       ├── genai_api.py            # Gemini 2.5 Flash AI wrapper
 │       ├── mail_utils.py           # SMTP email sending
+│       ├── alert_utils.py          # Loss alerts + market open/close summaries (Telegram + email)
+│       ├── background_refresh.py   # Daemon thread: cache warm, alerts, open/close summaries
 │       ├── ramboq_logger.py        # Centralised logging
 │       ├── singleton_base.py       # Singleton pattern base class
 │       └── utils.py                # Config loaders, path helpers, CSS
@@ -53,9 +58,9 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 │   ├── resume/                     # PDF resume files
 │   ├── style/style.css             # Base CSS
 │   └── yaml/
-│       ├── config.yaml             # Connection settings, log paths (relative), app flags — tracked in git
-│       ├── ramboq_config.yaml      # Page content (about, faq, contact text)
-│       ├── ramboq_constants.yaml   # App-wide constants
+│       ├── backend_config.yaml             # Connection settings, log paths (relative), app flags — tracked in git
+│       ├── frontend_config.yaml      # Page content (about, faq, contact text)
+│       ├── constants.yaml   # App-wide constants
 │       └── secrets.yaml            # ⛔ SMTP + broker credentials (gitignored)
 ├── etc/
 │   └── nginx/sites-available/
@@ -96,30 +101,54 @@ cookie_secret: <random-string>
 kite_login_url: https://kite.zerodha.com/api/login
 kite_twofa_url: https://kite.zerodha.com/api/twofa
 gemini_api_key: <gemini-api-key>
+telegram_bot_token: <bot-token-from-botfather>
+telegram_chat_id: <group-chat-id>   # negative integer for groups
+alert_emails:
+  - <email-to-notify>
 ```
 
-### `setup/yaml/config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
+### `setup/yaml/backend_config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
 ```yaml
-# Connection settings
 retry_count: 3
 conn_reset_hours: 23
 
-# Log file paths (relative to app working directory — uniform across prod, dev, and pod)
 file_log_file: .log/log_file
 error_log_file: .log/error_file
 short_file_log_file: .log/short_log_file
 short_error_log_file: .log/short_error_file
 
-# Log levels (10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
 
-# App flags — set to True on server by initial_deploy.sh; preserved across deploys
 prod: False
 mail: False
 perplexity: False
 enforce_password_standard: False
+
+# Loss alert thresholds
+alert_loss_abs: 10000          # ₹ absolute day loss (0 = disabled)
+alert_loss_pct: 2.0            # % day loss (0 = disabled)
+alert_cooldown_minutes: 30
+
+# Background refresh
+background_refresh: True
+performance_refresh_interval: 5
+market_refresh_time: "08:30"
+open_summary_offset_minutes: 15
+
+# Market segments
+market_segments:
+  equity:
+    hours_start: "09:15"
+    hours_end: "15:30"
+    holiday_exchange: "NSE"
+    exchanges: ["NSE", "BSE", "NFO", "CDS"]
+  commodity:
+    hours_start: "09:00"
+    hours_end: "23:30"
+    holiday_exchange: "MCX"
+    exchanges: ["MCX"]
 ```
 
 ---
@@ -142,7 +171,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Hand-place `setup/yaml/secrets.yaml` (not in git). `config.yaml` is tracked in git with safe defaults — update `prod`, `mail`, `perplexity` flags on the server after first deploy.
+Hand-place `setup/yaml/secrets.yaml` (not in git). `backend_config.yaml` is tracked in git with safe defaults — update `prod`, `mail`, `perplexity` flags on the server after first deploy.
 
 Run locally:
 ```bash
@@ -171,7 +200,7 @@ sudo bash /opt/ramboq/webhook/initial_deploy.sh \
   --branch-dev dev
 ```
 
-The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `config.yaml` template, systemd service install, nginx config, sudoers, and service startup.
+The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `backend_config.yaml` template, systemd service install, nginx config, sudoers, and service startup.
 
 **After the script completes, you still need to do manually:**
 1. Fill in `secrets.yaml` with real SMTP/Kite credentials
@@ -353,10 +382,10 @@ sudo mkdir -p /opt/ramboq_dev/.log
 sudo chown -R www-data:www-data /opt/ramboq_dev/.log
 ```
 
-**3. Place secrets and set dev flags in config.yaml:**
+**3. Place secrets and set dev flags in backend_config.yaml:**
 ```bash
 sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_dev/setup/yaml/secrets.yaml
-# config.yaml is already present from git — just set prod: False (it is by default)
+# backend_config.yaml is already present from git — just set prod: False (it is by default)
 # Log paths use relative .log/ paths — no changes needed
 ```
 
@@ -692,7 +721,7 @@ nginx pod.ramboq.com → localhost:8504
 
 ### Secrets handling
 
-`secrets.yaml` and `config.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. Log paths in `config.yaml` use relative paths (`.log/`), which resolve to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host) — identical format to prod and dev.
+`secrets.yaml` and `backend_config.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. Log paths in `backend_config.yaml` use relative paths (`.log/`), which resolve to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host) — identical format to prod and dev.
 
 ### First-time pod environment setup (on server)
 
@@ -728,7 +757,7 @@ sudo chown -R www-data:www-data /opt/ramboq_pod/.log
 sudo mkdir -p /opt/ramboq_pod/setup/yaml
 # Create secrets.yaml manually — do not copy from another environment
 sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_pod/setup/yaml/config.yaml
+sudo nano /opt/ramboq_pod/setup/yaml/backend_config.yaml
 ```
 ```yaml
 # Log paths are relative — resolve to /app/.log/ inside the container (mapped to /opt/ramboq_pod/.log/ on host)
@@ -799,7 +828,7 @@ git push origin pod
 ## Security Notes
 
 - `setup/yaml/secrets.yaml` — contains SMTP and broker credentials, **gitignored**, hand-place on server only
-- `setup/yaml/config.yaml` — tracked in git with safe defaults; server-specific flag overrides (`prod: True` etc.) are preserved across deploys by the deploy scripts
+- `setup/yaml/backend_config.yaml` — tracked in git with safe defaults; server-specific flag overrides (`prod: True` etc.) are preserved across deploys by the deploy scripts
 - `var/www/.ssh/` — SSH keys, **gitignored**, never commit
 - The webhook secret in `hooks.json` should be rotated periodically and kept in sync with the GitHub webhook settings
 - Port `9001` (webhook listener) is not directly exposed — only accessible via nginx proxy
