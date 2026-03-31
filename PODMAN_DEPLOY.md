@@ -115,12 +115,12 @@ sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/secrets.yaml
 sudo chmod 600 /opt/ramboq_pod/setup/yaml/secrets.yaml
 ```
 
-### Step 6 — Create config.yaml
+### Step 6 — Create backend_config.yaml
 
 Log paths must use `/app/.log/` (container-internal paths, mapped to `/opt/ramboq_pod/.log/` at runtime):
 
 ```bash
-sudo tee /opt/ramboq_pod/setup/yaml/config.yaml <<'EOF'
+sudo tee /opt/ramboq_pod/setup/yaml/backend_config.yaml <<'EOF'
 # Connection settings
 retry_count: 3
 conn_reset_hours: 23
@@ -166,7 +166,7 @@ market_segments:
     holiday_exchange: "MCX"
     exchanges: ["MCX"]
 EOF
-sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/config.yaml
+sudo chown www-data:www-data /opt/ramboq_pod/setup/yaml/backend_config.yaml
 ```
 
 > Note: set `perplexity: True` when ready to enable live Gemini AI market reports.

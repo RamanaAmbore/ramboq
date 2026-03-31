@@ -2,7 +2,7 @@ import threading
 import time
 from datetime import timedelta, time as dtime
 
-from src.helpers.date_time_utils import timestamp_indian, is_market_open
+from src.helpers.date_time_utils import timestamp_indian, is_market_open, timestamp_display
 from src.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
@@ -71,7 +71,8 @@ def _loop(cfg):
     from src.helpers.utils import get_nearest_time, get_cycle_date
     from src.helpers.alert_utils import check_and_alert, send_summary
 
-    open_offset_mins = cfg.get('open_summary_offset_minutes', 15)
+    open_offset_mins  = cfg.get('open_summary_offset_minutes', 15)
+    close_offset_mins = cfg.get('close_summary_offset_minutes', 15)
     mkt_refresh_h, mkt_refresh_m = _parse_time(cfg.get('market_refresh_time', '08:30'))
     interval = cfg.get('performance_refresh_interval', 5)
 
@@ -140,8 +141,8 @@ def _loop(cfg):
                         df_margins        = fetch_margins(perf_key)
                         df_holdings, sum_holdings   = fetch_holdings(perf_key, df_margins)
                         df_positions, sum_positions = fetch_positions(perf_key)
-                        last_perf_key     = perf_key
-                        ist_display       = now.strftime("%a, %B %d, %Y, %I:%M %p")
+                        last_perf_key = perf_key
+                        ist_display   = timestamp_display()
                         logger.info(f"Background: performance data cached for {perf_key}")
 
                         for seg in open_segments:
@@ -187,14 +188,15 @@ def _loop(cfg):
                 h_set    = holiday_cache.get(seg['holiday_exchange'], {}).get(now.year, set())
                 close_dt = now.replace(hour=seg['hours_end'].hour, minute=seg['hours_end'].minute,
                                        second=0, microsecond=0)
-                if today not in h_set and now > close_dt:
+                close_trigger_dt = close_dt + timedelta(minutes=close_offset_mins)
+                if today not in h_set and now >= close_trigger_dt:
                     logger.info(f"Background: fetching close summary for {seg['name']}")
                     try:
                         close_key         = get_nearest_time(interval=interval)
                         df_margins        = fetch_margins(close_key)
                         df_holdings, sum_holdings   = fetch_holdings(close_key, df_margins)
                         df_positions, sum_positions = fetch_positions(close_key)
-                        ist_display       = now.strftime("%a, %B %d, %Y, %I:%M %p")
+                        ist_display       = timestamp_display()
 
                         seg_exchanges = seg['exchanges']
                         seg_holdings  = df_holdings[df_holdings['exchange'].isin(seg_exchanges)] \

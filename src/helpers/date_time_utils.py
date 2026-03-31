@@ -51,6 +51,18 @@ def current_time_indian():
     return datetime.now(tz=INDIAN_TIMEZONE).time()
 
 
+def timestamp_display() -> str:
+    """
+    Returns a formatted dual-timezone timestamp string for alerts and emails.
+    Example: Mon, March 30, 2026, 09:30 AM IST | Mon, March 30, 2026, 10:00 PM EDT
+    """
+    now_ist = timestamp_indian()
+    now_est = timestamp_est()
+    ist_str = now_ist.strftime('%a, %B %d, %Y, %I:%M %p IST')
+    est_str = now_est.strftime('%a, %B %d, %Y, %I:%M %p %Z')
+    return f"{ist_str} | {est_str}"
+
+
 def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),
                    market_end: dtime = dtime(15, 30)) -> bool:
     """

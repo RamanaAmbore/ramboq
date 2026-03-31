@@ -14,17 +14,16 @@ error_log_level: 40
 console_log_level: 40
 
 # App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
-prod: False
 enforce_password_standard: False
 
-# prod_test_in_dev: master switch for production capabilities in this environment.
+# cap_in_dev: master switch for production capabilities in this environment.
 # Set True on prod/pod servers and on dev when testing end-to-end.
 # Set False on dev to avoid CPU/bandwidth waste when prod runs in parallel.
-prod_test_in_dev: False
+cap_in_dev: False
 
-# Production capability flags — each independently enables one capability when prod_test_in_dev is True.
+# Production capability flags — each independently enables one capability when cap_in_dev is True.
 # To add a new capability: add its flag here and gate it with is_prod_capable() AND config.get('<flag>').
-perplexity: False          # GenAI market update (Gemini)
+genai: False               # GenAI market update (Gemini)
 telegram: False            # Telegram alert notifications
 mail: False                # Email notifications (SMTP)
 
@@ -39,6 +38,7 @@ background_refresh: True
 performance_refresh_interval: 5    # minutes — must match get_nearest_time interval
 market_refresh_time: "08:30"       # IST — pre-fetch market update once per day before market opens
 open_summary_offset_minutes: 15    # minutes after segment open to send open summary
+close_summary_offset_minutes: 15   # minutes after segment close to send close summary
 
 # Market segments — used to determine fetch window and open/close summaries
 # holiday_exchange: exchange name passed to kite.holidays()

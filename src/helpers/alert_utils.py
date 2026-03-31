@@ -5,7 +5,7 @@ Message type prefixes:
   Telegram subject : Open | Alert | Close
   Email subject    : RamboQuant Open: | RamboQuant Alert: | RamboQuant Close:
 
-Thresholds (config.yaml):
+Thresholds (backend_config.yaml):
   alert_loss_abs:         alert if day loss > this absolute INR value (0 = disabled)
   alert_loss_pct:         alert if day loss > this % of current value  (0 = disabled)
   alert_cooldown_minutes: minimum minutes between repeat alerts for same account+type
@@ -35,7 +35,7 @@ _MSG_TYPES = {
 
 def _send_telegram(message: str):
     if not is_prod_capable():
-        logger.info("Telegram skipped — not prod-capable (set prod or prod_test_in_dev to True)")
+        logger.info("Telegram skipped — not prod-capable (set cap_in_dev to True)")
         return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')
@@ -74,7 +74,7 @@ def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
 
     telegram_msg = (
-        f"<b>{tg_prefix} — {ist_display} IST</b>\n\n"
+        f"<b>{tg_prefix} — {ist_display}</b>\n\n"
         f"<code>{table}</code>"
     )
     _send_telegram(telegram_msg)
@@ -84,7 +84,7 @@ def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
         subject = f"{email_prefix}{subject_detail}"
         html_body = (
             f"<html><body>"
-            f"<p><b>{tg_prefix} — {ist_display} IST</b></p>"
+            f"<p><b>{tg_prefix} — {ist_display}</b></p>"
             f"<pre style='font-family:monospace;font-size:13px'>{table}</pre>"
             f"</body></html>"
         )
@@ -137,7 +137,7 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, l
 
     segment_label = f" — {label}" if label else ""
     table = f"Holdings{segment_label}\n{holdings_table}\n\nPositions{segment_label}\n{positions_table}"
-    subject_detail = f"{label + ' — ' if label else ''}{ist_display} IST"
+    subject_detail = f"{label + ' — ' if label else ''}{ist_display}"
 
     _dispatch(msg_type, ist_display, table, subject_detail)
     logger.info(f"Background: {msg_type} summary sent")

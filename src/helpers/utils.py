@@ -43,7 +43,7 @@ class CustomDict(dict):
 
 
 # Load profile data from a YAML file
-with open(get_path('ramboq_constants.yaml'), 'r', errors='ignore', encoding='utf-8') as file:
+with open(get_path('constants.yaml'), 'r', errors='ignore', encoding='utf-8') as file:
     constants = yaml.safe_load(file)  # Load YAML file into a Python dictionary
 
 # Load custom CSS styles for styling the frontend
@@ -51,7 +51,7 @@ with open(get_path("style.css"), "r", encoding='utf-8', errors='ignore') as css:
     css_style = css.read()  # Read the CSS file into a string
 
 # Load additional configuration data from a YAML file
-with open('setup/yaml/ramboq_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+with open('setup/yaml/frontend_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     ramboq_config = yaml.safe_load(file)  # Load YAML config file
     nav_labels = ramboq_config['nav_labels']
     default_nav_label = ramboq_config['default_nav_label']
@@ -68,9 +68,9 @@ with open('setup/yaml/secrets.yaml', 'r', encoding='utf-8', errors='ignore') as 
     secrets = yaml.safe_load(file)  # Load YAML config file
 
 # Load configuration from YAML file (merged deploy + connection settings)
-with open('setup/yaml/config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
+with open('setup/yaml/backend_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     config = yaml.safe_load(file)
-    ramboq_deploy = config  # all deploy keys are now in config.yaml
+    ramboq_deploy = config  # all deploy keys are now in backend_config.yaml
 
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
@@ -79,17 +79,17 @@ def is_prod_capable():
     """
     Returns True if production capabilities are enabled for this environment.
 
-    Controlled solely by prod_test_in_dev in config.yaml — no code changes needed
+    Controlled solely by cap_in_dev in backend_config.yaml — no code changes needed
     to enable or disable capabilities. Set to True on prod/pod servers. Set to False
     on dev to avoid consuming CPU/bandwidth when prod is running in parallel.
 
-    Each capability also has its own flag (perplexity, telegram, mail). Both this
+    Each capability also has its own flag (genai, telegram, mail). Both this
     function AND the capability flag must be True for a capability to run.
 
-    To add a new production capability: add its flag to config.yaml, gate with
+    To add a new production capability: add its flag to backend_config.yaml, gate with
     is_prod_capable() AND config.get('<flag>'). No other code changes required.
     """
-    return bool(config.get('prod_test_in_dev', False))
+    return bool(config.get('cap_in_dev', False))
 
 
 def get_image_bin_file(file):
@@ -325,7 +325,7 @@ def validate_password_standard(password: str) -> tuple[bool, str]:
     Returns:
         (bool, str): (is_valid, message)
     """
-    if not ramboq_deploy['prod'] and not ramboq_deploy['enforce_password_standard']:
+    if not ramboq_deploy['enforce_password_standard']:
         return True, "Validation skipped in production mode."
 
     if len(password) < 8:

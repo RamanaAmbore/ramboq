@@ -227,12 +227,12 @@ setup_environment() {
     chown -R www-data:www-data "$app_root/.log"
     log_ok "Created $app_root/.log with empty log files"
 
-    # config.yaml template (connection settings + deploy flags + log paths)
+    # backend_config.yaml template (connection settings + deploy flags + log paths)
     local yaml_dir="$app_root/setup/yaml"
     mkdir -p "$yaml_dir"
 
-    if [ ! -f "$yaml_dir/config.yaml" ]; then
-        cat > "$yaml_dir/config.yaml" << EOF
+    if [ ! -f "$yaml_dir/backend_config.yaml" ]; then
+        cat > "$yaml_dir/backend_config.yaml" << EOF
 # Connection settings
 retry_count: 3
 conn_reset_hours: 23
@@ -249,21 +249,20 @@ error_log_level: 40
 console_log_level: 40
 
 # App flags
-prod: $is_prod
 enforce_password_standard: False
 
-# prod_test_in_dev: master switch — True on prod/pod, False on dev by default
-prod_test_in_dev: $capabilities
+# cap_in_dev: master switch — True on prod/pod, False on dev by default
+cap_in_dev: $capabilities
 
-# Production capability flags (each independently toggleable when prod_test_in_dev is True)
-perplexity: $capabilities
+# Production capability flags (each independently toggleable when cap_in_dev is True)
+genai: $capabilities
 telegram: $capabilities
 mail: $capabilities
 EOF
-        chown www-data:www-data "$yaml_dir/config.yaml"
-        log_ok "Created config.yaml"
+        chown www-data:www-data "$yaml_dir/backend_config.yaml"
+        log_ok "Created backend_config.yaml"
     else
-        log_ok "config.yaml already exists — not overwriting"
+        log_ok "backend_config.yaml already exists — not overwriting"
     fi
 
     # secrets.yaml template

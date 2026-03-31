@@ -58,9 +58,9 @@ A production Streamlit web application for **RamboQuant Analytics LLP**, serving
 │   ├── resume/                     # PDF resume files
 │   ├── style/style.css             # Base CSS
 │   └── yaml/
-│       ├── config.yaml             # Connection settings, log paths (relative), app flags — tracked in git
-│       ├── ramboq_config.yaml      # Page content (about, faq, contact text)
-│       ├── ramboq_constants.yaml   # App-wide constants
+│       ├── backend_config.yaml             # Connection settings, log paths (relative), app flags — tracked in git
+│       ├── frontend_config.yaml      # Page content (about, faq, contact text)
+│       ├── constants.yaml   # App-wide constants
 │       └── secrets.yaml            # ⛔ SMTP + broker credentials (gitignored)
 ├── etc/
 │   └── nginx/sites-available/
@@ -107,7 +107,7 @@ alert_emails:
   - <email-to-notify>
 ```
 
-### `setup/yaml/config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
+### `setup/yaml/backend_config.yaml` (tracked in git — server flags overridden by `initial_deploy.sh`, preserved across deploys)
 ```yaml
 retry_count: 3
 conn_reset_hours: 23
@@ -171,7 +171,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Hand-place `setup/yaml/secrets.yaml` (not in git). `config.yaml` is tracked in git with safe defaults — update `prod`, `mail`, `perplexity` flags on the server after first deploy.
+Hand-place `setup/yaml/secrets.yaml` (not in git). `backend_config.yaml` is tracked in git with safe defaults — update `prod`, `mail`, `perplexity` flags on the server after first deploy.
 
 Run locally:
 ```bash
@@ -200,7 +200,7 @@ sudo bash /opt/ramboq/webhook/initial_deploy.sh \
   --branch-dev dev
 ```
 
-The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `config.yaml` template, systemd service install, nginx config, sudoers, and service startup.
+The script handles: system packages, SSH setup, git clone, venv, pip install, log directories, `backend_config.yaml` template, systemd service install, nginx config, sudoers, and service startup.
 
 **After the script completes, you still need to do manually:**
 1. Fill in `secrets.yaml` with real SMTP/Kite credentials
@@ -382,10 +382,10 @@ sudo mkdir -p /opt/ramboq_dev/.log
 sudo chown -R www-data:www-data /opt/ramboq_dev/.log
 ```
 
-**3. Place secrets and set dev flags in config.yaml:**
+**3. Place secrets and set dev flags in backend_config.yaml:**
 ```bash
 sudo cp /opt/ramboq/setup/yaml/secrets.yaml /opt/ramboq_dev/setup/yaml/secrets.yaml
-# config.yaml is already present from git — just set prod: False (it is by default)
+# backend_config.yaml is already present from git — just set prod: False (it is by default)
 # Log paths use relative .log/ paths — no changes needed
 ```
 
@@ -721,7 +721,7 @@ nginx pod.ramboq.com → localhost:8504
 
 ### Secrets handling
 
-`secrets.yaml` and `config.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. Log paths in `config.yaml` use relative paths (`.log/`), which resolve to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host) — identical format to prod and dev.
+`secrets.yaml` and `backend_config.yaml` are **never baked into the image** — they are volume-mounted at runtime from `/opt/ramboq_pod/setup/yaml/`. Log paths in `backend_config.yaml` use relative paths (`.log/`), which resolve to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host) — identical format to prod and dev.
 
 ### First-time pod environment setup (on server)
 
@@ -757,7 +757,7 @@ sudo chown -R www-data:www-data /opt/ramboq_pod/.log
 sudo mkdir -p /opt/ramboq_pod/setup/yaml
 # Create secrets.yaml manually — do not copy from another environment
 sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_pod/setup/yaml/config.yaml
+sudo nano /opt/ramboq_pod/setup/yaml/backend_config.yaml
 ```
 ```yaml
 # Log paths are relative — resolve to /app/.log/ inside the container (mapped to /opt/ramboq_pod/.log/ on host)
@@ -828,7 +828,7 @@ git push origin pod
 ## Security Notes
 
 - `setup/yaml/secrets.yaml` — contains SMTP and broker credentials, **gitignored**, hand-place on server only
-- `setup/yaml/config.yaml` — tracked in git with safe defaults; server-specific flag overrides (`prod: True` etc.) are preserved across deploys by the deploy scripts
+- `setup/yaml/backend_config.yaml` — tracked in git with safe defaults; server-specific flag overrides (`prod: True` etc.) are preserved across deploys by the deploy scripts
 - `var/www/.ssh/` — SSH keys, **gitignored**, never commit
 - The webhook secret in `hooks.json` should be rotated periodically and kept in sync with the GitHub webhook settings
 - Port `9001` (webhook listener) is not directly exposed — only accessible via nginx proxy

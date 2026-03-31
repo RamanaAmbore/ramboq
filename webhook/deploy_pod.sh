@@ -19,12 +19,23 @@ BRANCH="${REF#refs/heads/}"
 
   git --git-dir="$APP_ROOT/.git" --work-tree="$APP_ROOT" config --add safe.directory "$APP_ROOT"
 
-  # Preserve server-specific config.yaml (prod/mail/perplexity flags) across git checkout
-  CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
-  [ -f "setup/yaml/config.yaml" ] && cp "setup/yaml/config.yaml" "$CONFIG_BAK"
+  # One-time migration: rename old config file names to new names
+  [ -f "setup/yaml/config.yaml" ] && [ ! -f "setup/yaml/backend_config.yaml" ] && \
+    mv "setup/yaml/config.yaml" "setup/yaml/backend_config.yaml" && \
+    echo "[$TS] Migrated config.yaml → backend_config.yaml"
+  [ -f "setup/yaml/ramboq_config.yaml" ] && [ ! -f "setup/yaml/frontend_config.yaml" ] && \
+    mv "setup/yaml/ramboq_config.yaml" "setup/yaml/frontend_config.yaml" && \
+    echo "[$TS] Migrated ramboq_config.yaml → frontend_config.yaml"
+  [ -f "setup/yaml/ramboq_constants.yaml" ] && [ ! -f "setup/yaml/constants.yaml" ] && \
+    mv "setup/yaml/ramboq_constants.yaml" "setup/yaml/constants.yaml" && \
+    echo "[$TS] Migrated ramboq_constants.yaml → constants.yaml"
 
-  # Reset config.yaml to git-tracked version so checkout proceeds cleanly
-  git checkout -- setup/yaml/config.yaml
+  # Preserve server-specific backend_config.yaml (cap_in_dev/mail/genai flags) across git checkout
+  CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
+  [ -f "setup/yaml/backend_config.yaml" ] && cp "setup/yaml/backend_config.yaml" "$CONFIG_BAK"
+
+  # Reset backend_config.yaml to git-tracked version so checkout proceeds cleanly
+  git checkout -- setup/yaml/backend_config.yaml 2>/dev/null || true
 
   PREV_HEAD=$(git rev-parse HEAD)
   git fetch origin "$BRANCH"
@@ -32,8 +43,8 @@ BRANCH="${REF#refs/heads/}"
   git pull origin "$BRANCH"
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)
 
-  # Restore server-specific config.yaml
-  [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/config.yaml"
+  # Restore server-specific backend_config.yaml
+  [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/backend_config.yaml"
 
   echo "[$TS] Changed files:"
   echo "$CHANGED"

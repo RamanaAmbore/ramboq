@@ -25,7 +25,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
 - For the `pod` branch: `deploy_pod.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
-- Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
+- Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `backend_config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
 
 ---
 
@@ -53,12 +53,12 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ### Helpers (`src/helpers/`)
 - **`broker_apis.py`** — `fetch_holdings()`, `fetch_positions()`, `fetch_margins()` — each decorated with `@for_all_accounts`; returns a list (one DataFrame per account). `fetch_holidays(exchange)` — calls `kite.holidays(exchange)`, returns set of holiday dates for the current year; used by background refresh for NSE and MCX calendars.
-- **`connections.py`** — `Connections` singleton (extends `SingletonBase`) holds one `KiteConnection` per account; handles Kite 2FA login, TOTP, and access token refresh. Re-authenticates after 23 hours (`conn_reset_hours` in `config.yaml`)
+- **`connections.py`** — `Connections` singleton (extends `SingletonBase`) holds one `KiteConnection` per account; handles Kite 2FA login, TOTP, and access token refresh. Re-authenticates after 23 hours (`conn_reset_hours` in `backend_config.yaml`)
 - **`decorators.py`** — `@for_all_accounts` iterates all accounts or a single one; `@retry_kite_conn()` retries with `test_conn=True` from attempt 2; `@track_it()` logs execution time; `@lock_it_for_update` / `@update_lock` for thread safety
 - **`singleton_base.py`** — Thread-safe singleton via double-checked locking; `_instances` dict keyed by class
 - **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
-- **`genai_api.py`** — Gemini 2.5 Flash via `google-genai` with Google Search grounding; falls back to `ramboq_config['market']` static content when `perplexity: False` in `config.yaml` or when Gemini returns empty/None response (rate limiting)
-- **`mail_utils.py`** — SMTP via Hostinger; respects `prod` and `mail` flags in `config.yaml` before sending. `send_email(name, email_id, subject, html_body)`
+- **`genai_api.py`** — Gemini 2.5 Flash via `google-genai` with Google Search grounding; falls back to `ramboq_config['market']` static content when `genai: False` in `backend_config.yaml` or when Gemini returns empty/None response (rate limiting)
+- **`mail_utils.py`** — SMTP via Hostinger; respects `cap_in_dev` and `mail` flags in `backend_config.yaml` before sending. `send_email(name, email_id, subject, html_body)`
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`. `is_market_open(now, holiday_set, market_start, market_end)` — returns True if not in holiday_set and within time window; weekends NOT hardcoded as closed to support special trading sessions (Muhurat etc.)
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 - **`background_refresh.py`** — Daemon thread started once at app startup. Warms market update cache immediately at startup. During market hours: pre-fetches broker data at each interval boundary; sends open summary (15 min after segment open); fires loss alerts. After market close: sends close summary. Segment-aware — handles Equity (NSE/BSE/NFO/CDS) and Commodity (MCX) independently with separate holiday calendars and open/close times.
@@ -87,31 +87,31 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 | File | Tracked | Contents |
 |---|---|---|
-| `config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `prod`/`mail`/`perplexity`/`prod_test_in_dev` flags (defaults `False`), alert thresholds, market segment definitions; deploy scripts merge new repo config with server's preserved flags |
-| `ramboq_config.yaml` | Yes | All page content, nav labels, Gemini prompts/params, Mermaid diagrams, fallback market report |
-| `ramboq_constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
+| `backend_config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `enforce_password_standard`/`cap_in_dev`/`genai`/`mail`/`telegram` flags (defaults `False`), alert thresholds, market segment definitions; deploy scripts merge new repo config with server's preserved flags |
+| `frontend_config.yaml` | Yes | All page content, nav labels, Gemini prompts/params, Mermaid diagrams, fallback market report |
+| `constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
 | `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, `gemini_api_key`, `telegram_bot_token`, `telegram_chat_id`, `alert_emails` |
 
-`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `config.yaml` with correct `prod` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `prod`/`mail`/`perplexity`/`enforce_password_standard`/`prod_test_in_dev` are overlaid from the server's saved copy.
+`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `backend_config.yaml` with correct `cap_in_dev` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `enforce_password_standard`/`cap_in_dev`/`genai`/`telegram`/`mail` are overlaid from the server's saved copy.
 
-### Production capabilities — `prod_test_in_dev` and individual flags
+### Production capabilities — `cap_in_dev` and individual flags
 
-Production capabilities (GenAI, Telegram, email) are controlled by two config.yaml flags that must both be True:
+Production capabilities (GenAI, Telegram, email) are controlled by two backend_config.yaml flags that must both be True:
 
 | Flag | Purpose | Prod/pod | Dev (testing) | Dev (idle) |
 |---|---|---|---|---|
-| `prod_test_in_dev` | Environment master switch | `True` | `True` | `False` |
-| `perplexity` | GenAI market update (Gemini) | `True` | `True`/`False` | — |
+| `cap_in_dev` | Environment master switch | `True` | `True` | `False` |
+| `genai` | GenAI market update (Gemini) | `True` | `True`/`False` | — |
 | `telegram` | Telegram alert notifications | `True` | `True`/`False` | — |
 | `mail` | Email notifications (SMTP) | `True` | `True`/`False` | — |
 
-**Gate logic:** `is_prod_capable() AND config.get('<flag>')` where `is_prod_capable()` = `prod_test_in_dev`.
+**Gate logic:** `is_prod_capable() AND config.get('<flag>')` where `is_prod_capable()` = `cap_in_dev`.
 
-- When `prod_test_in_dev: False` — all capabilities skip, no CPU/bandwidth used (dev running alongside prod)
-- When `prod_test_in_dev: True` — each capability fires or skips based on its own flag independently
-- No code change ever needed — flip flags in config.yaml on the server
+- When `cap_in_dev: False` — all capabilities skip, no CPU/bandwidth used (dev running alongside prod)
+- When `cap_in_dev: True` — each capability fires or skips based on its own flag independently
+- No code change ever needed — flip flags in backend_config.yaml on the server
 
-**Adding a new production capability:** add its flag to `config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy_dev.sh` and `deploy.sh`. Set it to `True` on prod/pod servers.
+**Adding a new production capability:** add its flag to `backend_config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy_dev.sh` and `deploy.sh`. Set it to `True` on prod/pod servers.
 
 ---
 
@@ -138,7 +138,7 @@ One row per breached threshold (abs and pct fire separate rows):
 - Columns: Type | Account | Day Loss | Day Loss% | Abs | Pct
 - `—` shown for columns not applicable to that threshold
 
-### Alert Thresholds (config.yaml)
+### Alert Thresholds (backend_config.yaml)
 ```yaml
 alert_loss_abs: 10000          # ₹ absolute day loss threshold (0 = disabled)
 alert_loss_pct: 2.0            # % day loss threshold (0 = disabled)
@@ -161,14 +161,14 @@ alert_emails:
 
 ## Market Segments and Hours
 
-Defined in `config.yaml` under `market_segments`. Background thread handles each segment independently.
+Defined in `backend_config.yaml` under `market_segments`. Background thread handles each segment independently.
 
 | Segment | Config key | Exchanges | Hours (IST) | Holiday source |
 |---|---|---|---|---|
 | Equity | `equity` | NSE, BSE, NFO, CDS | 09:15–15:30 | `kite.holidays("NSE")` |
 | Commodity | `commodity` | MCX | 09:00–23:30 | `kite.holidays("MCX")` |
 
-- Open summary sent `open_summary_offset_minutes` (default 15) after segment open
+- Open summary sent `open_summary_offset_minutes` (default 15) after segment open; close summary sent `close_summary_offset_minutes` (default 15) after segment close
 - Holiday calendars loaded at startup, refreshed on new year
 - Weekends NOT hardcoded as closed — special trading sessions (Muhurat, special Saturday) work correctly since they are absent from the holiday list
 - Holdings always belong to equity segment; positions are filtered by `exchange` column
@@ -183,6 +183,7 @@ Defined in `config.yaml` under `market_segments`. Background thread handles each
 | Market update pre-fetch | Once per day at `market_refresh_time` (08:30 IST) |
 | Performance data pre-fetch | Every `performance_refresh_interval` (5 min) during market hours |
 | Open summary (per segment) | `open_summary_offset_minutes` (15) after segment open, once per day |
+| Close summary (per segment) | `close_summary_offset_minutes` (15) after segment close, once per day |
 | Loss alert check | Every performance fetch during market hours |
 | Close summary (per segment) | Once after segment close time, on trading days only |
 
@@ -282,7 +283,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
 | `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
-> All three environments use the same relative `.log/` paths — no per-environment config changes needed. The `prod`/`mail`/`perplexity` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
+> All three environments use the same relative `.log/` paths — no per-environment config changes needed. The `cap_in_dev`/`genai`/`mail`/`telegram` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
 
 ---
 
@@ -290,18 +291,18 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | Task | Files to edit |
 |---|---|
-| Add a new page | Create `src/newpage.py`, add to `page_functions` dict in `app.py`, add nav label to `ramboq_config.yaml` |
-| Change page content (text, FAQs, etc.) | `setup/yaml/ramboq_config.yaml` |
+| Add a new page | Create `src/newpage.py`, add to `page_functions` dict in `app.py`, add nav label to `frontend_config.yaml` |
+| Change page content (text, FAQs, etc.) | `setup/yaml/frontend_config.yaml` |
 | Change broker data columns shown | `src/constants.py` — update `holdings_config`, `positions_config`, or `margins_config` |
-| Change AI market report prompt | `setup/yaml/ramboq_config.yaml` — `pplx_system_msg`, `pplx_user_msg`, `pplx_temperature`, `pplx_max_tokens`, `genai_model` |
+| Change AI market report prompt | `setup/yaml/frontend_config.yaml` — `genai_system_msg`, `genai_user_msg`, `genai_temperature`, `genai_max_tokens`, `genai_model` |
 | Change email template | `src/constants.py` — HTML template strings |
-| Change connection retry behaviour | `setup/yaml/config.yaml` — `retry_count`, `conn_reset_hours` |
-| Change log verbosity | `setup/yaml/config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
+| Change connection retry behaviour | `setup/yaml/backend_config.yaml` — `retry_count`, `conn_reset_hours` |
+| Change log verbosity | `setup/yaml/backend_config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
 | Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else` at the bottom; copy to server after changes |
 | Change browser tab title or SEO meta tags | `setup/streamlit/index.html` — update `<title>`, OG/Twitter meta tags |
-| Change footer text | `setup/yaml/ramboq_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
-| Change alert thresholds | `setup/yaml/config.yaml` — `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes` |
+| Change footer text | `setup/yaml/frontend_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
+| Change alert thresholds | `setup/yaml/backend_config.yaml` — `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes` |
 | Change alert recipients | `setup/yaml/secrets.yaml` on server — `alert_emails`, `telegram_chat_id` |
-| Add/change market segment hours | `setup/yaml/config.yaml` — `market_segments` block |
-| Change open summary timing | `setup/yaml/config.yaml` — `open_summary_offset_minutes` |
+| Add/change market segment hours | `setup/yaml/backend_config.yaml` — `market_segments` block |
+| Change open/close summary timing | `setup/yaml/backend_config.yaml` — `open_summary_offset_minutes`, `close_summary_offset_minutes` |
