@@ -61,7 +61,7 @@ def _send_telegram(message: str):
 
 
 def _fixed_table(headers, rows):
-    """Render a list of string-tuple rows as a fixed-width monospace table."""
+    """Render a list of string-tuple rows as a fixed-width monospace table (for Telegram)."""
     col_widths = [max(len(h), max((len(r[i]) for r in rows), default=0))
                   for i, h in enumerate(headers)]
 
@@ -72,26 +72,69 @@ def _fixed_table(headers, rows):
     return "\n".join([fmt(headers), sep] + [fmt(r) for r in rows])
 
 
-def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
+def _html_table(headers, rows):
+    """Render a list of string-tuple rows as an HTML table for email."""
+    th_style = (
+        "background-color:#1a3a5c;color:#ffffff;padding:8px 12px;"
+        "text-align:left;font-family:monospace;font-size:13px;white-space:nowrap"
+    )
+    td_style = (
+        "padding:6px 12px;font-family:monospace;font-size:13px;"
+        "border-bottom:1px solid #dce3ea;white-space:nowrap"
+    )
+    td_alt_style = td_style + ";background-color:#f4f7fa"
+
+    header_cells = "".join(f"<th style='{th_style}'>{h}</th>" for h in headers)
+    row_html = ""
+    for i, row in enumerate(rows):
+        bg = td_alt_style if i % 2 else td_style
+        cells = "".join(f"<td style='{bg}'>{v}</td>" for v in row)
+        row_html += f"<tr>{cells}</tr>"
+
+    return (
+        f"<table style='border-collapse:collapse;width:100%'>"
+        f"<thead><tr>{header_cells}</tr></thead>"
+        f"<tbody>{row_html}</tbody>"
+        f"</table>"
+    )
+
+
+def _branch_banner_html(branch: str) -> str:
+    """Return a prominent HTML banner for non-main branches."""
+    return (
+        f"<div style='background-color:#fff3cd;border:1px solid #ffc107;"
+        f"border-radius:4px;padding:8px 14px;margin-bottom:12px;"
+        f"font-family:sans-serif;font-size:13px;color:#856404'>"
+        f"&#9888; <strong>Non-production branch: {branch}</strong>"
+        f"</div>"
+    )
+
+
+def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: str,
+              subject_detail: str):
     """Send Telegram + email with correct prefixes for the message type."""
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
 
     branch = config.get('deploy_branch', 'main')
     branch_tag = f" [{branch}]" if branch != 'main' else ''
 
+    # Telegram: fixed-width monospace table; branch warning line on non-main
+    branch_line = f"\n⚠ <b>Branch: {branch}</b>" if branch != 'main' else ''
     telegram_msg = (
-        f"<b>{tg_prefix}{branch_tag} — {ist_display}</b>\n\n"
-        f"<code>{table}</code>"
+        f"<b>{tg_prefix}{branch_tag} — {ist_display}</b>{branch_line}\n\n"
+        f"<code>{tg_table}</code>"
     )
     _send_telegram(telegram_msg)
 
     alert_emails = secrets.get('alert_emails', [])
     if alert_emails:
         subject = f"{email_prefix}{branch_tag}{subject_detail}" if branch_tag else f"{email_prefix}{subject_detail}"
+        branch_banner = _branch_banner_html(branch) if branch != 'main' else ''
         html_body = (
-            f"<html><body>"
-            f"<p><b>{tg_prefix} — {ist_display}</b></p>"
-            f"<pre style='font-family:monospace;font-size:13px'>{table}</pre>"
+            f"<html><body style='font-family:sans-serif'>"
+            f"{branch_banner}"
+            f"<p style='font-size:14px'><b>{tg_prefix}{branch_tag} — {ist_display}</b></p>"
+            f"{email_table_html}"
             f"</body></html>"
         )
         for email in alert_emails:
@@ -138,14 +181,25 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, l
         pnl     = float(row.get('pnl', 0) or 0)
         p_rows.append((account, f"₹{pnl:,.0f}"))
 
-    holdings_table  = _fixed_table(h_headers, h_rows) if h_rows else "No holdings data"
-    positions_table = _fixed_table(p_headers, p_rows) if p_rows else "No positions data"
-
     segment_label = f" — {label}" if label else ""
-    table = f"Holdings{segment_label}\n{holdings_table}\n\nPositions{segment_label}\n{positions_table}"
     subject_detail = f"{label + ' — ' if label else ''}{ist_display}"
 
-    _dispatch(msg_type, ist_display, table, subject_detail)
+    # Telegram: fixed-width monospace
+    h_tg = _fixed_table(h_headers, h_rows) if h_rows else "No holdings data"
+    p_tg = _fixed_table(p_headers, p_rows) if p_rows else "No positions data"
+    tg_table = f"Holdings{segment_label}\n{h_tg}\n\nPositions{segment_label}\n{p_tg}"
+
+    # Email: HTML tables with section headings
+    h_email = _html_table(h_headers, h_rows) if h_rows else "<p>No holdings data</p>"
+    p_email = _html_table(p_headers, p_rows) if p_rows else "<p>No positions data</p>"
+    email_table_html = (
+        f"<p style='margin-top:16px;font-weight:bold'>Holdings{segment_label}</p>"
+        f"{h_email}"
+        f"<p style='margin-top:16px;font-weight:bold'>Positions{segment_label}</p>"
+        f"{p_email}"
+    )
+
+    _dispatch(msg_type, ist_display, tg_table, email_table_html, subject_detail)
     logger.info(f"Background: {msg_type} summary sent")
 
 
@@ -225,8 +279,13 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
     if not rows:
         return alert_state
 
-    headers = ("Type", "Account", "Day Loss", "Day Loss%", "Abs", "Pct")
-    table = _fixed_table(headers, rows)
+    headers = ("Type", "Account", "Day Loss", "Day Loss%", "Abs Thr", "Pct Thr")
+
+    # Telegram: fixed-width monospace
+    tg_table = _fixed_table(headers, rows)
+
+    # Email: HTML table
+    email_table_html = _html_table(headers, rows)
 
     parts = []
     for typ, account, day_loss, day_pct, abs_thr, pct_thr in rows:
@@ -237,6 +296,6 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
         parts.append(f"{typ} {account} {day_loss} ({day_pct}) [{thr}]")
     subject_detail = " | ".join(parts)
 
-    _dispatch('alert', ist_display, table, subject_detail)
+    _dispatch('alert', ist_display, tg_table, email_table_html, subject_detail)
     logger.warning(f"Loss alerts fired: {[(r[0], r[1]) for r in rows]}")
     return alert_state
