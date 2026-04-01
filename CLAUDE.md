@@ -22,9 +22,9 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | Podman (container dev) | `pod` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com | Podman container |
 | Development | any other non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com | Python venv |
 
-- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
+- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `dispatch.sh` → `deploy.sh <ENV> <REF>` → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
-- For the `pod` branch: `deploy_pod.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
+- For the `pod` branch: `deploy.sh pod` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
 - Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `backend_config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
 
 ---
@@ -69,13 +69,12 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`favicon.png`** — Reference copy of the Streamlit default favicon (not deployed — source favicon is `setup/images/favicon.png`)
 
 ### Webhook / Deployment (`webhook/`)
-- **`deploy.sh`** — Prod deploy script (`main` branch); git pull, pip install, copies `setup/images/favicon.png` and `setup/streamlit/index.html` into Streamlit static folder, syncs nginx/static files, restarts service
-- **`deploy_dev.sh`** — Dev deploy script (non-main, non-pod branches); same as deploy.sh but without nginx/static sync
-- **`deploy_pod.sh`** — Pod deploy script (`pod` branch); runs `podman build` then restarts service. Favicon and index.html are copied inside the container via `Containerfile` (no venv on host)
+- **`deploy.sh`** — Unified deploy script. Called as `deploy.sh <ENV> <REF>` where ENV is `prod|dev|pod`. Common section handles git update, config merge, writing `deploy_branch` into `backend_config.yaml`, service restart, and `notify_deploy.py`. Env-specific sections: nginx/static sync (prod only), `podman build` (pod only), `pip install` + favicon copy (prod/dev only). Pod notify runs via `podman exec`; prod/dev run directly.
+- **`notify_deploy.py`** — Standalone deploy notification script; sends Telegram + email immediately after each deploy without importing app modules (avoids log file permission conflict with running service). Reads `backend_config.yaml` and `secrets.yaml` directly. Gated by `cap_in_dev` and `notify_on_startup` flags
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
 - **`hooks.json`** — Single `ramboq-deploy` hook; validates push event, repo name, and HMAC-SHA256 signature; passes `ref` to `dispatch.sh`. **Deployed to `/etc/webhook/hooks.json`** (independent of all deployment directories). Copy manually after changes: `sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
-- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls the correct env's deploy script (`deploy.sh` for `main`, `deploy_pod.sh` for any branch starting with `pod`, `deploy_dev.sh` for everything else). No env-specific logic here. Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
+- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls `deploy.sh` with the right ENV arg (`prod` for `main`, `pod` for branches starting with `pod`, `dev` for everything else). Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
 - **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only
 - **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches; all output (stdout+stderr) goes to `hook.log`
@@ -87,31 +86,32 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 | File | Tracked | Contents |
 |---|---|---|
-| `backend_config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `enforce_password_standard`/`cap_in_dev`/`genai`/`mail`/`telegram` flags (defaults `False`), alert thresholds, market segment definitions; deploy scripts merge new repo config with server's preserved flags |
+| `backend_config.yaml` | **Yes — tracked** | `retry_count`, `conn_reset_hours`, relative log paths, log levels, `enforce_password_standard`/`cap_in_dev`/`genai`/`mail`/`telegram`/`notify_on_startup` flags, alert thresholds, market segment definitions; deploy scripts merge new repo config with server's preserved flags |
 | `frontend_config.yaml` | Yes | All page content, nav labels, Gemini prompts/params, Mermaid diagrams, fallback market report |
 | `constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
 | `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, `gemini_api_key`, `telegram_bot_token`, `telegram_chat_id`, `alert_emails` |
 
-`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `backend_config.yaml` with correct `cap_in_dev` flag; subsequent deploys merge: repo config is the base (picks up new fields), only `enforce_password_standard`/`cap_in_dev`/`genai`/`telegram`/`mail` are overlaid from the server's saved copy.
+`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `backend_config.yaml`; subsequent deploys merge: repo config is the base (picks up new fields), only `enforce_password_standard`/`cap_in_dev`/`genai`/`telegram`/`mail`/`notify_on_startup` are overlaid from the server's saved copy. `deploy_branch` is always set fresh by the deploy script — never preserved.
 
 ### Production capabilities — `cap_in_dev` and individual flags
 
-Production capabilities (GenAI, Telegram, email) are controlled by two backend_config.yaml flags that must both be True:
+Production capabilities (GenAI, Telegram, email) are controlled by `cap_in_dev` (master switch) and individual flags — both must be True:
 
-| Flag | Purpose | Prod/pod | Dev (testing) | Dev (idle) |
-|---|---|---|---|---|
-| `cap_in_dev` | Environment master switch | `True` | `True` | `False` |
-| `genai` | GenAI market update (Gemini) | `True` | `True`/`False` | — |
-| `telegram` | Telegram alert notifications | `True` | `True`/`False` | — |
-| `mail` | Email notifications (SMTP) | `True` | `True`/`False` | — |
+| Flag | Purpose | Prod/pod | Dev |
+|---|---|---|---|
+| `cap_in_dev` | Environment master switch | `True` | `True` |
+| `genai` | GenAI market update (Gemini) | `True` | `True`/`False` |
+| `telegram` | Telegram alert notifications | `True` | `True`/`False` |
+| `mail` | Email notifications (SMTP) | `True` | `True`/`False` |
+| `notify_on_startup` | Send test Telegram+email on each deploy | `False` | `True` |
 
 **Gate logic:** `is_prod_capable() AND config.get('<flag>')` where `is_prod_capable()` = `cap_in_dev`.
 
-- When `cap_in_dev: False` — all capabilities skip, no CPU/bandwidth used (dev running alongside prod)
-- When `cap_in_dev: True` — each capability fires or skips based on its own flag independently
-- No code change ever needed — flip flags in backend_config.yaml on the server
+- `cap_in_dev: True` is the tracked default for all environments
+- `notify_on_startup: True` on dev so every deploy immediately validates notifications; `False` on prod/pod
+- No code change ever needed — flip flags in `backend_config.yaml` on the server
 
-**Adding a new production capability:** add its flag to `backend_config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy_dev.sh` and `deploy.sh`. Set it to `True` on prod/pod servers.
+**Adding a new production capability:** add its flag to `backend_config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy.sh` (the `for key in ...` loop). Set it to `True` on prod/pod servers.
 
 ---
 
@@ -124,11 +124,17 @@ Production capabilities (GenAI, Telegram, email) are controlled by two backend_c
 | Market open summary | `Open` | `RamboQuant Open: ` |
 | Intra-day loss alert | `Alert` | `RamboQuant Alert: ` |
 | Market close summary | `Close` | `RamboQuant Close: ` |
+| Deploy notification | `Deploy OK` | `RamboQuant Deploy OK: ` |
+
+### Timestamp Format
+All alerts, summaries, and deploy notifications use dual-timezone format generated by `timestamp_display()` in `date_time_utils.py`:
+`Mon, March 30, 2026, 09:30 AM IST | Mon, March 30, 2026, 10:00 PM EDT`
+The EST side uses `%Z` so it correctly shows `EST` in winter and `EDT` in summer.
 
 ### Open/Close Summary Format
 Sent per segment (Equity and Commodity independently):
-- **Telegram**: `Open — Equity — Mon, March 30, 2026, 09:30 AM IST` + monospace table
-- **Email subject**: `RamboQuant Open: Equity — Mon, March 30, 2026, 09:30 AM IST`
+- **Telegram**: `Open — Equity — Mon, March 30, 2026, 09:30 AM IST | ...` + monospace table
+- **Email subject**: `RamboQuant Open: Equity — Mon, March 30, 2026, 09:30 AM IST | ...`
 - Holdings table: Account | Cur Val | P&L | P&L% | Day Loss | Day Loss%
 - Positions table: Account | P&L
 - Accounts shown as masked values (ZG#### / ZJ####)
@@ -185,7 +191,6 @@ Defined in `backend_config.yaml` under `market_segments`. Background thread hand
 | Open summary (per segment) | `open_summary_offset_minutes` (15) after segment open, once per day |
 | Close summary (per segment) | `close_summary_offset_minutes` (15) after segment close, once per day |
 | Loss alert check | Every performance fetch during market hours |
-| Close summary (per segment) | Once after segment close time, on trading days only |
 
 ---
 
@@ -255,7 +260,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy.sh` | Prod deploy output (main branch) |
+| `hook_debug.log` | `deploy.sh prod` | Prod deploy output (main branch) |
 | `hook.log` | `ramboq_hook.service` | All webhook listener output (stdout+stderr combined) |
 | `incoming_requests.log` | `log-request.sh` | Raw webhook requests |
 | `error_file` | `ramboq.service` tee | All Streamlit stdout+stderr |
@@ -267,7 +272,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy_dev.sh` | Dev deploy output (non-main, non-pod branches) |
+| `hook_debug.log` | `deploy.sh dev` | Dev deploy output (non-main, non-pod branches) |
 | `error_file` | `ramboq_dev.service` tee | All Streamlit stdout+stderr |
 | `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines (not written by service) |
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
@@ -277,13 +282,13 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy_pod.sh` | Pod deploy output (`pod` branch) |
+| `hook_debug.log` | `deploy.sh pod` | Pod deploy output (`pod` branch) |
 | `error_file` | `ramboq_pod.service` tee | All Streamlit stdout+stderr from container |
 | `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines |
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
 | `short_log_file` | `ramboq_logger.py` | Last 50 Python app log lines |
 
-> All three environments use the same relative `.log/` paths — no per-environment config changes needed. The `cap_in_dev`/`genai`/`mail`/`telegram` flags differ per environment and are set by `initial_deploy.sh`, then preserved across deploys.
+> All three environments use the same relative `.log/` paths — no per-environment config changes needed. `notify_on_startup` differs per environment (`True` on dev, `False` on prod/pod) and is preserved across deploys.
 
 ---
 
@@ -299,10 +304,11 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change connection retry behaviour | `setup/yaml/backend_config.yaml` — `retry_count`, `conn_reset_hours` |
 | Change log verbosity | `setup/yaml/backend_config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
-| Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else` at the bottom; copy to server after changes |
+| Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else`; copy to server after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh` |
 | Change browser tab title or SEO meta tags | `setup/streamlit/index.html` — update `<title>`, OG/Twitter meta tags |
 | Change footer text | `setup/yaml/frontend_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
 | Change alert thresholds | `setup/yaml/backend_config.yaml` — `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes` |
 | Change alert recipients | `setup/yaml/secrets.yaml` on server — `alert_emails`, `telegram_chat_id` |
+| Enable/disable deploy notification | `setup/yaml/backend_config.yaml` on server — `notify_on_startup` (True=dev, False=prod/pod) |
 | Add/change market segment hours | `setup/yaml/backend_config.yaml` — `market_segments` block |
 | Change open/close summary timing | `setup/yaml/backend_config.yaml` — `open_summary_offset_minutes`, `close_summary_offset_minutes` |

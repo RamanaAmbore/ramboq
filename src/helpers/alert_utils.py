@@ -35,7 +35,10 @@ _MSG_TYPES = {
 
 def _send_telegram(message: str):
     if not is_prod_capable():
-        logger.info("Telegram skipped — not prod-capable (set cap_in_dev to True)")
+        logger.info("Telegram skipped — cap_in_dev is False")
+        return
+    if not config.get('telegram', False):
+        logger.info("Telegram skipped — telegram flag is False")
         return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')
@@ -73,15 +76,18 @@ def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
     """Send Telegram + email with correct prefixes for the message type."""
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
 
+    branch = config.get('deploy_branch', 'main')
+    branch_tag = f" [{branch}]" if branch != 'main' else ''
+
     telegram_msg = (
-        f"<b>{tg_prefix} — {ist_display}</b>\n\n"
+        f"<b>{tg_prefix}{branch_tag} — {ist_display}</b>\n\n"
         f"<code>{table}</code>"
     )
     _send_telegram(telegram_msg)
 
     alert_emails = secrets.get('alert_emails', [])
     if alert_emails:
-        subject = f"{email_prefix}{subject_detail}"
+        subject = f"{email_prefix}{branch_tag}{subject_detail}" if branch_tag else f"{email_prefix}{subject_detail}"
         html_body = (
             f"<html><body>"
             f"<p><b>{tg_prefix} — {ist_display}</b></p>"

@@ -177,11 +177,10 @@ setup_environment() {
     local ssh_clone_url="$3"  # empty = use HTTPS
 
     local clone_url="${ssh_clone_url:-$REPO_HTTPS}"
-    local is_prod="False"
-    local capabilities="False"
-    if [ "$branch" = "main" ]; then
-        is_prod="True"
-        capabilities="True"
+    local capabilities="True"
+    local notify_on_startup="False"
+    if [ "$branch" != "main" ] && [[ "$branch" != pod* ]]; then
+        notify_on_startup="True"
     fi
 
     log_step "3. Setting up $app_root (branch: $branch)"
@@ -237,27 +236,57 @@ setup_environment() {
 retry_count: 3
 conn_reset_hours: 23
 
-# Log file paths (relative to app working directory)
+# Log file paths (relative to app working directory — works uniformly for prod, dev, and pod)
 file_log_file: .log/log_file
 error_log_file: .log/error_file
 short_file_log_file: .log/short_log_file
 short_error_log_file: .log/short_error_file
 
-# Log levels (10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
+# Log levels (Python logging: 10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
 
-# App flags
+# App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
 enforce_password_standard: False
 
-# cap_in_dev: master switch — True on prod/pod, False on dev by default
-cap_in_dev: $capabilities
+# cap_in_dev: master switch for production capabilities in this environment.
+# True on prod/pod and dev — enables GenAI, Telegram, email. Set False to silence everything.
+cap_in_dev: True
 
-# Production capability flags (each independently toggleable when cap_in_dev is True)
-genai: $capabilities
-telegram: $capabilities
-mail: $capabilities
+# Production capability flags — each independently enables one capability when cap_in_dev is True.
+genai: True
+telegram: True
+mail: True
+notify_on_startup: $notify_on_startup
+
+# Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
+deploy_branch: main
+
+# Loss alert thresholds — checked after every background performance refresh (during market hours)
+alert_loss_abs: 10000
+alert_loss_pct: 2.0
+alert_cooldown_minutes: 30
+
+# Background refresh settings (all times in India IST)
+background_refresh: True
+performance_refresh_interval: 5
+market_refresh_time: "08:30"
+open_summary_offset_minutes: 15
+close_summary_offset_minutes: 15
+
+# Market segments
+market_segments:
+  equity:
+    hours_start: "09:15"
+    hours_end: "15:30"
+    holiday_exchange: "NSE"
+    exchanges: ["NSE", "BSE", "NFO", "CDS"]
+  commodity:
+    hours_start: "09:00"
+    hours_end: "23:30"
+    holiday_exchange: "MCX"
+    exchanges: ["MCX"]
 EOF
         chown www-data:www-data "$yaml_dir/backend_config.yaml"
         log_ok "Created backend_config.yaml"
