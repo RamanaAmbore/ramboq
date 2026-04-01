@@ -146,13 +146,35 @@ def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: 
 
 
 # ---------------------------------------------------------------------------
+# Funds table helpers
+# ---------------------------------------------------------------------------
+
+def _build_funds_rows(df_margins):
+    """Build (Account, Cash, Avail Margin, Used Margin, Collateral) rows from df_margins."""
+    rows = []
+    if df_margins is None or df_margins.empty:
+        return rows
+    for _, row in df_margins.iterrows():
+        account   = str(row.get('account', ''))
+        cash      = float(row.get('avail opening_balance', 0) or 0)
+        avail_net = float(row.get('net', 0) or 0)
+        used      = float(row.get('util debits', 0) or 0)
+        collat    = float(row.get('avail collateral', 0) or 0)
+        rows.append((account, f"₹{cash:,.0f}", f"₹{avail_net:,.0f}",
+                     f"₹{used:,.0f}", f"₹{collat:,.0f}"))
+    return rows
+
+
+# ---------------------------------------------------------------------------
 # Open / Close summary
 # ---------------------------------------------------------------------------
 
-def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, label: str = ""):
+def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
+                 label: str = "", df_margins=None):
     """
-    Send holdings + positions summary at market open or close.
+    Send holdings + positions + funds summary at market open or close.
     msg_type: 'open' or 'close'
+    df_margins: full margins dataframe (all accounts + TOTAL); included when provided.
     """
     # Holdings table: Account | Cur Val | P&L | P&L% | Day Loss | Day Loss%
     h_headers = ("Account", "Cur Val", "P&L", "P&L%", "Day Loss", "Day Loss%")
@@ -181,6 +203,10 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, l
         pnl     = float(row.get('pnl', 0) or 0)
         p_rows.append((account, f"₹{pnl:,.0f}"))
 
+    # Funds table: Account | Cash | Avail Margin | Used Margin | Collateral
+    f_headers = ("Account", "Cash", "Avail Margin", "Used Margin", "Collateral")
+    f_rows = _build_funds_rows(df_margins)
+
     segment_label = f" — {label}" if label else ""
     subject_detail = f"{label + ' — ' if label else ''}{ist_display}"
 
@@ -188,6 +214,9 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, l
     h_tg = _fixed_table(h_headers, h_rows) if h_rows else "No holdings data"
     p_tg = _fixed_table(p_headers, p_rows) if p_rows else "No positions data"
     tg_table = f"Holdings{segment_label}\n{h_tg}\n\nPositions{segment_label}\n{p_tg}"
+    if f_rows:
+        f_tg = _fixed_table(f_headers, f_rows)
+        tg_table += f"\n\nFunds\n{f_tg}"
 
     # Email: HTML tables with section headings
     h_email = _html_table(h_headers, h_rows) if h_rows else "<p>No holdings data</p>"
@@ -198,16 +227,19 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str, l
         f"<p style='margin-top:16px;font-weight:bold'>Positions{segment_label}</p>"
         f"{p_email}"
     )
+    if f_rows:
+        f_email = _html_table(f_headers, f_rows)
+        email_table_html += f"<p style='margin-top:16px;font-weight:bold'>Funds</p>{f_email}"
 
     _dispatch(msg_type, ist_display, tg_table, email_table_html, subject_detail)
     logger.info(f"Background: {msg_type} summary sent")
 
 
 # ---------------------------------------------------------------------------
-# Intra-day loss alerts
+# Intra-day loss alerts + negative fund balance alert
 # ---------------------------------------------------------------------------
 
-def _build_alert_rows(sum_holdings, sum_positions, alert_loss_abs, alert_loss_pct,
+def _build_alert_rows(sum_holdings, sum_positions, df_margins, alert_loss_abs, alert_loss_pct,
                       alert_state, cooldown_mins):
     now = datetime.now()
     rows = []
@@ -216,7 +248,7 @@ def _build_alert_rows(sum_holdings, sum_positions, alert_loss_abs, alert_loss_pc
         last = alert_state.get(key)
         return not last or (now - last) >= timedelta(minutes=cooldown_mins)
 
-    # Holdings
+    # Holdings day-loss alerts
     for _, row in sum_holdings.iterrows():
         account = str(row.get('account', ''))
         day_val = float(row.get('day_change_val', 0) or 0)
@@ -242,7 +274,7 @@ def _build_alert_rows(sum_holdings, sum_positions, alert_loss_abs, alert_loss_pc
         elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
             logger.info(f"Holdings alert suppressed for {account} (cooldown)")
 
-    # Positions
+    # Positions day-loss alerts
     for _, row in sum_positions.iterrows():
         account = str(row.get('account', ''))
         pnl = float(row.get('pnl', 0) or 0)
@@ -255,23 +287,41 @@ def _build_alert_rows(sum_holdings, sum_positions, alert_loss_abs, alert_loss_pc
         elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
             logger.info(f"Positions alert suppressed for {account} (cooldown)")
 
+    # Negative fund balance alerts (cash or avail margin < 0)
+    if df_margins is not None and not df_margins.empty:
+        for _, row in df_margins.iterrows():
+            account   = str(row.get('account', ''))
+            cash      = float(row.get('avail opening_balance', 0) or 0)
+            avail_net = float(row.get('net', 0) or 0)
+
+            for field, val, label in [
+                ('cash', cash, 'Cash'),
+                ('margin', avail_net, 'Avail Margin'),
+            ]:
+                key = f"funds_{field}_{account}"
+                if val < 0 and _cooldown_ok(key):
+                    rows.append(("Funds", account, f"₹{val:,.0f}", f"{label} negative",
+                                 "—", "—"))
+                    alert_state[key] = now
+                elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
+                    logger.info(f"Funds alert suppressed for {account} {label} (cooldown)")
+
     return rows, alert_state
 
 
-def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display: str):
+def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display: str,
+                    df_margins=None):
     """
-    Check day P&L thresholds. One row per breached threshold.
+    Check day P&L thresholds and negative fund balances. One row per breached threshold.
     Returns alert_state (modified in place).
+    df_margins: full margins dataframe; used for negative balance checks.
     """
     alert_loss_abs = config.get('alert_loss_abs', 0)
     alert_loss_pct = config.get('alert_loss_pct', 0)
     cooldown_mins  = config.get('alert_cooldown_minutes', 30)
 
-    if not alert_loss_abs and not alert_loss_pct:
-        return alert_state
-
     rows, alert_state = _build_alert_rows(
-        sum_holdings, sum_positions,
+        sum_holdings, sum_positions, df_margins,
         alert_loss_abs, alert_loss_pct,
         alert_state, cooldown_mins
     )
@@ -279,7 +329,7 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
     if not rows:
         return alert_state
 
-    headers = ("Type", "Account", "Day Loss", "Day Loss%", "Abs Thr", "Pct Thr")
+    headers = ("Type", "Account", "Value", "Detail", "Abs Thr", "Pct Thr")
 
     # Telegram: fixed-width monospace
     tg_table = _fixed_table(headers, rows)
@@ -288,14 +338,15 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
     email_table_html = _html_table(headers, rows)
 
     parts = []
-    for typ, account, day_loss, day_pct, abs_thr, pct_thr in rows:
+    for typ, account, value, detail, abs_thr, pct_thr in rows:
         thr = "+".join(t for t in [
             f"Abs {abs_thr}" if abs_thr != "—" else "",
             f"Pct {pct_thr}" if pct_thr != "—" else "",
+            detail if detail not in ("—", "") else "",
         ] if t)
-        parts.append(f"{typ} {account} {day_loss} ({day_pct}) [{thr}]")
+        parts.append(f"{typ} {account} {value} [{thr}]")
     subject_detail = " | ".join(parts)
 
     _dispatch('alert', ist_display, tg_table, email_table_html, subject_detail)
-    logger.warning(f"Loss alerts fired: {[(r[0], r[1]) for r in rows]}")
+    logger.warning(f"Loss/fund alerts fired: {[(r[0], r[1]) for r in rows]}")
     return alert_state

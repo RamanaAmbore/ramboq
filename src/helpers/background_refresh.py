@@ -169,12 +169,14 @@ def _loop(cfg):
                             if ss['last_open_date'] != today and now >= open_dt:
                                 label = seg['name'].capitalize()
                                 send_summary(seg_sum_holdings, seg_sum_positions,
-                                             ist_display, 'open', label=label)
+                                             ist_display, 'open', label=label,
+                                             df_margins=df_margins)
                                 ss['last_open_date'] = today
 
                             # Loss alerts (use full sum for all-account check)
                             alert_state = check_and_alert(
-                                seg_sum_holdings, seg_sum_positions, alert_state, ist_display
+                                seg_sum_holdings, seg_sum_positions, alert_state, ist_display,
+                                df_margins=df_margins
                             )
 
                     except Exception as e:
@@ -208,7 +210,8 @@ def _loop(cfg):
                         seg_sum_positions = _summarise_positions(seg_positions)
 
                         label = seg['name'].capitalize()
-                        send_summary(seg_sum_holdings, seg_sum_positions, ist_display, 'close', label=label)
+                        send_summary(seg_sum_holdings, seg_sum_positions, ist_display, 'close',
+                                     label=label, df_margins=df_margins)
                         ss['last_close_date'] = today
                     except Exception as e:
                         logger.error(f"Background: close summary for {seg['name']} failed: {e}")
