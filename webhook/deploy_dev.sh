@@ -68,7 +68,7 @@ BRANCH="${REF#refs/heads/}"
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
 
   echo "[$TS] Sending startup notification..."
-  python webhook/notify_deploy.py \
+  python "$APP_ROOT/webhook/notify_deploy.py" \
     && echo "[$TS] Startup notification done" \
     || echo "[$TS] WARNING: startup notification failed"
 
