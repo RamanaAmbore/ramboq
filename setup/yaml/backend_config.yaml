@@ -27,6 +27,9 @@ telegram: True            # Telegram alert notifications
 mail: True                # Email notifications (SMTP)
 notify_on_startup: True   # Send test Telegram+email on each deploy to confirm notifications work (set False on prod)
 
+# Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
+deploy_branch: main
+
 # Loss alert thresholds — checked after every background performance refresh (during market hours)
 # Set to 0 to disable a threshold. alert_emails and telegram credentials go in secrets.yaml.
 alert_loss_abs: 10000          # alert if day loss > ₹10,000 for any account or TOTAL

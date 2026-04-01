@@ -22,9 +22,9 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | Podman (container dev) | `pod` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com | Podman container |
 | Development | any other non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com | Python venv |
 
-- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `deploy.sh` → branch routing → venv+pip OR podman build → systemctl restart
+- GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `dispatch.sh` → `deploy.sh <ENV> <REF>` → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
-- For the `pod` branch: `deploy_pod.sh` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
+- For the `pod` branch: `deploy.sh pod` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
 - Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `backend_config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
 
 ---
@@ -69,14 +69,12 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`favicon.png`** — Reference copy of the Streamlit default favicon (not deployed — source favicon is `setup/images/favicon.png`)
 
 ### Webhook / Deployment (`webhook/`)
-- **`deploy.sh`** — Prod deploy script (`main` branch); git pull, pip install, copies `setup/images/favicon.png` and `setup/streamlit/index.html` into Streamlit static folder, syncs nginx/static files, restarts service, runs `notify_deploy.py`
-- **`deploy_dev.sh`** — Dev deploy script (non-main, non-pod branches); same as deploy.sh but without nginx/static sync
-- **`deploy_pod.sh`** — Pod deploy script (`pod` branch); runs `podman build` then restarts service. Favicon and index.html are copied inside the container via `Containerfile` (no venv on host). Runs `notify_deploy.py` via `podman exec`
+- **`deploy.sh`** — Unified deploy script. Called as `deploy.sh <ENV> <REF>` where ENV is `prod|dev|pod`. Common section handles git update, config merge, writing `deploy_branch` into `backend_config.yaml`, service restart, and `notify_deploy.py`. Env-specific sections: nginx/static sync (prod only), `podman build` (pod only), `pip install` + favicon copy (prod/dev only). Pod notify runs via `podman exec`; prod/dev run directly.
 - **`notify_deploy.py`** — Standalone deploy notification script; sends Telegram + email immediately after each deploy without importing app modules (avoids log file permission conflict with running service). Reads `backend_config.yaml` and `secrets.yaml` directly. Gated by `cap_in_dev` and `notify_on_startup` flags
 - **`initial_deploy.sh`** — One-time setup script; run once on a fresh server before first push. Accepts `--env prod|dev|both`, `--ssh-key-prod`, `--ssh-key-dev`, `--branch-dev`. Automates everything except secrets, certbot, Cloudflare DNS, and GitHub webhook
 - **`ramboq_pod.service`** — Podman container systemd unit, port 8504; mounts `setup/yaml` and `.log` as volumes
 - **`hooks.json`** — Single `ramboq-deploy` hook; validates push event, repo name, and HMAC-SHA256 signature; passes `ref` to `dispatch.sh`. **Deployed to `/etc/webhook/hooks.json`** (independent of all deployment directories). Copy manually after changes: `sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json && sudo systemctl restart ramboq_hook.service`
-- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls the correct env's deploy script (`deploy.sh` for `main`, `deploy_pod.sh` for any branch starting with `pod`, `deploy_dev.sh` for everything else). No env-specific logic here. Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
+- **`dispatch.sh`** — Thin router at `/etc/webhook/dispatch.sh`; reads branch from `ref`, calls `deploy.sh` with the right ENV arg (`prod` for `main`, `pod` for branches starting with `pod`, `dev` for everything else). Copy after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh`
 - **`ramboq.service`** — Prod systemd unit, port 8502; tee pipes Streamlit output to `error_file` only
 - **`ramboq_dev.service`** — Dev systemd unit, port 8503; tee pipes Streamlit output to `error_file` only
 - **`ramboq_hook.service`** — Webhook listener, port 9001; shared service handles all branches; all output (stdout+stderr) goes to `hook.log`
@@ -93,7 +91,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 | `constants.yaml` | Yes | 250+ ISD country codes, profile section keys |
 | `secrets.yaml` | **No — gitignored** | SMTP creds, Kite API keys/TOTP per account, `cookie_secret`, `kite_login_url`, `kite_twofa_url`, `gemini_api_key`, `telegram_bot_token`, `telegram_chat_id`, `alert_emails` |
 
-`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `backend_config.yaml`; subsequent deploys merge: repo config is the base (picks up new fields), only `enforce_password_standard`/`cap_in_dev`/`genai`/`telegram`/`mail`/`notify_on_startup` are overlaid from the server's saved copy.
+`secrets.yaml` must be **hand-placed on the server** — never in git. `initial_deploy.sh` creates `backend_config.yaml`; subsequent deploys merge: repo config is the base (picks up new fields), only `enforce_password_standard`/`cap_in_dev`/`genai`/`telegram`/`mail`/`notify_on_startup` are overlaid from the server's saved copy. `deploy_branch` is always set fresh by the deploy script — never preserved.
 
 ### Production capabilities — `cap_in_dev` and individual flags
 
@@ -113,7 +111,7 @@ Production capabilities (GenAI, Telegram, email) are controlled by `cap_in_dev` 
 - `notify_on_startup: True` on dev so every deploy immediately validates notifications; `False` on prod/pod
 - No code change ever needed — flip flags in `backend_config.yaml` on the server
 
-**Adding a new production capability:** add its flag to `backend_config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy_dev.sh` and `deploy.sh`. Set it to `True` on prod/pod servers.
+**Adding a new production capability:** add its flag to `backend_config.yaml` (default `False`), gate it with `is_prod_capable() AND config.get('<flag>')` in the relevant module. Add the flag to the preserved keys list in `deploy.sh` (the `for key in ...` loop). Set it to `True` on prod/pod servers.
 
 ---
 
@@ -262,7 +260,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy.sh` | Prod deploy output (main branch) |
+| `hook_debug.log` | `deploy.sh prod` | Prod deploy output (main branch) |
 | `hook.log` | `ramboq_hook.service` | All webhook listener output (stdout+stderr combined) |
 | `incoming_requests.log` | `log-request.sh` | Raw webhook requests |
 | `error_file` | `ramboq.service` tee | All Streamlit stdout+stderr |
@@ -274,7 +272,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy_dev.sh` | Dev deploy output (non-main, non-pod branches) |
+| `hook_debug.log` | `deploy.sh dev` | Dev deploy output (non-main, non-pod branches) |
 | `error_file` | `ramboq_dev.service` tee | All Streamlit stdout+stderr |
 | `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines (not written by service) |
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
@@ -284,7 +282,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 
 | File | Source | Notes |
 |---|---|---|
-| `hook_debug.log` | `deploy_pod.sh` | Pod deploy output (`pod` branch) |
+| `hook_debug.log` | `deploy.sh pod` | Pod deploy output (`pod` branch) |
 | `error_file` | `ramboq_pod.service` tee | All Streamlit stdout+stderr from container |
 | `short_error_file` | `ramboq_logger.py` | Last 50 Python error lines |
 | `log_file` | `ramboq_logger.py` | Full Python app log (5MB rotating) |
@@ -306,7 +304,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change connection retry behaviour | `setup/yaml/backend_config.yaml` — `retry_count`, `conn_reset_hours` |
 | Change log verbosity | `setup/yaml/backend_config.yaml` — `file_log_level`, `error_log_level`, `console_log_level` |
 | Add a new broker account | `setup/yaml/secrets.yaml` — add entry under `kite_accounts` |
-| Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else` at the bottom; copy to server after changes |
+| Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else`; copy to server after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh` |
 | Change browser tab title or SEO meta tags | `setup/streamlit/index.html` — update `<title>`, OG/Twitter meta tags |
 | Change footer text | `setup/yaml/frontend_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
 | Change alert thresholds | `setup/yaml/backend_config.yaml` — `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes` |

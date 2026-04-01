@@ -43,6 +43,9 @@ def main():
         print("notify_deploy: skipped — notify_on_startup is False")
         return
 
+    branch = cfg.get("deploy_branch", "main")
+    branch_tag = f" [{branch}]" if branch != "main" else ""
+
     ts = _timestamp()
     errors = []
 
@@ -55,7 +58,7 @@ def main():
                 resp = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id,
-                          "text": f"<b>Deploy OK</b>\n{ts}",
+                          "text": f"<b>Deploy OK{branch_tag}</b>\n{ts}",
                           "parse_mode": "HTML"},
                     timeout=10,
                 )
@@ -75,8 +78,8 @@ def main():
         smtp_name     = sec.get("smtp_user_name", "")
         alert_emails  = sec.get("alert_emails", [])
 
-        subject  = f"RamboQuant Deploy OK: {ts}"
-        html_body = f"<html><body><p><b>Deploy OK</b><br>{ts}</p></body></html>"
+        subject  = f"RamboQuant Deploy OK{branch_tag}: {ts}"
+        html_body = f"<html><body><p><b>Deploy OK{branch_tag}</b><br>{ts}</p></body></html>"
 
         for email in alert_emails:
             try:
