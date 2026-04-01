@@ -59,8 +59,7 @@ BRANCH="${REF#refs/heads/}"
 
   echo "[$TS] Sending startup notification..."
   sleep 5  # allow container to start
-  sudo podman exec ramboq-pod python -c \
-    "from src.helpers.alert_utils import send_startup_notification; send_startup_notification()" \
+  sudo podman exec ramboq-pod python webhook/notify_deploy.py \
     && echo "[$TS] Startup notification done" \
     || echo "[$TS] WARNING: startup notification failed"
 

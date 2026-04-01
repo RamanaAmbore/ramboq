@@ -79,7 +79,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
 
   echo "[$TS] Sending startup notification..."
-  python -c "from src.helpers.alert_utils import send_startup_notification; send_startup_notification()" \
+  python webhook/notify_deploy.py \
     && echo "[$TS] Startup notification done" \
     || echo "[$TS] WARNING: startup notification failed"
 

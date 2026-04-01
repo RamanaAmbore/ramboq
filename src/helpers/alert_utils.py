@@ -20,9 +20,8 @@ from datetime import datetime, timedelta
 
 import requests
 
-from src.helpers.date_time_utils import timestamp_display
 from src.helpers.mail_utils import send_email
-from src.helpers.ramboq_logger import get_logger, shutdown_logger
+from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import secrets, config, is_prod_capable
 
 logger = get_logger(__name__)
@@ -98,42 +97,6 @@ def _dispatch(msg_type: str, ist_display: str, table: str, subject_detail: str):
                 logger.info(f"{tg_prefix} email sent to {email}")
             except Exception as e:
                 logger.error(f"Failed to send {tg_prefix} email to {email}: {e}")
-
-
-# ---------------------------------------------------------------------------
-# Startup deploy notification
-# ---------------------------------------------------------------------------
-
-def send_startup_notification():
-    """
-    Send a test Telegram message and email at app startup to validate
-    that notifications are wired up correctly after a deploy.
-    Gated on is_prod_capable() so it only fires when cap_in_dev is True.
-    Controlled by notify_on_startup flag in backend_config.yaml.
-    """
-    if not is_prod_capable():
-        logger.info("Startup notification skipped — cap_in_dev is False")
-        return
-    if not config.get('notify_on_startup', False):
-        return
-
-    ts = timestamp_display()
-    msg = f"Deploy OK — {ts}"
-
-    tg_body = f"<b>Deploy OK</b>\n{ts}"
-    _send_telegram(tg_body)
-
-    alert_emails = secrets.get('alert_emails', [])
-    for email in alert_emails:
-        try:
-            send_email("", email, f"RamboQuant Deploy OK: {ts}",
-                       f"<html><body><p><b>Deploy OK</b><br>{ts}</p></body></html>")
-            logger.info(f"Startup notification email sent to {email}")
-        except Exception as e:
-            logger.error(f"Startup notification email failed for {email}: {e}")
-
-    logger.info(f"Startup notification sent: {msg}")
-    shutdown_logger()  # flush async queue before deploy subprocess exits
 
 
 # ---------------------------------------------------------------------------
