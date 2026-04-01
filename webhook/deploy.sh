@@ -126,7 +126,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   echo "[$TS] Sending startup notification..."
   if [ "$ENV" = "pod" ]; then
     sleep 5  # allow container to start
-    sudo podman exec ramboq-pod python /app/webhook/notify_deploy.py \
+    sudo podman exec ramboq-pod-app python /app/webhook/notify_deploy.py \
       && echo "[$TS] Startup notification done" \
       || echo "[$TS] WARNING: startup notification failed"
   else
