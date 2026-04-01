@@ -177,11 +177,10 @@ setup_environment() {
     local ssh_clone_url="$3"  # empty = use HTTPS
 
     local clone_url="${ssh_clone_url:-$REPO_HTTPS}"
-    local is_prod="False"
-    local capabilities="False"
-    if [ "$branch" = "main" ]; then
-        is_prod="True"
-        capabilities="True"
+    local capabilities="True"
+    local notify_on_startup="False"
+    if [ "$branch" != "main" ] && [[ "$branch" != pod* ]]; then
+        notify_on_startup="True"
     fi
 
     log_step "3. Setting up $app_root (branch: $branch)"
@@ -251,13 +250,14 @@ console_log_level: 40
 # App flags
 enforce_password_standard: False
 
-# cap_in_dev: master switch — True on prod/pod, False on dev by default
-cap_in_dev: $capabilities
+# cap_in_dev: master switch — True on all environments
+cap_in_dev: True
 
 # Production capability flags (each independently toggleable when cap_in_dev is True)
-genai: $capabilities
-telegram: $capabilities
-mail: $capabilities
+genai: True
+telegram: True
+mail: True
+notify_on_startup: $notify_on_startup
 EOF
         chown www-data:www-data "$yaml_dir/backend_config.yaml"
         log_ok "Created backend_config.yaml"

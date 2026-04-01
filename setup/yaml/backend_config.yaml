@@ -17,15 +17,15 @@ console_log_level: 40
 enforce_password_standard: False
 
 # cap_in_dev: master switch for production capabilities in this environment.
-# Set True on prod/pod servers and on dev when testing end-to-end.
-# Set False on dev to avoid CPU/bandwidth waste when prod runs in parallel.
-cap_in_dev: False
+# True on prod/pod and dev — enables GenAI, Telegram, email. Set False to silence everything.
+cap_in_dev: True
 
 # Production capability flags — each independently enables one capability when cap_in_dev is True.
 # To add a new capability: add its flag here and gate it with is_prod_capable() AND config.get('<flag>').
-genai: False               # GenAI market update (Gemini)
-telegram: False            # Telegram alert notifications
-mail: False                # Email notifications (SMTP)
+genai: True               # GenAI market update (Gemini)
+telegram: True            # Telegram alert notifications
+mail: True                # Email notifications (SMTP)
+notify_on_startup: True   # Send test Telegram+email on each deploy to confirm notifications work (set False on prod)
 
 # Loss alert thresholds — checked after every background performance refresh (during market hours)
 # Set to 0 to disable a threshold. alert_emails and telegram credentials go in secrets.yaml.

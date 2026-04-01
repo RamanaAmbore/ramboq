@@ -46,7 +46,7 @@ BRANCH="${REF#refs/heads/}"
   # Merge: keep new repo config as base (picks up any new fields), overlay only
   # env-specific flags from the server's saved config so they survive deploys.
   if [ -f "$CONFIG_BAK" ]; then
-    for key in enforce_password_standard cap_in_dev genai telegram mail; do
+    for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup; do
       val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
       [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/backend_config.yaml"
     done
