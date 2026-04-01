@@ -24,8 +24,14 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 - GitHub push → webhook at `webhook.ramboq.com/hooks/update` → `dispatch.sh` → `deploy.sh <ENV> <REF>` → venv+pip OR podman build → systemctl restart
 - `webhook.ramboq.com`, `dev.ramboq.com`, and `pod.ramboq.com` must be **grey cloud (DNS only)** in Cloudflare
-- For the `pod` branch: `deploy.sh pod` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`
+- For the `pod` branch: `deploy.sh pod` runs `podman build -t ramboq-pod:latest` then restarts `ramboq_pod.service`; running container is named **`ramboq-pod-app`** (set by `--name` in `ramboq_pod.service`) — use this name in `podman exec` and sudoers
 - Secrets are never baked into the Podman image — `setup/yaml/` is volume-mounted at runtime; log paths in `backend_config.yaml` are relative (`.log/`), resolving to `/app/.log/` inside the container (mapped to `/opt/ramboq_pod/.log/` on the host)
+
+### Branch Strategy
+All three branches (`main`, `dev`, `pod`) are kept in sync — every feature is developed on `dev`, merged to `main`, then merged to `pod`. After merging:
+- `dev` and `pod` are fast-forwarded to match `main` so all branches stay at the same commit
+- Branches are **never deleted** from GitHub — all three are permanent
+- Webhook deploys each branch to its own environment automatically on push
 
 ---
 
@@ -235,7 +241,8 @@ Key session state variables:
 - **Do not call `get_nearest_time()` more than once per page render** — use the returned value throughout
 - **Do not touch `ramboq_ssh/`** — it is a frozen reference snapshot of prod server files, not actively maintained. All real work happens in `src/`
 - **Do not mock broker API calls in tests** — the `@for_all_accounts` decorator and `Connections` singleton behaviour differs significantly from mocks
-- **Do not commit `secrets.yaml`** — it is gitignored; contains API keys, SMTP credentials, cookie secrets, Telegram token
+- **Do not commit `secrets.yaml`** — it is gitignored; contains API keys, SMTP credentials, cookie secrets, Telegram token. Changes must be applied via SSH `sed` on all three server paths (`/opt/ramboq`, `/opt/ramboq_dev`, `/opt/ramboq_pod`) individually
+- **Pod `podman exec` uses container name `ramboq-pod-app`** — not `ramboq-pod`; the service file sets `--name ramboq-pod-app`; sudoers and deploy scripts must match
 - **Do not use `st.sidebar`** — sidebar navigation is disabled in `.streamlit/config.toml`; all navigation is via `header.py`
 - **Do not add branch filter rules to hooks.json** — branch routing is handled in `dispatch.sh`, not in `hooks.json`; `hooks.json` only validates the event, repo, and HMAC
 - **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
