@@ -374,7 +374,7 @@ www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx
 www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/etc/nginx/sites-available/. /etc/nginx/sites-available/
 www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/var/www/html/. /var/www/html/
 www-data ALL=(ALL) NOPASSWD: /usr/bin/podman build -t ramboq-pod\:latest *
-www-data ALL=(ALL) NOPASSWD: /usr/bin/podman exec ramboq-pod *
+www-data ALL=(ALL) NOPASSWD: /usr/bin/podman exec ramboq-pod-app *
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -c > /dev/null && log_ok "Configured sudoers at $SUDOERS_FILE" || log_err "sudoers syntax error — check $SUDOERS_FILE manually"
