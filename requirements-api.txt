@@ -1,0 +1,15 @@
+# Phase 1 API dependencies — install alongside requirements.txt
+# pip install -r requirements.txt -r requirements-api.txt
+
+# Litestar ASGI framework
+litestar[standard]~=2.12
+
+# ASGI server
+uvicorn[standard]~=0.34
+
+# Async Redis client + ARQ worker queue
+redis~=5.2
+arq~=0.26
+
+# Async HTTP (for future Streamlit → API calls)
+httpx~=0.28
