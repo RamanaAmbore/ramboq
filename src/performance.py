@@ -18,7 +18,7 @@ def performance():
         _performance_content()
 
 
-@st.fragment(run_every=60)
+@st.fragment(run_every=config.get('performance_refresh_interval', 5) * 60)
 def _performance_content():
     refresh_time = get_nearest_time(interval=config.get('performance_refresh_interval', 5))
     ist_display = datetime.strptime(refresh_time, "%d-%b-%y %H:%M").strftime("%a, %B %d, %Y, %I:%M %p")

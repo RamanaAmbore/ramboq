@@ -44,7 +44,8 @@ def main():
         return
 
     branch = cfg.get("deploy_branch", "main")
-    branch_tag = f" [{branch}]" if branch != "main" else ""
+    is_non_main = branch != "main"
+    branch_tag = f" [{branch}]" if is_non_main else ""
 
     ts = _timestamp()
     errors = []
@@ -54,11 +55,12 @@ def main():
         token   = sec.get("telegram_bot_token", "")
         chat_id = sec.get("telegram_chat_id", "")
         if token and chat_id:
+            branch_line = f"\n⚠ <b>Branch: {branch}</b>" if is_non_main else ""
             try:
                 resp = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id,
-                          "text": f"<b>Deploy OK{branch_tag}</b>\n{ts}",
+                          "text": f"<b>Deploy OK{branch_tag}</b>{branch_line}\n{ts}",
                           "parse_mode": "HTML"},
                     timeout=10,
                 )
@@ -78,8 +80,33 @@ def main():
         smtp_name     = sec.get("smtp_user_name", "")
         alert_emails  = sec.get("alert_emails", [])
 
-        subject  = f"RamboQuant Deploy OK{branch_tag}: {ts}"
-        html_body = f"<html><body><p><b>Deploy OK{branch_tag}</b><br>{ts}</p></body></html>"
+        subject = f"RamboQuant Deploy OK{branch_tag}: {ts}"
+
+        branch_banner = ""
+        if is_non_main:
+            branch_banner = (
+                f"<div style='background-color:#fff3cd;border:1px solid #ffc107;"
+                f"border-radius:4px;padding:8px 14px;margin-bottom:12px;"
+                f"font-family:sans-serif;font-size:13px;color:#856404'>"
+                f"&#9888; <strong>Non-production branch: {branch}</strong>"
+                f"</div>"
+            )
+
+        html_body = (
+            f"<html><body style='font-family:sans-serif'>"
+            f"{branch_banner}"
+            f"<table style='border-collapse:collapse;width:100%'>"
+            f"<thead><tr>"
+            f"<th style='background-color:#1a3a5c;color:#fff;padding:8px 12px;text-align:left;font-size:13px'>Event</th>"
+            f"<th style='background-color:#1a3a5c;color:#fff;padding:8px 12px;text-align:left;font-size:13px'>Timestamp</th>"
+            f"</tr></thead>"
+            f"<tbody><tr>"
+            f"<td style='padding:6px 12px;font-size:13px;border-bottom:1px solid #dce3ea'><b>Deploy OK{branch_tag}</b></td>"
+            f"<td style='padding:6px 12px;font-size:13px;border-bottom:1px solid #dce3ea;font-family:monospace'>{ts}</td>"
+            f"</tr></tbody>"
+            f"</table>"
+            f"</body></html>"
+        )
 
         for email in alert_emails:
             try:
