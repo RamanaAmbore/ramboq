@@ -22,7 +22,7 @@ import requests
 
 from src.helpers.date_time_utils import timestamp_display
 from src.helpers.mail_utils import send_email
-from src.helpers.ramboq_logger import get_logger
+from src.helpers.ramboq_logger import get_logger, shutdown_logger
 from src.helpers.utils import secrets, config, is_prod_capable
 
 logger = get_logger(__name__)
@@ -133,6 +133,7 @@ def send_startup_notification():
             logger.error(f"Startup notification email failed for {email}: {e}")
 
     logger.info(f"Startup notification sent: {msg}")
+    shutdown_logger()  # flush async queue before deploy subprocess exits
 
 
 # ---------------------------------------------------------------------------
