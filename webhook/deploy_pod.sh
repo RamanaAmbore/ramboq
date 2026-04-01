@@ -57,5 +57,12 @@ BRANCH="${REF#refs/heads/}"
   echo "[$TS] Restarting $APP_SERVICE..."
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
 
+  echo "[$TS] Sending startup notification..."
+  sleep 5  # allow container to start
+  sudo podman exec ramboq-pod python -c \
+    "from src.helpers.alert_utils import send_startup_notification; send_startup_notification()" \
+    && echo "[$TS] Startup notification done" \
+    || echo "[$TS] WARNING: startup notification failed"
+
   echo "[$TS] Deployment complete"
 } >> "$LOG" 2>&1
