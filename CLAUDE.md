@@ -62,7 +62,7 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`. `is_market_open(now, holiday_set, market_start, market_end)` — returns True if not in holiday_set and within time window; weekends NOT hardcoded as closed to support special trading sessions (Muhurat etc.)
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 - **`background_refresh.py`** — Daemon thread started once at app startup. Warms market update cache immediately at startup. During market hours: pre-fetches broker data at each interval boundary; sends open summary (15 min after segment open); fires loss alerts. After market close: sends close summary. Segment-aware — handles Equity (NSE/BSE/NFO/CDS) and Commodity (MCX) independently with separate holiday calendars and open/close times.
-- **`alert_utils.py`** — Loss alert and market summary notifications. `send_summary(sum_holdings, sum_positions, ist_display, msg_type, label)` — sends open/close summary. `check_and_alert(sum_holdings, sum_positions, alert_state, ist_display)` — checks day P&L thresholds, fires one row per breached threshold. Both send via Telegram Bot API and SMTP email. Message type prefixes: Telegram `Open|Alert|Close`, email subject `RamboQuant Open:|RamboQuant Alert:|RamboQuant Close:`. Email uses HTML `<table>` formatting; Telegram uses `<code>` monospace block. Non-main branches show `[branch]` tag in all subjects/headers plus `⚠ Branch: <name>` in Telegram and a yellow banner in email body.
+- **`alert_utils.py`** — Loss alert and market summary notifications. `send_summary(sum_holdings, sum_positions, ist_display, msg_type, label, df_margins)` — sends open/close summary including a Funds table (Account | Cash | Avail Margin | Used Margin | Collateral) when `df_margins` is provided. `check_and_alert(sum_holdings, sum_positions, alert_state, ist_display, df_margins)` — checks day P&L thresholds AND negative fund balances (cash < 0 or avail margin < 0), fires one row per breached threshold. Both send via Telegram Bot API and SMTP email. Message type prefixes: Telegram `Open|Alert|Close`, email subject `RamboQuant Open:|RamboQuant Alert:|RamboQuant Close:`. Email uses HTML `<table>` formatting; Telegram uses `<code>` monospace block. Non-main branches show `[branch]` tag in all subjects/headers plus `⚠ Branch: <name>` in Telegram and a yellow banner in email body.
 
 ### Static Assets (`setup/streamlit/`)
 - **`index.html`** — Custom Streamlit entry HTML with RamboQuant Analytics meta tags, OG/Twitter cards, and favicon link. Copied into the Streamlit venv static folder on every deploy and app startup to survive pip upgrades.
@@ -133,16 +133,19 @@ The EST side uses `%Z` so it correctly shows `EST` in winter and `EDT` in summer
 
 ### Open/Close Summary Format
 Sent per segment (Equity and Commodity independently):
-- **Telegram**: `Open [branch] — Equity — <timestamp>` + `⚠ Branch: <name>` line (non-main only) + `<code>` monospace table
+- **Telegram**: `Open [branch] — Equity — <timestamp>` + `⚠ Branch: <name>` line (non-main only) + `<code>` monospace block
 - **Email subject**: `RamboQuant Open: [branch]Equity — <timestamp>` (branch tag omitted on main)
-- **Email body**: yellow banner for non-main + HTML `<table>` with styled headers for Holdings and Positions sections
+- **Email body**: yellow banner for non-main + HTML `<table>` sections for Holdings, Positions, and Funds
 - Holdings table: Account | Cur Val | P&L | P&L% | Day Loss | Day Loss%
 - Positions table: Account | P&L
+- Funds table: Account | Cash | Avail Margin | Used Margin | Collateral
 - Accounts shown as masked values (ZG#### / ZJ####)
 
-### Loss Alert Format
-One row per breached threshold (abs and pct fire separate rows):
-- Columns: Type | Account | Day Loss | Day Loss% | Abs Thr | Pct Thr
+### Loss / Fund Alert Format
+One row per breached threshold (abs, pct, and fund checks fire separate rows):
+- Columns: Type | Account | Value | Detail | Abs Thr | Pct Thr
+- Type can be `Holdings`, `Positions`, or `Funds`
+- Funds rows fired when `cash < 0` or `avail margin < 0` for any account (subject to cooldown)
 - `—` shown for columns not applicable to that threshold
 - Email uses HTML `<table>`; Telegram uses `<code>` monospace block
 
