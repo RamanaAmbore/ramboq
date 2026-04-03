@@ -124,13 +124,19 @@ async def _task_market(state: dict) -> None:
     """Warm market cache at startup, then every day at 08:30 IST."""
     from src.helpers.genai_api import get_market_update
 
-    while True:
+    # On first run, only fetch if before 08:30 IST today (i.e. no report yet today)
+    now = timestamp_indian()
+    today_warm = now.replace(hour=8, minute=30, second=0, microsecond=0)
+    if now < today_warm:
         try:
             await _run(get_market_update)
             logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
         except Exception as e:
             logger.error(f"Background: market warm failed: {e}")
+    else:
+        logger.info("Background: market task skipping startup warm (past 08:30 IST)")
 
+    while True:
         # Sleep until 08:30 IST tomorrow
         now  = timestamp_indian()
         next_warm = now.replace(hour=8, minute=30, second=0, microsecond=0)
@@ -139,6 +145,12 @@ async def _task_market(state: dict) -> None:
         sleep_s = (next_warm - now).total_seconds()
         logger.info(f"Background: market task sleeping {sleep_s/3600:.1f}h until next warm")
         await asyncio.sleep(sleep_s)
+
+        try:
+            await _run(get_market_update)
+            logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
+        except Exception as e:
+            logger.error(f"Background: market warm failed: {e}")
 
 
 async def _task_performance(state: dict) -> None:
