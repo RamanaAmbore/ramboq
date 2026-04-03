@@ -43,10 +43,10 @@
 
   // Admin sub-menu items (shown in dropdown)
   const adminSubLinks = [
-    { href: '/orders',  label: 'Orders' },
-    { href: '/algo',    label: 'Algo Agent' },
-    { href: '/admin',   label: 'Users' },
     { href: '/console', label: 'Terminal' },
+    { href: '/algo',    label: 'Algo Agent' },
+    { href: '/orders',  label: 'Orders' },
+    { href: '/admin',   label: 'Users' },
   ];
 
   // Admin gets a single "Admin" nav item (dropdown handled in template)
@@ -251,12 +251,14 @@
     top: 100%;
     right: 0;
     z-index: 60;
-    min-width: 140px;
+    min-width: 150px;
     margin-top: 4px;
     border-radius: 0.375rem;
-    background: rgba(15, 40, 40, 0.95);
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10), 0 4px 12px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.12);
     overflow: hidden;
   }
   .admin-dropdown-item {
