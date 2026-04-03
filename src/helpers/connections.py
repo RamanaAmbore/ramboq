@@ -58,24 +58,16 @@ class KiteConnection:
         try:
             kite_url = self.kite.login_url()
             logger.info("Kite login URL received.")
-            resp = self.session.get(kite_url)
-            # Redirect followed successfully — extract token from final URL
-            from urllib.parse import urlparse, parse_qs
-            params = parse_qs(urlparse(resp.url).query)
-            request_token = params.get("request_token", [""])[0]
+            self.session.get(kite_url)
+            request_token = ""
         except Exception as e:
-            # Redirect raised an exception — extract token from the error string
+            # Extract request token from URL exception
             try:
                 request_token = str(e).split("request_token=")[1].split("&")[0].split()[0]
+                logger.info(f"Request Token received: {request_token}")
             except Exception:
                 logger.error("Failed to extract request token.")
                 raise
-
-        if request_token:
-            logger.info(f"Request Token received: {request_token}")
-        else:
-            logger.error("Request token is empty after login flow.")
-            raise RuntimeError("Empty request token")
 
         self.setup_access_token(request_token)
 
