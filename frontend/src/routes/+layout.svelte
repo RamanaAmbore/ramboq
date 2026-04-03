@@ -64,7 +64,7 @@
       <!-- Desktop -->
       <div class="nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-4" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-11 w-auto pointer-events-none" />
         </a>
         <nav class="flex items-center gap-0.5 flex-1">
           {#each navLinks($authStore.user) as link}
@@ -85,7 +85,7 @@
       <!-- Mobile bar -->
       <div class="nav-inner md:hidden flex items-center justify-between h-12">
         <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-8 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-10 w-auto pointer-events-none" />
         </a>
         <button
           onclick={() => menuOpen = !menuOpen}
@@ -160,7 +160,7 @@
 
   .accent-bar {
     position: fixed;
-    height: 3px;
+    height: 5px;
     background-color: #ef9309;
     z-index: 200;
     max-width: 958px;

@@ -51,51 +51,49 @@
   const pnlStyle = ({ value }) =>
     value < 0 ? { color: '#c0392b' } : { color: '#27ae60' };
 
-  const defaultCol = { resizable: true, sortable: true, filter: true };
+  const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true };
 
   const holdingsSummaryCols = [
-    { field: 'account',               headerName: 'Account',    width: 110 },
-    { field: 'cur_val',               headerName: 'Cur Val',    flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'inv_val',               headerName: 'Inv Val',    flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'pnl',                   headerName: 'P&L',        flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'pnl_percentage',        headerName: 'P&L %',      width: 90, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_val',        headerName: 'Day P&L',    flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_percentage', headerName: 'Day %',      width: 90, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75},
+    { field: 'cur_val',               headerName: 'Cur Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'inv_val',               headerName: 'Inv Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'pnl',                   headerName: 'P&L',      flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'day_change_val',        headerName: 'Day P&L',  flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'day_change_percentage', headerName: 'Day %',    width: 70, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   const holdingsCols = [
-    { field: 'account',               headerName: 'Account',    width: 110 },
-    { field: 'tradingsymbol',         headerName: 'Symbol',     flex: 1 },
-    { field: 'exchange',              headerName: 'Exch',       width: 80 },
-    { field: 'quantity',              headerName: 'Qty',        width: 80,  type: 'numericColumn' },
-    { field: 'average_price',         headerName: 'Avg Price',  width: 110, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'close_price',           headerName: 'Close',      width: 100, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'cur_val',               headerName: 'Cur Val',    width: 120, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'pnl',                   headerName: 'P&L',        width: 110, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'pnl_percentage',        headerName: 'P&L %',      width: 90,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_val',        headerName: 'Day P&L',    width: 110, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_percentage', headerName: 'Day %',      width: 90,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'account',               headerName: 'Account',  width: 90,   },
+    { field: 'tradingsymbol',         headerName: 'Symbol',   minWidth: 100, flex: 1, pinned: 'left',  },
+    { field: 'quantity',              headerName: 'Qty',      width: 60,  type: 'numericColumn' },
+    { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'pnl',                   headerName: 'P&L',      width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'day_change_val',        headerName: 'Day P&L',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'day_change_percentage', headerName: 'Day %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   // Per-account holdings cols — without the account column
   const holdingsAcctCols = holdingsCols.filter(c => c.field !== 'account');
 
   const positionsSummaryCols = [
-    { field: 'account', headerName: 'Account', width: 110 },
+    { field: 'account', headerName: 'Account', width: 90,  },
     { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   const positionsCols = [
-    { field: 'account',       headerName: 'Account',    width: 110 },
-    { field: 'tradingsymbol', headerName: 'Symbol',     flex: 1 },
-    { field: 'exchange',      headerName: 'Exch',       width: 80 },
-    { field: 'product',       headerName: 'Product',    width: 90 },
-    { field: 'quantity',      headerName: 'Qty',        width: 80,  type: 'numericColumn' },
-    { field: 'average_price', headerName: 'Avg Price',  width: 110, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'close_price',   headerName: 'Close',      width: 100, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'pnl',           headerName: 'P&L',        width: 110, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'unrealised',    headerName: 'Unrealised', width: 110, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'realised',      headerName: 'Realised',   width: 110, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'account',       headerName: 'Account',   width: 90,   },
+    { field: 'tradingsymbol', headerName: 'Symbol',    minWidth: 100, flex: 1, pinned: 'left',  },
+    { field: 'product',       headerName: 'Product',   width: 65 },
+    { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn' },
+    { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
+    { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   const positionsAcctCols = positionsCols.filter(c => c.field !== 'account');
@@ -242,7 +240,21 @@
   });
 </script>
 
+{#if error}
+  <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
+{/if}
+
+<!-- Tabs + timestamp -->
 <div class="flex items-center justify-between mb-3">
+  <div class="flex gap-0.5">
+    {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
+      <button
+        class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+               {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+        onclick={() => switchTab(id)}
+      >{label}</button>
+    {/each}
+  </div>
   <div class="text-xs text-muted">
     {#if loading && !lastRefresh}
       <span class="animate-pulse">Loading…</span>
@@ -250,55 +262,32 @@
       <span>{lastRefresh}</span>
     {/if}
   </div>
-  <div class="flex items-center gap-2">
-    {#if loading && lastRefresh}
-      <span class="text-xs text-muted animate-pulse">Refreshing…</span>
-    {/if}
-    <button onclick={loadAll} disabled={loading} class="btn-secondary disabled:opacity-50">Refresh</button>
-  </div>
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  {#if error}
-    <div class="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
-  {/if}
+<section class:hidden={activeTab !== 'holdings'}>
+  <h2 class="section-heading">Summary</h2>
+  <div bind:this={holdingsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
 
-  <!-- Tabs -->
-  <div class="flex border-b border-gray-200 mb-4 gap-0.5">
-    {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
-      <button
-        class="px-4 py-1.5 text-xs font-medium border-b-2 transition-colors
-               {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-        onclick={() => switchTab(id)}
-      >{label}</button>
-    {/each}
-  </div>
+  <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
 
-  <section class:hidden={activeTab !== 'holdings'}>
-    <h2 class="section-heading">Summary</h2>
-    <div bind:this={holdingsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-5 w-full"></div>
+  <h2 class="section-heading">All Holdings</h2>
+  <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+</section>
 
-    <div bind:this={holdingsAccountsContainer} class="mb-5"></div>
+<section class:hidden={activeTab !== 'positions'}>
+  <h2 class="section-heading">Summary</h2>
+  <div bind:this={positionsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
 
-    <h2 class="section-heading">All Holdings</h2>
-    <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
-  </section>
+  <div bind:this={positionsAccountsContainer} class="mb-4"></div>
 
-  <section class:hidden={activeTab !== 'positions'}>
-    <h2 class="section-heading">Summary</h2>
-    <div bind:this={positionsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-5 w-full"></div>
+  <h2 class="section-heading">All Positions</h2>
+  <div bind:this={positionsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+</section>
 
-    <div bind:this={positionsAccountsContainer} class="mb-5"></div>
-
-    <h2 class="section-heading">All Positions</h2>
-    <div bind:this={positionsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
-  </section>
-
-  <section class:hidden={activeTab !== 'funds'}>
-    <h2 class="section-heading">Fund Balances</h2>
-    <div bind:this={fundsEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
-  </section>
-</div>
+<section class:hidden={activeTab !== 'funds'}>
+  <h2 class="section-heading">Fund Balances</h2>
+  <div bind:this={fundsEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+</section>
 
 <style>
   .hidden { display: none; }
