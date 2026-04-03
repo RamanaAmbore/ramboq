@@ -6,11 +6,13 @@ This file is for Claude Code. It provides project context, file map, patterns, a
 
 ## Project Overview
 
-**RamboQuant** is a production Streamlit web app for RamboQuant Analytics LLP at [ramboq.com](https://ramboq.com). It provides portfolio performance tracking, market updates (via Gemini AI), user onboarding, and investment information.
+**RamboQuant** is a production web app for RamboQuant Analytics LLP at [ramboq.com](https://ramboq.com). It provides portfolio performance tracking, market updates (via Gemini AI), user onboarding, and investment information.
 
-- **Single codebase**, two deployments: prod (`main` branch) and dev (any non-main branch)
-- **No database** — all data comes from Zerodha Kite broker API and YAML config files
-- **Auth is partially stubbed** — cookies track session state but backend user validation returns a placeholder
+- **Dual architecture**: Streamlit (legacy) + Litestar API + SvelteKit frontend (migration in progress on `new` branch)
+- **Single codebase**, three deployment targets: prod (`main`), dev (non-main branches), pod (`pod` branch)
+- **Database**: PostgreSQL 17 via SQLAlchemy 2.x async + asyncpg; `ramboq` (prod) / `ramboq_dev` (dev) selected by `deploy_branch`
+- **Broker data** comes from Zerodha Kite API; no DB storage for market data
+- **Auth**: JWT (HS256) with PBKDF2-SHA256 password hashing; users in SQLAlchemy DB; stub mode when DB is empty
 
 ---
 
@@ -249,6 +251,59 @@ Key session state variables:
 - **Always `chown www-data` after manual server operations** — any file created or modified on the server via SSH (git commands, scp, manual edits) must be owned by `www-data` or deploy scripts will fail silently. After any manual work run: `sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log /opt/ramboq_dev/.git /opt/ramboq_dev/.log /opt/ramboq_pod/.git /opt/ramboq_pod/.log`
 - **Do not hardcode weekends as closed** — use `is_market_open()` with the Kite holiday list; special Saturday trading sessions must work
 - **Do not add `show_spinner` to `@st.cache_data` on broker/market fetch functions** — background thread pre-warms cache; spinners would show on first load after restart but are misleading since data is already warm
+
+---
+
+## API Architecture (`new` branch — Litestar + SvelteKit)
+
+### Key Technologies
+- **API framework**: Litestar 2.x with msgspec.Struct schemas (~10× faster than pydantic)
+- **DataFrame**: Polars for API route aggregation; pandas in broker/alert layer (broker APIs return pandas)
+- **Database**: PostgreSQL 17 via SQLAlchemy 2.x async + asyncpg. Two databases on same server: `ramboq` (prod, branch=main) and `ramboq_dev` (dev, any other branch). Selected by `deploy_branch` in `backend_config.yaml`.
+- **Background**: Three asyncio tasks in Litestar process (market warm, performance refresh, close summaries); blocking broker calls run in ThreadPoolExecutor
+- **Auth**: JWT HS256 (8h TTL), PBKDF2-SHA256 passwords, users in PostgreSQL. Admin approval required for partner registration. Admin can create pre-approved users.
+
+### Database
+- **PostgreSQL** on server (69.62.78.136), port 5432
+- Credentials in `secrets.yaml`: `db_user`, `db_password`, `db_host` (default localhost), `db_port` (default 5432)
+- `deploy_branch == 'main'` → database `ramboq`; any other branch → `ramboq_dev`
+- Tables auto-created on startup via `init_db()`
+- **User table** (30 columns): `id`, `account_id` (auto-generated `rambo-XXXXXX`), `username`, `password_hash`, `role` (admin/partner), `display_name`, `email`, `phone`, `pan`, `aadhaar_last4`, `date_of_birth`, `kyc_verified`, `address_line1/2`, `city`, `state`, `pincode`, `contribution`, `contribution_date`, `share_pct`, `bank_name`, `bank_account`, `bank_ifsc`, `nominee_name/relation/phone`, `is_approved`, `is_active`, `join_date`, `notes`, `created_at`, `updated_at`
+
+### API File Map
+- **`api/app.py`** — Litestar app; on_startup: init_db() + background tasks; CORS; OpenAPI via Scalar
+- **`api/schemas.py`** — msgspec.Struct response models for all endpoints
+- **`api/database.py`** — PostgreSQL via asyncpg; DB name selected by deploy_branch
+- **`api/models.py`** — `User` ORM model with full partner fields (personal, KYC, address, investment, bank, nominee)
+- **`api/background.py`** — Async background scheduler: `_task_market`, `_task_performance`, `_task_close`
+- **`api/cache.py`** — In-process TTL cache with per-key async locking
+- **`api/auth_guard.py`** — `jwt_guard` and `admin_guard` for route protection
+- **`api/routes/auth.py`** — Login (blocks unapproved partners), register (pending approval), me, logout
+- **`api/routes/admin.py`** — Admin-only: create user, approve/reject, update all fields, logs, exec, users list, deactivate
+- **`api/routes/holdings.py`** / **`positions.py`** / **`funds.py`** — Polars aggregation, public endpoints
+- **`api/routes/market.py`** — Gemini market report with 1-hour TTL cache
+- **`api/routes/config.py`** — Post/about content from frontend_config.yaml with refreshed_at timestamp
+- **`api/routes/ws.py`** — WebSocket fan-out via per-connection asyncio.Queue
+
+### SvelteKit File Map
+- **`frontend/src/app.css`** — AG Grid theme (flat, no shadow, mermaid-teal header `#d0e0e0`, `#315062` text), btn-primary matches AG Grid header
+- **`frontend/src/lib/api.js`** — REST helpers with JWT auth headers, 401 auto-redirect, admin CRUD helpers
+- **`frontend/src/lib/stores.js`** — authStore (sessionStorage-backed) + dataCache (stale-while-revalidate)
+- **`frontend/src/lib/ws.js`** — Auto-reconnect WebSocket client
+- **`frontend/src/routes/+layout.svelte`** — Responsive nav, role-based links (Users for admin), mobile hamburger
+- **`frontend/src/routes/performance/`** — AG Grid tables with per-account + combined grids; URL synced via ?tab=; smooth transaction updates
+- **`frontend/src/routes/market/`** — Markdown renderer + timestamp; all pages in white cards with uniform `p-5 pt-4`
+- **`frontend/src/routes/signin/`** — Sign In / Register tabs; register collects name, email, phone, PAN
+- **`frontend/src/routes/admin/`** — User management: create user, approve/reject, edit all partner fields (personal, address, investment, bank, nominee)
+- **`frontend/src/routes/portfolio/`** — Partner contribution info
+
+### Background Processing
+Two modes available:
+1. **Litestar async** (default): `bash run_api.sh` — single process, no Redis
+2. **ARQ worker** (optional): `bash run_api.sh` + `bash run_worker.sh` — needs Redis
+
+### Logging
+Simplified to 3 handlers: rotating log file (5MB × 5), rotating error file, console. All async via QueueListener.
 
 ---
 

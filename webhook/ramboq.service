@@ -1,15 +1,22 @@
 [Unit]
-Description=Streamlit App for ramboq.com
-After=network.target
+Description=RamboQuant API + SvelteKit SPA (prod — ramboq.com)
+After=network.target redis.service
+Wants=redis.service
 
 [Service]
 WorkingDirectory=/opt/ramboq
 User=www-data
 Group=www-data
-ExecStart=/bin/bash -c 'source /opt/ramboq/venv/bin/activate && streamlit run app.py --server.port=8502 --server.address=0.0.0.0 2>&1 | tee -a /opt/ramboq/.log/error_file'
+ExecStart=/bin/bash -c 'source /opt/ramboq/venv/bin/activate && \
+  uvicorn api.app:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 2 \
+    --log-level warning \
+    2>&1 | tee -a /opt/ramboq/.log/error_file'
 Restart=always
 RestartSec=5
+Environment=REDIS_URL=redis://localhost:6379
 
 [Install]
 WantedBy=multi-user.target
-

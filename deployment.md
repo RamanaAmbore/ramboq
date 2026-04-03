@@ -1,269 +1,343 @@
-⚙️ Secure GitHub Webhook Deployment for ramboq.com: A Complete Guide with Nginx, systemd, and Cloudflare
-This tutorial explains how to automate deployments from GitHub using signed webhooks, served via Nginx with SSL (via Certbot), integrated with Cloudflare DNS and reverse proxying. Services are orchestrated with systemd, and deploy logic is modularized inside /webhook.
+# RamboQuant — Deployment Guide
 
-🧭 Architecture Overview
-Developer → GitHub → Webhook (HMAC signed)
-             ↓
-       Cloudflare DNS & Proxy
-             ↓
-           Nginx
-       /hooks/update ↘
-                    Webhook listener → deploy.sh → Restart app
-             /
-        Streamlit app (/)
+Complete server setup and deployment reference for all three environments.
 
+---
 
+## Architecture Overview
 
-📁 Directory Structure
-/opt/ramboq/
-├── src/
-├── setup/
-├── .venv/
-├── .log/
-│   ├── hook.log
-│   ├── hook.err
-│   ├── hook_debug.log
-│   └── reload_services.log
-├── webhook/
-│   ├── hooks.json
-│   ├── deploy.sh
-│   └── services.sh
+```
+Developer (local)
+    │  git push origin <branch>
+    ▼
+GitHub → POST https://webhook.ramboq.com/hooks/update (HMAC-SHA256 signed)
+    ▼
+Nginx (port 443, webhook.ramboq.com) → proxy to port 9001
+    ▼
+Webhook listener (ramboq_hook.service, port 9001, www-data)
+    │  Validates: push event + repo name + HMAC signature
+    │  Calls: /etc/webhook/dispatch.sh <ref>
+    ▼
+dispatch.sh — routes by branch:
+    ├── main         → /opt/ramboq/webhook/deploy.sh prod main
+    ├── pod*         → /opt/ramboq_pod/webhook/deploy.sh pod <ref>
+    └── any other    → /opt/ramboq_dev/webhook/deploy.sh dev <ref>
+    ▼
+deploy.sh — git pull, pip install, config merge, systemctl restart
+    ▼
+App running:
+    ├── ramboq.com      (port 8502) — Streamlit + Litestar API (port 8000)
+    ├── dev.ramboq.com  (port 8503) — Streamlit + Litestar API (port 8001)
+    └── pod.ramboq.com  (port 8504) — Podman container
+```
 
-
+---
 
-🔑 Step 1: SSH Setup for GitHub Access
-sudo -u www-data ssh-keygen -t ed25519 -f /var/www/.ssh/id_ed25519 -N ""
-# Add id_ed25519.pub to GitHub Deploy Keys (read/write)
-sudo chown -R www-data:www-data /var/www/.ssh
-chmod 700 /var/www/.ssh
-chmod 600 /var/www/.ssh/id_ed25519
-git remote set-url origin git@github.com:<your_user>/ramboq.git
+## Environments
 
-
+| Environment | Branch | Server path | Streamlit port | API port | Domain | Database |
+|---|---|---|---|---|---|---|
+| Production | `main` | `/opt/ramboq` | 8502 | 8000 | ramboq.com | `ramboq` |
+| Development | non-main | `/opt/ramboq_dev` | 8503 | 8001 | dev.ramboq.com | `ramboq_dev` |
+| Pod (container) | `pod` | `/opt/ramboq_pod` | 8504 | — | pod.ramboq.com | `ramboq_dev` |
 
-🔐 Step 2: Generate Webhook Secret
-openssl rand -hex 16
+All three branches (`main`, `dev`, `pod`) are permanent — never deleted from GitHub.
 
+---
 
-Save this secret securely. Use it in GitHub webhook config and inside hooks.json.
+## Prerequisites
 
-🔗 Step 3: GitHub Webhook Creation
-In GitHub repo:
-- Go to Settings → Webhooks → Add Webhook
-- Payload URL: https://www.ramboq.com/hooks/update
-- Content-Type: application/json
-- Secret: (your secret from above)
-- Event: ✅ Push only
+- Ubuntu server with public IP
+- Python 3.11+
+- PostgreSQL 17
+- Node.js 20+ (for SvelteKit build)
+- nginx, certbot, systemd
+- Podman (for pod environment only)
 
-🧬 Step 4: hooks.json (Webhook Trigger Rules)
-[
-  {
-    "id": "ramboq-deploy",
-    "execute-command": "/opt/ramboq/webhook/deploy.sh",
-    "command-working-directory": "/opt/ramboq",
-    "pass-environment-to-command": [
-      {
-        "source": "header",
-        "name": "X-Hub-Signature-256",
-        "envname": "HTTP_X_HUB_SIGNATURE_256"
-      },
-      {
-        "source": "header",
-        "name": "X-GitHub-Event",
-        "envname": "HTTP_X_GITHUB_EVENT"
-      }
-    ],
-    "trigger-rule": {
-      "and": [
-        {
-          "match": {
-            "type": "value",
-            "value": "push",
-            "parameter": {
-              "source": "header",
-              "name": "X-GitHub-Event"
-            }
-          }
-        },
-        {
-          "match": {
-            "type": "value",
-            "value": "refs/heads/main",
-            "parameter": {
-              "source": "payload",
-              "name": "ref"
-            }
-          }
-        },
-        {
-          "match": {
-            "type": "payload-hmac-sha256",
-            "parameter": {
-              "source": "header",
-              "name": "X-Hub-Signature-256"
-            },
-            "secret": "your_generated_secret_here"
-          }
-        }
-      ]
-    }
-  }
-]
+---
 
-
+## Initial Server Setup
 
-🧾 Step 5: deploy.sh
-#!/bin/bash
+### Automated
 
-LOG="/opt/ramboq/.log/hook_debug.log"
-TS=$(date '+%Y-%m-%d %H:%M:%S')
-export HOME=/var/www
+```bash
+sudo bash /opt/ramboq/webhook/initial_deploy.sh --env both
+```
 
-{
-  echo "[$TS] Deploy triggered"
-  env | grep '^HTTP_' || echo "No HTTP headers found"
-  cat
-  echo "[$TS] Signature: $HTTP_X_HUB_SIGNATURE_256"
+This handles: system packages, SSH setup, git clone, venv, pip install, log directories, systemd services, nginx config, and sudoers.
 
-  cd /opt/ramboq || exit 1
-  git config --add safe.directory /opt/ramboq
-  git pull origin main
+**After the script, do manually:**
+1. Place `secrets.yaml` with real credentials (see below)
+2. Set Cloudflare DNS records (grey cloud for webhook/dev/pod)
+3. Run certbot for SSL
+4. Add GitHub webhook
+5. Set up PostgreSQL databases
+6. Restart services
 
-  source .venv/bin/activate
-  pip install --no-cache-dir -r requirements.txt
+### PostgreSQL Setup
 
-  sudo systemctl restart ramboq.service || echo "Restart failed"
+```sql
+-- As postgres superuser
+CREATE DATABASE ramboq OWNER rambo_admin;
+CREATE DATABASE ramboq_dev OWNER rambo_admin;
+```
 
-  echo "[$TS] Deployment complete"
-} >> "$LOG" 2>&1
+Tables are auto-created on first API startup via `init_db()`.
 
-
+The API selects the database by `deploy_branch` in `backend_config.yaml`:
+- `main` → `ramboq`
+- anything else → `ramboq_dev`
 
-🔁 Step 6: services.sh
-#!/bin/bash
+### Secrets File
 
-LOG_FILE="/opt/ramboq/.log/reload_services.log"
-TS=$(date +"%Y-%m-%d %H:%M:%S")
+Hand-place `setup/yaml/secrets.yaml` on all three server paths. Never committed to git.
 
-echo "[$TS] Reloading services..." | tee -a $LOG_FILE
+```yaml
+# SMTP
+smtp_server: smtp.hostinger.com
+smtp_port: 587
+smtp_user_name: RamboQuant Team
+smtp_user: <email>
+smtp_pass: <password>
 
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
+# Broker accounts
+kite_accounts:
+  <user_id>:
+    password: ...
+    totp_token: ...
+    api_key: ...
+    api_secret: ...
+kite_login_url: https://kite.zerodha.com/api/login
+kite_twofa_url: https://kite.zerodha.com/api/twofa
 
-if sudo nginx -t; then
-  sudo systemctl reload nginx
-else
-  echo "Nginx test failed" | tee -a $LOG_FILE
-fi
+# Database
+db_user: rambo_admin
+db_password: <password>
 
-sudo systemctl restart ramboq_hook.service
-sudo systemctl restart ramboq.service
+# Auth
+cookie_secret: <random-string>
 
-echo "[$TS] Reload complete." | tee -a $LOG_FILE
+# AI
+gemini_api_key: <key>
 
-
+# Notifications
+telegram_bot_token: <token>
+telegram_chat_id: <group-chat-id>
+alert_emails:
+  - <email>
+```
 
-⚙️ Step 7: Systemd Services
-These should be saved in /etc/systemd/system/
+Update on all three servers individually:
+```bash
+sudo nano /opt/ramboq/setup/yaml/secrets.yaml
+sudo nano /opt/ramboq_dev/setup/yaml/secrets.yaml
+sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
+```
 
-ramboq.service
-[Unit]
-Description=Streamlit App for ramboq.com
-After=network.target
+---
 
-[Service]
-WorkingDirectory=/opt/ramboq
-ExecStart=/bin/bash -c 'source /opt/ramboq/.venv/bin/activate && streamlit run app.py --server.port=8502 --server.address=0.0.0.0'
-Restart=always
-RestartSec=5
+## SSL Certificates
 
-[Install]
-WantedBy=multi-user.target
+**Prerequisite:** DNS must resolve to server IP (grey cloud in Cloudflare).
 
-
-ramboq_hook.service
-[Unit]
-Description=Webhook Listener for ramboq.com
-After=network.target
+```bash
+sudo certbot --nginx -d ramboq.com -d www.ramboq.com -d webhook.ramboq.com -d dev.ramboq.com -d pod.ramboq.com
+```
 
-[Service]
-ExecStart=/usr/bin/webhook -hooks /opt/ramboq/webhook/hooks.json -port 9001 -verbose
-StandardOutput=append:/opt/ramboq/.log/hook.log
-StandardError=append:/opt/ramboq/.log/hook.err
-Restart=always
-User=www-data
-Group=www-data
-
-[Install]
-WantedBy=multi-user.target
-
-
-
-🌐 Step 8: Nginx Setup
-Create /etc/nginx/sites-available/ramboq.com:
-server {
-    server_name ramboq.com www.ramboq.com localhost;
-
-    location / {
-        proxy_pass http://localhost:8502;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 86400;
-    }
-
-    location /hooks/update {
-        proxy_pass http://127.0.0.1:9001/hooks/ramboq-deploy;
-        proxy_http_version 1.1;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Host $host;
-    }
-
-    listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/live/ramboq.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/ramboq.com/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-}
-
-server {
-    listen 80;
-    server_name ramboq.com www.ramboq.com localhost;
-
-    if ($host = www.ramboq.com) {
-        return 301 https://$host$request_uri;
-    }
-
-    if ($host = ramboq.com) {
-        return 301 https://$host$request_uri;
-    }
-
-    return 404;
-}
-
-
-Enable with:
-sudo ln -s /etc/nginx/sites-available/ramboq.com /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-
-
-
-🔐 Step 9: Certbot SSL Setup
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d ramboq.com -d www.ramboq.com
+Auto-renewal via systemd timer:
+```bash
+sudo systemctl status certbot.timer
 sudo certbot renew --dry-run
+```
 
+---
 
+## Cloudflare DNS
 
-☁️ Step 10: Cloudflare Setup
-- Add DNS A records for ramboq.com and www.ramboq.com pointing to server IP
-- Proxy traffic (orange cloud) to enable caching, DDoS mitigation
-- SSL Mode: Full (Strict)
-- Optionally restrict traffic to only Cloudflare IP ranges in Nginx
+| Type | Name | Target | Proxy |
+|---|---|---|---|
+| A | `ramboq.com` | server IP | Orange (proxied) |
+| A | `www` | server IP | Orange (proxied) |
+| A | `webhook` | server IP | **Grey (DNS only)** |
+| A | `dev` | server IP | **Grey (DNS only)** |
+| A | `pod` | server IP | **Grey (DNS only)** |
 
-🐳 Step 11: Docker (Planned)
-Some components may be containerized in future. You'll write a separate Docker tutorial covering:
-- App containerization
+`webhook`, `dev`, and `pod` **must** be grey cloud — Cloudflare proxy breaks webhook HMAC validation and certbot HTTP challenges.
+
+---
+
+## GitHub Webhook
+
+1. Go to **GitHub → repo → Settings → Webhooks → Add webhook**
+2. Payload URL: `https://webhook.ramboq.com/hooks/update`
+3. Content type: `application/json`
+4. Secret: value from `hooks.json` → `payload-hmac-sha256.secret`
+5. Events: **Just the push event**
+
+Verify:
+```bash
+sudo systemctl status ramboq_hook.service
+sudo ss -tlnp | grep 9001
+```
+
+---
+
+## Service Files
+
+All service files are in `webhook/` and installed to `/etc/systemd/system/`.
+
+| File | Service | Port | Purpose |
+|---|---|---|---|
+| `ramboq.service` | ramboq.service | 8502 | Prod Streamlit app |
+| `ramboq_dev.service` | ramboq_dev.service | 8503 | Dev Streamlit app |
+| `ramboq_pod.service` | ramboq_pod.service | 8504 | Podman container |
+| `ramboq_hook.service` | ramboq_hook.service | 9001 | Webhook listener (shared) |
+
+After updating a service file:
+```bash
+sudo cp /opt/ramboq/webhook/ramboq.service /etc/systemd/system/ramboq.service
+sudo systemctl daemon-reload && sudo systemctl restart ramboq.service
+```
+
+After updating `hooks.json` or `dispatch.sh`:
+```bash
+sudo cp /opt/ramboq/webhook/hooks.json /etc/webhook/hooks.json
+sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh
+sudo systemctl restart ramboq_hook.service
+```
+
+---
+
+## Litestar API Deployment
+
+The API runs alongside Streamlit on each environment. On the server:
+
+```bash
+# Start API (includes background tasks + DB init)
+bash run_api.sh --no-reload    # production mode
+
+# Or with auto-reload for dev
+bash run_api.sh
+```
+
+The API:
+- Connects to PostgreSQL (db selected by `deploy_branch`)
+- Creates tables on startup if they don't exist
+- Starts background tasks (market warm, performance refresh, alerts)
+- Serves SvelteKit build if `frontend/build/` exists
+
+### SvelteKit Build (for production)
+
+```bash
+cd frontend && npm install && npm run build
+```
+
+The built files at `frontend/build/` are served by Litestar as static files.
+
+---
+
+## Config Merge on Deploy
+
+`deploy.sh` merges backend_config.yaml on every deploy:
+- Repo config is the base (picks up new fields)
+- These server flags are preserved: `enforce_password_standard`, `cap_in_dev`, `genai`, `telegram`, `mail`, `notify_on_startup`
+- `deploy_branch` is always set fresh by the deploy script
+
+---
+
+## Podman Environment
+
+The `pod` branch runs inside a Podman container.
+
+```bash
+# First-time setup
+sudo apt install -y podman
+sudo mkdir -p /opt/ramboq_pod
+sudo chown www-data:www-data /opt/ramboq_pod
+sudo -u www-data git clone <repo> /opt/ramboq_pod
+sudo -u www-data git -C /opt/ramboq_pod checkout pod
+```
+
+Secrets are volume-mounted at runtime (never baked into the image):
+```
+-v /opt/ramboq_pod/setup/yaml:/app/setup/yaml:ro
+-v /opt/ramboq_pod/.log:/app/.log:rw
+```
+
+Container name: `ramboq-pod-app` (set by `--name` in service file).
+
+---
+
+## Log Files
+
+Each environment has its own `.log/` directory:
+
+| File | Source | Contents |
+|---|---|---|
+| `hook_debug.log` | deploy.sh | Deploy script output |
+| `hook.log` | ramboq_hook.service | Webhook listener output (shared, prod only) |
+| `error_file` | systemd service tee | All Streamlit stdout+stderr |
+| `log_file` | ramboq_logger.py | Full Python app log (5MB rotating × 5) |
+
+---
+
+## Debugging
+
+### Deploy not triggering
+```bash
+sudo systemctl status ramboq_hook.service
+sudo ss -tlnp | grep 9001
+tail -50 /opt/ramboq/.log/hook.log
+```
+
+### Deploy triggered but app not updated
+```bash
+tail -100 /opt/ramboq/.log/hook_debug.log      # prod
+tail -100 /opt/ramboq_dev/.log/hook_debug.log   # dev
+sudo systemctl status ramboq.service
+```
+
+### Permission issues (deploy fails silently)
+```bash
+# Always run after manual server operations
+sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log
+sudo chown -R www-data:www-data /opt/ramboq_dev/.git /opt/ramboq_dev/.log
+sudo chown -R www-data:www-data /opt/ramboq_pod/.git /opt/ramboq_pod/.log
+```
+
+### 502 Bad Gateway
+```bash
+sudo ss -tlnp | grep -E '8502|8503|8504'
+tail -50 /opt/ramboq/.log/error_file
+sudo nginx -t
+```
+
+### PostgreSQL connection issues
+```bash
+PGPASSWORD='<password>' psql -U rambo_admin -h localhost -d ramboq -c 'SELECT 1;'
+```
+
+---
+
+## Useful Commands
+
+```bash
+# Service status
+sudo systemctl status ramboq.service ramboq_dev.service ramboq_hook.service
+
+# Live logs
+tail -f /opt/ramboq/.log/hook_debug.log         # prod deploys
+tail -f /opt/ramboq/.log/log_file                # prod app log
+
+# Manual deploy (bypass webhook)
+bash /opt/ramboq/webhook/deploy.sh prod main
+bash /opt/ramboq_dev/webhook/deploy.sh dev dev
+
+# Confirm ports
+sudo ss -tlnp | grep -E '8502|8503|8504|9001|8000|8001'
+
+# Reload all services
+sudo systemctl daemon-reload
+sudo systemctl restart ramboq.service ramboq_dev.service ramboq_hook.service
+sudo nginx -t && sudo systemctl reload nginx
+```

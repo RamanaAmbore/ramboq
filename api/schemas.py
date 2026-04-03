@@ -1,17 +1,18 @@
 """
-Pydantic v2 response schemas for all API endpoints.
-These define the contract between the Litestar backend and any frontend (Streamlit or SvelteKit).
+msgspec response schemas for all API endpoints.
+msgspec.Struct is ~10x faster than pydantic for serialisation.
+Litestar has native msgspec support — no adapter needed.
 """
 
 from typing import Optional
-from pydantic import BaseModel
+import msgspec
 
 
 # ---------------------------------------------------------------------------
 # Holdings
 # ---------------------------------------------------------------------------
 
-class HoldingRow(BaseModel):
+class HoldingRow(msgspec.Struct):
     account: str
     tradingsymbol: str
     exchange: str
@@ -22,12 +23,12 @@ class HoldingRow(BaseModel):
     cur_val: float
     pnl: float
     pnl_percentage: float
-    day_change: float
-    day_change_val: float
-    day_change_percentage: float
+    day_change: float = 0.0
+    day_change_val: float = 0.0
+    day_change_percentage: float = 0.0
 
 
-class HoldingsSummaryRow(BaseModel):
+class HoldingsSummaryRow(msgspec.Struct):
     account: str
     inv_val: float
     cur_val: float
@@ -39,7 +40,7 @@ class HoldingsSummaryRow(BaseModel):
     net: Optional[float] = None
 
 
-class HoldingsResponse(BaseModel):
+class HoldingsResponse(msgspec.Struct):
     rows: list[HoldingRow]
     summary: list[HoldingsSummaryRow]
     refreshed_at: str
@@ -49,7 +50,7 @@ class HoldingsResponse(BaseModel):
 # Positions
 # ---------------------------------------------------------------------------
 
-class PositionRow(BaseModel):
+class PositionRow(msgspec.Struct):
     account: str
     tradingsymbol: str
     exchange: str
@@ -58,16 +59,16 @@ class PositionRow(BaseModel):
     average_price: float
     close_price: float
     pnl: float
-    unrealised: float
-    realised: float
+    unrealised: float = 0.0
+    realised: float = 0.0
 
 
-class PositionsSummaryRow(BaseModel):
+class PositionsSummaryRow(msgspec.Struct):
     account: str
     pnl: float
 
 
-class PositionsResponse(BaseModel):
+class PositionsResponse(msgspec.Struct):
     rows: list[PositionRow]
     summary: list[PositionsSummaryRow]
     refreshed_at: str
@@ -77,7 +78,7 @@ class PositionsResponse(BaseModel):
 # Funds
 # ---------------------------------------------------------------------------
 
-class FundsRow(BaseModel):
+class FundsRow(msgspec.Struct):
     account: str
     cash: float           # avail opening_balance
     avail_margin: float   # net
@@ -85,7 +86,7 @@ class FundsRow(BaseModel):
     collateral: float     # avail collateral
 
 
-class FundsResponse(BaseModel):
+class FundsResponse(msgspec.Struct):
     rows: list[FundsRow]
     refreshed_at: str
 
@@ -94,7 +95,101 @@ class FundsResponse(BaseModel):
 # Market update
 # ---------------------------------------------------------------------------
 
-class MarketResponse(BaseModel):
+class MarketResponse(msgspec.Struct):
     content: str
     cycle_date: str
     refreshed_at: str
+
+
+# ---------------------------------------------------------------------------
+# Post / Insights
+# ---------------------------------------------------------------------------
+
+class PostResponse(msgspec.Struct):
+    content: str
+    refreshed_at: str
+
+
+# ---------------------------------------------------------------------------
+# Orders
+# ---------------------------------------------------------------------------
+
+class PlaceOrderRequest(msgspec.Struct):
+    account: str
+    variety: str = "regular"
+    exchange: str = ""
+    tradingsymbol: str = ""
+    transaction_type: str = ""
+    quantity: int = 0
+    product: str = ""
+    order_type: str = ""
+    price: Optional[float] = None
+    trigger_price: Optional[float] = None
+    validity: str = "DAY"
+    tag: Optional[str] = None
+
+
+class ModifyOrderRequest(msgspec.Struct):
+    account: str
+    variety: str = "regular"
+    quantity: Optional[int] = None
+    price: Optional[float] = None
+    order_type: Optional[str] = None
+    trigger_price: Optional[float] = None
+    validity: Optional[str] = None
+
+
+class OrderRow(msgspec.Struct):
+    order_id: str
+    account: str
+    exchange: str
+    tradingsymbol: str
+    transaction_type: str
+    quantity: int
+    pending_quantity: int
+    filled_quantity: int
+    price: float
+    trigger_price: float
+    average_price: float
+    status: str
+    order_type: str
+    product: str
+    variety: str
+    order_timestamp: str
+    exchange_timestamp: Optional[str] = None
+    status_message: Optional[str] = None
+    tag: Optional[str] = None
+
+
+class OrdersResponse(msgspec.Struct):
+    rows: list[OrderRow]
+    refreshed_at: str
+
+
+class PlaceOrderResponse(msgspec.Struct):
+    order_id: str
+    account: str
+    detail: str = "Order placed successfully"
+
+
+class CancelOrderResponse(msgspec.Struct):
+    order_id: str
+    detail: str = "Order cancelled successfully"
+
+
+class ModifyOrderResponse(msgspec.Struct):
+    order_id: str
+    detail: str = "Order modified successfully"
+
+
+# ---------------------------------------------------------------------------
+# Accounts
+# ---------------------------------------------------------------------------
+
+class AccountInfo(msgspec.Struct):
+    account_id: str
+    display: str
+
+
+class AccountsResponse(msgspec.Struct):
+    accounts: list[AccountInfo]

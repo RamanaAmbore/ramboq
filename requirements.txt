@@ -1,15 +1,10 @@
-streamlit~=1.48.1
+# Core broker / data dependencies (shared by API and worker layers)
 pyyaml~=6.0.2
-plotly
-streamlit-scroll-navigation
-streamlit_extras
 kiteconnect~=5.0.1
 pyotp~=2.9.0
 google-genai~=1.0
 babel~=2.17.0
-
 pandas~=2.3.1
 pillow~=11.3.0
 requests~=2.32.4
-streamlit-cookies-manager
-extra-streamlit-components
+plotly

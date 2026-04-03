@@ -1,19 +1,63 @@
 """Holdings endpoint — returns per-account rows and summary."""
 
 import pandas as pd
+import polars as pl
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
 
+from api.cache import get_or_fetch
 from api.schemas import HoldingsResponse, HoldingRow, HoldingsSummaryRow
 from src.helpers import broker_apis
 from src.helpers.date_time_utils import timestamp_display
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import mask_column
-from src.constants import holdings_config
 
 logger = get_logger(__name__)
 
-_HOLDING_COLS = [c for c in holdings_config.keys() if c not in ('cash', 'net')]
+_ROW_COLS = [
+    'account', 'tradingsymbol', 'exchange', 'quantity',
+    'average_price', 'close_price', 'inv_val', 'cur_val',
+    'pnl', 'pnl_percentage', 'day_change', 'day_change_val', 'day_change_percentage',
+]
+
+_TTL = 30  # seconds — background task invalidates on each refresh
+
+
+def _fetch() -> HoldingsResponse:
+    raw = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
+    raw['account'] = mask_column(raw['account'])
+
+    df = pl.from_pandas(raw.fillna(0))
+
+    row_cols = [c for c in _ROW_COLS if c in df.columns]
+    df_rows = df.select(row_cols)
+
+    sum_cols = [c for c in ['inv_val', 'cur_val', 'pnl', 'day_change_val'] if c in df.columns]
+    grouped = (
+        df.group_by('account')
+          .agg([pl.col(c).sum() for c in sum_cols])
+    )
+    grouped = grouped.with_columns([
+        (pl.col('pnl')            / pl.col('inv_val')  * 100).alias('pnl_percentage'),
+        (pl.col('day_change_val') / pl.col('cur_val')  * 100).alias('day_change_percentage'),
+    ])
+
+    totals = grouped.select(sum_cols).sum().with_columns([
+        pl.lit('TOTAL').alias('account'),
+        (pl.col('pnl')            / pl.col('inv_val')  * 100).alias('pnl_percentage'),
+        (pl.col('day_change_val') / pl.col('cur_val')  * 100).alias('day_change_percentage'),
+    ])
+    summary_df = pl.concat([grouped, totals], how='diagonal').fill_nan(0).fill_null(0)
+
+    rows = [
+        HoldingRow(**{k: (v if v is not None else 0) for k, v in r.items()})
+        for r in df_rows.to_dicts()
+    ]
+    summary = [
+        HoldingsSummaryRow(**{k: (v if v is not None else 0) for k, v in r.items()})
+        for r in summary_df.to_dicts()
+    ]
+    return HoldingsResponse(rows=rows, summary=summary, refreshed_at=timestamp_display())
 
 
 class HoldingsController(Controller):
@@ -22,30 +66,7 @@ class HoldingsController(Controller):
     @get("/")
     async def get_holdings(self) -> HoldingsResponse:
         try:
-            df = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
-            df = df[[c for c in _HOLDING_COLS if c in df.columns]]
-            df['account'] = mask_column(df['account'])
-
-            # Summary: per-account + TOTAL
-            sum_cols = ["inv_val", "cur_val", "pnl", "day_change_val"]
-            grouped = df.groupby("account")[sum_cols].sum().reset_index()
-            grouped['pnl_percentage'] = grouped['pnl'] / grouped['inv_val'] * 100
-            grouped['day_change_percentage'] = grouped['day_change_val'] / grouped['cur_val'] * 100
-
-            totals = grouped[sum_cols].sum().to_frame().T
-            totals['account'] = 'TOTAL'
-            totals['pnl_percentage'] = totals['pnl'] / totals['inv_val'] * 100
-            totals['day_change_percentage'] = totals['day_change_val'] / totals['cur_val'] * 100
-            summary_df = pd.concat([grouped, totals], ignore_index=True).fillna(0)
-
-            rows = [HoldingRow(**r) for r in df.fillna(0).to_dict(orient='records')]
-            summary = [HoldingsSummaryRow(**r) for r in summary_df.to_dict(orient='records')]
-
-            return HoldingsResponse(
-                rows=rows,
-                summary=summary,
-                refreshed_at=timestamp_display(),
-            )
+            return await get_or_fetch("holdings", _fetch, ttl_seconds=_TTL)
         except Exception as e:
             logger.error(f"Holdings API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

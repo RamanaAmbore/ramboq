@@ -4,6 +4,9 @@
 # Usage: deploy.sh <ENV> <REF>
 #   ENV : prod | dev | pod
 #   REF : refs/heads/<branch>  (e.g. refs/heads/main)
+#
+# Phase 3: Streamlit removed. Services now run uvicorn (Litestar + SvelteKit SPA).
+# The SvelteKit build (frontend/build/) is served as static files by Litestar.
 
 TS=$(date '+%Y-%m-%d %H:%M:%S')
 export HOME=/var/www
@@ -60,10 +63,8 @@ LOG="$APP_ROOT/.log/hook_debug.log"
 
   # --- Restore / merge server-specific config flags ---
   if [ "$ENV" = "pod" ]; then
-    # Pod: full restore (no field merge — pod config is fully server-managed)
     [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/backend_config.yaml"
   else
-    # Prod / dev: keep new repo config as base, overlay only env-specific flags
     if [ -f "$CONFIG_BAK" ]; then
       for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup; do
         val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
@@ -73,7 +74,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     fi
   fi
 
-  # Write current branch into config so the app can include it in alerts/notifications
+  # Write current branch into config
   if grep -q "^deploy_branch:" "setup/yaml/backend_config.yaml" 2>/dev/null; then
     sed -i "s/^deploy_branch:.*/deploy_branch: ${BRANCH}/" "setup/yaml/backend_config.yaml"
   else
@@ -83,7 +84,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   echo "[$TS] Changed files:"
   echo "$CHANGED"
 
-  # --- Prod-only: sync nginx configs and static files ---
+  # --- Prod-only: sync nginx configs ---
   if [ "$ENV" = "prod" ]; then
     if echo "$CHANGED" | grep -q '^etc/'; then
       echo "[$TS] Syncing nginx configs..."
@@ -93,11 +94,6 @@ LOG="$APP_ROOT/.log/hook_debug.log"
       else
         echo "[$TS] ERROR: nginx config test failed — not reloading"
       fi
-    fi
-
-    if echo "$CHANGED" | grep -q '^var/www/html/'; then
-      echo "[$TS] Syncing static files..."
-      sudo cp -r "$APP_ROOT/var/www/html/." /var/www/html/
     fi
   fi
 
@@ -109,15 +105,27 @@ LOG="$APP_ROOT/.log/hook_debug.log"
       || { echo "[$TS] ERROR: Podman image build failed"; exit 1; }
   fi
 
-  # --- Prod / dev: pip install and favicon copy ---
+  # --- Prod / dev: install Python deps + build SvelteKit frontend ---
   if [ "$ENV" != "pod" ]; then
     source venv/bin/activate
-    pip install --no-cache-dir -r requirements.txt
 
-    # Copy custom favicon and index.html into Streamlit static folder (survives pip upgrades)
-    STREAMLIT_STATIC=$(python -c "import streamlit; import os; print(os.path.join(os.path.dirname(streamlit.__file__), 'static'))")
-    cp "$APP_ROOT/setup/images/favicon.png" "$STREAMLIT_STATIC/favicon.png"
-    cp "$APP_ROOT/setup/streamlit/index.html" "$STREAMLIT_STATIC/index.html"
+    # Install Python dependencies (API layer only — no Streamlit)
+    pip install --no-cache-dir -r requirements-api.txt \
+      && echo "[$TS] Python deps installed" \
+      || { echo "[$TS] ERROR: pip install failed"; exit 1; }
+
+    # Build SvelteKit frontend (only if frontend files changed or build doesn't exist)
+    if echo "$CHANGED" | grep -q '^frontend/' || [ ! -d "$APP_ROOT/frontend/build" ]; then
+      echo "[$TS] Building SvelteKit frontend..."
+      cd "$APP_ROOT/frontend"
+      npm ci --prefer-offline 2>&1 | tail -5
+      npm run build \
+        && echo "[$TS] SvelteKit build complete" \
+        || { echo "[$TS] ERROR: SvelteKit build failed"; exit 1; }
+      cd "$APP_ROOT"
+    else
+      echo "[$TS] No frontend changes — skipping SvelteKit build"
+    fi
   fi
 
   echo "[$TS] Restarting $APP_SERVICE..."
@@ -125,7 +133,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
 
   echo "[$TS] Sending startup notification..."
   if [ "$ENV" = "pod" ]; then
-    sleep 5  # allow container to start
+    sleep 5
     sudo podman exec ramboq-pod-app python /app/webhook/notify_deploy.py \
       && echo "[$TS] Startup notification done" \
       || echo "[$TS] WARNING: startup notification failed"

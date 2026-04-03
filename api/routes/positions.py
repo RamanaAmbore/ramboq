@@ -1,19 +1,51 @@
 """Positions endpoint — returns per-account rows and summary."""
 
 import pandas as pd
+import polars as pl
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
 
+from api.cache import get_or_fetch
 from api.schemas import PositionsResponse, PositionRow, PositionsSummaryRow
 from src.helpers import broker_apis
 from src.helpers.date_time_utils import timestamp_display
 from src.helpers.ramboq_logger import get_logger
 from src.helpers.utils import mask_column
-from src.constants import positions_config
 
 logger = get_logger(__name__)
 
-_POSITION_COLS = list(positions_config.keys())
+_ROW_COLS = [
+    'account', 'tradingsymbol', 'exchange', 'product',
+    'quantity', 'average_price', 'close_price',
+    'pnl', 'unrealised', 'realised',
+]
+
+_TTL = 30
+
+
+def _fetch() -> PositionsResponse:
+    raw = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
+    raw['account'] = mask_column(raw['account'])
+
+    df = pl.from_pandas(raw.fillna(0))
+
+    row_cols = [c for c in _ROW_COLS if c in df.columns]
+    df_rows = df.select(row_cols)
+
+    grouped = df.group_by('account').agg(pl.col('pnl').sum()) if 'pnl' in df.columns \
+              else pl.DataFrame({'account': [], 'pnl': []})
+    totals = pl.DataFrame([{'account': 'TOTAL', 'pnl': grouped['pnl'].sum()}])
+    summary_df = pl.concat([grouped, totals], how='diagonal').fill_nan(0).fill_null(0)
+
+    rows = [
+        PositionRow(**{k: (v if v is not None else 0) for k, v in r.items()})
+        for r in df_rows.to_dicts()
+    ]
+    summary = [
+        PositionsSummaryRow(**{k: (v if v is not None else 0) for k, v in r.items()})
+        for r in summary_df.to_dicts()
+    ]
+    return PositionsResponse(rows=rows, summary=summary, refreshed_at=timestamp_display())
 
 
 class PositionsController(Controller):
@@ -22,22 +54,7 @@ class PositionsController(Controller):
     @get("/")
     async def get_positions(self) -> PositionsResponse:
         try:
-            df = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
-            df = df[[c for c in _POSITION_COLS if c in df.columns]]
-            df['account'] = mask_column(df['account'])
-
-            grouped = df.groupby("account")[["pnl"]].sum().reset_index()
-            totals = pd.DataFrame([{'account': 'TOTAL', 'pnl': grouped['pnl'].sum()}])
-            summary_df = pd.concat([grouped, totals], ignore_index=True)
-
-            rows = [PositionRow(**r) for r in df.fillna(0).to_dict(orient='records')]
-            summary = [PositionsSummaryRow(**r) for r in summary_df.to_dict(orient='records')]
-
-            return PositionsResponse(
-                rows=rows,
-                summary=summary,
-                refreshed_at=timestamp_display(),
-            )
+            return await get_or_fetch("positions", _fetch, ttl_seconds=_TTL)
         except Exception as e:
             logger.error(f"Positions API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

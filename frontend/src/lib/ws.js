@@ -1,0 +1,81 @@
+/**
+ * WebSocket client — connects to /ws/performance and emits update events.
+ *
+ * Usage (Svelte component):
+ *   import { createPerformanceSocket } from '$lib/ws';
+ *
+ *   let unsub;
+ *   onMount(() => {
+ *     unsub = createPerformanceSocket((msg) => {
+ *       // msg.event === 'performance_updated'
+ *       // msg.refreshed_at — display timestamp
+ *       invalidateAll(); // or call queryClient.invalidateQueries()
+ *     });
+ *     return () => unsub();
+ *   });
+ */
+
+const WS_PATH = '/ws/performance';
+
+/**
+ * Opens a WebSocket connection and calls `onMessage` for each performance
+ * update event. Returns an unsub function that closes the socket.
+ *
+ * @param {(msg: object) => void} onMessage
+ * @returns {() => void} cleanup function
+ */
+export function createPerformanceSocket(onMessage) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const host  = import.meta.env.DEV
+    ? 'localhost:8000'   // bypass Vite WS proxy limitation — connect directly
+    : location.host;
+  const url = `${proto}://${host}${WS_PATH}`;
+
+  let socket = null;
+  let pingInterval = null;
+  let closed = false;
+  let reconnectTimer = null;
+
+  function connect() {
+    if (closed) return;
+    socket = new WebSocket(url);
+
+    socket.addEventListener('open', () => {
+      // Heartbeat: send ping every 25 s
+      pingInterval = setInterval(() => {
+        if (socket?.readyState === WebSocket.OPEN) socket.send('ping');
+      }, 25_000);
+    });
+
+    socket.addEventListener('message', (e) => {
+      if (e.data === 'pong') return; // heartbeat reply — ignore
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg?.event === 'performance_updated') onMessage(msg);
+      } catch {
+        // ignore non-JSON frames
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      clearInterval(pingInterval);
+      if (!closed) {
+        // Reconnect with exponential back-off (2 s)
+        reconnectTimer = setTimeout(connect, 2_000);
+      }
+    });
+
+    socket.addEventListener('error', () => {
+      socket?.close();
+    });
+  }
+
+  connect();
+
+  return function unsub() {
+    closed = true;
+    clearInterval(pingInterval);
+    clearTimeout(reconnectTimer);
+    socket?.close();
+  };
+}

@@ -1,9 +1,11 @@
 """Funds endpoint — returns margins / cash / available margin per account."""
 
 import pandas as pd
+import polars as pl
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
 
+from api.cache import get_or_fetch
 from api.schemas import FundsResponse, FundsRow
 from src.helpers import broker_apis
 from src.helpers.date_time_utils import timestamp_display
@@ -12,6 +14,36 @@ from src.helpers.utils import mask_column
 
 logger = get_logger(__name__)
 
+_TTL = 30
+
+_COL_MAP = {
+    'avail opening_balance': 'cash',
+    'net':                   'avail_margin',
+    'util debits':           'used_margin',
+    'avail collateral':      'collateral',
+}
+
+
+def _fetch() -> FundsResponse:
+    raw = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
+    raw['account'] = mask_column(raw['account'])
+
+    df = pl.from_pandas(raw.fillna(0))
+
+    # Rename broker column names to schema names
+    rename = {k: v for k, v in _COL_MAP.items() if k in df.columns}
+    df = df.rename(rename)
+
+    numeric = ['cash', 'avail_margin', 'used_margin', 'collateral']
+    present = [c for c in numeric if c in df.columns]
+
+    totals = df.select(present).sum().with_columns(pl.lit('TOTAL').alias('account'))
+    df_all = pl.concat([df.select(['account', *present]), totals], how='diagonal') \
+               .fill_nan(0).fill_null(0)
+
+    rows = [FundsRow(**r) for r in df_all.to_dicts()]
+    return FundsResponse(rows=rows, refreshed_at=timestamp_display())
+
 
 class FundsController(Controller):
     path = "/api/funds"
@@ -19,29 +51,7 @@ class FundsController(Controller):
     @get("/")
     async def get_funds(self) -> FundsResponse:
         try:
-            df = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
-            df['account'] = mask_column(df['account'])
-
-            rows = []
-            for _, row in df.iterrows():
-                rows.append(FundsRow(
-                    account=str(row.get('account', '')),
-                    cash=float(row.get('avail opening_balance', 0) or 0),
-                    avail_margin=float(row.get('net', 0) or 0),
-                    used_margin=float(row.get('util debits', 0) or 0),
-                    collateral=float(row.get('avail collateral', 0) or 0),
-                ))
-
-            # Append TOTAL row
-            rows.append(FundsRow(
-                account='TOTAL',
-                cash=sum(r.cash for r in rows),
-                avail_margin=sum(r.avail_margin for r in rows),
-                used_margin=sum(r.used_margin for r in rows),
-                collateral=sum(r.collateral for r in rows),
-            ))
-
-            return FundsResponse(rows=rows, refreshed_at=timestamp_display())
+            return await get_or_fetch("funds", _fetch, ttl_seconds=_TTL)
         except Exception as e:
             logger.error(f"Funds API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

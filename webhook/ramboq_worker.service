@@ -1,0 +1,16 @@
+[Unit]
+Description=RamboQuant ARQ background worker (prod)
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+WorkingDirectory=/opt/ramboq
+User=www-data
+Group=www-data
+ExecStart=/bin/bash /opt/ramboq/run_worker.sh
+Restart=always
+RestartSec=10
+Environment=REDIS_URL=redis://localhost:6379
+
+[Install]
+WantedBy=multi-user.target

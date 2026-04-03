@@ -1,14 +1,15 @@
 [Unit]
-Description=Streamlit App for pod.ramboq.com (Podman container)
+Description=RamboQuant API + SvelteKit SPA (pod — pod.ramboq.com, Podman container)
 After=network.target
 
 [Service]
 WorkingDirectory=/opt/ramboq_pod
 ExecStartPre=-/usr/bin/podman rm -f ramboq-pod-app
 ExecStart=/usr/bin/podman run --name ramboq-pod-app --rm \
-    -p 8504:8504 \
+    -p 8002:8000 \
     -v /opt/ramboq_pod/setup/yaml:/app/setup/yaml:ro \
     -v /opt/ramboq_pod/.log:/app/.log:rw \
+    -e REDIS_URL=redis://host.containers.internal:6379 \
     ramboq-pod:latest
 ExecStop=/usr/bin/podman stop ramboq-pod-app
 Restart=always
