@@ -67,6 +67,11 @@
 
   onDestroy(() => unsub?.());
 </script>
+<svelte:head>
+  <title>Market Report | RamboQuant Analytics</title>
+  <meta name="description" content="AI-powered daily market report covering Indian equity, commodity, and global markets." />
+</svelte:head>
+
 
 <div class="flex items-center justify-between mb-3">
   <div class="text-xs text-muted">

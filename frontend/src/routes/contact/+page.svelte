@@ -25,6 +25,11 @@
     }
   }
 </script>
+<svelte:head>
+  <title>Contact | RamboQuant Analytics</title>
+  <meta name="description" content="Get in touch with RamboQuant Analytics LLP." />
+</svelte:head>
+
 
 <div class="w-full">
   <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">

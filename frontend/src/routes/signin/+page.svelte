@@ -48,6 +48,11 @@
     } finally { loading = false; }
   }
 </script>
+<svelte:head>
+  <title>Sign In | RamboQuant Analytics</title>
+  <meta name="description" content="Sign in to your RamboQuant Analytics partner account." />
+</svelte:head>
+
 
 <div class="max-w-sm mx-auto">
   <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /console
+Disallow: /orders
+Disallow: /algo
+Disallow: /api/
+
+Sitemap: https://ramboq.com/sitemap.xml

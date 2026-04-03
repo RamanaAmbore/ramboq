@@ -261,6 +261,11 @@
       .forEach(g => g?.destroy());
   });
 </script>
+<svelte:head>
+  <title>Performance | RamboQuant Analytics</title>
+  <meta name="description" content="Real-time portfolio performance — holdings, positions, and fund balances." />
+</svelte:head>
+
 
 {#if error}
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>

@@ -58,6 +58,11 @@
     } finally { loading = false; }
   });
 </script>
+<svelte:head>
+  <title>Investment Insights | RamboQuant Analytics</title>
+  <meta name="description" content="Investment insights and market analysis from RamboQuant Analytics." />
+</svelte:head>
+
 
 {#if lastRefresh}
   <div class="text-xs text-muted mb-3">

@@ -11,6 +11,11 @@ With a long-term portfolio XIRR exceeding 22%, Rambo's approach blends high-conv
 
 RamboQuant Analytics is not for those content with average, index-like returns. It's built for partners who demand more — smarter strategies, sharper execution, and sustainable wealth creation.`;
 </script>
+<svelte:head>
+  <title>About | RamboQuant Analytics</title>
+  <meta name="description" content="Learn about RamboQuant Analytics LLP — investment strategy, philosophy, and team." />
+</svelte:head>
+
 
 <div class="w-full">
   <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">

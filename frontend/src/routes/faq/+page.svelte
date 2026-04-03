@@ -124,6 +124,11 @@
     }
   });
 </script>
+<svelte:head>
+  <title>FAQ | RamboQuant Analytics</title>
+  <meta name="description" content="Frequently asked questions about RamboQuant Analytics partnership and investment process." />
+</svelte:head>
+
 
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <h1 class="page-heading">Frequently Asked Questions</h1>
