@@ -82,6 +82,10 @@ if _FRONTEND_BUILD.exists():
 
     @get("/{path:path}", include_in_schema=False)
     async def _spa_fallback(path: str) -> File:  # noqa: F811
+        # Serve static files (logo.png, nav_image.png, etc.) if they exist
+        static_file = _FRONTEND_BUILD / path
+        if static_file.is_file() and ".." not in path:
+            return File(path=static_file, content_disposition_type="inline")
         return File(path=_index_html, filename="index.html", content_disposition_type="inline")
 
     @get("/", include_in_schema=False)
