@@ -257,7 +257,7 @@
     background-image: url('/nav_image.png');
     background-size: cover;
     background-position: center;
-    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10), 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.55), 0 4px 12px rgba(0,0,0,0.3);
     border: 1px solid rgba(255,255,255,0.12);
     overflow: hidden;
   }
