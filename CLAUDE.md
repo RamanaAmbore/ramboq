@@ -254,56 +254,51 @@ Key session state variables:
 
 ---
 
-## API Architecture (`new` branch — Litestar + SvelteKit)
+## API Architecture (Litestar + SvelteKit)
 
 ### Key Technologies
 - **API framework**: Litestar 2.x with msgspec.Struct schemas (~10× faster than pydantic)
-- **DataFrame**: Polars for API route aggregation; pandas in broker/alert layer (broker APIs return pandas)
-- **Database**: PostgreSQL 17 via SQLAlchemy 2.x async + asyncpg. Two databases on same server: `ramboq` (prod, branch=main) and `ramboq_dev` (dev, any other branch). Selected by `deploy_branch` in `backend_config.yaml`.
-- **Background**: Three asyncio tasks in Litestar process (market warm, performance refresh, close summaries); blocking broker calls run in ThreadPoolExecutor
-- **Auth**: JWT HS256 (8h TTL), PBKDF2-SHA256 passwords, users in PostgreSQL. Admin approval required for partner registration. Admin can create pre-approved users.
+- **DataFrame**: Polars for API route aggregation; pandas in broker/alert layer
+- **Database**: PostgreSQL 17 via SQLAlchemy 2.x async + asyncpg. `ramboq` (prod/main) and `ramboq_dev` (dev/non-main). Selected by `deploy_branch`.
+- **Background**: Four asyncio tasks: market warm, performance refresh, close summaries, expiry auto-close
+- **Auth**: JWT HS256 (24h TTL), PBKDF2-SHA256 passwords, admin approval for partners
+- **Algo**: Adaptive limit-order chase engine for expiry auto-close (no market orders)
+- **Holidays**: NSE official API (`nseindia.com/api/holiday-master`) for NSE/NFO/MCX/CDS
+- **SEO**: OG/Twitter cards, JSON-LD, sitemap.xml, robots.txt, per-page titles
 
 ### Database
-- **PostgreSQL** on server (69.62.78.136), port 5432
-- Credentials in `secrets.yaml`: `db_user`, `db_password`, `db_host` (default localhost), `db_port` (default 5432)
-- `deploy_branch == 'main'` → database `ramboq`; any other branch → `ramboq_dev`
-- Tables auto-created on startup via `init_db()`
-- **User table** (30 columns): `id`, `account_id` (auto-generated `rambo-XXXXXX`), `username`, `password_hash`, `role` (admin/partner), `display_name`, `email`, `phone`, `pan`, `aadhaar_last4`, `date_of_birth`, `kyc_verified`, `address_line1/2`, `city`, `state`, `pincode`, `contribution`, `contribution_date`, `share_pct`, `bank_name`, `bank_account`, `bank_ifsc`, `nominee_name/relation/phone`, `is_approved`, `is_active`, `join_date`, `notes`, `created_at`, `updated_at`
+- **PostgreSQL** on server, port 5432
+- Credentials in `secrets.yaml`: `db_user`, `db_password`
+- `deploy_branch == 'main'` → `ramboq`; any other → `ramboq_dev`
+- Tables: `users` (32 cols), `algo_orders`, `algo_events` — auto-created on startup
 
 ### API File Map
-- **`api/app.py`** — Litestar app; on_startup: init_db() + background tasks; CORS; OpenAPI via Scalar
-- **`api/schemas.py`** — msgspec.Struct response models for all endpoints
-- **`api/database.py`** — PostgreSQL via asyncpg; DB name selected by deploy_branch
-- **`api/models.py`** — `User` ORM model with full partner fields (personal, KYC, address, investment, bank, nominee)
-- **`api/background.py`** — Async background scheduler: `_task_market`, `_task_performance`, `_task_close`
-- **`api/cache.py`** — In-process TTL cache with per-key async locking
-- **`api/auth_guard.py`** — `jwt_guard` and `admin_guard` for route protection
-- **`api/routes/auth.py`** — Login (blocks unapproved partners), register (pending approval), me, logout
-- **`api/routes/admin.py`** — Admin-only: create user, approve/reject, update all fields, logs, exec, users list, deactivate
-- **`api/routes/holdings.py`** / **`positions.py`** / **`funds.py`** — Polars aggregation, public endpoints
-- **`api/routes/market.py`** — Gemini market report with 1-hour TTL cache
-- **`api/routes/config.py`** — Post/about content from frontend_config.yaml with refreshed_at timestamp
-- **`api/routes/ws.py`** — WebSocket fan-out via per-connection asyncio.Queue
+- **`api/app.py`** — Litestar app; startup: init_db + background tasks; serves SvelteKit build
+- **`api/database.py`** — PostgreSQL via asyncpg; DB selected by deploy_branch
+- **`api/models.py`** — User (32 cols), AlgoOrder, AlgoEvent
+- **`api/background.py`** — Four tasks: market, performance, close, expiry check (09:20 IST daily)
+- **`api/algo/chase.py`** — Reusable adaptive limit-order chase engine
+- **`api/algo/expiry.py`** — Expiry-day auto-close: scan ITM/NTM, chase-close positions
+- **`api/routes/algo.py`** — Algo Agent API + WebSocket `/ws/algo`
+- **`api/routes/auth.py`** — Login (24h JWT), register (pending approval), me, logout
+- **`api/routes/admin.py`** — Create/approve/reject/update users, logs, exec
 
-### SvelteKit File Map
-- **`frontend/src/app.css`** — AG Grid theme (flat, no shadow, mermaid-teal header `#d0e0e0`, `#315062` text), btn-primary matches AG Grid header
-- **`frontend/src/lib/api.js`** — REST helpers with JWT auth headers, 401 auto-redirect, admin CRUD helpers
-- **`frontend/src/lib/stores.js`** — authStore (sessionStorage-backed) + dataCache (stale-while-revalidate)
-- **`frontend/src/lib/ws.js`** — Auto-reconnect WebSocket client
-- **`frontend/src/routes/+layout.svelte`** — Responsive nav, role-based links (Users for admin), mobile hamburger
-- **`frontend/src/routes/performance/`** — AG Grid tables with per-account + combined grids; URL synced via ?tab=; smooth transaction updates
-- **`frontend/src/routes/market/`** — Markdown renderer + timestamp; all pages in white cards with uniform `p-5 pt-4`
-- **`frontend/src/routes/signin/`** — Sign In / Register tabs; register collects name, email, phone, PAN
-- **`frontend/src/routes/admin/`** — User management: create user, approve/reject, edit all partner fields (personal, address, investment, bank, nominee)
-- **`frontend/src/routes/portfolio/`** — Partner contribution info
+### SvelteKit Pages
+- **`+layout.svelte`** — Nav with Admin ▾ dropdown (Terminal, Algo Agent, Orders, Users); mobile hamburger
+- **`performance/`** — AG Grid with color-coded P&L, per-account grids, URL ?tab= sync
+- **`market/`** — AI market report with timestamp
+- **`signin/`** — Sign In / Register (name, email, phone)
+- **`admin/`** — User management with full partner fields
+- **`algo/`** — Algo Agent dashboard: status, positions to close, chase orders, live event log
+- **`console/`** — Terminal: command textarea + output + live log (equal panels)
+- **`orders/`** — Order management
 
-### Background Processing
-Two modes available:
-1. **Litestar async** (default): `bash run_api.sh` — single process, no Redis
-2. **ARQ worker** (optional): `bash run_api.sh` + `bash run_worker.sh` — needs Redis
+### Deploy automation
+`deploy.sh` handles: git pull → pip install → npm build → restart Streamlit + API services → notify
 
 ### Logging
-Simplified to 3 handlers: rotating log file (5MB × 5), rotating error file, console. All async via QueueListener.
+- API uses `RAMBOQ_LOG_PREFIX=api_` env var for separate log files from Streamlit
+- 3 handlers: rotating log file (5MB × 5), rotating error file, console
 
 ---
 
