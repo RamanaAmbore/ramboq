@@ -16,6 +16,7 @@ ExecStart=/bin/bash -c 'source /opt/ramboq_dev/venv/bin/activate && \
     2>&1 | tee -a /opt/ramboq_dev/.log/api_error_file'
 Restart=always
 RestartSec=5
+Environment=RAMBOQ_LOG_PREFIX=api_
 
 [Install]
 WantedBy=multi-user.target

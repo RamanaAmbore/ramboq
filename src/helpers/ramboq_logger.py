@@ -9,13 +9,17 @@ import yaml
 with open('setup/yaml/backend_config.yaml', 'r', encoding='utf-8', errors='ignore') as file:
     deploy = yaml.safe_load(file)
 
+# Optional prefix for log file names (set via RAMBOQ_LOG_PREFIX env var)
+# Allows API and Streamlit to use separate log files in the same directory
+_LOG_PREFIX = os.environ.get('RAMBOQ_LOG_PREFIX', '')
+
 # Extract log settings from config
-FILE_LOG_FILE = deploy['file_log_file']
-ERROR_LOG_FILE = deploy['error_log_file']
+FILE_LOG_FILE = os.path.join(os.path.dirname(deploy['file_log_file']), _LOG_PREFIX + os.path.basename(deploy['file_log_file']))
+ERROR_LOG_FILE = os.path.join(os.path.dirname(deploy['error_log_file']), _LOG_PREFIX + os.path.basename(deploy['error_log_file']))
 FILE_LOG_LEVEL = int(deploy['file_log_level'])
 ERROR_LOG_LEVEL = int(deploy['error_log_level'])
-SHORT_FILE_LOG_FILE = deploy['short_file_log_file']
-SHORT_ERROR_LOG_FILE = deploy['short_error_log_file']
+SHORT_FILE_LOG_FILE = os.path.join(os.path.dirname(deploy['short_file_log_file']), _LOG_PREFIX + os.path.basename(deploy['short_file_log_file']))
+SHORT_ERROR_LOG_FILE = os.path.join(os.path.dirname(deploy['short_error_log_file']), _LOG_PREFIX + os.path.basename(deploy['short_error_log_file']))
 CONSOLE_LOG_LEVEL = int(deploy['console_log_level'])
 
 
