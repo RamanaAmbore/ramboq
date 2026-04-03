@@ -38,15 +38,15 @@
 
   // Additional links for signed-in users
   const partnerLinks = [
-    { href: '/portfolio', label: 'My Portfolio' },
+    { href: '/portfolio', label: 'Portfolio' },
   ];
 
-  // Admin-only links
+  // Admin-only links — logical sequence: trading → monitoring → system
   const adminLinks = [
-    { href: '/admin',   label: 'Users' },
-    { href: '/algo',    label: 'Algo Agent' },
     { href: '/orders',  label: 'Orders' },
-    { href: '/console', label: 'Console' },
+    { href: '/algo',    label: 'Algo' },
+    { href: '/admin',   label: 'Users' },
+    { href: '/console', label: 'Terminal' },
   ];
 
   /** All nav links for current auth state. */
@@ -217,9 +217,10 @@
     font-weight: 500;
     border-radius: 0.3rem;
     background: transparent;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.9);
     border: none;
     cursor: pointer;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 0 1px rgba(0,0,0,0.2);
     transition: background-color 0.05s;
     white-space: nowrap;
     text-decoration: none;
@@ -243,6 +244,7 @@
     transition: background-color 0.05s;
     outline: none !important;
     white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 0 1px rgba(0,0,0,0.2);
   }
   .nav-btn-signin:hover { background: rgba(255,255,255,0.28); }
 

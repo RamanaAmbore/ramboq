@@ -113,7 +113,7 @@
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
   <!-- Command input -->
-  <div class="mb-3">
+  <div class="mb-2">
     <div class="flex gap-2">
       <input
         bind:value={command}
@@ -125,9 +125,6 @@
         {running ? 'Running…' : 'Run'}
       </button>
     </div>
-    {#if output}
-      <pre class="mt-2 p-3 bg-gray-900 text-green-300 text-xs rounded font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-40">{output}</pre>
-    {/if}
   </div>
 
   <!-- Order help -->
@@ -136,20 +133,31 @@
     &mdash; Example: <code class="bg-gray-100 px-1 rounded">buy ZG0790 NIFTY24APR25000CE 50 LIMIT 100</code>
   </div>
 
-  <!-- Live log viewer (fills remaining space) -->
-  <div class="flex items-center justify-between mb-1">
-    <span class="section-heading">Live Log</span>
-    <div class="flex gap-2 items-center">
-      {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
-      <button onclick={() => loadLog(200)}  class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
-      <button onclick={() => loadLog(1000)} class="btn-secondary text-[0.6rem] py-0.5 px-2">Last 1000</button>
+  <!-- Two equal panels -->
+  <div class="grid grid-rows-2 flex-1 gap-2 min-h-0">
+    <!-- Command output -->
+    <div class="flex flex-col min-h-0">
+      <span class="section-heading mb-1">Output</span>
+      <pre class="flex-1 p-3 bg-gray-900 text-green-300 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap">{output || 'Run a command…'}</pre>
+    </div>
+
+    <!-- Live log -->
+    <div class="flex flex-col min-h-0">
+      <div class="flex items-center justify-between mb-1">
+        <span class="section-heading">Live Log</span>
+        <div class="flex gap-2 items-center">
+          {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
+          <button onclick={() => loadLog(200)}  class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
+          <button onclick={() => loadLog(1000)} class="btn-secondary text-[0.6rem] py-0.5 px-2">Last 1000</button>
+        </div>
+      </div>
+      {#if logError}
+        <div class="text-xs text-red-600 mb-1">{logError}</div>
+      {/if}
+      <pre
+        bind:this={logEl}
+        class="flex-1 p-3 bg-gray-900 text-gray-200 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap"
+      >{logLines.join('\n') || 'No log entries.'}</pre>
     </div>
   </div>
-  {#if logError}
-    <div class="text-xs text-red-600 mb-2">{logError}</div>
-  {/if}
-  <pre
-    bind:this={logEl}
-    class="flex-1 p-3 bg-gray-900 text-gray-200 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap"
-  >{logLines.join('\n') || 'No log entries.'}</pre>
 </div>

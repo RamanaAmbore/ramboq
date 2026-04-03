@@ -83,11 +83,29 @@ def fetch_margins(connections=Connections, account=None, kite=None):
 
 
 def fetch_holidays(exchange="NSE"):
-    """Fetch trading holidays for the given exchange via the first available Kite connection."""
-    conn = Connections().conn
-    kite = next(iter(conn.values())).get_kite_conn()
-    holidays = kite.holidays(exchange=exchange)
-    return {h['date'] for h in holidays}
+    """Fetch trading holidays for the given exchange via Kite REST API."""
+    import requests
+    from datetime import date as dt_date
+    try:
+        resp = requests.get("https://api.kite.trade/holidays", timeout=10)
+        resp.raise_for_status()
+        data = resp.json().get("data", {})
+        holidays = set()
+        if isinstance(data, dict):
+            entries = data.get(exchange, [])
+        elif isinstance(data, list):
+            entries = [h for h in data if exchange in h.get("exchanges", [])]
+        else:
+            entries = []
+        for h in entries:
+            d = h.get("date", "")
+            if isinstance(d, str) and d:
+                holidays.add(dt_date.fromisoformat(d[:10]))
+            elif isinstance(d, dt_date):
+                holidays.add(d)
+        return holidays
+    except Exception:
+        return set()
 
 
 def update_books(holdings, positions, margins):

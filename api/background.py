@@ -188,7 +188,7 @@ async def _task_performance(state: dict) -> None:
                 try:
                     holiday_cache[exch] = await _run(fetch_holidays, exch)
                 except Exception as e:
-                    logger.warning(f"Background: holiday load failed for {exch}: {e}")
+                    logger.debug(f"Background: holiday load skipped for {exch}: {e}")
                     holiday_cache[exch] = set()
 
         open_segments = [
