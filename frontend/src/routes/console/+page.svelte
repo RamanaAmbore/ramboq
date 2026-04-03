@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores';
   import { goto } from '$app/navigation';
 
@@ -9,16 +9,62 @@
   let running    = $state(false);
   let loadingLog = $state(false);
   let logError   = $state('');
+  let logInterval;
+  let logEl;
 
   function authHeaders() {
     const token = $authStore.token;
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  // Order shortcut: "buy ZG0790 NIFTY24APR25000CE 50 LIMIT 100"
+  // Parses: buy/sell account symbol qty [order_type] [price]
+  function parseOrder(cmd) {
+    const parts = cmd.trim().split(/\s+/);
+    if (parts.length < 4) return null;
+    const txn = parts[0].toUpperCase();
+    if (txn !== 'BUY' && txn !== 'SELL') return null;
+    return {
+      transaction_type: txn,
+      account:          parts[1],
+      tradingsymbol:    parts[2],
+      quantity:         parseInt(parts[3]) || 0,
+      order_type:       (parts[4] || 'MARKET').toUpperCase(),
+      price:            parseFloat(parts[5]) || 0,
+      exchange:         'NFO',
+      product:          'NRML',
+      variety:          'regular',
+      validity:         'DAY',
+    };
+  }
+
   async function runCommand() {
     if (!command.trim()) return;
     running = true;
     output  = '';
+
+    // Check if it's an order command
+    const order = parseOrder(command);
+    if (order) {
+      try {
+        const res = await fetch('/api/orders/place', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify(order),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          output = `ORDER FAILED: ${d.detail || res.statusText}`;
+        } else {
+          output = `ORDER PLACED: ${order.transaction_type} ${order.quantity} ${order.tradingsymbol} on ${order.account}\nOrder ID: ${d.order_id}`;
+        }
+      } catch (e) {
+        output = `ORDER ERROR: ${e.message}`;
+      } finally { running = false; }
+      return;
+    }
+
+    // Regular shell command
     try {
       const res = await fetch('/api/admin/exec', {
         method: 'POST',
@@ -41,56 +87,69 @@
       const d   = await res.json().catch(() => ({}));
       if (!res.ok) { logError = d.detail || 'Failed'; return; }
       logLines = d.lines || [];
+      // Auto-scroll to bottom
+      requestAnimationFrame(() => {
+        if (logEl) logEl.scrollTop = logEl.scrollHeight;
+      });
     } catch (e) {
       logError = e.message;
     } finally { loadingLog = false; }
   }
 
   onMount(() => {
-    if (!$authStore.token || $authStore.user?.role !== 'admin') {
+    if (!$authStore.user || $authStore.user.role !== 'admin') {
       goto('/signin');
       return;
     }
     loadLog();
+    // Auto-refresh log every 30 seconds
+    logInterval = setInterval(() => loadLog(200), 30000);
+  });
+
+  onDestroy(() => {
+    if (logInterval) clearInterval(logInterval);
   });
 </script>
 
-<div class="w-full space-y-5">
-  <h1 class="page-heading">Admin Console</h1>
-
-  <!-- Command panel -->
-  <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-    <div class="section-heading mb-2">Command</div>
+<div class="flex flex-col h-[calc(100vh-8rem)]">
+  <!-- Command input -->
+  <div class="mb-3">
     <div class="flex gap-2">
       <input
         bind:value={command}
         class="field-input font-mono text-xs flex-1"
-        placeholder="e.g.  ps aux | grep uvicorn"
+        placeholder="Shell command or order: buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
         onkeydown={(e) => e.key === 'Enter' && runCommand()}
       />
-      <button onclick={runCommand} disabled={running || !command.trim()} class="btn-primary disabled:opacity-50 shrink-0">
+      <button onclick={runCommand} disabled={running || !command.trim()} class="btn-primary disabled:opacity-50 shrink-0 text-xs">
         {running ? 'Running…' : 'Run'}
       </button>
     </div>
-    {#if output !== undefined && output !== ''}
-      <pre class="mt-3 p-3 bg-gray-900 text-green-300 text-xs rounded font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-64">{output}</pre>
+    {#if output}
+      <pre class="mt-2 p-3 bg-gray-900 text-green-300 text-xs rounded font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-40">{output}</pre>
     {/if}
   </div>
 
-  <!-- Log viewer -->
-  <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-    <div class="flex items-center justify-between mb-2">
-      <div class="section-heading">Application Log</div>
-      <div class="flex gap-2">
-        {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
-        <button onclick={() => loadLog(200)}  class="btn-secondary">Refresh</button>
-        <button onclick={() => loadLog(1000)} class="btn-secondary">Last 1000</button>
-      </div>
-    </div>
-    {#if logError}
-      <div class="text-xs text-red-600">{logError}</div>
-    {:else}
-      <pre class="p-3 bg-gray-900 text-gray-200 text-xs rounded font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-[60vh]">{logLines.join('\n') || 'No log entries.'}</pre>
-    {/if}
+  <!-- Order help -->
+  <div class="text-[0.6rem] text-muted mb-2">
+    Order syntax: <code class="bg-gray-100 px-1 rounded">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</code>
+    &mdash; Example: <code class="bg-gray-100 px-1 rounded">buy ZG0790 NIFTY24APR25000CE 50 LIMIT 100</code>
   </div>
+
+  <!-- Live log viewer (fills remaining space) -->
+  <div class="flex items-center justify-between mb-1">
+    <span class="section-heading">Live Log</span>
+    <div class="flex gap-2 items-center">
+      {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
+      <button onclick={() => loadLog(200)}  class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
+      <button onclick={() => loadLog(1000)} class="btn-secondary text-[0.6rem] py-0.5 px-2">Last 1000</button>
+    </div>
+  </div>
+  {#if logError}
+    <div class="text-xs text-red-600 mb-2">{logError}</div>
+  {/if}
+  <pre
+    bind:this={logEl}
+    class="flex-1 p-3 bg-gray-900 text-gray-200 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap"
+  >{logLines.join('\n') || 'No log entries.'}</pre>
 </div>

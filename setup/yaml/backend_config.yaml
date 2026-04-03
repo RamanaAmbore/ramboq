@@ -57,3 +57,12 @@ market_segments:
     hours_end: "23:30"
     holiday_exchange: "MCX"
     exchanges: ["MCX"]
+
+# Algo agent — adaptive order chasing and expiry auto-close
+algo:
+  chase_interval_seconds: 20        # seconds between price adjustments
+  aggression_step: 0.10             # spread fraction increase per attempt
+  max_attempts: 20                  # max attempts before giving up
+  expiry_start_offset_hours: 2      # hours before market close to start closing
+  expiry_ntm_buffer_pct: 2.0        # % from strike to flag as near-the-money
+  expiry_rescan_minutes: 30         # re-scan interval for new ITM positions

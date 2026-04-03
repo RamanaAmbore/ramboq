@@ -1,0 +1,287 @@
+"""
+Adaptive limit-order chase engine.
+
+Market orders are not allowed for most options. This module places LIMIT orders
+and progressively adjusts the price using market depth until filled.
+
+Reusable: called by expiry engine, interpreter buy/sell, or any future strategy.
+
+Usage:
+    result = await chase_order(account, symbol, 'SELL', 50, exchange='NFO')
+    # result: ChaseResult(order_id, fill_price, attempts, slippage, status)
+"""
+
+import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Callable, Optional
+
+from src.helpers.connections import Connections
+from src.helpers.ramboq_logger import get_logger
+
+logger = get_logger(__name__)
+
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="chase")
+
+
+class ChaseStatus(str, Enum):
+    PENDING   = "pending"
+    CHASING   = "chasing"
+    FILLED    = "filled"
+    PARTIAL   = "partial"
+    FAILED    = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class ChaseResult:
+    order_id: str = ""
+    account: str = ""
+    symbol: str = ""
+    transaction_type: str = ""
+    quantity: int = 0
+    initial_price: float = 0.0
+    fill_price: float = 0.0
+    attempts: int = 0
+    slippage: float = 0.0
+    status: ChaseStatus = ChaseStatus.PENDING
+    detail: str = ""
+
+
+@dataclass
+class ChaseConfig:
+    interval_seconds: int = 20       # time between price adjustments
+    aggression_step: float = 0.10    # spread fraction increase per attempt
+    max_attempts: int = 20           # before giving up
+    exchange: str = "NFO"
+    product: str = "NRML"
+    variety: str = "regular"
+    validity: str = "DAY"
+
+
+def _get_kite(account: str):
+    """Get authenticated Kite connection for an account."""
+    conns = Connections()
+    return conns.conn[account].get_kite_conn()
+
+
+def _get_depth(account: str, exchange: str, symbol: str) -> dict:
+    """Fetch market depth for a symbol. Returns {buy: [...], sell: [...]}."""
+    kite = _get_kite(account)
+    key = f"{exchange}:{symbol}"
+    data = kite.quote([key])
+    if key not in data:
+        raise ValueError(f"No quote data for {key}")
+    return data[key].get("depth", {})
+
+
+def _get_ltp(account: str, exchange: str, symbol: str) -> float:
+    """Fetch last traded price."""
+    kite = _get_kite(account)
+    key = f"{exchange}:{symbol}"
+    data = kite.ltp([key])
+    return data.get(key, {}).get("last_price", 0.0)
+
+
+def _calc_limit_price(depth: dict, transaction_type: str, attempt: int,
+                      aggression_step: float) -> float:
+    """
+    Calculate limit price from market depth.
+
+    For SELL: start at mid, move toward best_bid with each attempt.
+    For BUY:  start at mid, move toward best_ask with each attempt.
+    """
+    buy_depth  = depth.get("buy", [])
+    sell_depth = depth.get("sell", [])
+
+    best_bid = buy_depth[0]["price"]  if buy_depth  and buy_depth[0]["price"]  > 0 else 0
+    best_ask = sell_depth[0]["price"] if sell_depth and sell_depth[0]["price"] > 0 else 0
+
+    if best_bid == 0 or best_ask == 0:
+        # Fallback: use whichever is available
+        return best_bid or best_ask or 0
+
+    spread = best_ask - best_bid
+    mid = (best_bid + best_ask) / 2
+
+    # Aggression: fraction of spread to cross toward market
+    aggression = min(attempt * aggression_step, 0.95)
+
+    if transaction_type == "SELL":
+        # Move from mid toward best_bid
+        price = mid - (spread * aggression * 0.5)
+        return max(round(price, 2), best_bid)
+    else:
+        # BUY: move from mid toward best_ask
+        price = mid + (spread * aggression * 0.5)
+        return min(round(price, 2), best_ask)
+
+
+def _place_order(account: str, symbol: str, transaction_type: str,
+                 quantity: int, price: float, cfg: ChaseConfig) -> str:
+    """Place a limit order. Returns order_id."""
+    kite = _get_kite(account)
+    order_id = kite.place_order(
+        variety=cfg.variety,
+        exchange=cfg.exchange,
+        tradingsymbol=symbol,
+        transaction_type=transaction_type,
+        quantity=quantity,
+        product=cfg.product,
+        order_type="LIMIT",
+        price=price,
+        validity=cfg.validity,
+    )
+    return str(order_id)
+
+
+def _cancel_order(account: str, order_id: str, variety: str = "regular"):
+    """Cancel an open order."""
+    kite = _get_kite(account)
+    kite.cancel_order(variety=variety, order_id=order_id)
+
+
+def _order_status(account: str, order_id: str) -> dict:
+    """Get order status. Returns dict with status, filled_quantity, etc."""
+    kite = _get_kite(account)
+    orders = kite.orders()
+    for o in orders:
+        if str(o.get("order_id")) == order_id:
+            return o
+    return {}
+
+
+async def _run(fn, *args):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, fn, *args)
+
+
+async def chase_order(
+    account: str,
+    symbol: str,
+    transaction_type: str,
+    quantity: int,
+    cfg: ChaseConfig | None = None,
+    on_event: Callable | None = None,
+) -> ChaseResult:
+    """
+    Chase a limit order until filled.
+
+    Args:
+        account: Kite account ID (e.g. 'ZG0790')
+        symbol: Trading symbol (e.g. 'NIFTY24APR25000CE')
+        transaction_type: 'BUY' or 'SELL'
+        quantity: Number of lots/shares
+        cfg: Chase configuration (defaults used if None)
+        on_event: Optional callback(event_type: str, detail: dict) for real-time updates
+
+    Returns:
+        ChaseResult with fill details
+    """
+    if cfg is None:
+        cfg = ChaseConfig()
+
+    result = ChaseResult(
+        account=account, symbol=symbol,
+        transaction_type=transaction_type, quantity=quantity,
+    )
+
+    def emit(event_type: str, detail: dict = None):
+        if on_event:
+            try:
+                on_event(event_type, {
+                    "account": account, "symbol": symbol,
+                    "transaction_type": transaction_type,
+                    "quantity": quantity, **(detail or {}),
+                })
+            except Exception:
+                pass
+
+    current_order_id = None
+    remaining_qty = quantity
+
+    for attempt in range(1, cfg.max_attempts + 1):
+        result.attempts = attempt
+        result.status = ChaseStatus.CHASING
+
+        try:
+            # Get market depth
+            depth = await _run(_get_depth, account, cfg.exchange, symbol)
+            price = _calc_limit_price(depth, transaction_type, attempt, cfg.aggression_step)
+
+            if price <= 0:
+                logger.warning(f"Chase {symbol}: no valid price from depth at attempt {attempt}")
+                await asyncio.sleep(cfg.interval_seconds)
+                continue
+
+            if attempt == 1:
+                result.initial_price = price
+
+            # Cancel previous order if exists
+            if current_order_id:
+                try:
+                    await _run(_cancel_order, account, current_order_id, cfg.variety)
+                    emit("order_cancelled", {"order_id": current_order_id, "attempt": attempt})
+                except Exception as e:
+                    logger.warning(f"Chase {symbol}: cancel failed: {e}")
+
+            # Place new order
+            current_order_id = await _run(
+                _place_order, account, symbol, transaction_type, remaining_qty, price, cfg
+            )
+            result.order_id = current_order_id
+            logger.info(f"Chase {symbol}: attempt {attempt}/{cfg.max_attempts} "
+                        f"— {transaction_type} {remaining_qty} @ {price} (order {current_order_id})")
+            emit("order_placed", {"order_id": current_order_id, "price": price, "attempt": attempt})
+
+            # Wait for fill
+            await asyncio.sleep(cfg.interval_seconds)
+
+            # Check status
+            status = await _run(_order_status, account, current_order_id)
+            order_status = status.get("status", "").upper()
+            filled_qty = status.get("filled_quantity", 0)
+            avg_price = status.get("average_price", 0)
+
+            if order_status == "COMPLETE":
+                result.status = ChaseStatus.FILLED
+                result.fill_price = avg_price
+                result.slippage = abs(avg_price - result.initial_price) * quantity
+                result.detail = f"Filled at {avg_price} in {attempt} attempts"
+                emit("order_filled", {
+                    "order_id": current_order_id, "fill_price": avg_price,
+                    "attempts": attempt, "slippage": result.slippage,
+                })
+                logger.info(f"Chase {symbol}: FILLED @ {avg_price} "
+                            f"(attempt {attempt}, slippage ₹{result.slippage:.2f})")
+                return result
+
+            if filled_qty > 0 and filled_qty < remaining_qty:
+                # Partial fill — chase remaining
+                remaining_qty -= filled_qty
+                logger.info(f"Chase {symbol}: partial fill {filled_qty}, remaining {remaining_qty}")
+                emit("partial_fill", {"filled": filled_qty, "remaining": remaining_qty})
+
+            if order_status in ("CANCELLED", "REJECTED"):
+                logger.warning(f"Chase {symbol}: order {order_status} — {status.get('status_message', '')}")
+                current_order_id = None  # Need fresh order
+
+        except Exception as e:
+            logger.error(f"Chase {symbol}: attempt {attempt} error: {e}")
+            emit("error", {"attempt": attempt, "error": str(e)})
+            await asyncio.sleep(cfg.interval_seconds)
+
+    # Max attempts exhausted
+    if current_order_id:
+        try:
+            await _run(_cancel_order, account, current_order_id, cfg.variety)
+        except Exception:
+            pass
+
+    result.status = ChaseStatus.FAILED
+    result.detail = f"Failed after {cfg.max_attempts} attempts"
+    emit("chase_failed", {"attempts": cfg.max_attempts})
+    logger.error(f"Chase {symbol}: FAILED after {cfg.max_attempts} attempts")
+    return result

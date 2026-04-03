@@ -6,7 +6,7 @@ import secrets as _secrets
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Float, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -73,4 +73,46 @@ class User(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Algo — chase orders and events
+# ---------------------------------------------------------------------------
+
+class AlgoOrder(Base):
+    __tablename__ = "algo_orders"
+
+    id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
+    account: Mapped[str]         = mapped_column(String(32), nullable=False)
+    symbol: Mapped[str]          = mapped_column(String(64), nullable=False)
+    exchange: Mapped[str]        = mapped_column(String(8), nullable=False, default="NFO")
+    transaction_type: Mapped[str] = mapped_column(String(4), nullable=False)  # BUY/SELL
+    quantity: Mapped[int]        = mapped_column(Integer, nullable=False)
+    initial_price: Mapped[float] = mapped_column(Float, nullable=True)
+    fill_price: Mapped[float]    = mapped_column(Float, nullable=True)
+    attempts: Mapped[int]        = mapped_column(Integer, nullable=False, default=0)
+    slippage: Mapped[float]      = mapped_column(Float, nullable=True)
+    status: Mapped[str]          = mapped_column(String(16), nullable=False, default="pending")
+    engine: Mapped[str]          = mapped_column(String(16), nullable=False, default="expiry")  # expiry/manual/interpreter
+    broker_order_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expiry_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    filled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlgoEvent(Base):
+    __tablename__ = "algo_events"
+
+    id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
+    algo_order_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("algo_orders.id"), nullable=True)
+    event_type: Mapped[str]      = mapped_column(String(32), nullable=False)
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime]  = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )

@@ -31,7 +31,7 @@ from src.helpers.utils import secrets
 logger = get_logger(__name__)
 
 _JWT_ALGORITHM = "HS256"
-_TOKEN_TTL_SECONDS = 8 * 3600  # 8 hours
+_TOKEN_TTL_SECONDS = 24 * 3600  # 24 hours
 
 
 def _jwt_secret() -> str:

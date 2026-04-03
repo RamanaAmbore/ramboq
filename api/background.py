@@ -318,15 +318,49 @@ async def _task_close(state: dict) -> None:
 # Litestar lifecycle hooks
 # ---------------------------------------------------------------------------
 
+async def _task_expiry_check() -> None:
+    """Check once daily at 09:20 IST if today is an expiry day and auto-start the engine."""
+    from api.algo.expiry import ExpiryEngine
+    from api.routes.algo import _broadcast_event
+
+    while True:
+        now = timestamp_indian()
+        # Schedule for 09:20 IST daily
+        check_time = now.replace(hour=9, minute=20, second=0, microsecond=0)
+        if now >= check_time:
+            check_time += timedelta(days=1)
+        sleep_s = (check_time - now).total_seconds()
+        logger.info(f"Background: expiry check sleeping {sleep_s/3600:.1f}h until {check_time.strftime('%H:%M')}")
+        await asyncio.sleep(sleep_s)
+
+        try:
+            engine = ExpiryEngine(on_event=_broadcast_event)
+            # Quick scan to see if any positions expire today
+            positions = await _run(engine._fetch_option_positions)
+            today = timestamp_indian().date()
+            expiring = [p for p in positions if p.expiry == today]
+
+            if expiring:
+                logger.info(f"Background: expiry day detected — {len(expiring)} option positions expiring today")
+                _broadcast_event("expiry_day_detected", {"count": len(expiring)})
+                # Run full expiry engine
+                await engine.run()
+            else:
+                logger.info("Background: no option positions expiring today")
+        except Exception as e:
+            logger.error(f"Background: expiry check failed: {e}")
+
+
 async def on_startup(app) -> None:
-    """Start all three background tasks. Called by Litestar on startup."""
+    """Start all background tasks. Called by Litestar on startup."""
     state: dict = {}
     app.state.bg_tasks = [
         asyncio.create_task(_task_market(state),      name="bg-market"),
         asyncio.create_task(_task_performance(state), name="bg-performance"),
         asyncio.create_task(_task_close(state),       name="bg-close"),
+        asyncio.create_task(_task_expiry_check(),     name="bg-expiry"),
     ]
-    logger.info("Background: all tasks started (market, performance, close)")
+    logger.info("Background: all tasks started (market, performance, close, expiry)")
 
 
 async def on_shutdown(app) -> None:

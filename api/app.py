@@ -21,6 +21,7 @@ from litestar.static_files import create_static_files_router
 from api.background import on_startup as bg_startup, on_shutdown as bg_shutdown
 from api.database import init_db
 from api.routes.admin import AdminController
+from api.routes.algo import AlgoController, algo_ws_handler
 from api.routes.auth import AuthController
 from api.routes.config import ConfigController
 from api.routes.contact import ContactController
@@ -103,6 +104,7 @@ else:
 _route_handlers = [
     AuthController,
     AdminController,
+    AlgoController,
     HoldingsController,
     PositionsController,
     FundsController,
@@ -112,6 +114,7 @@ _route_handlers = [
     ContactController,
     ConfigController,
     performance_ws_handler,
+    algo_ws_handler,
 ]
 
 if _FRONTEND_BUILD.exists():

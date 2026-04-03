@@ -6,11 +6,14 @@
 
   const { children } = $props();
 
-  // Redirect /orders to signin if not authed
+  // Redirect admin pages to signin if not authed as admin
   $effect(() => {
     const path = page.url.pathname;
-    if (path.startsWith('/orders') && !$authStore.token) {
-      goto('/signin');
+    const adminPaths = ['/orders', '/console', '/admin', '/algo'];
+    if (adminPaths.some(p => path.startsWith(p))) {
+      if (!$authStore.user || $authStore.user.role !== 'admin') {
+        goto('/signin');
+      }
     }
   });
 
@@ -36,13 +39,14 @@
   // Additional links for signed-in users
   const partnerLinks = [
     { href: '/portfolio', label: 'My Portfolio' },
-    // { href: '/orders',    label: 'Orders'       },  // temporarily hidden
   ];
 
   // Admin-only links
   const adminLinks = [
-    { href: '/admin', label: 'Users' },
-    // { href: '/console', label: 'Console' },  // temporarily hidden
+    { href: '/admin',   label: 'Users' },
+    { href: '/algo',    label: 'Algo Agent' },
+    { href: '/orders',  label: 'Orders' },
+    { href: '/console', label: 'Console' },
   ];
 
   /** All nav links for current auth state. */
