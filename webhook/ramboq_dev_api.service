@@ -1,0 +1,21 @@
+[Unit]
+Description=RamboQuant Litestar API (dev — port 8001)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+WorkingDirectory=/opt/ramboq_dev
+User=www-data
+Group=www-data
+ExecStart=/bin/bash -c 'source /opt/ramboq_dev/venv/bin/activate && \
+  uvicorn api.app:app \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --workers 1 \
+    --log-level info \
+    2>&1 | tee -a /opt/ramboq_dev/.log/api_error_file'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
