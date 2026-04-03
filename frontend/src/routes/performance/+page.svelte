@@ -53,8 +53,11 @@
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true };
 
+  const acctFill = 'ag-col-fill';
+  const symFill  = 'ag-col-fill';
+
   const holdingsSummaryCols = [
-    { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75},
+    { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75, cellClass: acctFill, headerClass: acctFill },
     { field: 'cur_val',               headerName: 'Cur Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'inv_val',               headerName: 'Inv Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'pnl',                   headerName: 'P&L',      flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
@@ -64,8 +67,8 @@
   ];
 
   const holdingsCols = [
-    { field: 'account',               headerName: 'Account',  width: 90,   },
-    { field: 'tradingsymbol',         headerName: 'Symbol',   minWidth: 100, flex: 1, pinned: 'left',  },
+    { field: 'account',               headerName: 'Account',  width: 90, cellClass: acctFill, headerClass: acctFill },
+    { field: 'tradingsymbol',         headerName: 'Symbol',   width: 120, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'quantity',              headerName: 'Qty',      width: 60,  type: 'numericColumn' },
     { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
@@ -80,13 +83,13 @@
   const holdingsAcctCols = holdingsCols.filter(c => c.field !== 'account');
 
   const positionsSummaryCols = [
-    { field: 'account', headerName: 'Account', width: 90,  },
+    { field: 'account', headerName: 'Account', width: 90, cellClass: acctFill, headerClass: acctFill },
     { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   const positionsCols = [
-    { field: 'account',       headerName: 'Account',   width: 90,   },
-    { field: 'tradingsymbol', headerName: 'Symbol',    minWidth: 100, flex: 1, pinned: 'left',  },
+    { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill },
+    { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'product',       headerName: 'Product',   width: 65 },
     { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn' },
     { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn' },
@@ -99,7 +102,7 @@
   const positionsAcctCols = positionsCols.filter(c => c.field !== 'account');
 
   const fundsCols = [
-    { field: 'account',      headerName: 'Account',      width: 120 },
+    { field: 'account',      headerName: 'Account',      width: 120, cellClass: acctFill, headerClass: acctFill },
     { field: 'cash',         headerName: 'Cash',         flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'avail_margin', headerName: 'Avail Margin', flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'used_margin',  headerName: 'Used Margin',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
@@ -244,8 +247,7 @@
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
 {/if}
 
-<!-- Tabs + timestamp -->
-<div class="flex items-center justify-between mb-3">
+<div class="flex flex-wrap items-center justify-between mb-3 gap-1">
   <div class="flex gap-0.5">
     {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
       <button

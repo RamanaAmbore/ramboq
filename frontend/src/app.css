@@ -96,6 +96,14 @@
   font-weight: 400;
   color: #315062;
   letter-spacing: 0.01em;
+  text-shadow: 0 0.5px 0.5px rgba(0,0,0,0.15);
+}
+/* Background fill for Account and Symbol columns */
+.ag-theme-ramboq .ag-cell.ag-col-fill {
+  background-color: #e8f0f0 !important;
+}
+.ag-theme-ramboq .ag-header-cell.ag-col-fill {
+  background-color: rgba(0,0,0,0.06) !important;
 }
 
 /* ── Shared button styles ─────────────────────────────────────────────────── */

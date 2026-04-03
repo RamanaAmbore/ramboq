@@ -64,7 +64,7 @@
       <!-- Desktop -->
       <div class="nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-4" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-11 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-8 w-auto pointer-events-none" />
         </a>
         <nav class="flex items-center gap-0.5 flex-1">
           {#each navLinks($authStore.user) as link}
@@ -85,7 +85,7 @@
       <!-- Mobile bar -->
       <div class="nav-inner md:hidden flex items-center justify-between h-12">
         <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-10 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-11 w-auto pointer-events-none" />
         </a>
         <button
           onclick={() => menuOpen = !menuOpen}
@@ -168,8 +168,11 @@
     left: 50%;
     transform: translateX(-50%);
   }
-  .accent-bar-top    { top: 0; }
-  .accent-bar-bottom { bottom: 0; }
+  .accent-bar-top    { top: 0; height: 3px; }
+  .accent-bar-bottom { bottom: 0; height: 3px; }
+  @media (max-width: 767px) {
+    .accent-bar-top  { height: 5px; }
+  }
 
   .page-card {
     width: 100%;
@@ -193,7 +196,10 @@
     background-size: cover;
     background-position: center;
     background-attachment: local;
-    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10), 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow:
+      inset 0 0 0 100vw rgba(8, 35, 35, 0.10),
+      0 2px 4px rgba(0,0,0,0.25),
+      0 6px 16px rgba(0,0,0,0.12);
     overflow: visible;
   }
 
@@ -204,8 +210,8 @@
   }
 
   :global(.nav-btn) {
-    padding: 0.28rem 0.7rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.7rem;
     font-weight: 500;
     border-radius: 0.3rem;
     background: transparent;
@@ -224,8 +230,8 @@
 
   /* Sign In button — filled, matches btn-primary */
   .nav-btn-signin {
-    padding: 0.25rem 0.8rem;
-    font-size: 0.8rem;
+    padding: 0.22rem 0.7rem;
+    font-size: 0.7rem;
     font-weight: 600;
     border-radius: 0.3rem;
     background: rgba(255,255,255,0.18);
@@ -317,7 +323,10 @@
     background-image: url('/nav_image.png');
     background-size: cover;
     background-position: center bottom;
-    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10), 0 -1px 2px rgba(0,0,0,0.05);
+    box-shadow:
+      inset 0 0 0 100vw rgba(8, 35, 35, 0.10),
+      0 -2px 4px rgba(0,0,0,0.25),
+      0 -6px 16px rgba(0,0,0,0.12);
     height: 1.4rem;
     display: flex;
     align-items: center;
@@ -327,5 +336,5 @@
   .site-footer p { width: 100%; }
 
   :global(.text-accent) { color: #ef9309; }
-  .footer-text { color: rgba(255,255,255,0.92); font-size: 0.58rem; line-height: 1; }
+  .footer-text { color: rgba(255,255,255,0.92); font-size: 0.65rem; line-height: 1; }
 </style>
