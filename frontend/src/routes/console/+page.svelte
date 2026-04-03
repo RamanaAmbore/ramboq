@@ -111,31 +111,30 @@
   });
 </script>
 
+<div class="text-[0.6rem] text-muted mb-1">
+  Order: <code class="bg-gray-100 px-1 rounded">buy|sell ACCOUNT SYMBOL QTY [LIMIT PRICE]</code>
+</div>
+
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-  <!-- Command input -->
-  <div class="mb-2">
-    <div class="flex gap-2">
-      <input
+  <!-- Three equal panels: command, output, log -->
+  <div class="grid grid-rows-3 flex-1 gap-2 min-h-0">
+    <!-- Command input panel -->
+    <div class="flex flex-col min-h-0">
+      <div class="flex items-center justify-between mb-1">
+        <span class="section-heading">Command</span>
+        <button onclick={runCommand} disabled={running || !command.trim()} class="btn-primary disabled:opacity-50 text-[0.6rem] py-0.5 px-2">
+          {running ? 'Running…' : 'Run'}
+        </button>
+      </div>
+      <textarea
         bind:value={command}
-        class="field-input font-mono text-xs flex-1"
-        placeholder="Shell command or order: buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
-        onkeydown={(e) => e.key === 'Enter' && runCommand()}
-      />
-      <button onclick={runCommand} disabled={running || !command.trim()} class="btn-primary disabled:opacity-50 shrink-0 text-xs">
-        {running ? 'Running…' : 'Run'}
-      </button>
+        class="flex-1 p-2 bg-gray-900 text-green-400 text-[0.6rem] rounded font-mono leading-relaxed resize-none overflow-auto whitespace-pre-wrap border-none outline-none"
+        placeholder="Enter command..."
+        onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
+      ></textarea>
     </div>
-  </div>
 
-  <!-- Order help -->
-  <div class="text-[0.6rem] text-muted mb-2">
-    Order syntax: <code class="bg-gray-100 px-1 rounded">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</code>
-    &mdash; Example: <code class="bg-gray-100 px-1 rounded">buy ZG0790 NIFTY24APR25000CE 50 LIMIT 100</code>
-  </div>
-
-  <!-- Two equal panels -->
-  <div class="grid grid-rows-2 flex-1 gap-2 min-h-0">
-    <!-- Command output -->
+    <!-- Output panel -->
     <div class="flex flex-col min-h-0">
       <span class="section-heading mb-1">Output</span>
       <pre class="flex-1 p-3 bg-gray-900 text-green-300 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap">{output || 'Run a command…'}</pre>
