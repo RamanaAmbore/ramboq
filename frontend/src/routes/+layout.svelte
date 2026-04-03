@@ -9,7 +9,7 @@
   // Redirect admin pages to signin if not authed as admin
   $effect(() => {
     const path = page.url.pathname;
-    const adminPaths = ['/orders', '/console', '/admin', '/algo'];
+    const adminPaths = ['/orders', '/console', '/admin', '/algo', '/logs'];
     if (adminPaths.some(p => path.startsWith(p))) {
       if (!$authStore.user || $authStore.user.role !== 'admin') {
         goto('/signin');
@@ -41,13 +41,17 @@
     { href: '/portfolio', label: 'Portfolio' },
   ];
 
-  // Admin-only links — logical sequence: trading → monitoring → system
-  const adminLinks = [
+  // Admin sub-menu items (shown in dropdown)
+  const adminSubLinks = [
     { href: '/orders',  label: 'Orders' },
-    { href: '/algo',    label: 'Algo' },
+    { href: '/algo',    label: 'Algo Agent' },
     { href: '/admin',   label: 'Users' },
     { href: '/console', label: 'Terminal' },
+    { href: '/logs',    label: 'Logs' },
   ];
+
+  // Admin gets a single "Admin" nav item (dropdown handled in template)
+  const adminLinks = [];
 
   /** All nav links for current auth state. */
   function navLinks(user) {
@@ -57,8 +61,12 @@
   }
 
   let menuOpen = $state(false);
-  const closeMenu = () => { menuOpen = false; };
+  let adminOpen = $state(false);
+  const closeMenu = () => { menuOpen = false; adminOpen = false; };
+  const closeAdmin = () => { adminOpen = false; };
 </script>
+
+<svelte:window onclick={() => { if (adminOpen) adminOpen = false; }} />
 
 <div class="viewport">
   <div class="accent-bar accent-bar-top"></div>
@@ -77,6 +85,24 @@
               class="nav-btn {isActive(link.href) ? 'nav-btn-active' : ''}"
             >{link.label}</button>
           {/each}
+          {#if $authStore.user?.role === 'admin'}
+            <div class="relative">
+              <button
+                onclick={(e) => { e.stopPropagation(); adminOpen = !adminOpen; }}
+                class="nav-btn {adminSubLinks.some(l => isActive(l.href)) ? 'nav-btn-active' : ''}"
+              >Admin ▾</button>
+              {#if adminOpen}
+                <div class="admin-dropdown">
+                  {#each adminSubLinks as link}
+                    <button
+                      onclick={() => { goto(link.href); closeAdmin(); }}
+                      class="admin-dropdown-item {isActive(link.href) ? 'admin-dropdown-active' : ''}"
+                    >{link.label}</button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         </nav>
         {#if $authStore.user}
           <span class="nav-user-pill">{$authStore.user.display_name}</span>
@@ -118,6 +144,15 @@
               class="mobile-nav-item {isActive(link.href) ? 'mobile-nav-active' : ''}"
             >{link.label}</button>
           {/each}
+          {#if $authStore.user?.role === 'admin'}
+            <div class="mobile-nav-user">Admin</div>
+            {#each adminSubLinks as link}
+              <button
+                onclick={() => { goto(link.href); closeMenu(); }}
+                class="mobile-nav-item {isActive(link.href) ? 'mobile-nav-active' : ''}"
+              >{link.label}</button>
+            {/each}
+          {/if}
           {#if $authStore.user}
             <div class="mobile-nav-user">{$authStore.user.display_name}</div>
             <button onclick={() => { signOut(); closeMenu(); }} class="mobile-nav-item">Sign Out</button>
@@ -210,6 +245,39 @@
     margin: 0 auto;
     padding: 0 1rem;
   }
+
+  /* Admin dropdown */
+  .admin-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 60;
+    min-width: 140px;
+    margin-top: 4px;
+    border-radius: 0.375rem;
+    background: rgba(15, 40, 40, 0.95);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    overflow: hidden;
+  }
+  .admin-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    transition: background-color 0.05s;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .admin-dropdown-item:last-child { border-bottom: none; }
+  .admin-dropdown-item:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .admin-dropdown-active { background: rgba(255,255,255,0.15); color: #fff; }
 
   :global(.nav-btn) {
     padding: 0.25rem 0.6rem;
