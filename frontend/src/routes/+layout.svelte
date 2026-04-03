@@ -64,7 +64,7 @@
       <!-- Desktop -->
       <div class="nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-4" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-8 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none" />
         </a>
         <nav class="flex items-center gap-0.5 flex-1">
           {#each navLinks($authStore.user) as link}
@@ -83,9 +83,9 @@
       </div>
 
       <!-- Mobile bar -->
-      <div class="nav-inner md:hidden flex items-center justify-between h-12">
+      <div class="nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-11 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none" />
         </a>
         <button
           onclick={() => menuOpen = !menuOpen}
@@ -196,10 +196,8 @@
     background-size: cover;
     background-position: center;
     background-attachment: local;
-    box-shadow:
-      inset 0 0 0 100vw rgba(8, 35, 35, 0.10),
-      0 2px 4px rgba(0,0,0,0.25),
-      0 6px 16px rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10);
+    border-bottom: 1px solid rgba(0,0,0,0.15);
     overflow: visible;
   }
 
@@ -323,10 +321,8 @@
     background-image: url('/nav_image.png');
     background-size: cover;
     background-position: center bottom;
-    box-shadow:
-      inset 0 0 0 100vw rgba(8, 35, 35, 0.10),
-      0 -2px 4px rgba(0,0,0,0.25),
-      0 -6px 16px rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.10);
+    border-top: 1px solid rgba(0,0,0,0.06);
     height: 1.4rem;
     display: flex;
     align-items: center;

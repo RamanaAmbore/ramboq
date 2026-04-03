@@ -90,11 +90,10 @@
   const positionsCols = [
     { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill },
     { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
-    { field: 'product',       headerName: 'Product',   width: 65 },
+    { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn' },
     { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
@@ -247,23 +246,22 @@
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
 {/if}
 
-<div class="flex flex-wrap items-center justify-between mb-3 gap-1">
-  <div class="flex gap-0.5">
-    {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
-      <button
-        class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-               {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-        onclick={() => switchTab(id)}
-      >{label}</button>
-    {/each}
-  </div>
-  <div class="text-xs text-muted">
-    {#if loading && !lastRefresh}
-      <span class="animate-pulse">Loading…</span>
-    {:else if lastRefresh}
-      <span>{lastRefresh}</span>
-    {/if}
-  </div>
+<div class="text-xs text-muted mb-2">
+  {#if loading && !lastRefresh}
+    <span class="animate-pulse">Loading…</span>
+  {:else if lastRefresh}
+    <span>{lastRefresh}</span>
+  {/if}
+</div>
+
+<div class="flex gap-0.5 mb-3">
+  {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
+    <button
+      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+             {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+      onclick={() => switchTab(id)}
+    >{label}</button>
+  {/each}
 </div>
 
 <section class:hidden={activeTab !== 'holdings'}>
