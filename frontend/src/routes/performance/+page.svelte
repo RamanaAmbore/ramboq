@@ -71,7 +71,7 @@
         : { color: '#999' };
   };
 
-  const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1 };
+  const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';
