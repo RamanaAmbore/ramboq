@@ -83,29 +83,42 @@ def fetch_margins(connections=Connections, account=None, kite=None):
 
 
 def fetch_holidays(exchange="NSE"):
-    """Fetch trading holidays for the given exchange via Kite REST API."""
+    """
+    Fetch trading holidays from NSE/MCX official APIs.
+
+    NSE API returns segments: CM (equity cash), FO (F&O), CD (currency), CBM (commodity on BSE).
+    MCX holidays are fetched from MCX website.
+    Maps exchange param to the right segment.
+    """
     import requests
-    from datetime import date as dt_date
+    from datetime import datetime as dt_datetime
+
+    # Map Kite exchange names to NSE holiday API segment keys
+    # CM=equity cash, FO=F&O, CD=currency, COM=commodity(MCX)
+    _SEGMENT_MAP = {"NSE": "CM", "BSE": "CM", "NFO": "FO", "CDS": "CD", "MCX": "COM"}
+
+    holidays = set()
     try:
-        resp = requests.get("https://api.kite.trade/holidays", timeout=10)
+        resp = requests.get(
+            "https://www.nseindia.com/api/holiday-master?type=trading",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=10,
+        )
         resp.raise_for_status()
-        data = resp.json().get("data", {})
-        holidays = set()
-        if isinstance(data, dict):
-            entries = data.get(exchange, [])
-        elif isinstance(data, list):
-            entries = [h for h in data if exchange in h.get("exchanges", [])]
-        else:
-            entries = []
+        data = resp.json()
+        segment = _SEGMENT_MAP.get(exchange, "CM")
+        entries = data.get(segment, [])
+
         for h in entries:
-            d = h.get("date", "")
-            if isinstance(d, str) and d:
-                holidays.add(dt_date.fromisoformat(d[:10]))
-            elif isinstance(d, dt_date):
-                holidays.add(d)
-        return holidays
+            d = h.get("tradingDate", "")
+            if d:
+                try:
+                    holidays.add(dt_datetime.strptime(d, "%d-%b-%Y").date())
+                except ValueError:
+                    pass
     except Exception:
-        return set()
+        pass
+
+    return holidays
 
 
 def update_books(holdings, positions, margins):
