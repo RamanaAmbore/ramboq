@@ -49,9 +49,29 @@
   const pctFmt = ({ value }) =>
     value == null ? '' : `${Number(value).toFixed(2)}%`;
   const pnlStyle = ({ value }) =>
-    value < 0 ? { color: '#c0392b' } : { color: '#27ae60' };
+    value < 0
+      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
+      : value > 0
+        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
+        : { color: '#999' };
+  const qtyStyle = ({ value }) =>
+    value < 0
+      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
+      : value > 0
+        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
+        : { color: '#999' };
+  const avgVsLtpStyle = (params) => {
+    const avg = params.data?.average_price;
+    const ltp = params.data?.close_price;
+    if (avg == null || ltp == null) return {};
+    return avg > ltp
+      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
+      : avg < ltp
+        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
+        : { color: '#999' };
+  };
 
-  const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true };
+  const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1 };
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';
@@ -69,14 +89,14 @@
   const holdingsCols = [
     { field: 'account',               headerName: 'Account',  width: 90, cellClass: acctFill, headerClass: acctFill },
     { field: 'tradingsymbol',         headerName: 'Symbol',   width: 120, pinned: 'left', cellClass: symFill, headerClass: symFill },
-    { field: 'quantity',              headerName: 'Qty',      width: 60,  type: 'numericColumn' },
-    { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'pnl',                   headerName: 'P&L',      width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'day_change_val',        headerName: 'Day P&L',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'day_change_percentage', headerName: 'Day %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'quantity',              headerName: 'Qty',      width: 60,  type: 'numericColumn' },
+    { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
+    { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
+    { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
   ];
 
   // Per-account holdings cols — without the account column
@@ -91,11 +111,11 @@
     { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill },
     { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn' },
-    { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn', cellStyle: qtyStyle },
+    { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
+    { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
   ];
 
   const positionsAcctCols = positionsCols.filter(c => c.field !== 'account');
@@ -246,12 +266,17 @@
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
 {/if}
 
-<div class="text-xs text-muted mb-2">
-  {#if loading && !lastRefresh}
-    <span class="animate-pulse">Loading…</span>
-  {:else if lastRefresh}
-    <span>{lastRefresh}</span>
-  {/if}
+<div class="flex items-center justify-between mb-2">
+  <div class="text-xs text-muted">
+    {#if loading && !lastRefresh}
+      <span class="animate-pulse">Loading…</span>
+    {:else if lastRefresh}
+      <span>{lastRefresh}</span>
+    {/if}
+  </div>
+  <button onclick={loadAll} disabled={loading} class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50">
+    {loading ? 'Refreshing…' : 'Refresh'}
+  </button>
 </div>
 
 <div class="flex gap-0.5 mb-3">

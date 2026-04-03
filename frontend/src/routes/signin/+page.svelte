@@ -8,7 +8,7 @@
   let error     = $state('');
 
   let signinForm = $state({ username: '', password: '' });
-  let regForm    = $state({ username: '', password: '', confirm: '', display_name: '', email: '', phone: '', pan: '' });
+  let regForm    = $state({ username: '', password: '', confirm: '', display_name: '', email: '', phone: '' });
 
   async function signin() {
     loading = true; error = '';
@@ -36,7 +36,6 @@
         display_name: regForm.display_name || regForm.username,
         email:        regForm.email,
         phone:        regForm.phone,
-        pan:          regForm.pan,
       });
       authStore.login(data.access_token, {
         username:     data.username,
@@ -50,22 +49,21 @@
   }
 </script>
 
-<div class="max-w-sm mx-auto mt-10">
-  <!-- Tab selector -->
-  <div class="flex border-b border-gray-200 mb-0">
-    <button
-      onclick={() => { tab = 'signin'; error = ''; }}
-      class="flex-1 py-2 text-xs font-semibold border-b-2 transition-colors
-             {tab === 'signin' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >Sign In</button>
-    <button
-      onclick={() => { tab = 'register'; error = ''; }}
-      class="flex-1 py-2 text-xs font-semibold border-b-2 transition-colors
-             {tab === 'register' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >Register</button>
-  </div>
-
-  <div class="bg-white rounded-b-lg rounded-tr-lg border border-t-0 border-gray-200 shadow-sm p-6">
+<div class="max-w-sm mx-auto">
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
+    <!-- Tab selector -->
+    <div class="flex border-b border-gray-200 mb-4">
+      <button
+        onclick={() => { tab = 'signin'; error = ''; }}
+        class="flex-1 py-2 text-xs font-semibold border-b-2 transition-colors
+               {tab === 'signin' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+      >Sign In</button>
+      <button
+        onclick={() => { tab = 'register'; error = ''; }}
+        class="flex-1 py-2 text-xs font-semibold border-b-2 transition-colors
+               {tab === 'register' ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+      >Register</button>
+    </div>
 
     {#if error}
       <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
@@ -107,10 +105,6 @@
         <div>
           <label class="field-label" for="r-phone">Phone</label>
           <input id="r-phone" bind:value={regForm.phone} class="field-input" placeholder="+91 98765 43210" />
-        </div>
-        <div>
-          <label class="field-label" for="r-pan">PAN</label>
-          <input id="r-pan" bind:value={regForm.pan} class="field-input" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase" />
         </div>
         <div>
           <label class="field-label" for="r-pass">Password</label>
