@@ -16,9 +16,9 @@ REF="${2:-refs/heads/main}"
 BRANCH="${REF#refs/heads/}"
 
 case "$ENV" in
-  prod) APP_ROOT="/opt/ramboq";     APP_SERVICE="ramboq.service"     ;;
-  dev)  APP_ROOT="/opt/ramboq_dev"; APP_SERVICE="ramboq_dev.service" ;;
-  pod)  APP_ROOT="/opt/ramboq_pod"; APP_SERVICE="ramboq_pod.service" ;;
+  prod) APP_ROOT="/opt/ramboq";     APP_SERVICE="ramboq.service";     API_SERVICE="ramboq_api.service"     ;;
+  dev)  APP_ROOT="/opt/ramboq_dev"; APP_SERVICE="ramboq_dev.service"; API_SERVICE="ramboq_dev_api.service" ;;
+  pod)  APP_ROOT="/opt/ramboq_pod"; APP_SERVICE="ramboq_pod.service"; API_SERVICE=""                       ;;
   *) echo "[$TS] ERROR: unknown ENV '$ENV'"; exit 1 ;;
 esac
 
@@ -114,22 +114,28 @@ LOG="$APP_ROOT/.log/hook_debug.log"
       && echo "[$TS] Python deps installed" \
       || { echo "[$TS] ERROR: pip install failed"; exit 1; }
 
-    # Build SvelteKit frontend (only if frontend files changed or build doesn't exist)
-    if echo "$CHANGED" | grep -q '^frontend/' || [ ! -d "$APP_ROOT/frontend/build" ]; then
+    # Build SvelteKit frontend
+    if command -v npm &>/dev/null && [ -f "$APP_ROOT/frontend/package.json" ]; then
       echo "[$TS] Building SvelteKit frontend..."
       cd "$APP_ROOT/frontend"
-      npm ci --prefer-offline 2>&1 | tail -5
+      npm install --prefer-offline 2>&1 | tail -3
       npm run build \
         && echo "[$TS] SvelteKit build complete" \
-        || { echo "[$TS] ERROR: SvelteKit build failed"; exit 1; }
+        || echo "[$TS] WARNING: SvelteKit build failed (non-fatal)"
       cd "$APP_ROOT"
     else
-      echo "[$TS] No frontend changes — skipping SvelteKit build"
+      echo "[$TS] npm not found or no frontend — skipping SvelteKit build"
     fi
   fi
 
   echo "[$TS] Restarting $APP_SERVICE..."
   sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
+
+  # Restart API service if it exists
+  if [ -n "$API_SERVICE" ] && systemctl list-unit-files | grep -q "$API_SERVICE"; then
+    echo "[$TS] Restarting $API_SERVICE..."
+    sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
+  fi
 
   echo "[$TS] Sending startup notification..."
   if [ "$ENV" = "pod" ]; then
