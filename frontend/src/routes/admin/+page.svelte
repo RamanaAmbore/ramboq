@@ -138,17 +138,17 @@
   {/if}
 
   {#if loading}
-    <div class="text-center text-text/40 text-sm animate-pulse py-8">Loading users…</div>
+    <div class="text-center text-text/40 text-xs animate-pulse py-8">Loading users…</div>
   {:else if !users.length}
-    <p class="text-sm text-text/50">No users registered.</p>
+    <p class="text-xs text-text/50">No users registered.</p>
   {:else}
     <div class="space-y-3">
       {#each users as user}
-        <div class="rounded-lg border border-gray-200 p-4">
+        <div class="rounded-lg border border-gray-200 p-3">
           <!-- Header row -->
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center flex-wrap gap-1.5">
-              <span class="font-semibold text-sm text-primary">{user.display_name}</span>
+              <span class="font-semibold text-xs text-primary">{user.display_name}</span>
               <span class="text-xs text-muted">@{user.username}</span>
               <span class="text-[0.6rem] text-muted font-mono">{user.account_id}</span>
               <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-semibold uppercase

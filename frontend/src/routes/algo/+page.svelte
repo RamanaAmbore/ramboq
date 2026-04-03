@@ -104,7 +104,7 @@
 <!-- Status bar -->
 <div class="flex items-center justify-between mb-3">
   <div class="flex items-center gap-3">
-    <span class="text-sm font-semibold {statusColor(status.status)} uppercase">{status.status}</span>
+    <span class="text-xs font-semibold {statusColor(status.status)} uppercase">{status.status}</span>
     {#if status.last_scan}
       <span class="text-xs text-muted">Last scan: {status.last_scan}</span>
     {/if}
@@ -126,19 +126,19 @@
 <!-- Stats -->
 <div class="grid grid-cols-4 gap-3 mb-4">
   <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-lg font-bold text-primary">{status.pending_count}</div>
+    <div class="text-sm font-bold text-primary">{status.pending_count}</div>
     <div class="text-[0.6rem] text-muted uppercase">Pending</div>
   </div>
   <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-lg font-bold text-green-600">{status.closed_count}</div>
+    <div class="text-sm font-bold text-green-600">{status.closed_count}</div>
     <div class="text-[0.6rem] text-muted uppercase">Closed</div>
   </div>
   <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-lg font-bold text-red-600">{status.failed_count}</div>
+    <div class="text-sm font-bold text-red-600">{status.failed_count}</div>
     <div class="text-[0.6rem] text-muted uppercase">Failed</div>
   </div>
   <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-lg font-bold {pnlColor(-status.total_slippage)}">₹{status.total_slippage.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+    <div class="text-sm font-bold {pnlColor(-status.total_slippage)}">₹{status.total_slippage.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
     <div class="text-[0.6rem] text-muted uppercase">Slippage</div>
   </div>
 </div>

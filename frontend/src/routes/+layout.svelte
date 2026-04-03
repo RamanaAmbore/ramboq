@@ -9,7 +9,7 @@
   // Redirect admin pages to signin if not authed as admin
   $effect(() => {
     const path = page.url.pathname;
-    const adminPaths = ['/orders', '/console', '/admin', '/algo', '/logs'];
+    const adminPaths = ['/orders', '/console', '/admin', '/algo'];
     if (adminPaths.some(p => path.startsWith(p))) {
       if (!$authStore.user || $authStore.user.role !== 'admin') {
         goto('/signin');
@@ -47,7 +47,6 @@
     { href: '/algo',    label: 'Algo Agent' },
     { href: '/admin',   label: 'Users' },
     { href: '/console', label: 'Terminal' },
-    { href: '/logs',    label: 'Logs' },
   ];
 
   // Admin gets a single "Admin" nav item (dropdown handled in template)

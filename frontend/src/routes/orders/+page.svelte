@@ -204,22 +204,22 @@
 </div>
 
 {#if successMsg}
-  <div class="mb-4 p-3 rounded bg-green-50 text-green-700 text-sm border border-green-200">
+  <div class="mb-4 p-3 rounded bg-green-50 text-green-700 text-xs border border-green-200">
     {successMsg}
   </div>
 {/if}
 
 {#if error}
-  <div class="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
+  <div class="mb-4 p-3 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
 {/if}
 
 <!-- ── Order form ─────────────────────────────────────────────────────────── -->
 {#if showForm}
   <div class="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">Place Order</h2>
+    <h2 class="text-xs font-semibold text-gray-700 mb-4">Place Order</h2>
 
     {#if formError}
-      <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-sm border border-red-200">{formError}</div>
+      <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{formError}</div>
     {/if}
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -313,7 +313,7 @@
       <button
         on:click={submitOrder}
         disabled={placing || !form.tradingsymbol || !form.account}
-        class="px-5 py-2 text-sm font-semibold rounded transition-colors disabled:opacity-50
+        class="px-5 py-2 text-xs font-semibold rounded transition-colors disabled:opacity-50
                {form.transaction_type === 'BUY'
                  ? 'bg-green-600 hover:bg-green-700 text-white'
                  : 'bg-red-600   hover:bg-red-700   text-white'}"
@@ -322,7 +322,7 @@
       </button>
       <button
         on:click={() => { showForm = false; resetForm(); formError = ''; }}
-        class="px-4 py-2 text-sm rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+        class="px-4 py-2 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
       >
         Cancel
       </button>
