@@ -130,9 +130,9 @@
 <svelte:head><title>Terminal | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-  <!-- Command input -->
-  <div class="mb-2">
-    <div class="flex gap-2">
+  <!-- Command area (half height) -->
+  <div class="flex flex-col" style="height: 50%;">
+    <div class="flex gap-2 mb-1">
       <input
         bind:value={command}
         class="field-input font-mono text-xs flex-1"
@@ -143,42 +143,48 @@
         {running ? '...' : 'Run'}
       </button>
     </div>
-    <div class="text-[0.5rem] text-muted mt-1">
-      <code>buy|sell ACCT SYMBOL QTY [LIMIT PRICE]</code> · <code>agent list|status|activate|config</code> · shell commands
+    <div class="text-[0.5rem] text-muted mb-1">
+      <code>buy|sell ACCT SYMBOL QTY [LIMIT PRICE]</code> · <code>agent list|status|activate|config</code> · shell
     </div>
+    <!-- Terminal output fills remaining command area -->
+    <pre class="log-panel flex-1 min-h-0">{#if cmdHistory.length}{@html cmdHistory.map(h =>
+      `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
+    ).join('\n\n')}{:else}<span class="log-debug">Run a command above…</span>{/if}</pre>
   </div>
 
-  <!-- Log Tabs -->
-  <div class="flex items-center justify-between mb-1">
-    <div class="flex gap-0.5">
-      {#each [['terminal','Terminal'],['system','System Log'],['agent','Agent Log']] as [id, label]}
-        <button
-          onclick={() => { logTab = id; if (id !== 'terminal') loadCurrentLog(); }}
-          class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-            {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-        >{label}</button>
-      {/each}
+  <!-- Log Tabs (remaining half) -->
+  <div class="flex flex-col min-h-0" style="height: 50%;">
+    <div class="flex items-center justify-between mb-1 mt-2">
+      <div class="flex gap-0.5">
+        {#each [['terminal','Terminal'],['order','Order Log'],['agent','Agent Log'],['system','System Log']] as [id, label]}
+          <button
+            onclick={() => { logTab = id; if (id !== 'terminal') loadCurrentLog(); }}
+            class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+              {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+          >{label}</button>
+        {/each}
+      </div>
+      <div class="flex gap-2 items-center">
+        {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
+        {#if logTab !== 'terminal'}
+          <button onclick={loadCurrentLog} class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
+        {/if}
+      </div>
     </div>
-    <div class="flex gap-2 items-center">
-      {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
-      {#if logTab !== 'terminal'}
-        <button onclick={loadCurrentLog} class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
-      {/if}
-    </div>
-  </div>
 
-  <!-- Log content (fills remaining space) -->
-  <pre
-    bind:this={logEl}
-    class="log-panel flex-1"
-  >{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
-    `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-  ).join('\n\n')}{:else}<span class="log-debug">Run a command above…</span>{/if}{:else if logTab === 'system'}{#if logLines.length}{@html logLines.map(l => {
-    const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
-    return `<span class="${cls}">${l}</span>`;
-  }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else}{#if agentLog.length}{@html agentLog.map(e => {
-    const t = e.timestamp?.slice(11,19) || '';
-    const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-    return `<span class="${cls}">[${t}] ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}</span>`;
-  }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{/if}</pre>
+    <!-- Log content -->
+    <pre
+      bind:this={logEl}
+      class="log-panel flex-1 min-h-0"
+    >{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
+      `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
+    ).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}<span class="log-debug">Order events appear here.</span>{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
+      const t = e.timestamp?.slice(11,19) || '';
+      const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
+      return `<span class="${cls}">[${t}] ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}</span>`;
+    }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if logLines.length}{@html logLines.map(l => {
+      const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
+      return `<span class="${cls}">${l}</span>`;
+    }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+  </div>
 </div>
