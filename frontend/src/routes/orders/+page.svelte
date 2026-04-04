@@ -71,8 +71,8 @@
     try {
       const res = await fetch('/api/agents/events/recent?n=50', { headers: authHeaders() });
       const data = await res.json().catch(() => []);
-      orderLog = (Array.isArray(data) ? data : []).filter(e =>
-        e.event_type?.includes('order') || e.event_type?.includes('action'));
+      const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled','action_success','action_failed']);
+      orderLog = (Array.isArray(data) ? data : []).filter(e => ORDER_TYPES.has(e.event_type));
     } catch (e) { /* ignore */ }
   }
   async function loadAgentLog() {
@@ -114,6 +114,7 @@
 
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
+<div class="flex flex-col h-[calc(100vh-8rem)]">
 <div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
 
 {#if error}<div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
@@ -152,7 +153,7 @@
 {#if loading && !orders.length}
   <div class="text-center text-muted text-xs animate-pulse py-4">Loading orders…</div>
 {:else if orders.length}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 max-h-[25vh] overflow-y-auto">
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <div class="rounded-lg border-2 {statusColor(o.status)} p-2.5">
         <div class="flex items-center justify-between mb-1">
@@ -179,9 +180,9 @@
 <!-- Order Entry (3 rows: input + help + output) -->
 <div class="mb-3">
   <div class="flex gap-2 mb-1">
-    <input bind:value={command} class="field-input font-mono text-xs flex-1"
+    <textarea bind:value={command} rows="4" class="field-input font-mono text-xs flex-1"
       placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
-      onkeydown={(e) => e.key === 'Enter' && runCommand()} />
+      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
     <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
       {running ? '...' : 'Place'}
     </button>
@@ -200,17 +201,18 @@
   {/each}
 </div>
 
-<pre class="log-panel max-h-[30vh]">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
+<pre class="log-panel flex-1 min-h-0">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
   `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
 ).join('\n\n')}{:else}<span class="log-debug">Place an order above…</span>{/if}{:else if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
   const t = e.timestamp?.slice(11,19) || '';
   const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-triggered';
-  return `<span class="${cls}">[${t}] ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}</span>`;
+  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = e.timestamp?.slice(11,19) || '';
   const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}">[${t}] ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}</span>`;
+  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
   const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
   return `<span class="${cls}">${l}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+</div>

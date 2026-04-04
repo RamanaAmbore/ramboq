@@ -47,7 +47,7 @@ def retry_kite_conn(max_attempts: int):
                     return func(*args, **kwargs)
 
                 except Exception as e:
-                    logger.warning(
+                    logger.debug(
                         f"{func.__name__}: Attempt {attempt + 1} of {max_attempts} failed: {e}..."
                     )
                     if attempt == max_attempts - 1:

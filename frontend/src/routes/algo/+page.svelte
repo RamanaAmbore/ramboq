@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
 
   let agents      = $state([]);
@@ -166,6 +166,8 @@
 <svelte:head>
   <title>Algo Agent | RamboQuant Analytics</title>
 </svelte:head>
+
+<div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
