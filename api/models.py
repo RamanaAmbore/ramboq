@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -111,6 +112,65 @@ class AlgoEvent(Base):
     id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
     algo_order_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("algo_orders.id"), nullable=True)
     event_type: Mapped[str]      = mapped_column(String(32), nullable=False)
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime]  = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent Framework — Conditions → Alerts → Actions
+# ---------------------------------------------------------------------------
+
+class Agent(Base):
+    __tablename__ = "agents"
+
+    id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
+    slug: Mapped[str]            = mapped_column(String(64), unique=True, nullable=False, index=True)
+    name: Mapped[str]            = mapped_column(String(128), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Condition tree (AND/OR/NOT with account selection)
+    conditions: Mapped[dict]     = mapped_column(JSONB, nullable=False, default=dict)
+
+    # Alert channels
+    events: Mapped[list]         = mapped_column(JSONB, nullable=False, default=list)
+
+    # Actions (empty list = alert-only)
+    actions: Mapped[list]        = mapped_column(JSONB, nullable=False, default=list)
+
+    # Evaluation config
+    scope: Mapped[str]           = mapped_column(String(16), nullable=False, default="per_account")
+    schedule: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default="market_hours")
+    cooldown_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+
+    # Runtime state
+    status: Mapped[str]          = mapped_column(String(16), nullable=False, default="inactive")
+    last_triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    trigger_count: Mapped[int]   = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Meta
+    is_system: Mapped[bool]      = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class AgentEvent(Base):
+    __tablename__ = "agent_events"
+
+    id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
+    agent_id: Mapped[int]        = mapped_column(Integer, ForeignKey("agents.id"), nullable=False)
+    event_type: Mapped[str]      = mapped_column(String(32), nullable=False)
+    trigger_condition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime]  = mapped_column(
         DateTime(timezone=True), nullable=False,

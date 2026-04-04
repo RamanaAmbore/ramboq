@@ -46,9 +46,13 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     """Create all tables (idempotent)."""
     async with engine.begin() as conn:
-        from api.models import User  # noqa: F401 �� ensure model registered
+        from api.models import User, Agent, AgentEvent  # noqa: F401 �� ensure model registered
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database: tables verified")
+
+    # Seed built-in agents
+    from api.algo.agent_engine import seed_agents
+    await seed_agents()
 
 
 async def get_session() -> AsyncSession:

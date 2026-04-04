@@ -66,7 +66,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/backend_config.yaml"
   else
     if [ -f "$CONFIG_BAK" ]; then
-      for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup; do
+      for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
         val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
         [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/backend_config.yaml"
       done
