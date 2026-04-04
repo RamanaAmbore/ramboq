@@ -216,20 +216,18 @@
   {/each}
 </div>
 
-<pre
-  bind:this={logEl}
-  class="p-3 bg-gray-900 rounded font-mono text-[0.55rem] leading-relaxed overflow-auto whitespace-pre-wrap max-h-[30vh]"
->{#if logTab === 'order'}{#if orderLog.length}{orderLog.map(e => {
+<pre bind:this={logEl} class="log-panel max-h-[30vh]">{#if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
   const t = e.timestamp?.slice(11,19) || '';
-  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}`;
-}).join('\n')}{:else}<span class="text-gray-500">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{agentLog.map(e => {
+  const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : e.event_type === 'triggered' ? 'log-agent-triggered' : 'log-agent-default';
+  return `<span class="${cls}">[${t}] ${e.event_type?.padEnd(16)||''} ${e.trigger_condition||''}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = e.timestamp?.slice(11,19) || '';
-  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}`;
-}).join('\n')}{:else}<span class="text-gray-500">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(line => {
-  if (line.includes('ERROR')) return `<span class="text-red-400">${line}</span>`;
-  if (line.includes('WARNING')) return `<span class="text-amber-400">${line}</span>`;
-  return `<span class="text-gray-300">${line}</span>`;
-}).join('\n')}{:else}<span class="text-gray-500">No log entries.</span>{/if}{/if}</pre>
+  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
+  return `<span class="${cls}">[${t}] ${e.event_type?.padEnd(16)||''} ${e.trigger_condition||''}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(line => {
+  const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
+  return `<span class="${cls}">${line}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
   .hidden { display: none; }

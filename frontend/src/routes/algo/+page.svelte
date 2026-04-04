@@ -278,11 +278,11 @@
   {/each}
 </div>
 
-<pre class="p-3 bg-gray-900 rounded font-mono text-[0.55rem] leading-relaxed overflow-auto whitespace-pre-wrap max-h-[35vh]">{#if logTab === 'agent'}{#if agentEvents.length}{agentEvents.map(e => {
+<pre class="log-panel max-h-[35vh]">{#if logTab === 'agent'}{#if agentEvents.length}{@html agentEvents.map(e => {
   const t = e.timestamp?.slice(11, 19) || '';
-  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition || ''}`;
-}).join('\n')}{:else}<span class="text-gray-500">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
-  if (line.includes('ERROR')) return `<span class="text-red-400">${line}</span>`;
-  if (line.includes('WARNING')) return `<span class="text-amber-400">${line}</span>`;
-  return `<span class="text-gray-300">${line}</span>`;
-}).join('\n')}{:else}<span class="text-gray-500">No log entries.</span>{/if}{:else}<span class="text-gray-500">No order events.</span>{/if}</pre>
+  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
+  return `<span class="${cls}">[${t}] ${(e.event_type||'').padEnd(16)} ${e.trigger_condition || ''}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
+  const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
+  return `<span class="${cls}">${line}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else}<span class="log-debug">No order events.</span>{/if}</pre>

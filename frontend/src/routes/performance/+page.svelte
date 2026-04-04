@@ -133,6 +133,7 @@
       columnDefs: colDefs,
       rowData,
       defaultColDef: defaultCol,
+      overlayNoRowsTemplate: '<span style="font-size:0.65rem;color:#999">—</span>',
       domLayout: 'autoHeight',
     });
   }
