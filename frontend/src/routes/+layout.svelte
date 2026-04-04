@@ -104,7 +104,12 @@
           {/if}
         </nav>
         {#if $authStore.user}
-          <span class="nav-user-pill">{$authStore.user.display_name}</span>
+          <span class="nav-user-pill">
+            {$authStore.user.display_name.toLowerCase()}
+            {#if $authStore.user.role === 'admin'}
+              <span class="text-[0.5rem] opacity-60 ml-0.5">admin</span>
+            {/if}
+          </span>
           <button onclick={signOut} class="nav-btn">Sign Out</button>
         {:else}
           <button onclick={() => goto('/signin')} class="nav-btn-signin {isActive('/signin') ? 'nav-btn-active' : ''}">Sign In</button>
@@ -116,6 +121,15 @@
         <a href="/about" class="shrink-0" tabindex="-1">
           <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none" />
         </a>
+        <div class="flex items-center gap-2">
+          {#if $authStore.user}
+            <span class="text-[0.6rem] text-white/70 font-medium">
+              {$authStore.user.display_name.toLowerCase()}
+              {#if $authStore.user.role === 'admin'}
+                <span class="text-[0.45rem] opacity-50">admin</span>
+              {/if}
+            </span>
+          {/if}
         <button
           onclick={() => menuOpen = !menuOpen}
           class="hamburger"
@@ -132,6 +146,7 @@
             </svg>
           {/if}
         </button>
+        </div>
       </div>
 
       <!-- Mobile dropdown -->

@@ -10,8 +10,8 @@
   ModuleRegistry.registerModules([AllCommunityModule]);
 
   // Read tab from URL ?tab= param; default to 'holdings'
-  const validTabs = ['holdings', 'positions', 'funds'];
-  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'holdings');
+  const validTabs = ['funds', 'positions', 'holdings'];
+  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'funds');
 
   function switchTab(/** @type {string} */ id) {
     activeTab = id;
@@ -285,7 +285,7 @@
 </div>
 
 <div class="flex gap-0.5 mb-3">
-  {#each [['holdings','Holdings'],['positions','Positions'],['funds','Funds']] as [id, label]}
+  {#each [['funds','Funds'],['positions','Positions'],['holdings','Holdings']] as [id, label]}
     <button
       class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
              {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
