@@ -122,24 +122,30 @@ async def _run(fn, *args):
 
 async def _task_market(state: dict) -> None:
     """Warm market cache at startup, then every day at 08:30 IST."""
-    from src.helpers.genai_api import get_market_update
+    from api.routes.market import fetch_fresh
+    from api.cache import invalidate
 
-    # On first run, only fetch if before 08:30 IST today (i.e. no report yet today)
+    # Warm once at 07:00 IST daily — only one Gemini call per day
+    # On startup: fetch only if before 07:00 (no report yet today)
     now = timestamp_indian()
-    today_warm = now.replace(hour=8, minute=30, second=0, microsecond=0)
+    today_warm = now.replace(hour=7, minute=0, second=0, microsecond=0)
     if now < today_warm:
         try:
-            await _run(get_market_update)
+            result = await _run(fetch_fresh)
+            # Put into cache directly
+            from api.cache import _store
+            import time as _time
+            _store["market"] = (_time.monotonic() + 86400, result)
             logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
         except Exception as e:
             logger.error(f"Background: market warm failed: {e}")
     else:
-        logger.info("Background: market task skipping startup warm (past 08:30 IST)")
+        logger.info("Background: market task skipping startup warm (past 07:00 IST)")
 
     while True:
-        # Sleep until 08:30 IST tomorrow
+        # Sleep until 07:00 IST next day
         now  = timestamp_indian()
-        next_warm = now.replace(hour=8, minute=30, second=0, microsecond=0)
+        next_warm = now.replace(hour=7, minute=0, second=0, microsecond=0)
         if now >= next_warm:
             next_warm += timedelta(days=1)
         sleep_s = (next_warm - now).total_seconds()
@@ -147,8 +153,16 @@ async def _task_market(state: dict) -> None:
         await asyncio.sleep(sleep_s)
 
         try:
-            await _run(get_market_update)
+            result = await _run(fetch_fresh)
+            from api.cache import _store
+            import time as _time
+            _store["market"] = (_time.monotonic() + 86400, result)
             logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
+
+            # Broadcast to frontend so market page auto-refreshes
+            from api.routes.ws import broadcast
+            import json
+            broadcast(json.dumps({"event": "market_updated", "refreshed_at": timestamp_display()}))
         except Exception as e:
             logger.error(f"Background: market warm failed: {e}")
 

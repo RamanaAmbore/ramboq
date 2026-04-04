@@ -12,13 +12,25 @@ from src.helpers.utils import get_cycle_date
 
 logger = get_logger(__name__)
 
-# Market report changes once per day (cycle_date advances at 08:00 IST).
-# Cache for 3600 s so a fresh Gemini call is made at most once per hour,
-# and the worker's daily warm at 08:30 forces a fresh fetch via warm_market_cache.
-_TTL = 3600
+# Market report: fetched ONCE per day by background task at 07:00 IST.
+# API serves cached data only — never calls Gemini on user request.
+# TTL = 24h. If cache is empty (first startup), returns fallback static content.
+_TTL = 86400  # 24 hours
 
 
-def _fetch() -> MarketResponse:
+def _fetch_cached() -> MarketResponse:
+    """Return cached market data or static fallback — does NOT call Gemini."""
+    from src.helpers.utils import ramboq_config
+    content = ramboq_config.get("market", "Market update will be available at 07:00 AM IST.")
+    return MarketResponse(
+        content=content,
+        cycle_date=str(get_cycle_date()),
+        refreshed_at=timestamp_display(),
+    )
+
+
+def fetch_fresh() -> MarketResponse:
+    """Call Gemini for fresh market update — only called by background task."""
     content = genai_api.get_market_update()
     return MarketResponse(
         content=content,
@@ -33,7 +45,7 @@ class MarketController(Controller):
     @get("/")
     async def get_market(self) -> MarketResponse:
         try:
-            return await get_or_fetch("market", _fetch, ttl_seconds=_TTL)
+            return await get_or_fetch("market", _fetch_cached, ttl_seconds=_TTL)
         except Exception as e:
             logger.error(f"Market API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
