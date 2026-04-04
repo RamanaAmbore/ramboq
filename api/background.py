@@ -156,7 +156,7 @@ async def _task_market(state: dict) -> None:
 async def _task_performance(state: dict) -> None:
     """Refresh performance data every N minutes during market hours."""
     from src.helpers.broker_apis import fetch_holidays
-    from src.helpers.alert_utils import send_summary, check_and_alert
+    from src.helpers.alert_utils import send_summary
     from src.helpers.background_refresh import _summarise_holdings, _summarise_positions
     from api.cache import invalidate_all
     from api.routes.ws import broadcast
@@ -233,9 +233,7 @@ async def _task_performance(state: dict) -> None:
                                                     'open', label=_label, df_margins=_dm))
                     ss['last_open'] = today
 
-                _dm = df_margins
-                alert_state = await _run(lambda: check_and_alert(
-                    seg_sum_h, seg_sum_p, alert_state, ist_display, df_margins=_dm))
+                # check_and_alert removed — agents handle alerts now
 
             # Run agent engine with market data context
             try:

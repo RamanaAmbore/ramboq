@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
 
@@ -139,7 +139,7 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="text-xs text-muted mb-2">
-  {new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
+  {clientTimestamp()}
 </div>
 
 {#if error}

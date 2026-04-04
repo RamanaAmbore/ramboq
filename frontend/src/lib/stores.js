@@ -73,3 +73,11 @@ export const dataCache = {
   funds:     null,   // { rows, refreshed_at }
   insights:  null,   // { content }
 };
+
+/** Format current time like the API's timestamp_display(): IST | EST */
+export function clientTimestamp() {
+  const now = new Date();
+  const ist = now.toLocaleString('en-IN', { weekday: 'short', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) + ' IST';
+  const est = now.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
+  return `${ist} | ${est}`;
+}

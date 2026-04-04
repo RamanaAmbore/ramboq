@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchUsers, approveUser, rejectUser, updateUser, createUser } from '$lib/api';
 
   let users    = $state([]);
@@ -93,7 +93,7 @@
   });
 </script>
 
-<div class="text-xs text-muted mb-2">{new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</div>
+<div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
 
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <div class="flex items-center justify-between mb-1">

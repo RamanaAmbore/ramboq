@@ -77,6 +77,10 @@ def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),
     """
     if holiday_set and now.date() in holiday_set:
         return False
+    # Regular weekends are closed (Muhurat trading on special Saturdays
+    # will need an explicit override if needed in future)
+    if now.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
     t = now.time().replace(second=0, microsecond=0)
     return market_start <= t <= market_end
 

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { authStore } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { goto } from '$app/navigation';
 
   onMount(() => {
@@ -24,7 +24,7 @@
   }
 </script>
 
-<div class="text-xs text-muted mb-2">{new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</div>
+<div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
 
 {#if $authStore.user}
   <div class="w-full space-y-4">
