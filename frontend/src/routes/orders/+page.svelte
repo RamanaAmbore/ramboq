@@ -5,10 +5,11 @@
   import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
 
-  let orders      = $state([]);
-  let accounts    = $state([]);
-  let loading     = $state(true);
-  let error       = $state('');
+  let orders        = $state([]);
+  let accounts      = $state([]);
+  let loading       = $state(true);
+  let error         = $state('');
+  let filterStatus  = $state('all');
   let success     = $state('');
   let command     = $state('');
   let cmdOutput   = $state('');
@@ -168,6 +169,35 @@
   <div class="mb-3 p-2 rounded text-xs font-mono {cmdOutput.startsWith('✓') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}">{cmdOutput}</div>
 {/if}
 
+<!-- Status Dashboard -->
+<div class="grid grid-cols-5 gap-2 mb-3">
+  <button onclick={() => filterStatus = 'all'}
+    class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
+    <div class="text-sm font-bold text-primary">{orders.length}</div>
+    <div class="text-[0.55rem] text-muted uppercase">All</div>
+  </button>
+  <button onclick={() => filterStatus = 'open'}
+    class="rounded-lg border-2 bg-amber-50 border-amber-400 p-2 text-center {filterStatus === 'open' ? 'ring-2 ring-primary/30' : ''}">
+    <div class="text-sm font-bold {orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length > 0 ? 'text-amber-600' : 'text-muted'}">{orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length}</div>
+    <div class="text-[0.55rem] text-muted uppercase">Open</div>
+  </button>
+  <button onclick={() => filterStatus = 'complete'}
+    class="rounded-lg border-2 bg-green-50 border-green-500 p-2 text-center {filterStatus === 'complete' ? 'ring-2 ring-primary/30' : ''}">
+    <div class="text-sm font-bold {orders.filter(o => o.status === 'COMPLETE').length > 0 ? 'text-green-600' : 'text-muted'}">{orders.filter(o => o.status === 'COMPLETE').length}</div>
+    <div class="text-[0.55rem] text-muted uppercase">Filled</div>
+  </button>
+  <button onclick={() => filterStatus = 'rejected'}
+    class="rounded-lg border-2 bg-red-50 border-red-400 p-2 text-center {filterStatus === 'rejected' ? 'ring-2 ring-primary/30' : ''}">
+    <div class="text-sm font-bold {orders.filter(o => o.status === 'REJECTED').length > 0 ? 'text-red-600' : 'text-muted'}">{orders.filter(o => o.status === 'REJECTED').length}</div>
+    <div class="text-[0.55rem] text-muted uppercase">Rejected</div>
+  </button>
+  <button onclick={() => filterStatus = 'cancelled'}
+    class="rounded-lg border-2 bg-gray-50 border-gray-400 p-2 text-center {filterStatus === 'cancelled' ? 'ring-2 ring-primary/30' : ''}">
+    <div class="text-sm font-bold {orders.filter(o => o.status === 'CANCELLED').length > 0 ? 'text-gray-600' : 'text-muted'}">{orders.filter(o => o.status === 'CANCELLED').length}</div>
+    <div class="text-[0.55rem] text-muted uppercase">Cancelled</div>
+  </button>
+</div>
+
 <!-- Order Cards Grid -->
 {#if loading && !orders.length}
   <div class="text-center text-muted text-xs animate-pulse py-8">Loading orders…</div>
@@ -175,7 +205,7 @@
   <div class="text-center text-muted text-xs py-4">No orders today.</div>
 {:else}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
-    {#each orders as o}
+    {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <div class="rounded-lg border-2 {statusColor(o.status)} p-2.5">
         <div class="flex items-center justify-between mb-1">
           <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.quantity}</span>

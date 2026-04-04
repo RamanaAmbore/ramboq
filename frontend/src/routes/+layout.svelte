@@ -123,10 +123,10 @@
         </a>
         <div class="flex items-center gap-2">
           {#if $authStore.user}
-            <span class="text-[0.6rem] text-white/70 font-medium">
+            <span class="nav-user-pill text-[0.6rem]">
               {$authStore.user.display_name.toLowerCase()}
               {#if $authStore.user.role === 'admin'}
-                <span class="text-[0.45rem] opacity-50">admin</span>
+                <span class="text-[0.5rem] opacity-60 ml-0.5">admin</span>
               {/if}
             </span>
           {/if}
