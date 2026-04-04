@@ -267,32 +267,22 @@
   </div>
 {/if}
 
-<!-- Log Toggle + Log Panel -->
-<div class="flex items-center gap-2 mb-2">
-  <button onclick={() => { logTab = 'agent'; loadAgentLog(); }}
-    class="text-[0.65rem] font-medium px-2 py-0.5 rounded {logTab === 'agent' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
-    Agent Log
-  </button>
-  <button onclick={() => { logTab = 'system'; loadSystemLog(); }}
-    class="text-[0.65rem] font-medium px-2 py-0.5 rounded {logTab === 'system' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
-    System Log
-  </button>
-  {#if loading}<span class="text-xs text-muted animate-pulse ml-2">Loading…</span>{/if}
+<!-- Log Tabs -->
+<div class="flex items-center gap-1 mb-2">
+  {#each [['agent','Agent Log'],['order','Order Log'],['system','System Log']] as [id, label]}
+    <button
+      onclick={() => { logTab = id; if (id === 'agent') loadAgentLog(); else if (id === 'system') loadSystemLog(); }}
+      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+    >{label}</button>
+  {/each}
 </div>
 
 <pre class="p-3 bg-gray-900 rounded font-mono text-[0.55rem] leading-relaxed overflow-auto whitespace-pre-wrap max-h-[35vh]">{#if logTab === 'agent'}{#if agentEvents.length}{agentEvents.map(e => {
-  const icon = eventIcon(e.event_type);
   const t = e.timestamp?.slice(11, 19) || '';
-  const cond = e.trigger_condition || '';
-  return `[${t}] ${icon} ${e.event_type.padEnd(16)} ${cond}`;
-}).join('\n')}{:else}No agent events yet.{/if}{:else}{#if systemLog.length}{systemLog.map(line => {
-  if (line.includes('ERROR')) return `\x1b[31m${line}\x1b[0m`;
-  if (line.includes('WARNING')) return `\x1b[33m${line}\x1b[0m`;
-  return line;
-}).join('\n')}{:else}No log entries.{/if}{/if}</pre>
-
-<style>
-  :global(.animate-pulse) {
-    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-</style>
+  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition || ''}`;
+}).join('\n')}{:else}<span class="text-gray-500">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
+  if (line.includes('ERROR')) return `<span class="text-red-400">${line}</span>`;
+  if (line.includes('WARNING')) return `<span class="text-amber-400">${line}</span>`;
+  return `<span class="text-gray-300">${line}</span>`;
+}).join('\n')}{:else}<span class="text-gray-500">No log entries.</span>{/if}{:else}<span class="text-gray-500">No order events.</span>{/if}</pre>

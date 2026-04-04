@@ -294,14 +294,9 @@
   {/each}
 </div>
 
-<section class:hidden={activeTab !== 'holdings'}>
-  <h2 class="section-heading">Summary</h2>
-  <div bind:this={holdingsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
-
-  <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
-
-  <h2 class="section-heading">All Holdings</h2>
-  <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+<section class:hidden={activeTab !== 'funds'}>
+  <h2 class="section-heading">Fund Balances</h2>
+  <div bind:this={fundsEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
 </section>
 
 <section class:hidden={activeTab !== 'positions'}>
@@ -314,9 +309,14 @@
   <div bind:this={positionsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
 </section>
 
-<section class:hidden={activeTab !== 'funds'}>
-  <h2 class="section-heading">Fund Balances</h2>
-  <div bind:this={fundsEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+<section class:hidden={activeTab !== 'holdings'}>
+  <h2 class="section-heading">Summary</h2>
+  <div bind:this={holdingsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
+
+  <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
+
+  <h2 class="section-heading">All Holdings</h2>
+  <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
 </section>
 
 <style>

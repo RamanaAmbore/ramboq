@@ -1,359 +1,236 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { createGrid, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+  import { goto } from '$app/navigation';
+  import { authStore } from '$lib/stores';
   import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
 
-  ModuleRegistry.registerModules([AllCommunityModule]);
+  let orders      = $state([]);
+  let accounts    = $state([]);
+  let loading     = $state(true);
+  let error       = $state('');
+  let success     = $state('');
+  let command     = $state('');
+  let cmdOutput   = $state('');
+  let running     = $state(false);
+  let logTab      = $state('order');  // order | agent | system
+  let orderLog    = $state([]);
+  let agentLog    = $state([]);
+  let systemLog   = $state([]);
+  let logEl;
+  let unsub;
+  let logInterval;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  let accounts    = [];
-  let lastRefresh = '';
-  let loading     = false;
-  let error       = '';
-  let successMsg  = '';
+  function authHeaders() {
+    const token = $authStore.token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
-  // Order form
-  let showForm  = false;
-  let placing   = false;
-  let formError = '';
-  let form = {
-    account:          '',
-    exchange:         'NSE',
-    tradingsymbol:    '',
-    transaction_type: 'BUY',
-    order_type:       'MARKET',
-    product:          'CNC',
-    quantity:         1,
-    price:            '',
-    trigger_price:    '',
-    validity:         'DAY',
-    variety:          'regular',
-  };
-
-  // AG Grid
-  let ordersEl   = null;
-  let ordersGrid = null;
-
-  // ── Column defs ────────────────────────────────────────────────────────────
-  const statusCellStyle = ({ value }) => {
-    if (!value) return {};
-    const v = value.toUpperCase();
-    if (v === 'COMPLETE')                        return { color: '#27ae60', fontWeight: '600' };
-    if (v === 'REJECTED' || v === 'CANCELLED')   return { color: '#c0392b' };
-    if (v === 'OPEN' || v === 'TRIGGER PENDING') return { color: '#2a5298', fontWeight: '600' };
-    return {};
-  };
-
-  const txnCellStyle = ({ value }) =>
-    value === 'BUY'
-      ? { color: '#27ae60', fontWeight: '600' }
-      : { color: '#c0392b', fontWeight: '600' };
-
-  const numFmt = ({ value }) =>
-    value == null || value === 0
-      ? '—'
-      : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-
-  // Cancel button rendered inside the grid for OPEN orders
-  const cancelRenderer = (/** @type {{ data: { status: string, order_id: string, account: string, variety: string } }} */ params) => {
-    const status = (params.data?.status ?? '').toUpperCase();
-    if (status !== 'OPEN' && status !== 'TRIGGER PENDING') return '';
-    const btn = document.createElement('button');
-    btn.textContent = 'Cancel';
-    btn.className   = 'px-2 py-0.5 text-xs rounded border border-red-400 text-red-600 hover:bg-red-50';
-    btn.addEventListener('click', () => {
-      handleCancel(params.data.order_id, params.data.account, params.data.variety);
-    });
-    return btn;
-  };
-
-  const orderCols = [
-    { field: 'account',          headerName: 'Account',   width: 110 },
-    { field: 'order_timestamp',  headerName: 'Time',      width: 155 },
-    { field: 'tradingsymbol',    headerName: 'Symbol',    flex: 1 },
-    { field: 'exchange',         headerName: 'Exch',      width: 70 },
-    { field: 'transaction_type', headerName: 'B/S',       width: 60,  cellStyle: txnCellStyle },
-    { field: 'quantity',         headerName: 'Qty',       width: 70,  type: 'numericColumn' },
-    { field: 'pending_quantity', headerName: 'Pending',   width: 80,  type: 'numericColumn' },
-    { field: 'order_type',       headerName: 'Type',      width: 85 },
-    { field: 'product',          headerName: 'Product',   width: 80 },
-    { field: 'price',            headerName: 'Price',     width: 95,  valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'average_price',    headerName: 'Avg',       width: 95,  valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'status',           headerName: 'Status',    width: 140, cellStyle: statusCellStyle },
-    { field: 'status_message',   headerName: 'Message',   flex: 1 },
-    { headerName: '',            width: 80,  cellRenderer: cancelRenderer, sortable: false, filter: false },
-  ];
-
-  // ── Actions ────────────────────────────────────────────────────────────────
   async function loadOrders() {
-    loading = true;
-    error   = '';
+    loading = true; error = '';
     try {
       const data = await fetchOrders();
-      ordersGrid?.setGridOption('rowData', data.rows ?? []);
-      lastRefresh = data.refreshed_at ?? '';
-    } catch (e) {
-      error = /** @type {Error} */ (e).message;
-    } finally {
-      loading = false;
-    }
+      orders = data.rows || [];
+    } catch (e) { error = e.message; }
+    finally { loading = false; }
   }
 
-  async function handleCancel(/** @type {string} */ orderId, /** @type {string} */ account, /** @type {string} */ variety) {
-    if (!confirm(`Cancel order ${orderId}?`)) return;
-    successMsg = '';
-    error      = '';
+  async function loadAccounts() {
+    try { const data = await fetchAccounts(); accounts = data.accounts || []; }
+    catch (e) { /* ignore */ }
+  }
+
+  async function doCancel(/** @type {string} */ orderId, /** @type {string} */ account) {
     try {
-      await cancelOrder(orderId, account, variety);
-      successMsg = `Order ${orderId} cancelled`;
+      await cancelOrder(orderId, account);
+      success = `Order ${orderId} cancelled`;
       await loadOrders();
-    } catch (e) {
-      error = /** @type {Error} */ (e).message;
-    }
+    } catch (e) { error = e.message; }
   }
 
-  async function submitOrder() {
-    placing    = true;
-    formError  = '';
-    successMsg = '';
+  // Command line order: buy ACCOUNT SYMBOL QTY [LIMIT PRICE]
+  async function runCommand() {
+    if (!command.trim()) return;
+    running = true; cmdOutput = '';
+    const parts = command.trim().split(/\s+/);
+    const txn = parts[0]?.toUpperCase();
+    if ((txn === 'BUY' || txn === 'SELL') && parts.length >= 4) {
+      try {
+        const payload = {
+          account: parts[1], tradingsymbol: parts[2], quantity: parseInt(parts[3]) || 0,
+          transaction_type: txn, exchange: 'NFO', product: 'NRML',
+          order_type: (parts[4] || 'MARKET').toUpperCase(),
+          price: parseFloat(parts[5]) || 0, validity: 'DAY', variety: 'regular',
+        };
+        const res = await placeOrder(payload);
+        cmdOutput = `✓ Order placed: ${txn} ${parts[3]} ${parts[2]} | ID: ${res.order_id}`;
+        await loadOrders();
+      } catch (e) { cmdOutput = `✗ ${e.message}`; }
+    } else {
+      cmdOutput = 'Syntax: buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]';
+    }
+    running = false;
+  }
+
+  // Log loading
+  async function loadOrderLog() {
+    // Order events from agent events or system log
     try {
-      const payload = {
-        ...form,
-        quantity:      Number(form.quantity),
-        price:         form.price         ? Number(form.price)         : null,
-        trigger_price: form.trigger_price ? Number(form.trigger_price) : null,
-      };
-      const res = await placeOrder(payload);
-      successMsg = `Order ${res.order_id} placed for ${res.account}`;
-      showForm   = false;
-      resetForm();
-      await loadOrders();
-    } catch (e) {
-      formError = /** @type {Error} */ (e).message;
-    } finally {
-      placing = false;
-    }
+      const res = await fetch('/api/agents/events/recent?n=50', { headers: authHeaders() });
+      const data = await res.json().catch(() => []);
+      orderLog = (Array.isArray(data) ? data : []).filter(e =>
+        e.event_type?.includes('order') || e.event_type?.includes('action'));
+    } catch (e) { /* ignore */ }
   }
 
-  function resetForm() {
-    form = {
-      account:          accounts[0]?.account_id ?? '',
-      exchange:         'NSE',
-      tradingsymbol:    '',
-      transaction_type: 'BUY',
-      order_type:       'MARKET',
-      product:          'CNC',
-      quantity:         1,
-      price:            '',
-      trigger_price:    '',
-      validity:         'DAY',
-      variety:          'regular',
-    };
+  async function loadAgentLog() {
+    try {
+      const res = await fetch('/api/agents/events/recent?n=100', { headers: authHeaders() });
+      agentLog = await res.json().catch(() => []);
+    } catch (e) { /* ignore */ }
   }
 
-  $: needsPrice   = form.order_type === 'LIMIT' || form.order_type === 'SL';
-  $: needsTrigger = form.order_type === 'SL'    || form.order_type === 'SL-M';
+  async function loadSystemLog() {
+    try {
+      const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
+      const d = await res.json().catch(() => ({}));
+      systemLog = d.lines || [];
+    } catch (e) { /* ignore */ }
+  }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-  let unsub;
+  function loadCurrentLog() {
+    if (logTab === 'order') loadOrderLog();
+    else if (logTab === 'agent') loadAgentLog();
+    else loadSystemLog();
+  }
 
-  onMount(async () => {
-    ordersGrid = createGrid(ordersEl, {
-      columnDefs: orderCols,
-      rowData: [],
-      defaultColDef: { resizable: true, sortable: true, filter: true },
-      domLayout: 'autoHeight',
-    });
+  const statusColor = (/** @type {string} */ s) => {
+    const c = s?.toUpperCase();
+    if (c === 'COMPLETE') return 'border-green-500 bg-green-50';
+    if (c === 'REJECTED' || c === 'CANCELLED') return 'border-red-400 bg-red-50';
+    if (c === 'OPEN' || c === 'TRIGGER PENDING') return 'border-amber-400 bg-amber-50';
+    return 'border-gray-300 bg-white';
+  };
 
-    const [, accts] = await Promise.all([loadOrders(), fetchAccounts()]);
-    accounts       = accts.accounts ?? [];
-    form.account   = accounts[0]?.account_id ?? '';
+  const txnColor = (/** @type {string} */ t) =>
+    t === 'BUY' ? 'text-green-600' : 'text-red-600';
 
+  const eventIcon = (/** @type {string} */ t) => ({
+    triggered:'🟠', alert_sent:'🟡', action_success:'🟢', action_failed:'🔴',
+    order_placed:'📝', order_filled:'✅', order_cancelled:'❌',
+  }[t] || '⚪');
+
+  const logLineColor = (/** @type {string} */ line) => {
+    if (line.includes('ERROR')) return 'bg-red-900/30 text-red-300';
+    if (line.includes('WARNING')) return 'bg-amber-900/20 text-amber-300';
+    return 'text-gray-300';
+  };
+
+  onMount(() => {
+    if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
+    loadOrders(); loadAccounts(); loadCurrentLog();
     unsub = createPerformanceSocket(() => loadOrders());
+    logInterval = setInterval(loadCurrentLog, 30000);
   });
 
-  onDestroy(() => {
-    unsub?.();
-    ordersGrid?.destroy();
-  });
+  onDestroy(() => { unsub?.(); if (logInterval) clearInterval(logInterval); });
 </script>
 
-<!-- ── Header ──────────────────────────────────────────────────────────────── -->
-<div class="flex items-center justify-between mb-4">
-  <div>
-    <h1 class="page-heading mb-0">Orders</h1>
-    {#if lastRefresh}
-      <p class="text-xs text-muted mt-0.5">{lastRefresh}</p>
-    {/if}
-  </div>
-  <div class="flex items-center gap-2">
-    {#if loading}
-      <span class="text-xs text-muted animate-pulse">Refreshing…</span>
-    {/if}
-    <button on:click={loadOrders} disabled={loading} class="btn-secondary disabled:opacity-50">
-      Refresh
-    </button>
-    <button
-      on:click={() => { showForm = !showForm; formError = ''; successMsg = ''; }}
-      class="btn-primary"
-    >
-      {showForm ? 'Close' : '+ New Order'}
-    </button>
-  </div>
+<svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
+
+<div class="text-xs text-muted mb-2">
+  {new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
 </div>
 
-{#if successMsg}
-  <div class="mb-4 p-3 rounded bg-green-50 text-green-700 text-xs border border-green-200">
-    {successMsg}
-  </div>
-{/if}
-
 {#if error}
-  <div class="mb-4 p-3 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
+  <div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
+{/if}
+{#if success}
+  <div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>
 {/if}
 
-<!-- ── Order form ─────────────────────────────────────────────────────────── -->
-{#if showForm}
-  <div class="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-    <h2 class="text-xs font-semibold text-gray-700 mb-4">Place Order</h2>
+<!-- Command line -->
+<div class="flex gap-2 mb-3">
+  <input
+    bind:value={command}
+    class="field-input font-mono text-xs flex-1"
+    placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
+    onkeydown={(e) => e.key === 'Enter' && runCommand()}
+  />
+  <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
+    {running ? '...' : 'Place'}
+  </button>
+  <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">
+    Refresh
+  </button>
+</div>
+{#if cmdOutput}
+  <div class="mb-3 p-2 rounded text-xs font-mono {cmdOutput.startsWith('✓') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}">{cmdOutput}</div>
+{/if}
 
-    {#if formError}
-      <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{formError}</div>
-    {/if}
-
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-
-      <div>
-        <label class="field-label" for="f-account">Account</label>
-        <select id="f-account" bind:value={form.account} class="field-input">
-          {#each accounts as a}
-            <option value={a.account_id}>{a.display}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div>
-        <label class="field-label" for="f-txn">Buy / Sell</label>
-        <select id="f-txn" bind:value={form.transaction_type}
-          class="field-input font-semibold {form.transaction_type === 'BUY' ? 'text-green-700' : 'text-red-700'}">
-          <option value="BUY">BUY</option>
-          <option value="SELL">SELL</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="field-label" for="f-exch">Exchange</label>
-        <select id="f-exch" bind:value={form.exchange} class="field-input">
-          {#each ['NSE','BSE','NFO','MCX','CDS','BFO'] as ex}
-            <option>{ex}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div class="col-span-2 sm:col-span-1">
-        <label class="field-label" for="f-sym">Symbol</label>
-        <input
-          id="f-sym"
-          bind:value={form.tradingsymbol}
-          placeholder="e.g. RELIANCE"
-          class="field-input"
-          on:input={(e) => form.tradingsymbol = /** @type {HTMLInputElement} */(e.target).value.toUpperCase()}
-        />
-      </div>
-
-      <div>
-        <label class="field-label" for="f-otype">Order Type</label>
-        <select id="f-otype" bind:value={form.order_type} class="field-input">
-          {#each ['MARKET','LIMIT','SL','SL-M'] as ot}
-            <option>{ot}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div>
-        <label class="field-label" for="f-product">Product</label>
-        <select id="f-product" bind:value={form.product} class="field-input">
-          {#each ['CNC','MIS','NRML'] as p}
-            <option>{p}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div>
-        <label class="field-label" for="f-qty">Quantity</label>
-        <input id="f-qty" type="number" min="1" bind:value={form.quantity} class="field-input" />
-      </div>
-
-      {#if needsPrice}
-        <div>
-          <label class="field-label" for="f-price">Price</label>
-          <input id="f-price" type="number" step="0.05" bind:value={form.price} class="field-input" placeholder="0.00" />
+<!-- Order Cards Grid -->
+{#if loading && !orders.length}
+  <div class="text-center text-muted text-xs animate-pulse py-8">Loading orders…</div>
+{:else if !orders.length}
+  <div class="text-center text-muted text-xs py-4">No orders today.</div>
+{:else}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+    {#each orders as o}
+      <div class="rounded-lg border-2 {statusColor(o.status)} p-2.5">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.quantity}</span>
+          <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
+            {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' :
+             o.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+             'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-      {/if}
-
-      {#if needsTrigger}
-        <div>
-          <label class="field-label" for="f-trigger">Trigger Price</label>
-          <input id="f-trigger" type="number" step="0.05" bind:value={form.trigger_price} class="field-input" placeholder="0.00" />
+        <div class="text-xs font-medium text-primary mb-0.5">{o.tradingsymbol}</div>
+        <div class="grid grid-cols-2 gap-x-2 text-[0.55rem] text-text/70">
+          <div>Acct: {o.account}</div>
+          <div>Exch: {o.exchange}</div>
+          <div>Type: {o.order_type}</div>
+          <div>Price: {o.average_price || o.price || '—'}</div>
+          <div>Filled: {o.filled_quantity}/{o.quantity}</div>
+          <div>Product: {o.product}</div>
         </div>
-      {/if}
-
-      <div>
-        <label class="field-label" for="f-validity">Validity</label>
-        <select id="f-validity" bind:value={form.validity} class="field-input">
-          <option>DAY</option>
-          <option>IOC</option>
-        </select>
+        {#if o.status === 'OPEN' || o.status === 'TRIGGER PENDING'}
+          <button onclick={() => doCancel(o.order_id, o.account)}
+            class="mt-1.5 text-[0.55rem] text-red-600 hover:underline">Cancel</button>
+        {/if}
+        {#if o.status_message}
+          <div class="text-[0.5rem] text-red-500 mt-1">{o.status_message}</div>
+        {/if}
       </div>
-
-    </div>
-
-    <div class="mt-5 flex gap-3">
-      <button
-        on:click={submitOrder}
-        disabled={placing || !form.tradingsymbol || !form.account}
-        class="px-5 py-2 text-xs font-semibold rounded transition-colors disabled:opacity-50
-               {form.transaction_type === 'BUY'
-                 ? 'bg-green-600 hover:bg-green-700 text-white'
-                 : 'bg-red-600   hover:bg-red-700   text-white'}"
-      >
-        {placing ? 'Placing…' : `${form.transaction_type} ${form.tradingsymbol || '—'}`}
-      </button>
-      <button
-        on:click={() => { showForm = false; resetForm(); formError = ''; }}
-        class="px-4 py-2 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-      >
-        Cancel
-      </button>
-    </div>
+    {/each}
   </div>
 {/if}
 
-<!-- ── Order book ─────────────────────────────────────────────────────────── -->
-<div bind:this={ordersEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+<!-- Log Tabs -->
+<div class="flex items-center gap-1 mb-2">
+  {#each [['order','Order Log'],['agent','Agent Log'],['system','System Log']] as [id, label]}
+    <button
+      onclick={() => { logTab = id; loadCurrentLog(); }}
+      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+    >{label}</button>
+  {/each}
+</div>
+
+<pre
+  bind:this={logEl}
+  class="p-3 bg-gray-900 rounded font-mono text-[0.55rem] leading-relaxed overflow-auto whitespace-pre-wrap max-h-[30vh]"
+>{#if logTab === 'order'}{#if orderLog.length}{orderLog.map(e => {
+  const t = e.timestamp?.slice(11,19) || '';
+  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}`;
+}).join('\n')}{:else}<span class="text-gray-500">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{agentLog.map(e => {
+  const t = e.timestamp?.slice(11,19) || '';
+  return `[${t}] ${eventIcon(e.event_type)} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}`;
+}).join('\n')}{:else}<span class="text-gray-500">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(line => {
+  if (line.includes('ERROR')) return `<span class="text-red-400">${line}</span>`;
+  if (line.includes('WARNING')) return `<span class="text-amber-400">${line}</span>`;
+  return `<span class="text-gray-300">${line}</span>`;
+}).join('\n')}{:else}<span class="text-gray-500">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  :global(.field-label) {
-    display: block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.25rem;
-  }
-  :global(.field-input) {
-    width: 100%;
-    padding: 0.375rem 0.5rem;
-    font-size: 0.875rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    background: white;
-    outline: none;
-  }
-  :global(.field-input:focus) {
-    border-color: #2a5298;
-    box-shadow: 0 0 0 2px rgba(42,82,152,0.15);
-  }
+  .hidden { display: none; }
 </style>

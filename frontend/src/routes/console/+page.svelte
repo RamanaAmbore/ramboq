@@ -128,7 +128,8 @@
 
   function loadCurrentLog() {
     if (logTab === 'system') loadSystemLog();
-    else loadAgentLog();
+    else if (logTab === 'agent') loadAgentLog();
+    // order tab shows agent events filtered — reuse agentLog
   }
 
   onMount(() => {
@@ -174,18 +175,17 @@
       <pre class="flex-1 p-3 bg-gray-900 text-green-300 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap">{output || 'Run a command…'}</pre>
     </div>
 
-    <!-- Log panel with toggle -->
+    <!-- Log Tabs -->
     <div class="flex flex-col min-h-0">
       <div class="flex items-center justify-between mb-1">
         <div class="flex gap-1">
-          <button onclick={() => { logTab = 'system'; loadSystemLog(); }}
-            class="text-[0.6rem] font-medium px-2 py-0.5 rounded {logTab === 'system' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
-            System Log
-          </button>
-          <button onclick={() => { logTab = 'agent'; loadAgentLog(); }}
-            class="text-[0.6rem] font-medium px-2 py-0.5 rounded {logTab === 'agent' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
-            Agent Log
-          </button>
+          {#each [['system','System Log'],['agent','Agent Log'],['order','Order Log']] as [id, label]}
+            <button
+              onclick={() => { logTab = id; loadCurrentLog(); }}
+              class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+                {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+            >{label}</button>
+          {/each}
         </div>
         <div class="flex gap-2 items-center">
           {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
@@ -197,17 +197,16 @@
       {/if}
       <pre
         bind:this={logEl}
-        class="flex-1 p-3 bg-gray-900 text-[0.55rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap
-               {logTab === 'system' ? 'text-gray-200' : 'text-gray-300'}"
-      >{#if logTab === 'system'}{logLines.map(l => {
-        if (l.includes('ERROR')) return '🔴 ' + l;
-        if (l.includes('WARNING')) return '🟠 ' + l;
-        return l;
-      }).join('\n') || 'No log entries.'}{:else}{agentLog.length ? agentLog.map(e => {
+        class="flex-1 p-3 bg-gray-900 text-[0.55rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap"
+      >{#if logTab === 'system'}{#if logLines.length}{@html logLines.map(l => {
+        if (l.includes('ERROR')) return `<span class="text-red-400">${l}</span>`;
+        if (l.includes('WARNING')) return `<span class="text-amber-400">${l}</span>`;
+        return `<span class="text-gray-300">${l}</span>`;
+      }).join('\n')}{:else}<span class="text-gray-500">No log entries.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{agentLog.map(e => {
         const icons = {triggered:'🟠',alert_sent:'🟡',action_success:'🟢',action_failed:'🔴',activated:'⚪',deactivated:'⚪',config_changed:'🟣'};
         const t = e.timestamp?.slice(11,19) || '';
-        return `[${t}] ${icons[e.event_type]||'⚪'} ${e.event_type.padEnd(16)} ${e.trigger_condition||''}`;
-      }).join('\n') : 'No agent events.'}{/if}</pre>
+        return `[${t}] ${icons[e.event_type]||'⚪'} ${(e.event_type||'').padEnd(16)} ${e.trigger_condition||''}`;
+      }).join('\n')}{:else}<span class="text-gray-500">No agent events.</span>{/if}{:else}<span class="text-gray-500">No order events.</span>{/if}</pre>
     </div>
   </div>
 </div>

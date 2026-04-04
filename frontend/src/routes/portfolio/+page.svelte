@@ -24,6 +24,8 @@
   }
 </script>
 
+<div class="text-xs text-muted mb-2">{new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</div>
+
 {#if $authStore.user}
   <div class="w-full space-y-4">
 
