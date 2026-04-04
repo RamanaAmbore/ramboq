@@ -242,7 +242,9 @@ def _build_context(sum_holdings, sum_positions, df_margins, now, seg_state: dict
             ctx["avail_margin"] = float(row.get("net", row.get("avail_margin", 0)) or 0)
             ctx["used_margin"] = float(row.get("util debits", row.get("used_margin", 0)) or 0)
 
-    # Market state per segment
+    # Market state per segment (with holiday awareness)
+    from src.helpers.broker_apis import fetch_holidays
+
     segments = app_config.get("market_segments", {})
     for seg_name, seg_cfg in segments.items():
         h, m = map(int, seg_cfg.get("hours_start", "09:15").split(":"))
@@ -251,11 +253,24 @@ def _build_context(sum_holdings, sum_positions, df_margins, now, seg_state: dict
         close_time = now.replace(hour=h, minute=m, second=0, microsecond=0)
 
         prefix = "nse" if seg_name == "equity" else "mcx"
-        is_open = open_time <= now <= close_time
+        holiday_exchange = seg_cfg.get("holiday_exchange", "NSE")
+
+        # Check if today is a holiday or weekend
+        try:
+            holidays = fetch_holidays(holiday_exchange)
+        except Exception:
+            holidays = set()
+
+        is_holiday = now.date() in holidays
+        is_weekend = now.weekday() >= 5  # Saturday=5, Sunday=6
+        in_time_range = open_time <= now <= close_time
+        is_open = in_time_range and not is_holiday and not is_weekend
+
         ctx[f"{prefix}_open"] = is_open
-        ctx[f"{prefix}_closed"] = now > close_time
-        ctx[f"minutes_since_{prefix}_open"] = max(0, int((now - open_time).total_seconds() / 60)) if now >= open_time else 0
-        ctx[f"minutes_since_{prefix}_close"] = max(0, int((now - close_time).total_seconds() / 60)) if now >= close_time else 0
+        ctx[f"{prefix}_closed"] = (now > close_time) and not is_holiday and not is_weekend
+        ctx[f"{prefix}_holiday"] = is_holiday
+        ctx[f"minutes_since_{prefix}_open"] = max(0, int((now - open_time).total_seconds() / 60)) if now >= open_time and is_open else 0
+        ctx[f"minutes_since_{prefix}_close"] = max(0, int((now - close_time).total_seconds() / 60)) if now > close_time and not is_holiday else 0
 
     # Expiry detection
     ctx["is_expiry_day"] = False

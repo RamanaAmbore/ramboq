@@ -50,6 +50,19 @@ def main():
     ts = _timestamp()
     errors = []
 
+    # Check service status
+    import subprocess
+    services_status = []
+    for svc in ["ramboq_api.service", "ramboq_dev_api.service", "ramboq_hook.service"]:
+        try:
+            result = subprocess.run(["systemctl", "is-active", svc],
+                                    capture_output=True, text=True, timeout=5)
+            status = result.stdout.strip()
+            services_status.append(f"{svc}: {status}")
+        except Exception:
+            services_status.append(f"{svc}: unknown")
+    svc_text = " | ".join(services_status)
+
     # --- Telegram ---
     if cfg.get("telegram", False):
         token   = sec.get("telegram_bot_token", "")
@@ -60,7 +73,7 @@ def main():
                 resp = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json={"chat_id": chat_id,
-                          "text": f"<b>Deploy OK{branch_tag}</b>{branch_line}\n{ts}",
+                          "text": f"<b>Deploy OK{branch_tag}</b>{branch_line}\n{ts}\n<code>{svc_text}</code>",
                           "parse_mode": "HTML"},
                     timeout=10,
                 )
@@ -103,6 +116,9 @@ def main():
             f"<tbody><tr>"
             f"<td style='padding:6px 12px;font-size:13px;border-bottom:1px solid #dce3ea'><b>Deploy OK{branch_tag}</b></td>"
             f"<td style='padding:6px 12px;font-size:13px;border-bottom:1px solid #dce3ea;font-family:monospace'>{ts}</td>"
+            f"</tr><tr>"
+            f"<td style='padding:6px 12px;font-size:12px;border-bottom:1px solid #dce3ea'>Services</td>"
+            f"<td style='padding:6px 12px;font-size:12px;border-bottom:1px solid #dce3ea;font-family:monospace'>{svc_text}</td>"
             f"</tr></tbody>"
             f"</table>"
             f"</body></html>"
