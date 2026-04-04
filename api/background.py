@@ -237,6 +237,24 @@ async def _task_performance(state: dict) -> None:
                 alert_state = await _run(lambda: check_and_alert(
                     seg_sum_h, seg_sum_p, alert_state, ist_display, df_margins=_dm))
 
+            # Run agent engine with market data context
+            try:
+                from api.algo.agent_engine import run_cycle
+                from api.routes.algo import _broadcast_event
+                agent_context = {
+                    "sum_holdings": sum_holdings,
+                    "sum_positions": sum_positions,
+                    "df_margins": df_margins,
+                    "df_holdings": df_holdings,
+                    "df_positions": df_positions,
+                    "ist_display": ist_display,
+                    "now": now,
+                    "seg_state": seg_state,
+                }
+                await run_cycle(agent_context, broadcast_fn=_broadcast_event)
+            except Exception as ae:
+                logger.error(f"Background: agent engine failed: {ae}")
+
             # Invalidate in-process cache and push to WebSocket clients
             invalidate_all()
             broadcast(json.dumps({

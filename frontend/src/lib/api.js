@@ -89,6 +89,45 @@ export const fetchMarket = () => _get('/market/');
 export const fetchPost   = () => _get('/config/post');
 export const fetchAbout  = () => _get('/config/about');
 
+// ── Agent endpoints (admin) ───────────────────────────────────────────────────
+export const fetchAgents      = () => _get('/agents/', { auth: true });
+export const fetchAgentTypes  = () => _get('/agents/types', { auth: true });
+export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
+export const fetchRecentAgentEvents = (n = 100) => _get(`/agents/events/recent?n=${n}`, { auth: true });
+export const createAgent      = (payload) => _post('/agents/', payload, { auth: true });
+
+export async function updateAgent(slug, payload) {
+  const res = await fetch(`${BASE}/agents/${slug}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+}
+
+export async function activateAgent(slug) {
+  const res = await fetch(`${BASE}/agents/${slug}/activate`, { method: 'PUT', headers: _authHeaders() });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+}
+
+export async function deactivateAgent(slug) {
+  const res = await fetch(`${BASE}/agents/${slug}/deactivate`, { method: 'PUT', headers: _authHeaders() });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+}
+
+export async function deleteAgent(slug) {
+  const res = await fetch(`${BASE}/agents/${slug}`, { method: 'DELETE', headers: _authHeaders() });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+}
+
+export async function interpretAgent(command) {
+  return _post('/agents/interpret', { command }, { auth: true });
+}
+
 // ── Order mutations (protected) ───────────────────────────────────────────────
 export async function placeOrder(payload) {
   return _post('/orders/place', payload, { auth: true });

@@ -2,64 +2,87 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores';
+  import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
 
-  let status     = $state({ status: 'idle', pending_count: 0, closed_count: 0, failed_count: 0, total_slippage: 0, last_scan: '' });
-  let positions  = $state([]);
-  let orders     = $state([]);
-  let events     = $state([]);
-  let loading    = $state(false);
-  let error      = $state('');
+  let agents      = $state([]);
+  let agentEvents = $state([]);
+  let loading     = $state(true);
+  let error       = $state('');
+  let logTab      = $state('agent');  // agent | system
+  let systemLog   = $state([]);
+  let editing     = $state(null);     // slug of agent being edited
+  let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'per_account', schedule: 'market_hours' }));
   let ws;
+  let refreshInterval;
 
   function authHeaders() {
     const token = $authStore.token;
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  async function fetchStatus() {
+  async function loadAgents() {
     try {
-      const res = await fetch('/api/algo/status', { headers: authHeaders() });
-      if (res.ok) status = await res.json();
+      const data = await fetchAgents();
+      agents = data;
+    } catch (e) { error = e.message; }
+  }
+
+  async function loadAgentLog() {
+    try {
+      const data = await fetchRecentAgentEvents(100);
+      agentEvents = data;
     } catch (e) { /* ignore */ }
   }
 
-  async function fetchPositions() {
+  async function loadSystemLog() {
     try {
-      const res = await fetch('/api/algo/positions', { headers: authHeaders() });
-      if (res.ok) positions = await res.json();
-    } catch (e) { /* ignore */ }
-  }
-
-  async function fetchOrders() {
-    try {
-      const res = await fetch('/api/algo/orders', { headers: authHeaders() });
-      if (res.ok) orders = await res.json();
+      const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
+      if (res.ok) { const d = await res.json(); systemLog = d.lines || []; }
     } catch (e) { /* ignore */ }
   }
 
   async function loadAll() {
     loading = true;
-    await Promise.all([fetchStatus(), fetchPositions(), fetchOrders()]);
+    await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog()]);
     loading = false;
   }
 
-  async function startEngine() {
-    error = '';
+  async function toggle(/** @type {any} */ agent) {
     try {
-      const res = await fetch('/api/algo/start', { method: 'POST', headers: authHeaders() });
-      const d = await res.json();
-      if (!res.ok) error = d.detail || 'Failed';
-      await loadAll();
+      if (agent.status === 'inactive') await activateAgent(agent.slug);
+      else await deactivateAgent(agent.slug);
+      await loadAgents();
     } catch (e) { error = e.message; }
   }
 
-  async function stopEngine() {
-    error = '';
+  function startEdit(/** @type {any} */ agent) {
+    editing = agent.slug;
+    editForm = {
+      name: agent.name,
+      description: agent.description || '',
+      conditions: JSON.stringify(agent.conditions, null, 2),
+      events: JSON.stringify(agent.events, null, 2),
+      actions: JSON.stringify(agent.actions, null, 2),
+      cooldown_minutes: agent.cooldown_minutes,
+      scope: agent.scope,
+      schedule: agent.schedule || 'market_hours',
+    };
+  }
+
+  async function saveEdit() {
     try {
-      const res = await fetch('/api/algo/stop', { method: 'POST', headers: authHeaders() });
-      const d = await res.json();
-      if (!res.ok) error = d.detail || 'Failed';
-      await loadAll();
+      await updateAgent(editing, {
+        name: editForm.name,
+        description: editForm.description,
+        conditions: JSON.parse(editForm.conditions),
+        events: JSON.parse(editForm.events),
+        actions: JSON.parse(editForm.actions),
+        cooldown_minutes: editForm.cooldown_minutes,
+        scope: editForm.scope,
+        schedule: editForm.schedule,
+      });
+      editing = null;
+      await loadAgents();
     } catch (e) { error = e.message; }
   }
 
@@ -69,17 +92,63 @@
     ws.onmessage = (e) => {
       try {
         const evt = JSON.parse(e.data);
-        events = [{ time: new Date().toLocaleTimeString(), ...evt }, ...events].slice(0, 200);
-        // Refresh data on key events
-        if (['order_filled', 'chase_failed', 'scan_complete', 'close_complete', 'engine_started', 'engine_stopped'].includes(evt.event)) {
-          loadAll();
+        if (evt.event === 'agent_state') {
+          const idx = agents.findIndex(a => a.slug === evt.slug);
+          if (idx >= 0) agents[idx].status = evt.status;
+          agents = [...agents];
+        }
+        if (['agent_alert', 'agent_state'].includes(evt.event)) {
+          loadAgentLog();
         }
       } catch { /* ignore */ }
     };
     ws.onclose = () => setTimeout(connectWS, 3000);
   }
 
-  let refreshInterval;
+  const statusBorder = (/** @type {string} */ s) => ({
+    active: 'border-green-500', inactive: 'border-gray-300',
+    triggered: 'border-red-500', running: 'border-orange-400',
+    cooldown: 'border-amber-400', error: 'border-red-600',
+  }[s] || 'border-gray-300');
+
+  const statusDot = (/** @type {string} */ s) => ({
+    active: 'bg-green-500', inactive: 'bg-gray-400',
+    triggered: 'bg-red-500', running: 'bg-orange-400',
+    cooldown: 'bg-amber-400', error: 'bg-red-600',
+  }[s] || 'bg-gray-400');
+
+  const eventColor = (/** @type {string} */ t) => ({
+    triggered: 'text-orange-600', alert_sent: 'text-yellow-600',
+    action_success: 'text-green-600', action_failed: 'text-red-600',
+    activated: 'text-gray-500', deactivated: 'text-gray-500',
+    config_changed: 'text-purple-600',
+  }[t] || 'text-gray-500');
+
+  const eventIcon = (/** @type {string} */ t) => ({
+    triggered: '🟠', alert_sent: '🟡', action_success: '🟢',
+    action_failed: '🔴', activated: '⚪', deactivated: '⚪', config_changed: '🟣',
+  }[t] || '⚪');
+
+  function conditionSummary(/** @type {any} */ cond) {
+    if (!cond) return '—';
+    if (cond.operator && cond.rules) {
+      return cond.rules.map(r => conditionSummary(r)).join(` ${cond.operator.toUpperCase()} `);
+    }
+    const f = cond.field || '?';
+    const v = typeof cond.value === 'number' && Math.abs(cond.value) >= 1000
+      ? `₹${cond.value.toLocaleString('en-IN')}` : String(cond.value ?? '?');
+    return `${f} ${cond.op || '?'} ${v}`;
+  }
+
+  function actionSummary(/** @type {any[]} */ actions) {
+    if (!actions || !actions.length) return 'Alert only';
+    return actions.map(a => a.type).join(', ');
+  }
+
+  function channelSummary(/** @type {any[]} */ events) {
+    if (!events) return '—';
+    return events.filter(e => e.enabled).map(e => e.channel).join(', ');
+  }
 
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
@@ -92,139 +161,138 @@
     if (ws) ws.close();
     if (refreshInterval) clearInterval(refreshInterval);
   });
-
-  const statusColor = (s) => ({
-    idle: 'text-muted', scanning: 'text-amber-600', closing: 'text-orange-600',
-    done: 'text-green-600',
-  }[s] || 'text-muted');
-
-  const pnlColor = (v) => v < 0 ? 'text-red-600' : v > 0 ? 'text-green-600' : 'text-muted';
 </script>
 
-<!-- Status bar -->
-<div class="flex items-center justify-between mb-3">
-  <div class="flex items-center gap-3">
-    <span class="text-xs font-semibold {statusColor(status.status)} uppercase">{status.status}</span>
-    {#if status.last_scan}
-      <span class="text-xs text-muted">Last scan: {status.last_scan}</span>
-    {/if}
-  </div>
-  <div class="flex gap-2">
-    <button onclick={loadAll} class="btn-secondary text-[0.65rem] py-0.5 px-2" disabled={loading}>Refresh</button>
-    {#if status.status === 'idle' || status.status === 'done'}
-      <button onclick={startEngine} class="btn-primary text-[0.65rem] py-0.5 px-2">Start Expiry Close</button>
-    {:else}
-      <button onclick={stopEngine} class="btn-secondary text-[0.65rem] py-0.5 px-2 text-red-600 border-red-300">Stop</button>
-    {/if}
-  </div>
-</div>
+<svelte:head>
+  <title>Algo Agent | RamboQuant Analytics</title>
+</svelte:head>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
 {/if}
 
-<!-- Stats -->
-<div class="grid grid-cols-4 gap-3 mb-4">
-  <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-sm font-bold text-primary">{status.pending_count}</div>
-    <div class="text-[0.6rem] text-muted uppercase">Pending</div>
-  </div>
-  <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-sm font-bold text-green-600">{status.closed_count}</div>
-    <div class="text-[0.6rem] text-muted uppercase">Closed</div>
-  </div>
-  <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-sm font-bold text-red-600">{status.failed_count}</div>
-    <div class="text-[0.6rem] text-muted uppercase">Failed</div>
-  </div>
-  <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
-    <div class="text-sm font-bold {pnlColor(-status.total_slippage)}">₹{status.total_slippage.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
-    <div class="text-[0.6rem] text-muted uppercase">Slippage</div>
-  </div>
+<!-- Agent Cards Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+  {#each agents as agent}
+    <div class="rounded-lg border-2 {statusBorder(agent.status)} bg-white p-3 {agent.status === 'triggered' ? 'animate-pulse' : ''}">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full {statusDot(agent.status)}"></span>
+          <span class="font-semibold text-xs text-primary">{agent.name}</span>
+        </div>
+        <button
+          onclick={() => toggle(agent)}
+          class="text-[0.6rem] px-2 py-0.5 rounded font-medium
+            {agent.status !== 'inactive'
+              ? 'bg-green-100 text-green-700'
+              : 'bg-gray-100 text-gray-500'}"
+        >{agent.status !== 'inactive' ? 'ON' : 'OFF'}</button>
+      </div>
+
+      <!-- Conditions -->
+      <div class="text-[0.6rem] text-text/70 mb-1">
+        <span class="text-muted">If:</span> {conditionSummary(agent.conditions)}
+      </div>
+
+      <!-- Channels + Actions -->
+      <div class="text-[0.6rem] text-text/70 mb-1">
+        <span class="text-muted">Alert:</span> {channelSummary(agent.events)}
+        <span class="mx-1">|</span>
+        <span class="text-muted">Do:</span> {actionSummary(agent.actions)}
+      </div>
+
+      <!-- Stats + Edit -->
+      <div class="flex items-center justify-between text-[0.55rem] text-muted mt-2">
+        <span>Last: {agent.last_triggered_at?.slice(0, 16) || '—'} | #{agent.trigger_count}</span>
+        <button onclick={() => startEdit(agent)} class="text-primary hover:underline">Edit</button>
+      </div>
+    </div>
+  {/each}
 </div>
 
-<!-- Positions to close -->
-{#if positions.length}
-  <div class="mb-4">
-    <h2 class="section-heading mb-2">Positions to Close</h2>
-    <div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table class="w-full text-xs">
-        <thead class="bg-gray-50 text-muted uppercase text-[0.6rem]">
-          <tr>
-            <th class="px-3 py-2 text-left">Account</th>
-            <th class="px-3 py-2 text-left">Symbol</th>
-            <th class="px-3 py-2 text-left">Exch</th>
-            <th class="px-3 py-2 text-right">Strike</th>
-            <th class="px-3 py-2 text-right">Underlying</th>
-            <th class="px-3 py-2 text-right">Qty</th>
-            <th class="px-3 py-2 text-left">Status</th>
-            <th class="px-3 py-2 text-left">Reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each positions.filter(p => p.needs_close) as p}
-            <tr class="border-t border-gray-100">
-              <td class="px-3 py-1.5">{p.account}</td>
-              <td class="px-3 py-1.5 font-medium">{p.symbol}</td>
-              <td class="px-3 py-1.5">{p.exchange}</td>
-              <td class="px-3 py-1.5 text-right">{p.strike}</td>
-              <td class="px-3 py-1.5 text-right">{p.underlying_ltp.toLocaleString('en-IN', {maximumFractionDigits: 2})}</td>
-              <td class="px-3 py-1.5 text-right {pnlColor(p.quantity)}">{p.quantity}</td>
-              <td class="px-3 py-1.5"><span class="px-1.5 py-0.5 rounded text-[0.55rem] font-semibold uppercase
-                {p.moneyness === 'ITM' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{p.moneyness}</span></td>
-              <td class="px-3 py-1.5 text-muted">{p.close_reason}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+<!-- Agent Editor (inline) -->
+{#if editing}
+  <div class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="section-heading">Edit: {editing}</h3>
+      <button onclick={() => editing = null} class="text-xs text-muted hover:text-text">Cancel</button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="field-label">Name</label>
+        <input bind:value={editForm.name} class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">Description</label>
+        <input bind:value={editForm.description} class="field-input" />
+      </div>
+      <div>
+        <label class="field-label">Scope</label>
+        <select bind:value={editForm.scope} class="field-input">
+          <option value="per_account">Per Account</option>
+          <option value="total">Total Only</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Schedule</label>
+        <select bind:value={editForm.schedule} class="field-input">
+          <option value="market_hours">Market Hours</option>
+          <option value="always">Always</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Cooldown (minutes)</label>
+        <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+      <div>
+        <label class="field-label">Conditions (JSON)</label>
+        <textarea bind:value={editForm.conditions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+      </div>
+      <div>
+        <label class="field-label">Events (JSON)</label>
+        <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+      </div>
+      <div>
+        <label class="field-label">Actions (JSON)</label>
+        <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
+      <button onclick={() => editing = null} class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
     </div>
   </div>
 {/if}
 
-<!-- Chase orders -->
-{#if orders.length}
-  <div class="mb-4">
-    <h2 class="section-heading mb-2">Chase Orders</h2>
-    <div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-      <table class="w-full text-xs">
-        <thead class="bg-gray-50 text-muted uppercase text-[0.6rem]">
-          <tr>
-            <th class="px-3 py-2 text-left">Account</th>
-            <th class="px-3 py-2 text-left">Symbol</th>
-            <th class="px-3 py-2 text-left">Side</th>
-            <th class="px-3 py-2 text-right">Qty</th>
-            <th class="px-3 py-2 text-right">Init Price</th>
-            <th class="px-3 py-2 text-right">Fill Price</th>
-            <th class="px-3 py-2 text-right">Attempts</th>
-            <th class="px-3 py-2 text-right">Slippage</th>
-            <th class="px-3 py-2 text-left">Status</th>
-            <th class="px-3 py-2 text-left">Engine</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each orders as o}
-            <tr class="border-t border-gray-100">
-              <td class="px-3 py-1.5">{o.account}</td>
-              <td class="px-3 py-1.5 font-medium">{o.symbol}</td>
-              <td class="px-3 py-1.5 {o.transaction_type === 'BUY' ? 'text-green-600' : 'text-red-600'}">{o.transaction_type}</td>
-              <td class="px-3 py-1.5 text-right">{o.quantity}</td>
-              <td class="px-3 py-1.5 text-right">{o.initial_price?.toFixed(2) ?? '—'}</td>
-              <td class="px-3 py-1.5 text-right">{o.fill_price?.toFixed(2) ?? '—'}</td>
-              <td class="px-3 py-1.5 text-right">{o.attempts}</td>
-              <td class="px-3 py-1.5 text-right {pnlColor(-(o.slippage || 0))}">₹{(o.slippage || 0).toFixed(0)}</td>
-              <td class="px-3 py-1.5"><span class="px-1.5 py-0.5 rounded text-[0.55rem] font-semibold uppercase
-                {o.status === 'filled' ? 'bg-green-100 text-green-700' : o.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span></td>
-              <td class="px-3 py-1.5 text-muted">{o.engine}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  </div>
-{/if}
-
-<!-- Live event log -->
-<div>
-  <h2 class="section-heading mb-2">Event Log</h2>
-  <pre class="p-3 bg-gray-900 text-gray-200 text-[0.6rem] rounded font-mono leading-relaxed overflow-auto whitespace-pre-wrap max-h-[30vh]">{#if events.length}{events.map(e => `[${e.time}] ${e.event} ${JSON.stringify(e, null, 0).slice(0, 200)}`).join('\n')}{:else}Waiting for events…{/if}</pre>
+<!-- Log Toggle + Log Panel -->
+<div class="flex items-center gap-2 mb-2">
+  <button onclick={() => { logTab = 'agent'; loadAgentLog(); }}
+    class="text-[0.65rem] font-medium px-2 py-0.5 rounded {logTab === 'agent' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
+    Agent Log
+  </button>
+  <button onclick={() => { logTab = 'system'; loadSystemLog(); }}
+    class="text-[0.65rem] font-medium px-2 py-0.5 rounded {logTab === 'system' ? 'bg-primary text-white' : 'bg-gray-100 text-muted'}">
+    System Log
+  </button>
+  {#if loading}<span class="text-xs text-muted animate-pulse ml-2">Loading…</span>{/if}
 </div>
+
+<pre class="p-3 bg-gray-900 rounded font-mono text-[0.55rem] leading-relaxed overflow-auto whitespace-pre-wrap max-h-[35vh]">{#if logTab === 'agent'}{#if agentEvents.length}{agentEvents.map(e => {
+  const icon = eventIcon(e.event_type);
+  const t = e.timestamp?.slice(11, 19) || '';
+  const cond = e.trigger_condition || '';
+  return `[${t}] ${icon} ${e.event_type.padEnd(16)} ${cond}`;
+}).join('\n')}{:else}No agent events yet.{/if}{:else}{#if systemLog.length}{systemLog.map(line => {
+  if (line.includes('ERROR')) return `\x1b[31m${line}\x1b[0m`;
+  if (line.includes('WARNING')) return `\x1b[33m${line}\x1b[0m`;
+  return line;
+}).join('\n')}{:else}No log entries.{/if}{/if}</pre>
+
+<style>
+  :global(.animate-pulse) {
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+</style>
