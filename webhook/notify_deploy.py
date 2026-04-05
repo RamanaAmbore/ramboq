@@ -50,10 +50,17 @@ def main():
     ts = _timestamp()
     errors = []
 
-    # Check service status
+    # Services that were restarted by this deploy (per-env)
     import subprocess
+    env_services = {
+        "main": ["ramboq_api.service"],
+        "pod":  ["ramboq_pod.service"],
+    }.get(branch, ["ramboq_dev_api.service"])
+    # Always include the shared webhook listener
+    all_services = env_services + ["ramboq_hook.service"]
+
     services_status = []
-    for svc in ["ramboq_api.service", "ramboq_dev_api.service", "ramboq_hook.service"]:
+    for svc in all_services:
         try:
             result = subprocess.run(["systemctl", "is-active", svc],
                                     capture_output=True, text=True, timeout=5)
