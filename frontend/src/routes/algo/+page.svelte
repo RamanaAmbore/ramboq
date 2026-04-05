@@ -164,11 +164,11 @@
 </script>
 
 <svelte:head>
-  <title>Algo Agents | RamboQuant Analytics</title>
+  <title>AI Agents | RamboQuant Analytics</title>
 </svelte:head>
 
 <div class="flex items-center justify-between mb-2">
-  <h1 class="text-sm font-bold text-primary">Algo Agents</h1>
+  <h1 class="text-sm font-bold text-primary">AI Agents</h1>
   <div class="text-[0.65rem] text-muted">{clientTimestamp()}</div>
 </div>
 
