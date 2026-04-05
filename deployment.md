@@ -45,7 +45,7 @@ App running:
 | Production | `main` | `/opt/ramboq` | 8000 | ramboq.com | `ramboq` | `ramboq_api.service` |
 | Development | non-main | `/opt/ramboq_dev` | 8001 | dev.ramboq.com | `ramboq_dev` | `ramboq_dev_api.service` |
 
-Both branches (`main`, `dev`) are permanent — never deleted from GitHub. Streamlit services (`ramboq.service`, `ramboq_dev.service`) are disabled — Streamlit has been phased out.
+Both branches (`main`, `dev`) are permanent — never deleted from GitHub.
 
 ---
 
@@ -57,11 +57,11 @@ Environments share the same codebase but differ through several mechanisms:
 `deploy.sh <ENV>` sets `APP_ROOT`, `APP_SERVICE`, `API_SERVICE` via a case statement — everything downstream keys off these variables.
 
 ### 2. `deploy_branch` in `backend_config.yaml`
-Every deploy writes the current branch name into `setup/yaml/backend_config.yaml`:
+Every deploy writes the current branch name into `backend/config/backend_config.yaml`:
 ```yaml
 deploy_branch: main   # or dev
 ```
-This value is **always overwritten fresh** (never preserved). `api/database.py` reads it at startup to pick the database: `main` → `ramboq`, anything else → `ramboq_dev`. Alert/email subjects are tagged with `[branch]` for non-main deploys using the same field.
+This value is **always overwritten fresh** (never preserved). `backend/api/database.py` reads it at startup to pick the database: `main` → `ramboq`, anything else → `ramboq_dev`. Alert/email subjects are tagged with `[branch]` for non-main deploys using the same field.
 
 ### 3. Server-local config flags (preserved across deploys)
 Before `git pull`, `deploy.sh` backs up `backend_config.yaml` to `/tmp`, pulls the new version from git, then overlays these keys from the backup:
@@ -79,7 +79,7 @@ Each env has its own API service with a different `WorkingDirectory` and `--port
 | `ramboq_api.service` | `/opt/ramboq` | 8000 | `RAMBOQ_LOG_PREFIX=api_` |
 | `ramboq_dev_api.service` | `/opt/ramboq_dev` | 8001 | `RAMBOQ_LOG_PREFIX=api_` |
 
-`RAMBOQ_LOG_PREFIX=api_` makes the API write to `api_log_file` / `api_error_file`, separate from the legacy Streamlit `log_file` in the same `.log/` directory.
+`RAMBOQ_LOG_PREFIX=api_` makes the API write to `api_log_file` / `api_error_file` in the `.log/` directory.
 
 ### 5. Nginx site configs
 `etc/nginx/sites-available/ramboq.com` proxies to 8000; `dev.ramboq.com` proxies to 8001. Synced to `/etc/nginx/sites-available/` by prod deploy when `etc/` files change.
@@ -95,8 +95,8 @@ Hand-placed on each server path. Contains Kite keys, SMTP creds, DB password, Te
 ### What deploy.sh restarts
 | Env | Restarts |
 |---|---|
-| `prod` | `ramboq_api.service` only (Streamlit skipped — disabled) |
-| `dev` | `ramboq_dev_api.service` only (Streamlit skipped — disabled) |
+| `prod` | `ramboq_api.service` |
+| `dev` | `ramboq_dev_api.service` |
 
 Deploy notification (`notify_deploy.py`) reports status of all 3 services (`ramboq_api`, `ramboq_dev_api`, `ramboq_hook`) in every message — this is informational cross-env visibility, not the list of what was restarted.
 
@@ -146,7 +146,7 @@ The API selects the database by `deploy_branch` in `backend_config.yaml`:
 
 ### Secrets File
 
-Hand-place `setup/yaml/secrets.yaml` on both server paths. Never committed to git.
+Hand-place `backend/config/secrets.yaml` on both server paths. Never committed to git.
 
 ```yaml
 # SMTP
@@ -185,8 +185,8 @@ alert_emails:
 
 Update on both servers individually:
 ```bash
-sudo nano /opt/ramboq/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_dev/setup/yaml/secrets.yaml
+sudo nano /opt/ramboq/backend/config/secrets.yaml
+sudo nano /opt/ramboq_dev/backend/config/secrets.yaml
 ```
 
 ---
@@ -245,13 +245,11 @@ All service files are in `webhook/` and installed to `/etc/systemd/system/`.
 | `ramboq_api.service` | ramboq_api.service | 8000 | Prod Litestar API (uvicorn) | enabled |
 | `ramboq_dev_api.service` | ramboq_dev_api.service | 8001 | Dev Litestar API (uvicorn) | enabled |
 | `ramboq_hook.service` | ramboq_hook.service | 9001 | Webhook listener (shared, env-agnostic) | enabled |
-| `ramboq.service` | ramboq.service | 8502 | Prod Streamlit (legacy, phased out) | **disabled** |
-| `ramboq_dev.service` | ramboq_dev.service | 8503 | Dev Streamlit (legacy, phased out) | **disabled** |
 
 After updating a service file:
 ```bash
-sudo cp /opt/ramboq/webhook/ramboq.service /etc/systemd/system/ramboq.service
-sudo systemctl daemon-reload && sudo systemctl restart ramboq.service
+sudo cp /opt/ramboq/webhook/ramboq_api.service /etc/systemd/system/ramboq_api.service
+sudo systemctl daemon-reload && sudo systemctl restart ramboq_api.service
 ```
 
 After updating `hooks.json` or `dispatch.sh`:
@@ -265,14 +263,14 @@ sudo systemctl restart ramboq_hook.service
 
 ## Litestar API Deployment
 
-The API runs alongside Streamlit on each environment. On the server:
+The API runs as a systemd service on each environment. On the server:
 
 ```bash
 # Start API (includes background tasks + DB init)
-bash run_api.sh --no-reload    # production mode
+bash backend/run_api.sh --no-reload    # production mode
 
 # Or with auto-reload for dev
-bash run_api.sh
+bash backend/run_api.sh
 ```
 
 The API:
@@ -313,7 +311,6 @@ Each environment has its own `.log/` directory:
 | `api_log_file` | Litestar API (RAMBOQ_LOG_PREFIX=api_) | API app log — read by `/api/admin/logs` |
 | `api_error_file` | Litestar API systemd tee | API stdout+stderr (5MB rotating × 5) |
 | `api_short_log_file`, `api_short_error_file` | ramboq_logger.py | Last 50 lines each |
-| `log_file`, `error_file` | legacy Streamlit | Stale once Streamlit is disabled |
 
 ---
 
@@ -330,7 +327,7 @@ tail -50 /opt/ramboq/.log/hook.log
 ```bash
 tail -100 /opt/ramboq/.log/hook_debug.log      # prod
 tail -100 /opt/ramboq_dev/.log/hook_debug.log   # dev
-sudo systemctl status ramboq.service
+sudo systemctl status ramboq_api.service
 ```
 
 ### Permission issues (deploy fails silently)
@@ -342,8 +339,8 @@ sudo chown -R www-data:www-data /opt/ramboq_dev/.git /opt/ramboq_dev/.log
 
 ### 502 Bad Gateway
 ```bash
-sudo ss -tlnp | grep -E '8502|8503'
-tail -50 /opt/ramboq/.log/error_file
+sudo ss -tlnp | grep -E '8000|8001'
+tail -50 /opt/ramboq/.log/api_error_file
 sudo nginx -t
 ```
 
@@ -377,7 +374,4 @@ sudo ss -tlnp | grep -E '8000|8001|9001'
 sudo systemctl daemon-reload
 sudo systemctl restart ramboq_api.service ramboq_dev_api.service ramboq_hook.service
 sudo nginx -t && sudo systemctl reload nginx
-
-# Disable Streamlit (one-time)
-sudo systemctl disable --now ramboq.service ramboq_dev.service
 ```

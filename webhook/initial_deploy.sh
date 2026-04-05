@@ -227,7 +227,7 @@ setup_environment() {
     log_ok "Created $app_root/.log with empty log files"
 
     # backend_config.yaml template (connection settings + deploy flags + log paths)
-    local yaml_dir="$app_root/setup/yaml"
+    local yaml_dir="$app_root/backend/config"
     mkdir -p "$yaml_dir"
 
     if [ ! -f "$yaml_dir/backend_config.yaml" ]; then
@@ -448,8 +448,8 @@ echo ""
 echo -e "${BOLD}${YELLOW}Required manual steps:${NC}"
 echo ""
 echo "  1. Fill in secrets.yaml:"
-[[ "$ENV" == "prod" || "$ENV" == "both" ]] && echo "       sudo nano /opt/ramboq/setup/yaml/secrets.yaml"
-[[ "$ENV" == "dev"  || "$ENV" == "both" ]] && echo "       sudo nano /opt/ramboq_dev/setup/yaml/secrets.yaml"
+[[ "$ENV" == "prod" || "$ENV" == "both" ]] && echo "       sudo nano /opt/ramboq/backend/config/secrets.yaml"
+[[ "$ENV" == "dev"  || "$ENV" == "both" ]] && echo "       sudo nano /opt/ramboq_dev/backend/config/secrets.yaml"
 echo ""
 echo "  2. Set Cloudflare DNS to grey cloud (DNS only):"
 echo "       webhook.ramboq.com → $(curl -s ifconfig.me 2>/dev/null || echo '<server-ip>')"

@@ -5,8 +5,8 @@ __pycache__/
 .venv
 .vscode
 .DS_Store
-setup/yaml/secrets.yaml
-setup/yaml/ramboq_logger.yaml
+backend/config/secrets.yaml
+backend/config/ramboq_logger.yaml
 var/www/.ssh/
 var/www/.gitconfig
 *.pem

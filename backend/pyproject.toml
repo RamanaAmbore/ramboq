@@ -1,0 +1,15 @@
+[project]
+name = "ramboq-backend"
+version = "0.1.0"
+description = "RamboQuant Analytics backend — Litestar API + ARQ worker for Zerodha Kite"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["backend*"]
+exclude = ["backend.workers*"]

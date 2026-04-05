@@ -2,8 +2,13 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
-  import { fetchOrders, placeOrder, cancelOrder } from '$lib/api';
+  import { fetchOrders, placeOrder, cancelOrder, modifyOrder } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
+  import CommandBar from '$lib/CommandBar.svelte';
+  import OrderDetail from '$lib/OrderDetail.svelte';
+  import { loadInstruments } from '$lib/data/instruments';
+  import { loadAccounts } from '$lib/data/accounts';
+  import { orderGrammar, buildOrderPayload } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -11,16 +16,23 @@
   let error         = $state('');
   let success       = $state('');
   let filterStatus  = $state('all');
-  let command       = $state('');
-  let cmdOutput     = $state('');
   let running       = $state(false);
   let logTab        = $state('order');
   let orderLog      = $state([]);
   let agentLog      = $state([]);
   let systemLog     = $state([]);
   let cmdHistory    = $state([]);
+  let selectedOrder = $state(/** @type {any|null} */(null));
+  let cmdBar;
   let unsub;
   let logInterval;
+
+  // context for CommandBar — keeps openOrderIds fresh so cancel/modify suggest them
+  const cmdContext = $derived({
+    openOrderIds: orders
+      .filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING')
+      .map(o => o.order_id),
+  });
 
   function authHeaders() {
     const token = $authStore.token;
@@ -34,38 +46,45 @@
     finally { loading = false; }
   }
 
-  async function doCancel(/** @type {string} */ oid, /** @type {string} */ acct) {
-    try { await cancelOrder(oid, acct); success = `Order ${oid} cancelled`; await loadOrders(); }
-    catch (e) { error = e.message; }
-  }
-
   function addResult(/** @type {string} */ cmd, /** @type {string} */ result) {
     const t = new Date().toLocaleTimeString('en-IN', { hour12: false });
     cmdHistory = [{ cmd, result, time: t }, ...cmdHistory].slice(0, 100);
   }
 
-  async function runCommand() {
-    if (!command.trim()) return;
-    const cmd = command.trim();
+  async function runParsed(parsed) {
+    const display = `${parsed.verb} ${Object.values(parsed.args).join(' ')}`
+      + (Object.keys(parsed.kwargs || {}).length
+        ? ' ' + Object.entries(parsed.kwargs).map(([k,v]) => `${k}=${v}`).join(' ')
+        : '');
     running = true;
-    const parts = cmd.split(/\s+/);
-    const txn = parts[0]?.toUpperCase();
-    if ((txn === 'BUY' || txn === 'SELL') && parts.length >= 4) {
-      try {
-        const payload = {
-          account: parts[1], tradingsymbol: parts[2], quantity: parseInt(parts[3]) || 0,
-          transaction_type: txn, exchange: 'NFO', product: 'NRML',
-          order_type: (parts[4] || 'MARKET').toUpperCase(),
-          price: parseFloat(parts[5]) || 0, validity: 'DAY', variety: 'regular',
-        };
+    try {
+      if (parsed.verb === 'buy' || parsed.verb === 'sell') {
+        const payload = buildOrderPayload(parsed);
         const res = await placeOrder(payload);
-        addResult(cmd, `✓ ${txn} ${parts[3]} ${parts[2]} | ID: ${res.order_id}`);
-        await loadOrders();
-      } catch (e) { addResult(cmd, `✗ ${e.message}`); }
-    } else {
-      addResult(cmd, 'Syntax: buy|sell ACCOUNT SYMBOL QTY [LIMIT PRICE]');
+        addResult(display, `✓ ${parsed.verb.toUpperCase()} ${parsed.args.qty} ${payload.tradingsymbol} | ID: ${res.order_id}`);
+      } else if (parsed.verb === 'cancel') {
+        const id = parsed.args.order_id;
+        const ord = orders.find(o => o.order_id === id);
+        if (!ord) throw new Error(`order ${id} not found`);
+        await cancelOrder(id, ord.account);
+        addResult(display, `✓ Cancelled ${id}`);
+      } else if (parsed.verb === 'modify') {
+        const id = parsed.args.order_id;
+        const ord = orders.find(o => o.order_id === id);
+        if (!ord) throw new Error(`order ${id} not found`);
+        const p = { account: ord.account };
+        if (parsed.kwargs.price != null) p.price = parsed.kwargs.price;
+        if (parsed.kwargs.qty != null) p.quantity = parsed.kwargs.qty;
+        await modifyOrder(id, p);
+        addResult(display, `✓ Modified ${id}`);
+      }
+      await loadOrders();
+      cmdBar?.clear();
+    } catch (e) {
+      addResult(display, `✗ ${e.message}`);
+    } finally {
+      running = false;
     }
-    running = false; command = '';
   }
 
   async function loadOrderLog() {
@@ -105,6 +124,8 @@
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadOrders(); loadCurrentLog();
+    loadAccounts().catch(() => {});
+    loadInstruments().catch(() => {});
     unsub = createPerformanceSocket(() => loadOrders());
     logInterval = setInterval(loadCurrentLog, 30000);
   });
@@ -122,16 +143,24 @@
 
 <!-- Order Entry -->
 <div class="mb-3">
-  <div class="flex gap-2 mb-1">
-    <textarea bind:value={command} rows="4" class="field-input cmd-input font-mono text-xs flex-1"
-      placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
-      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
-    <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
-      {running ? '...' : 'Place'}
-    </button>
+  <div class="flex gap-2 items-start mb-1">
+    <div class="flex-1">
+      <CommandBar
+        bind:this={cmdBar}
+        grammar={orderGrammar}
+        context={cmdContext}
+        rows={3}
+        placeholder="buy ZG#### NIFTY22500CE 1 LIMIT 12.5 chase=5"
+        onsubmit={runParsed}
+        disabled={running}
+      />
+    </div>
     <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
   </div>
-  <div class="text-[0.5rem] text-muted">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</div>
+  <div class="text-[0.5rem] text-muted">
+    <code>buy|sell ACCT SYMBOL QTY MARKET|LIMIT [price] [chase=1-10]</code> ·
+    <code>cancel ORDER_ID</code> · <code>modify ORDER_ID price=X qty=N</code>
+  </div>
 </div>
 
 <!-- Status Dashboard -->
@@ -169,7 +198,8 @@
 {:else if orders.length}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 max-h-[25vh] overflow-y-auto">
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
-      <div class="rounded-lg border-2 {statusColor(o.status)} p-2.5">
+      <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
+        class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.quantity}</span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
@@ -181,15 +211,17 @@
           <div>Type: {o.order_type}</div><div>Price: {o.average_price || o.price || '—'}</div>
           <div>Filled: {o.filled_quantity}/{o.quantity}</div><div>Product: {o.product}</div>
         </div>
-        {#if o.status === 'OPEN' || o.status === 'TRIGGER PENDING'}
-          <button onclick={() => doCancel(o.order_id, o.account)} class="mt-1 text-[0.55rem] text-red-600 hover:underline">Cancel</button>
-        {/if}
-      </div>
+      </button>
     {/each}
   </div>
 {:else}
   <div class="text-center text-muted text-xs py-2 mb-3">No orders today.</div>
 {/if}
+
+<OrderDetail order={selectedOrder}
+  onclose={() => selectedOrder = null}
+  onchanged={async () => { await loadOrders(); if (selectedOrder) selectedOrder = orders.find(o => o.order_id === selectedOrder.order_id) || null; }}
+/>
 
 <LogPanel
   heightClass="flex-1 min-h-0"

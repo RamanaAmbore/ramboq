@@ -1,0 +1,142 @@
+# Order-entry command grammar.
+#
+# Language-agnostic schema (loadable from Python AND JavaScript).
+# Suggester / resolver hooks are referenced by name ("kind: symbol") and
+# implemented separately in each runtime (frontend/src/lib/data/*,
+# backend equivalents for the agent/shell commands).
+#
+# Grammar shape:
+#   verbs: map of verb_name → { tokens: [TokenSpec], kwargs: {name → KwargSpec} }
+#
+# TokenSpec fields:
+#   role       — semantic name (shown as hint)
+#   kind       — which runtime suggester to use (symbol/account/order_type/qty/price/order_id/chase_level/expiry)
+#   values     — static list (overrides `kind`)
+#   required   — true | "if:<kwarg/role>!=VALUE" | omitted (default false)
+#   parse      — "int" | "float" | "upper" | "str" (default: str)
+#   hint       — short help text
+#
+# KwargSpec fields: same as TokenSpec minus `required` and `role` (key is the role).
+
+verbs:
+  buy:
+    description: "Place a buy order"
+    tokens:
+      - role: account
+        kind: account
+        required: true
+      - role: instType
+        values: [CALL, PUT, FUT, EQ]
+        required: false
+        parse: upper
+        hint: "optional: CALL | PUT | FUT (default: EQ)"
+      - role: symbol
+        kind: symbol
+        required: true
+        hint: "underlying (RELIANCE, NIFTY, BANKNIFTY, …)"
+      - role: strike
+        kind: strike
+        required: "if:instType==CALL|PUT"
+        parse: float
+        hint: "strike price (CALL/PUT only)"
+      - role: qty
+        kind: qty
+        required: true
+        parse: int
+      - role: orderType
+        values: [MARKET, LIMIT, SL, SL-M]
+        required: true
+        parse: upper
+      - role: price
+        kind: price
+        required: "if:orderType!=MARKET"
+        parse: float
+    kwargs:
+      chase:
+        kind: chase_level
+        parse: int
+        hint: "1-10 (1=patient, 10=aggressive)"
+      expiry:
+        kind: expiry
+        hint: "YYYY-MM-DD override (defaults to nearest)"
+      product:
+        values: [MIS, NRML, CNC]
+
+  sell:
+    description: "Place a sell order"
+    tokens:
+      - role: account
+        kind: account
+        required: true
+      - role: instType
+        values: [CALL, PUT, FUT, EQ]
+        required: false
+        parse: upper
+        hint: "optional: CALL | PUT | FUT (default: EQ)"
+      - role: symbol
+        kind: symbol
+        required: true
+        hint: "underlying (RELIANCE, NIFTY, BANKNIFTY, …)"
+      - role: strike
+        kind: strike
+        required: "if:instType==CALL|PUT"
+        parse: float
+        hint: "strike price (CALL/PUT only)"
+      - role: qty
+        kind: qty
+        required: true
+        parse: int
+      - role: orderType
+        values: [MARKET, LIMIT, SL, SL-M]
+        required: true
+        parse: upper
+      - role: price
+        kind: price
+        required: "if:orderType!=MARKET"
+        parse: float
+    kwargs:
+      chase:
+        kind: chase_level
+        parse: int
+        hint: "1-10"
+      expiry:
+        kind: expiry
+        hint: "YYYY-MM-DD override"
+      product:
+        values: [MIS, NRML, CNC]
+
+  cancel:
+    description: "Cancel an open order"
+    tokens:
+      - role: order_id
+        kind: order_id
+        required: true
+
+  modify:
+    description: "Modify an open order"
+    tokens:
+      - role: order_id
+        kind: order_id
+        required: true
+    kwargs:
+      price:
+        parse: float
+      qty:
+        parse: int
+      chase:
+        kind: chase_level
+        parse: int
+        hint: "1-10"
+
+# Chase level → engine config (band in ticks, retry seconds)
+chase_levels:
+  "1":  { band_ticks: 10, retry_seconds: 60 }
+  "2":  { band_ticks: 9,  retry_seconds: 54 }
+  "3":  { band_ticks: 8,  retry_seconds: 48 }
+  "4":  { band_ticks: 7,  retry_seconds: 42 }
+  "5":  { band_ticks: 6,  retry_seconds: 36 }
+  "6":  { band_ticks: 5,  retry_seconds: 30 }
+  "7":  { band_ticks: 4,  retry_seconds: 24 }
+  "8":  { band_ticks: 3,  retry_seconds: 18 }
+  "9":  { band_ticks: 2,  retry_seconds: 12 }
+  "10": { band_ticks: 1,  retry_seconds: 6 }

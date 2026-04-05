@@ -32,22 +32,22 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   git --git-dir="$APP_ROOT/.git" --work-tree="$APP_ROOT" config --add safe.directory "$APP_ROOT"
 
   # One-time migration: rename old config file names to new names
-  [ -f "setup/yaml/config.yaml" ] && [ ! -f "setup/yaml/backend_config.yaml" ] && \
-    mv "setup/yaml/config.yaml" "setup/yaml/backend_config.yaml" && \
+  [ -f "backend/config/config.yaml" ] && [ ! -f "backend/config/backend_config.yaml" ] && \
+    mv "backend/config/config.yaml" "backend/config/backend_config.yaml" && \
     echo "[$TS] Migrated config.yaml → backend_config.yaml"
-  [ -f "setup/yaml/ramboq_config.yaml" ] && [ ! -f "setup/yaml/frontend_config.yaml" ] && \
-    mv "setup/yaml/ramboq_config.yaml" "setup/yaml/frontend_config.yaml" && \
+  [ -f "backend/config/ramboq_config.yaml" ] && [ ! -f "backend/config/frontend_config.yaml" ] && \
+    mv "backend/config/ramboq_config.yaml" "backend/config/frontend_config.yaml" && \
     echo "[$TS] Migrated ramboq_config.yaml → frontend_config.yaml"
-  [ -f "setup/yaml/ramboq_constants.yaml" ] && [ ! -f "setup/yaml/constants.yaml" ] && \
-    mv "setup/yaml/ramboq_constants.yaml" "setup/yaml/constants.yaml" && \
+  [ -f "backend/config/ramboq_constants.yaml" ] && [ ! -f "backend/config/constants.yaml" ] && \
+    mv "backend/config/ramboq_constants.yaml" "backend/config/constants.yaml" && \
     echo "[$TS] Migrated ramboq_constants.yaml → constants.yaml"
 
   # Save server-specific backend_config.yaml flags before git operations overwrite it
   CONFIG_BAK="/tmp/ramboq_config_$$.yaml"
-  [ -f "setup/yaml/backend_config.yaml" ] && cp "setup/yaml/backend_config.yaml" "$CONFIG_BAK"
+  [ -f "backend/config/backend_config.yaml" ] && cp "backend/config/backend_config.yaml" "$CONFIG_BAK"
 
   # Reset backend_config.yaml to git-tracked version so git operations proceed cleanly
-  git checkout -- setup/yaml/backend_config.yaml 2>/dev/null || true
+  git checkout -- backend/config/backend_config.yaml 2>/dev/null || true
 
   # --- Git update ---
   PREV_HEAD=$(git rev-parse HEAD)
@@ -64,16 +64,16 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   if [ -f "$CONFIG_BAK" ]; then
     for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
       val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
-      [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/backend_config.yaml"
+      [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "backend/config/backend_config.yaml"
     done
     rm -f "$CONFIG_BAK"
   fi
 
   # Write current branch into config
-  if grep -q "^deploy_branch:" "setup/yaml/backend_config.yaml" 2>/dev/null; then
-    sed -i "s/^deploy_branch:.*/deploy_branch: ${BRANCH}/" "setup/yaml/backend_config.yaml"
+  if grep -q "^deploy_branch:" "backend/config/backend_config.yaml" 2>/dev/null; then
+    sed -i "s/^deploy_branch:.*/deploy_branch: ${BRANCH}/" "backend/config/backend_config.yaml"
   else
-    echo "deploy_branch: ${BRANCH}" >> "setup/yaml/backend_config.yaml"
+    echo "deploy_branch: ${BRANCH}" >> "backend/config/backend_config.yaml"
   fi
 
   echo "[$TS] Changed files:"
@@ -96,7 +96,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   source venv/bin/activate
 
   # Install Python dependencies (API layer only)
-  pip install --no-cache-dir -r requirements-api.txt \
+  pip install --no-cache-dir -r backend/requirements.txt -r backend/requirements-api.txt \
     && echo "[$TS] Python deps installed" \
     || { echo "[$TS] ERROR: pip install failed"; exit 1; }
 

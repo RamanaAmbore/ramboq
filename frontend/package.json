@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@tanstack/svelte-query": "^5.68.0",
-    "ag-grid-community": "^33.2.0"
+    "ag-grid-community": "^33.2.0",
+    "js-yaml": "^4.1.1"
   },
   "type": "module"
 }
