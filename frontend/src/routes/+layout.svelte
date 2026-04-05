@@ -44,7 +44,7 @@
   // Admin sub-menu items (shown in dropdown)
   const adminSubLinks = [
     { href: '/console', label: 'Terminal' },
-    { href: '/algo',    label: 'Algo Agent' },
+    { href: '/algo',    label: 'Algo Agents' },
     { href: '/orders',  label: 'Orders' },
     { href: '/admin',   label: 'Users' },
   ];
