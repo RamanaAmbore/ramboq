@@ -279,17 +279,17 @@ Key session state variables:
 - **`api/background.py`** — Four tasks: market, performance, close, expiry check (09:20 IST daily)
 - **`api/algo/chase.py`** — Reusable adaptive limit-order chase engine
 - **`api/algo/expiry.py`** — Expiry-day auto-close: scan ITM/NTM, chase-close positions
-- **`api/routes/algo.py`** — Algo Agent API + WebSocket `/ws/algo`
+- **`api/routes/algo.py`** — AI Agents API + WebSocket `/ws/algo`
 - **`api/routes/auth.py`** — Login (24h JWT), register (pending approval), me, logout
 - **`api/routes/admin.py`** — Create/approve/reject/update users, logs, exec
 
 ### SvelteKit Pages
-- **`+layout.svelte`** — Nav with Admin ▾ dropdown (Terminal, Algo Agent, Orders, Users); mobile hamburger
+- **`+layout.svelte`** — Nav with Admin ▾ dropdown (Terminal, AI Agents, Orders, Users); mobile hamburger
 - **`performance/`** — AG Grid with color-coded P&L, per-account grids, URL ?tab= sync
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
 - **`admin/`** — User management with full partner fields
-- **`algo/`** — Algo Agent dashboard: status, positions to close, chase orders, live event log
+- **`algo/`** — AI Agents dashboard: status, positions to close, chase orders, live event log
 - **`console/`** — Terminal: command textarea + output + live log (equal panels)
 - **`orders/`** — Order management
 

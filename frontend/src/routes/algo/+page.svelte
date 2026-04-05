@@ -3,13 +3,15 @@
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
+  import LogPanel from '$lib/LogPanel.svelte';
 
   let agents      = $state([]);
   let agentEvents = $state([]);
   let loading     = $state(true);
   let error       = $state('');
-  let logTab      = $state('agent');  // agent | system
+  let logTab      = $state('agent');
   let systemLog   = $state([]);
+  let orderLog    = $state([]);
   let editing     = $state(null);     // slug of agent being edited
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'per_account', schedule: 'market_hours' }));
   let ws;
@@ -39,6 +41,19 @@
       const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
       if (res.ok) { const d = await res.json(); systemLog = d.lines || []; }
     } catch (e) { /* ignore */ }
+  }
+
+  async function loadOrderLog() {
+    try {
+      const data = await fetchRecentAgentEvents(100);
+      orderLog = data;
+    } catch (e) { /* ignore */ }
+  }
+
+  function loadCurrentLog() {
+    if (logTab === 'agent') loadAgentLog();
+    else if (logTab === 'system') loadSystemLog();
+    else if (logTab === 'order') loadOrderLog();
   }
 
   async function loadAll() {
@@ -164,10 +179,11 @@
 </script>
 
 <svelte:head>
-  <title>Algo Agent | RamboQuant Analytics</title>
+  <title>AI Agents | RamboQuant Analytics</title>
 </svelte:head>
 
-<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
+<h1 class="page-title-chip mb-2">AI Agents</h1>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
@@ -269,22 +285,12 @@
   </div>
 {/if}
 
-<!-- Log Tabs -->
-<div class="flex items-center gap-1 mb-2">
-  {#each [['order','Order Log'],['terminal','Terminal'],['agent','Agent Log'],['system','System Log']] as [id, label]}
-    <button
-      onclick={() => { logTab = id; if (id === 'agent') loadAgentLog(); else if (id === 'system') loadSystemLog(); }}
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >{label}</button>
-  {/each}
-</div>
-
-<pre class="log-panel max-h-[35vh]">{#if logTab === 'agent'}{#if agentEvents.length}{@html agentEvents.map(e => {
-  const t = e.timestamp?.slice(11, 19) || '';
-  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition || ''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
-  const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${line}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else if logTab === 'terminal'}<span class="log-debug">Use the Terminal page to run commands.</span>{:else}<span class="log-debug">No order events.</span>{/if}</pre>
+<LogPanel
+  heightClass="h-[50vh]"
+  initialTab={logTab}
+  cmdHistory={[]}
+  {orderLog}
+  agentLog={agentEvents}
+  {systemLog}
+  onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+/>

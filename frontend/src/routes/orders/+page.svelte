@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
-  import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
+  import { fetchOrders, placeOrder, cancelOrder } from '$lib/api';
+  import LogPanel from '$lib/LogPanel.svelte';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -69,10 +70,8 @@
 
   async function loadOrderLog() {
     try {
-      const res = await fetch('/api/agents/events/recent?n=50', { headers: authHeaders() });
-      const data = await res.json().catch(() => []);
-      const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled','action_success','action_failed']);
-      orderLog = (Array.isArray(data) ? data : []).filter(e => ORDER_TYPES.has(e.event_type));
+      const res = await fetch('/api/agents/events/recent?n=100', { headers: authHeaders() });
+      orderLog = await res.json().catch(() => []);
     } catch (e) { /* ignore */ }
   }
   async function loadAgentLog() {
@@ -115,10 +114,25 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
+<h1 class="page-title-chip mb-2">Orders</h1>
 
 {#if error}<div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
 {#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
+
+<!-- Order Entry -->
+<div class="mb-3">
+  <div class="flex gap-2 mb-1">
+    <textarea bind:value={command} rows="4" class="field-input cmd-input font-mono text-xs flex-1"
+      placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
+      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
+    <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
+      {running ? '...' : 'Place'}
+    </button>
+    <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
+  </div>
+  <div class="text-[0.5rem] text-muted">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</div>
+</div>
 
 <!-- Status Dashboard -->
 <div class="grid grid-cols-5 gap-2 mb-3">
@@ -177,42 +191,13 @@
   <div class="text-center text-muted text-xs py-2 mb-3">No orders today.</div>
 {/if}
 
-<!-- Order Entry (3 rows: input + help + output) -->
-<div class="mb-3">
-  <div class="flex gap-2 mb-1">
-    <textarea bind:value={command} rows="4" class="field-input font-mono text-xs flex-1"
-      placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
-      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
-    <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
-      {running ? '...' : 'Place'}
-    </button>
-    <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
-  </div>
-  <div class="text-[0.5rem] text-muted">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</div>
-</div>
-
-<!-- Log Tabs -->
-<div class="flex gap-0.5 mb-2">
-  {#each [['order','Order Log'],['terminal','Terminal'],['agent','Agent Log'],['system','System Log']] as [id, label]}
-    <button onclick={() => { logTab = id; loadCurrentLog(); }}
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >{label}</button>
-  {/each}
-</div>
-
-<pre class="log-panel flex-1 min-h-0">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
-  `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-).join('\n\n')}{:else}<span class="log-debug">Place an order above…</span>{/if}{:else if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
-  const t = e.timestamp?.slice(11,19) || '';
-  const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-triggered';
-  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
-  const t = e.timestamp?.slice(11,19) || '';
-  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
-  const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${l}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+<LogPanel
+  heightClass="flex-1 min-h-0"
+  initialTab={logTab}
+  {cmdHistory}
+  {orderLog}
+  {agentLog}
+  {systemLog}
+  onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+/>
 </div>
