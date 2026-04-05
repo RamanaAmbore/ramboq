@@ -17,6 +17,8 @@ const DB_NAME  = 'ramboq';
 const STORE    = 'instruments';
 const META_KEY = 'meta';
 const ITEMS_KEY = 'items';
+// Bump this when the index-building logic changes (e.g. _derivedUnderlying)
+const INDEX_SCHEMA_VERSION = 2;
 
 // Module-level runtime caches (rebuilt on each page load)
 let _items            = null;  // full list
@@ -119,8 +121,13 @@ async function _fetchAndCache() {
   });
   if (!res.ok) throw new Error(`instruments fetch ${res.status}`);
   const data = await res.json();
-  // Store compact form
-  await _idbPut(META_KEY, { cycle_date: data.cycle_date, count: data.count, cached_at: Date.now() });
+  // Store compact form + schema version so stale caches are invalidated
+  await _idbPut(META_KEY, {
+    cycle_date: data.cycle_date,
+    count: data.count,
+    cached_at: Date.now(),
+    schema_version: INDEX_SCHEMA_VERSION,
+  });
   await _idbPut(ITEMS_KEY, data.items);
   return data.items;
 }
@@ -135,7 +142,8 @@ export async function loadInstruments({ forceRefresh = false } = {}) {
       try {
         const meta = await _idbGet(META_KEY);
         const today = _todayIST();
-        if (meta && meta.cycle_date === today) {
+        if (meta && meta.cycle_date === today
+            && meta.schema_version === INDEX_SCHEMA_VERSION) {
           items = await _idbGet(ITEMS_KEY);
         }
       } catch (e) { /* ignore — fall through to fetch */ }
