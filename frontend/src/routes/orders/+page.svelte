@@ -116,7 +116,7 @@
 
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
-<div class="flex flex-col h-[calc(100vh-8rem)]">
+<div class="flex flex-col h-[calc(100vh-8rem)] page-tint">
 <div class="flex items-center justify-between mb-2">
   <h1 class="text-sm font-bold text-primary">Orders</h1>
   <div class="text-[0.65rem] text-muted">{clientTimestamp()}</div>
@@ -124,6 +124,20 @@
 
 {#if error}<div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
 {#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
+
+<!-- Order Entry -->
+<div class="mb-3">
+  <div class="flex gap-2 mb-1">
+    <textarea bind:value={command} rows="4" class="field-input cmd-input font-mono text-xs flex-1"
+      placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
+      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
+    <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
+      {running ? '...' : 'Place'}
+    </button>
+    <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
+  </div>
+  <div class="text-[0.5rem] text-muted">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</div>
+</div>
 
 <!-- Status Dashboard -->
 <div class="grid grid-cols-5 gap-2 mb-3">
@@ -181,20 +195,6 @@
 {:else}
   <div class="text-center text-muted text-xs py-2 mb-3">No orders today.</div>
 {/if}
-
-<!-- Order Entry (3 rows: input + help + output) -->
-<div class="mb-3">
-  <div class="flex gap-2 mb-1">
-    <textarea bind:value={command} rows="4" class="field-input cmd-input font-mono text-xs flex-1"
-      placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
-      onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
-    <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
-      {running ? '...' : 'Place'}
-    </button>
-    <button onclick={loadOrders} disabled={loading} class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
-  </div>
-  <div class="text-[0.5rem] text-muted">buy|sell ACCOUNT SYMBOL QTY [MARKET|LIMIT] [PRICE]</div>
-</div>
 
 <!-- Log Tabs -->
 <div class="flex gap-0.5 mb-2">

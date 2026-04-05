@@ -167,6 +167,7 @@
   <title>AI Agents | RamboQuant Analytics</title>
 </svelte:head>
 
+<div class="page-tint">
 <div class="flex items-center justify-between mb-2">
   <h1 class="text-sm font-bold text-primary">AI Agents</h1>
   <div class="text-[0.65rem] text-muted">{clientTimestamp()}</div>
@@ -292,3 +293,4 @@
   const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
   return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else if logTab === 'terminal'}<span class="log-debug">Use the Terminal page to run commands.</span>{:else}<span class="log-debug">No order events.</span>{/if}</pre>
+</div>

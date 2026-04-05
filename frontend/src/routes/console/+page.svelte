@@ -129,7 +129,7 @@
 
 <svelte:head><title>Terminal | RamboQuant Analytics</title></svelte:head>
 
-<div class="flex flex-col h-[calc(100vh-8rem)]">
+<div class="flex flex-col h-[calc(100vh-8rem)] page-tint">
   <div class="flex items-center justify-between mb-2">
     <h1 class="text-sm font-bold text-primary">Terminal</h1>
     <div class="text-[0.65rem] text-muted">{clientTimestamp()}</div>

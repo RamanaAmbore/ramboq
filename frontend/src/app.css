@@ -220,6 +220,13 @@
     caret-color: #f59e0b;
   }
   .cmd-input::placeholder { color: #64748b; font-weight: 400; }
+
+  .page-tint {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
   .cmd-input:focus {
     border-color: #475569;
     border-left-color: #fbbf24;
