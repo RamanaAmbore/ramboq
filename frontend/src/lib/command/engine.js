@@ -325,20 +325,24 @@ export function parse(line, grammar, context = {}) {
 
 /** Replace the active token in `line` with `replacement`, return new line + cursor. */
 export function applySuggestion(line, cursorPos, replacement) {
+  // A suggestion may be a value+label like "500 (5 lots × 100)" — only insert
+  // the value portion (first whitespace-delimited token, or before " (").
+  const parenIdx = replacement.indexOf(' (');
+  const value = parenIdx > 0 ? replacement.slice(0, parenIdx) : replacement;
   const tokens = tokenize(line);
   const at = tokenAtCursor(tokens, cursorPos, line);
   if (at.token) {
     const before = line.slice(0, at.token.start);
     const after = line.slice(at.token.end);
-    const needsSpace = !after.startsWith(' ') && !replacement.endsWith('=');
-    const insert = replacement + (needsSpace ? ' ' : '');
+    const needsSpace = !after.startsWith(' ') && !value.endsWith('=');
+    const insert = value + (needsSpace ? ' ' : '');
     return { line: before + insert + after, cursor: before.length + insert.length };
   }
   // Insert at cursor (new token)
   const before = line.slice(0, cursorPos);
   const after = line.slice(cursorPos);
   const needsLeadSpace = before.length > 0 && !before.endsWith(' ');
-  const needsTrailSpace = !after.startsWith(' ') && !replacement.endsWith('=');
-  const insert = (needsLeadSpace ? ' ' : '') + replacement + (needsTrailSpace ? ' ' : '');
+  const needsTrailSpace = !after.startsWith(' ') && !value.endsWith('=');
+  const insert = (needsLeadSpace ? ' ' : '') + value + (needsTrailSpace ? ' ' : '');
   return { line: before + insert + after, cursor: before.length + insert.length };
 }

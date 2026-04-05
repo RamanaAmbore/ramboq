@@ -109,14 +109,27 @@ function strikeSuggest(prefix, ctx) {
 }
 
 function qtySuggest(prefix, ctx) {
-  if (prefix) return [];
-  const raw = ctx.symbol;
-  if (!raw) return ['1'];
+  // Resolve instrument so we can pre-multiply by lot size for F&O.
   try {
-    const inst = resolveSymbol(raw, ctx);
+    const inst = resolveInstrument({
+      instType: ctx.instType || 'EQ',
+      symbol: ctx.symbol,
+      strike: ctx.strike,
+      expiry: ctx.expiry,
+    });
     const ls = inst.ls || 1;
-    return [1, 2, 3, 5, 10].map(n => String(n * ls));
+    const isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+    if (isFO && ls > 1) {
+      // Suggest N lots → N*ls shares, displayed as "500 (5 lots × 100)"
+      // The first token (number) is what gets inserted; the bracket is a label.
+      const lots = prefix ? [Number(prefix) || 1] : [1, 2, 3, 5, 10];
+      return lots.map(n => `${n * ls} (${n} lot${n > 1 ? 's' : ''} × ${ls})`);
+    }
+    // Equity: suggest plain share counts
+    if (prefix) return [];
+    return ['1', '5', '10', '25', '50', '100', '500'];
   } catch {
+    if (prefix) return [];
     return ['1','2','5','10','100'];
   }
 }
