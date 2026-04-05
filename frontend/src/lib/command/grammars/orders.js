@@ -141,12 +141,66 @@ function orderIdSuggest(prefix, ctx) {
   return ids.filter(id => id.startsWith(prefix)).slice(0, 20);
 }
 
+// In-memory cache of recent LTPs keyed by `${exchange}:${tradingsymbol}`
+const _ltpCache = new Map();
+
+async function _fetchLtp(exchange, tradingsymbol) {
+  const key = `${exchange}:${tradingsymbol}`;
+  const cached = _ltpCache.get(key);
+  if (cached && Date.now() - cached.at < 30000) return cached; // 30s cache
+  try {
+    const { authStore } = await import('$lib/stores');
+    const token = authStore.getToken();
+    const res = await fetch(`/api/quote/?exchange=${encodeURIComponent(exchange)}&tradingsymbol=${encodeURIComponent(tradingsymbol)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const entry = { ltp: data.ltp, bid: data.bid, ask: data.ask, at: Date.now() };
+    _ltpCache.set(key, entry);
+    return entry;
+  } catch { return null; }
+}
+
+function priceSuggest(prefix, ctx) {
+  // Resolve instrument from ctx to get tick_size + exchange; then look up LTP
+  try {
+    const inst = resolveInstrument({
+      instType: ctx.instType || 'EQ',
+      symbol: ctx.symbol,
+      strike: ctx.strike,
+      expiry: ctx.expiry,
+    });
+    const entry = _ltpCache.get(`${inst.e}:${inst.s}`);
+    if (!entry) {
+      // Kick off async fetch; next keystroke will pick it up
+      _fetchLtp(inst.e, inst.s);
+      return [];
+    }
+    const tick = inst.ts || 0.05;
+    // Round LTP to nearest tick
+    const atm = Math.round(entry.ltp / tick) * tick;
+    // Build ladder: ATM ± 10 ticks, centered on ATM
+    const steps = [];
+    for (let i = -10; i <= 10; i++) {
+      const p = +(atm + i * tick).toFixed(2);
+      if (p > 0) steps.push(String(p));
+    }
+    // Focus index = ATM (the midpoint)
+    const atmStr = String(+atm.toFixed(2));
+    const focus = steps.indexOf(atmStr);
+    if (focus >= 0) Object.defineProperty(steps, '_focusIndex', { value: focus, enumerable: false });
+    if (!prefix) return steps;
+    return steps.filter(s => s.startsWith(prefix));
+  } catch { return []; }
+}
+
 const SUGGESTERS = {
   symbol:       symbolSuggest,
   strike:       strikeSuggest,
   account:      (p, _) => suggestAccounts(p, 20),
   qty:          qtySuggest,
-  price:        () => [],
+  price:        priceSuggest,
   order_id:     orderIdSuggest,
   expiry:       expirySuggest,
   chase_level:  null,      // uses static values from YAML

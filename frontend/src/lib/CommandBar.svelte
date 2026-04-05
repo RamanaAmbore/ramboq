@@ -62,10 +62,10 @@
       // Enforce minimum prefix length for large-list roles (symbol/strike/etc.)
       // Verb, account, kwarg-key, and fixed-value roles (orderType, instType, chase)
       // always show. Free-text roles require `minPrefixLen` chars typed.
-      const alwaysShowRoles = new Set(['verb', 'account', 'kwarg-key', 'orderType', 'instType', 'order_id', 'qty']);
+      const alwaysShowRoles = new Set(['verb', 'account', 'kwarg-key', 'orderType', 'instType', 'order_id', 'qty', 'price', 'strike']);
       const currentPrefix = _currentPrefix();
-      if (!alwaysShowRoles.has(newRole) && !newRole?.startsWith('kwarg:')
-          && currentPrefix.length > 0 && currentPrefix.length < minPrefixLen) {
+      const isGatedRole = !alwaysShowRoles.has(newRole) && !newRole?.startsWith('kwarg:');
+      if (isGatedRole && currentPrefix.length < minPrefixLen) {
         newList = [];
       }
       suggList = newList;
@@ -229,9 +229,11 @@
   {/if}
 
   {#if showHelp}
-    <div class="text-[0.55rem] text-muted mt-0.5 flex gap-3">
-      {#if role}<span><span class="opacity-60">role:</span> <span class="text-accent">{role}</span></span>{/if}
-      {#if hint}<span class="opacity-70">{hint}</span>{/if}
+    <div class="text-[0.6rem] mt-0.5 flex gap-3 items-center">
+      {#if role}
+        <span class="role-badge">{role}</span>
+      {/if}
+      {#if hint}<span class="text-muted opacity-70">{hint}</span>{/if}
       {#if errors.length > 0}<span class="text-red-500">{errors.join(' · ')}</span>{/if}
     </div>
   {/if}
@@ -273,4 +275,17 @@
   .cmd-suggest-item:hover { background: rgba(255,255,255,0.06); }
   .cmd-suggest-item.active { background: rgba(245,158,11,0.2); color: #fbbf24; }
   :global(.text-accent) { color: #f59e0b; }
+
+  .role-badge {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 700;
+    font-size: 0.65rem;
+    color: #fff;
+    background: #f59e0b;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
 </style>
