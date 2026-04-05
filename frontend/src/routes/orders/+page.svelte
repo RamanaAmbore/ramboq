@@ -1,8 +1,9 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, logTime, parseLogLineTime } from '$lib/stores';
-  import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
+  import { authStore, clientTimestamp } from '$lib/stores';
+  import { fetchOrders, placeOrder, cancelOrder } from '$lib/api';
+  import LogPanel from '$lib/LogPanel.svelte';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -69,12 +70,8 @@
 
   async function loadOrderLog() {
     try {
-      const res = await fetch('/api/agents/events/recent?n=50', { headers: authHeaders() });
-      const data = await res.json().catch(() => []);
-      const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);
-      orderLog = (Array.isArray(data) ? data : []).filter(e =>
-        ORDER_TYPES.has(e.event_type) ||
-        (e.event_type?.startsWith('action_') && /place_order|chase_close/i.test(e.trigger_condition || '')));
+      const res = await fetch('/api/agents/events/recent?n=100', { headers: authHeaders() });
+      orderLog = await res.json().catch(() => []);
     } catch (e) { /* ignore */ }
   }
   async function loadAgentLog() {
@@ -194,30 +191,13 @@
   <div class="text-center text-muted text-xs py-2 mb-3">No orders today.</div>
 {/if}
 
-<!-- Log Tabs -->
-<div class="flex gap-0.5 mb-2">
-  {#each [['order','Order Log'],['terminal','Terminal'],['agent','Agent Log'],['system','System Log']] as [id, label]}
-    <button onclick={() => { logTab = id; loadCurrentLog(); }}
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >{label}</button>
-  {/each}
-</div>
-
-<pre class="log-panel flex-1 min-h-0">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
-  `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-).join('\n\n')}{:else}<span class="log-debug">Place an order above…</span>{/if}{:else if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
-  const t = logTime(e.timestamp);
-  const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-triggered';
-  return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
-  const t = logTime(e.timestamp);
-  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
-  const t = parseLogLineTime(l);
-  const rest = t ? l.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*-?\s*/, '') : l;
-  const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+<LogPanel
+  heightClass="flex-1 min-h-0"
+  initialTab={logTab}
+  {cmdHistory}
+  {orderLog}
+  {agentLog}
+  {systemLog}
+  onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+/>
 </div>

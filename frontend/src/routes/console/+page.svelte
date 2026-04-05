@@ -1,18 +1,17 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { authStore, clientTimestamp, logTime, parseLogLineTime } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { goto } from '$app/navigation';
+  import LogPanel from '$lib/LogPanel.svelte';
 
   let command      = $state('');
   let cmdHistory   = $state([]);  // [{cmd, result, time}]
   let logLines     = $state([]);
   let agentLog     = $state([]);
+  let orderLog     = $state([]);
   let logTab       = $state('terminal');
   let running      = $state(false);
-  let loadingLog   = $state(false);
-  let logError     = $state('');
   let logInterval;
-  let logEl;
 
   function authHeaders() {
     const token = $authStore.token;
@@ -90,32 +89,31 @@
   }
 
   async function loadSystemLog(n = 200) {
-    loadingLog = true; logError = '';
     try {
       const res = await fetch(`/api/admin/logs?n=${n}`, { headers: authHeaders() });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { logError = d.detail || 'Failed'; return; }
-      logLines = d.lines || [];
-      scrollLog();
-    } catch (e) { logError = e.message; } finally { loadingLog = false; }
+      if (res.ok) logLines = d.lines || [];
+    } catch (e) { /* ignore */ }
   }
 
   async function loadAgentLog() {
-    loadingLog = true;
     try {
       const res = await fetch('/api/agents/events/recent?n=100', { headers: authHeaders() });
       agentLog = await res.json().catch(() => []);
-      scrollLog();
-    } catch (e) { /* ignore */ } finally { loadingLog = false; }
+    } catch (e) { /* ignore */ }
   }
 
-  function scrollLog() {
-    requestAnimationFrame(() => { if (logEl) logEl.scrollTop = logEl.scrollHeight; });
+  async function loadOrderLog() {
+    try {
+      const res = await fetch('/api/agents/events/recent?n=100', { headers: authHeaders() });
+      orderLog = await res.json().catch(() => []);
+    } catch (e) { /* ignore */ }
   }
 
   function loadCurrentLog() {
     if (logTab === 'system') loadSystemLog();
     else if (logTab === 'agent') loadAgentLog();
+    else if (logTab === 'order') loadOrderLog();
   }
 
   onMount(() => {
@@ -151,40 +149,15 @@
   </div>
 
   <!-- Log Tabs fill remaining space -->
-  <div class="flex flex-col flex-1 min-h-0">
-    <div class="flex items-center justify-between mb-1 mt-2">
-      <div class="flex gap-0.5">
-        {#each [['terminal','Terminal'],['order','Order Log'],['agent','Agent Log'],['system','System Log']] as [id, label]}
-          <button
-            onclick={() => { logTab = id; if (id !== 'terminal') loadCurrentLog(); }}
-            class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-              {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-          >{label}</button>
-        {/each}
-      </div>
-      <div class="flex gap-2 items-center">
-        {#if loadingLog}<span class="text-xs text-muted animate-pulse">Loading…</span>{/if}
-        {#if logTab !== 'terminal'}
-          <button onclick={loadCurrentLog} class="btn-secondary text-[0.6rem] py-0.5 px-2">Refresh</button>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Log content -->
-    <pre
-      bind:this={logEl}
-      class="log-panel flex-1 min-h-0"
-    >{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
-      `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-    ).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}<span class="log-debug">Order events appear here.</span>{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
-      const t = logTime(e.timestamp);
-      const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-      return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-    }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if logLines.length}{@html logLines.map(l => {
-      const t = parseLogLineTime(l);
-      const rest = t ? l.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*-?\s*/, '') : l;
-      const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
-      return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
-    }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+  <div class="flex flex-col flex-1 min-h-0 mt-2">
+    <LogPanel
+      heightClass="flex-1 min-h-0"
+      initialTab={logTab}
+      {cmdHistory}
+      orderLog={orderLog}
+      {agentLog}
+      systemLog={logLines}
+      onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+    />
   </div>
 </div>

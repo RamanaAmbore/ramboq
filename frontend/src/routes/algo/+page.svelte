@@ -1,15 +1,17 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, logTime, parseLogLineTime } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
+  import LogPanel from '$lib/LogPanel.svelte';
 
   let agents      = $state([]);
   let agentEvents = $state([]);
   let loading     = $state(true);
   let error       = $state('');
-  let logTab      = $state('agent');  // agent | system
+  let logTab      = $state('agent');
   let systemLog   = $state([]);
+  let orderLog    = $state([]);
   let editing     = $state(null);     // slug of agent being edited
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'per_account', schedule: 'market_hours' }));
   let ws;
@@ -39,6 +41,19 @@
       const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
       if (res.ok) { const d = await res.json(); systemLog = d.lines || []; }
     } catch (e) { /* ignore */ }
+  }
+
+  async function loadOrderLog() {
+    try {
+      const data = await fetchRecentAgentEvents(100);
+      orderLog = data;
+    } catch (e) { /* ignore */ }
+  }
+
+  function loadCurrentLog() {
+    if (logTab === 'agent') loadAgentLog();
+    else if (logTab === 'system') loadSystemLog();
+    else if (logTab === 'order') loadOrderLog();
   }
 
   async function loadAll() {
@@ -270,23 +285,12 @@
   </div>
 {/if}
 
-<!-- Log Tabs -->
-<div class="flex items-center gap-1 mb-2">
-  {#each [['order','Order Log'],['terminal','Terminal'],['agent','Agent Log'],['system','System Log']] as [id, label]}
-    <button
-      onclick={() => { logTab = id; if (id === 'agent') loadAgentLog(); else if (id === 'system') loadSystemLog(); }}
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-    >{label}</button>
-  {/each}
-</div>
-
-<pre class="log-panel h-[50vh]">{#if logTab === 'agent'}{#if agentEvents.length}{@html agentEvents.map(e => {
-  const t = logTime(e.timestamp);
-  return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition || ''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
-  const t = parseLogLineTime(line);
-  const rest = t ? line.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*-?\s*/, '') : line;
-  const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else if logTab === 'terminal'}<span class="log-debug">Use the Terminal page to run commands.</span>{:else}<span class="log-debug">No order events.</span>{/if}</pre>
+<LogPanel
+  heightClass="h-[50vh]"
+  initialTab={logTab}
+  cmdHistory={[]}
+  {orderLog}
+  agentLog={agentEvents}
+  {systemLog}
+  onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+/>
