@@ -35,7 +35,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
 # ---------------------------------------------------------------------------
-# Direct broker fetch helpers (no Streamlit cache — worker is a separate process)
+# Direct broker fetch helpers (worker is a separate process)
 # ---------------------------------------------------------------------------
 
 def _fetch_margins_direct():

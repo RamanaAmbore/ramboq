@@ -1,17 +1,19 @@
 {
     "version": "0.2.0",
     "configurations": [
-        
         {
-            "name": "Streamlit",
+            "name": "Litestar API",
             "type": "debugpy",
             "request": "launch",
-            "module": "streamlit",
-            "args": ["run", "app.py", "--server.port=8502"],
+            "module": "uvicorn",
+            "args": ["backend.api.app:app", "--host", "127.0.0.1", "--port", "8001", "--reload"],
             "python": "${workspaceFolder}/venv/bin/python",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            "env": {
+                "RAMBOQ_LOG_PREFIX": "api_"
+            }
         }
     ]
 }

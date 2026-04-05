@@ -12,7 +12,7 @@ with open(_CONFIG_PATH, 'r', encoding='utf-8', errors='ignore') as file:
     deploy = yaml.safe_load(file)
 
 # Optional prefix for log file names (set via RAMBOQ_LOG_PREFIX env var)
-# Allows API and Streamlit to use separate log files in the same directory
+# Allows different API processes to write to distinct log files
 _LOG_PREFIX = os.environ.get('RAMBOQ_LOG_PREFIX', '')
 
 # Extract log settings from config

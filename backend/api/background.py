@@ -59,7 +59,7 @@ def _default_seg_state() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Direct broker fetch helpers (polars — no Streamlit cache)
+# Direct broker fetch helpers
 # ---------------------------------------------------------------------------
 
 def _fetch_margins_direct() -> pd.DataFrame:

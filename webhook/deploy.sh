@@ -5,7 +5,7 @@
 #   ENV : prod | dev
 #   REF : refs/heads/<branch>  (e.g. refs/heads/main)
 #
-# Phase 3: Streamlit removed. Services now run uvicorn (Litestar + SvelteKit SPA).
+# Services run uvicorn (Litestar API) + SvelteKit SPA as static files.
 # The SvelteKit build (frontend/build/) is served as static files by Litestar.
 
 TS=$(date '+%Y-%m-%d %H:%M:%S')

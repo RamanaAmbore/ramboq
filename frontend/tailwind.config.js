@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Exact Streamlit theme colors
+        // RamboQuant theme colors
         primary:   '#2f4f4f',   // primaryColor — dark teal (bull logo)
         text:      '#315062',   // textColor — dark blue-grey
         bg:        '#f7f7f5',   // backgroundColor — off-white

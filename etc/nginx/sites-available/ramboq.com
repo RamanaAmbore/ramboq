@@ -1,5 +1,5 @@
-# Phase 3: proxy to uvicorn (port 8000) instead of Streamlit.
-# Uvicorn serves both the Litestar REST/WS API and the SvelteKit SPA build.
+# Proxies to uvicorn on port 8000. Uvicorn serves the Litestar REST/WS API
+# and the SvelteKit SPA build as static files.
 
 server {
     server_name ramboq.com www.ramboq.com;
