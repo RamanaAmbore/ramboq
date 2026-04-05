@@ -128,8 +128,13 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     fi
   fi
 
-  echo "[$TS] Restarting $APP_SERVICE..."
-  sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
+  # Only restart Streamlit service if it is enabled (Streamlit is being phased out)
+  if systemctl is-enabled --quiet "$APP_SERVICE" 2>/dev/null; then
+    echo "[$TS] Restarting $APP_SERVICE..."
+    sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
+  else
+    echo "[$TS] Skipping $APP_SERVICE (disabled)"
+  fi
 
   # Restart API service if it exists
   if [ -n "$API_SERVICE" ] && systemctl list-unit-files | grep -q "$API_SERVICE"; then
