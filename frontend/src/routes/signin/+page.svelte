@@ -1,7 +1,7 @@
 <script>
   import { goto } from '$app/navigation';
   import { login as apiLogin, register as apiRegister } from '$lib/api';
-  import { authStore } from '$lib/stores';
+  import { authStore, clientTimestamp } from '$lib/stores';
 
   let tab       = $state('signin');   // signin or register
   let loading   = $state(false);
@@ -52,6 +52,8 @@
   <title>Sign In | RamboQuant Analytics</title>
   <meta name="description" content="Sign in to your RamboQuant Analytics partner account." />
 </svelte:head>
+
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
 
 <div class="max-w-sm mx-auto">

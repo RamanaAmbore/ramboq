@@ -65,7 +65,7 @@
 
 
 {#if lastRefresh}
-  <div class="text-xs text-muted mb-3">
+  <div class="text-[0.65rem] text-muted mb-3">
     <span>{lastRefresh}</span>
   </div>
 {/if}

@@ -93,7 +93,7 @@
   });
 </script>
 
-<div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <div class="flex items-center justify-between mb-1">

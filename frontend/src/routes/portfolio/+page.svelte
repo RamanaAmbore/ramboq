@@ -24,7 +24,7 @@
   }
 </script>
 
-<div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
 {#if $authStore.user}
   <div class="w-full space-y-4">

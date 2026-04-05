@@ -122,6 +122,14 @@
           <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none" />
         </a>
         <div class="flex items-center gap-2">
+          {#if $authStore.user}
+            <span class="nav-user-pill text-[0.6rem]">
+              {$authStore.user.display_name.toLowerCase()}
+              {#if $authStore.user.role === 'admin'}
+                <span class="text-[0.5rem] opacity-60 ml-0.5">admin</span>
+              {/if}
+            </span>
+          {/if}
         <button
           onclick={() => menuOpen = !menuOpen}
           class="hamburger"

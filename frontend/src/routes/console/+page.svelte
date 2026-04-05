@@ -130,7 +130,7 @@
 <svelte:head><title>Terminal | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-  <div class="text-xs text-muted mb-2">{clientTimestamp()}</div>
+  <div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
   <!-- Command input -->
   <div class="flex gap-2 mb-1">
