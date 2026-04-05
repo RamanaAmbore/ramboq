@@ -82,14 +82,17 @@ export function clientTimestamp() {
   return `${ist} | ${est}`;
 }
 
-/** Short HH:MM:SS IST|EST for log entries. Input: ISO string or Date. */
+/** Short DD-MMM HH:MM:SS IST | DD-MMM HH:MM:SS EST for log entries. Input: ISO string or Date. */
 export function logTime(iso) {
   if (!iso) return '';
   const d = typeof iso === 'string' ? new Date(iso) : iso;
   if (isNaN(d)) return '';
-  const ist = d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'Asia/Kolkata' });
-  const est = d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'America/New_York' });
-  return `${ist} IST|${est} EST`;
+  const fmt = (tz) => d.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, timeZone: tz,
+  }).replace(',', '');
+  return `${fmt('Asia/Kolkata')} IST | ${fmt('America/New_York')} EST`;
 }
 
 /** Parse the leading 'YYYY-MM-DD HH:MM:SS[,ms]' timestamp from a python log line
