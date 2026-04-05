@@ -117,10 +117,8 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)] page-tint">
-<div class="flex items-center justify-between mb-2">
-  <h1 class="text-sm font-bold text-primary">Orders</h1>
-  <div class="text-[0.65rem] text-muted">{clientTimestamp()}</div>
-</div>
+<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
+<h1 class="text-sm font-bold text-primary mb-2">Orders</h1>
 
 {#if error}<div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
 {#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
