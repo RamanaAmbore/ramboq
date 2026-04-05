@@ -18,7 +18,7 @@ const STORE    = 'instruments';
 const META_KEY = 'meta';
 const ITEMS_KEY = 'items';
 // Bump this when the index-building logic changes (e.g. _derivedUnderlying)
-const INDEX_SCHEMA_VERSION = 2;
+const INDEX_SCHEMA_VERSION = 3;
 
 // Module-level runtime caches (rebuilt on each page load)
 let _items            = null;  // full list
@@ -65,25 +65,16 @@ async function _idbPut(key, value) {
 function _derivedUnderlying(it) {
   // For options/futures, the Kite `name` field carries the full company name
   // ("INTERGLOBE AVIATION"), NOT the ticker. The ticker prefix is embedded in
-  // the tradingsymbol. Strip the date + strike + type suffix to recover it.
-  //   INDIGO26APR4200CE → INDIGO
-  //   NIFTY25APR0322500CE → NIFTY
-  //   NIFTY25APRFUT → NIFTY
-  //   RELIANCE (EQ)      → RELIANCE
-  if (it.t === 'EQ') return it.s;
-  const s = it.s;
-  if (it.t === 'FUT') {
-    const m = s.match(/^([A-Z]+?)\d{0,2}[A-Z]{3}FUT$/);
-    if (m) return m[1];
-    // Commodity futures: CRUDEOIL25APRFUT, etc.
-    return s.replace(/\d{0,2}[A-Z]{3}FUT$/, '');
-  }
-  // CE / PE — strip trailing <datepart><strike><CE|PE>
-  // Date formats: YYMON (monthly) or YYMONDD (weekly)
-  const m = s.match(/^([A-Z]+?)\d{0,2}[A-Z]{3}\d{0,2}\d+(?:\.\d+)?(CE|PE)$/);
-  if (m) return m[1];
-  // Fallback
-  return s.replace(/\d{0,2}[A-Z]{3}\d*\d+(CE|PE)$/, '');
+  // the tradingsymbol. The underlying is the longest pure-letter prefix before
+  // any digit. Works for all Kite tradingsymbol formats:
+  //   RELIANCE26APR1360CE       → RELIANCE   (monthly option)
+  //   NIFTY2640722700CE         → NIFTY      (weekly option — no month letters)
+  //   NIFTY25APRFUT             → NIFTY      (monthly future)
+  //   CRUDEOIL25APRFUT          → CRUDEOIL   (commodity future)
+  //   BANKNIFTY26APR51500CE     → BANKNIFTY
+  //   RELIANCE                   → RELIANCE   (equity)
+  const m = it.s.match(/^([A-Z]+)/);
+  return m ? m[1] : it.s;
 }
 
 function _buildIndexes(items) {
