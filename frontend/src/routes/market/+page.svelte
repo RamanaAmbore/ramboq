@@ -81,12 +81,9 @@
       <span>{lastRefresh}</span>
     {/if}
   </div>
-  <div class="flex items-center gap-2">
-    {#if loading && lastRefresh}
-      <span class="text-xs text-muted animate-pulse">Refreshing…</span>
-    {/if}
-    <button onclick={load} disabled={loading} class="btn-secondary">Refresh</button>
-  </div>
+  {#if loading && lastRefresh}
+    <span class="text-xs text-muted animate-pulse">Refreshing…</span>
+  {/if}
 </div>
 
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
