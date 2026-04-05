@@ -135,6 +135,7 @@
 .log-panel .log-agent-success     { color: #4ade80; background: rgba(74,222,128,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-failed      { color: #f87171; background: rgba(248,113,113,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-default     { color: #9ca3af; }
+.log-panel .log-ts                { color: #fde047; font-weight: 700; background: rgba(253,224,71,0.12); padding: 0 4px; border-radius: 2px; margin-right: 4px; }
 
 /* ── Shared button styles ─────────────────────────────────────────────────── */
 @layer components {
@@ -207,6 +208,13 @@
     transition: border-color 0.05s;
   }
   .field-input:focus { border-color: #2f4f4f; }
+
+  .cmd-input {
+    background: #f0fdf4;
+    border-color: #86efac;
+    color: #064e3b;
+  }
+  .cmd-input:focus { border-color: #16a34a; background: #ecfdf5; }
 
   .section-heading {
     font-size: 0.65rem;

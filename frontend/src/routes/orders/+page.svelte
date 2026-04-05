@@ -182,7 +182,7 @@
 <!-- Order Entry (3 rows: input + help + output) -->
 <div class="mb-3">
   <div class="flex gap-2 mb-1">
-    <textarea bind:value={command} rows="4" class="field-input font-mono text-xs flex-1"
+    <textarea bind:value={command} rows="4" class="field-input cmd-input font-mono text-xs flex-1"
       placeholder="buy ACCOUNT SYMBOL QTY [LIMIT PRICE]"
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}></textarea>
     <button onclick={runCommand} disabled={running} class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">
@@ -208,11 +208,11 @@
 ).join('\n\n')}{:else}<span class="log-debug">Place an order above…</span>{/if}{:else if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
   const t = logTime(e.timestamp);
   const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-triggered';
-  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+  return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
   const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+  return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
   const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
   return `<span class="${cls}">${l}</span>`;

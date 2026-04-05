@@ -137,7 +137,7 @@
     <textarea
       bind:value={command}
       rows="4"
-      class="field-input font-mono text-xs flex-1"
+      class="field-input cmd-input font-mono text-xs flex-1"
       placeholder="Shell command, order (buy/sell), or agent command"
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
     ></textarea>
@@ -178,7 +178,7 @@
     ).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}<span class="log-debug">Order events appear here.</span>{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
       const t = logTime(e.timestamp);
       const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-      return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+      return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
     }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if logLines.length}{@html logLines.map(l => {
       const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
       return `<span class="${cls}">${l}</span>`;
