@@ -74,7 +74,7 @@
 
 
 <div class="flex items-center justify-between mb-3">
-  <div class="text-xs text-muted">
+  <div class="text-[0.65rem] text-muted">
     {#if loading && !lastRefresh}
       <span class="animate-pulse">Loading…</span>
     {:else if lastRefresh}

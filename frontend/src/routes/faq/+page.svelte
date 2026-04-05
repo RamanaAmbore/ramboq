@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { clientTimestamp } from '$lib/stores';
 
   const faqs = [
     {
@@ -128,6 +129,8 @@
   <title>FAQ | RamboQuant Analytics</title>
   <meta name="description" content="Frequently asked questions about RamboQuant Analytics partnership and investment process." />
 </svelte:head>
+
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
 
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">

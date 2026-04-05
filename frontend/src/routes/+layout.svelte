@@ -168,7 +168,6 @@
             {/each}
           {/if}
           {#if $authStore.user}
-            <div class="mobile-nav-user">{$authStore.user.display_name}</div>
             <button onclick={() => { signOut(); closeMenu(); }} class="mobile-nav-item">Sign Out</button>
           {:else}
             <button onclick={() => { goto('/signin'); closeMenu(); }} class="mobile-nav-item">Sign In</button>

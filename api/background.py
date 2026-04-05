@@ -319,7 +319,7 @@ async def _task_close(state: dict) -> None:
                 second=0, microsecond=0
             ) + timedelta(minutes=close_offset)
 
-            if today not in h_set and now >= close_trigger:
+            if today not in h_set and now.weekday() < 5 and now >= close_trigger:
                 try:
                     (df_h, sum_h), (df_p, sum_p) = await _run(
                         lambda: (_fetch_holdings_direct(), _fetch_positions_direct()))

@@ -1,4 +1,5 @@
 <script>
+  import { clientTimestamp } from '$lib/stores';
   let form = { name: '', email: '', message: '' };
   let submitting = false;
   let success    = '';
@@ -29,6 +30,8 @@
   <title>Contact | RamboQuant Analytics</title>
   <meta name="description" content="Get in touch with RamboQuant Analytics LLP." />
 </svelte:head>
+
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
 
 <div class="w-full">

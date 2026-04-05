@@ -191,7 +191,7 @@ def _loop(cfg):
                 close_dt = now.replace(hour=seg['hours_end'].hour, minute=seg['hours_end'].minute,
                                        second=0, microsecond=0)
                 close_trigger_dt = close_dt + timedelta(minutes=close_offset_mins)
-                if today not in h_set and now >= close_trigger_dt:
+                if today not in h_set and now.weekday() < 5 and now >= close_trigger_dt:
                     logger.info(f"Background: fetching close summary for {seg['name']}")
                     try:
                         close_key         = get_nearest_time(interval=interval)
