@@ -28,9 +28,9 @@ def _timestamp():
 
 def main():
     try:
-        with open("setup/yaml/backend_config.yaml", "r", encoding="utf-8") as f:
+        with open("backend/config/backend_config.yaml", "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
-        with open("setup/yaml/secrets.yaml", "r", encoding="utf-8") as f:
+        with open("backend/config/secrets.yaml", "r", encoding="utf-8") as f:
             sec = yaml.safe_load(f)
     except Exception as e:
         print(f"notify_deploy: config load failed: {e}", file=sys.stderr)

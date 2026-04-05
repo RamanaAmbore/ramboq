@@ -1,7 +1,7 @@
-# RamboQuant — Migration Plan: Streamlit → Litestar + SvelteKit
+# RamboQuant — Migration Plan: Litestar + SvelteKit
 
-This document tracks the phased migration from the Streamlit monolith to a proper
-frontend/backend split. The goal is zero downtime — each phase is independently deployable.
+This document tracks the phased migration to a proper frontend/backend split.
+The goal is zero downtime — each phase is independently deployable.
 
 ---
 
@@ -26,25 +26,24 @@ frontend/backend split. The goal is zero downtime — each phase is independentl
 
 ## Phase 1 — API Layer ✅
 
-**Goal:** Litestar API runs alongside Streamlit. Validates API contract and broker connectivity.
+**Goal:** Litestar API validates API contract and broker connectivity.
 
 ```
-api/
-  app.py              — Litestar app, CORS config, OpenAPI (Scalar UI at /schema)
-  schemas.py          — Pydantic v2 response models
-  routes/
-    holdings.py       — GET /api/holdings/
-    positions.py      — GET /api/positions/
-    funds.py          — GET /api/funds/
-    market.py         — GET /api/market/
-    ws.py             — WS  /ws/performance  (placeholder)
-
-workers/
-  refresh_worker.py   — ARQ worker; mirrors background_refresh.py as cron jobs
-
-requirements-api.txt  — litestar, uvicorn, redis, arq, httpx
-run_api.sh            — starts Litestar on port 8000
-run_worker.sh         — starts ARQ worker (requires Redis)
+backend/
+  api/
+    app.py              — Litestar app, CORS config, OpenAPI (Scalar UI at /schema)
+    schemas.py          — Pydantic v2 response models
+    routes/
+      holdings.py       — GET /api/holdings/
+      positions.py      — GET /api/positions/
+      funds.py          — GET /api/funds/
+      market.py         — GET /api/market/
+      ws.py             — WS  /ws/performance  (placeholder)
+  workers/
+    refresh_worker.py   — ARQ worker; cron-style background refresh
+  requirements-api.txt  — litestar, uvicorn, redis, arq, httpx
+  run_api.sh            — starts Litestar on port 8000 (cd to repo root)
+  run_worker.sh         — starts ARQ worker (requires Redis)
 ```
 
 ---
@@ -55,13 +54,13 @@ run_worker.sh         — starts ARQ worker (requires Redis)
 fans out to connected clients. SvelteKit frontend subscribes via WebSocket.
 
 ```
-api/
+backend/api/
   app.py              — Redis pub/sub listener background task
   routes/
     ws.py             — WS /ws/performance — fan-out via per-connection asyncio.Queue
     auth.py           — POST /api/auth/login, POST /api/auth/logout (JWT, stub)
 
-workers/
+backend/workers/
   refresh_worker.py   — Publishes JSON to Redis 'performance:update' after each refresh
 
 frontend/             — SvelteKit app
@@ -95,7 +94,7 @@ refresh into Litestar async tasks, add SQLAlchemy user management, AG Grid polis
 **Backend:**
 
 ```
-api/
+backend/api/
   schemas.py          — msgspec.Struct (was pydantic BaseModel) — ~10× faster serialisation
   database.py         — NEW: SQLAlchemy async engine + session factory + init_db()
   models.py           — NEW: User ORM model (id, username, password_hash, role, display_name,
@@ -157,14 +156,14 @@ asyncpg~=0.30           # PostgreSQL async driver
 
 ```bash
 # On server — Litestar API (includes background tasks + DB init)
-bash run_api.sh
+bash backend/run_api.sh
 
 # SvelteKit dev server
 cd frontend && npm install && npm run dev
 
 # Optional: ARQ worker (alternative to Litestar background tasks)
 docker run -d -p 6379:6379 redis:alpine
-bash run_worker.sh
+bash backend/run_worker.sh
 ```
 
 ### API endpoints (Phase 4)
@@ -205,10 +204,10 @@ Users table (30 columns): `id`, `account_id` (auto-generated `rambo-XXXXXX`), `u
 
 ## What stays unchanged
 
-- `src/helpers/` — broker_apis, connections, decorators, alert_utils, genai_api (all reused by API)
-- `setup/yaml/` — all config and secrets files
+- `backend/shared/helpers/` — broker_apis, connections, decorators, alert_utils, genai_api (all reused by API)
+- `backend/config/` — all config and secrets files
 - `webhook/` — deploy scripts, notify_deploy.py
-- `workers/refresh_worker.py` — kept as optional ARQ-based alternative
+- `backend/workers/refresh_worker.py` — kept as optional ARQ-based alternative
 
 ---
 
@@ -218,8 +217,8 @@ Two modes available — Litestar async (default) or ARQ worker:
 
 | Mode | How to run | Redis needed? | Process count |
 |---|---|---|---|
-| **Litestar async** (default) | `bash run_api.sh` | No | 1 (API + background) |
-| **ARQ worker** | `bash run_api.sh` + `bash run_worker.sh` | Yes | 2 (API + worker) |
+| **Litestar async** (default) | `bash backend/run_api.sh` | No | 1 (API + background) |
+| **ARQ worker** | `bash backend/run_api.sh` + `bash backend/run_worker.sh` | Yes | 2 (API + worker) |
 
 Litestar async is simpler (single process, no Redis). ARQ mode is useful for
 multi-server setups where the worker runs on a different machine.

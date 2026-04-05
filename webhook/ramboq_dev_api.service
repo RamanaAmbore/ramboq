@@ -8,7 +8,7 @@ WorkingDirectory=/opt/ramboq_dev
 User=www-data
 Group=www-data
 ExecStart=/bin/bash -c 'source /opt/ramboq_dev/venv/bin/activate && \
-  uvicorn api.app:app \
+  uvicorn backend.api.app:app \
     --host 0.0.0.0 \
     --port 8001 \
     --workers 1 \

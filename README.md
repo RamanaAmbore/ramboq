@@ -4,7 +4,7 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 
 ## Architecture
 
-**Dual-stack**: Streamlit (legacy) + **Litestar API + SvelteKit frontend** (active migration on `new` branch).
+**Litestar API + SvelteKit frontend.**
 
 | Layer | Technology |
 |---|---|
@@ -100,27 +100,35 @@ All responses include `refreshed_at` in IST|EST dual-timezone format.
 ## Project Structure
 
 ```
-api/
-  app.py              — Litestar app; on_startup: init_db + background tasks
-  database.py         — PostgreSQL via asyncpg; DB selected by deploy_branch
-  models.py           — User ORM (30 columns: personal, KYC, address, investment, bank, nominee)
-  schemas.py          — msgspec.Struct response models
-  background.py       — Async scheduler: market warm, performance refresh, close summaries
-  cache.py            — In-process TTL cache with per-key locking
-  auth_guard.py       — jwt_guard + admin_guard
-  routes/
-    auth.py           — Login, register, me, logout
-    admin.py          — Create/approve/reject/update users, logs, exec
-    holdings.py       — Polars aggregation
-    positions.py      — Polars aggregation
-    funds.py          — Polars aggregation
-    market.py         — Gemini with 1h TTL cache
-    config.py         — Post/about content
-    orders.py         — Order CRUD (protected)
-    ws.py             — WebSocket fan-out
-
-workers/
-  refresh_worker.py   — ARQ worker (optional alternative to Litestar background)
+backend/
+  api/
+    app.py              — Litestar app; on_startup: init_db + background tasks
+    database.py         — PostgreSQL via asyncpg; DB selected by deploy_branch
+    models.py           — User ORM (30 columns: personal, KYC, address, investment, bank, nominee)
+    schemas.py          — msgspec.Struct response models
+    background.py       — Async scheduler: market warm, performance refresh, close summaries
+    cache.py            — In-process TTL cache with per-key locking
+    auth_guard.py       — jwt_guard + admin_guard
+    routes/
+      auth.py           — Login, register, me, logout
+      admin.py          — Create/approve/reject/update users, logs, exec
+      holdings.py       — Polars aggregation
+      positions.py      — Polars aggregation
+      funds.py          — Polars aggregation
+      market.py         — Gemini with 1h TTL cache
+      config.py         — Post/about content
+      orders.py         — Order CRUD (protected)
+      ws.py             — WebSocket fan-out
+  shared/helpers/       — broker_apis, connections, decorators, alert_utils, genai_api, summarise, ...
+  workers/
+    refresh_worker.py   — ARQ worker (optional alternative to Litestar background)
+  scripts/              — One-off admin / maintenance scripts
+  config/               — backend_config.yaml, frontend_config.yaml, constants.yaml, secrets.yaml
+  requirements.txt      — Core dependencies
+  requirements-api.txt  — API-specific dependencies
+  run_api.sh            — API entrypoint (cd to repo root, then uvicorn)
+  run_worker.sh         — ARQ worker entrypoint
+  pyproject.toml        — ramboq-backend package
 
 frontend/
   src/
@@ -141,8 +149,6 @@ frontend/
       admin/          — User management (create, approve, edit all fields)
       portfolio/      — Partner contribution info
 
-src/helpers/          — Shared: broker_apis, connections, decorators, alert_utils, genai_api
-setup/yaml/           — backend_config.yaml, frontend_config.yaml, constants.yaml, secrets.yaml
 webhook/              — deploy.sh, dispatch.sh, service files, hooks.json
 ```
 
@@ -152,10 +158,10 @@ webhook/              — deploy.sh, dispatch.sh, service files, hooks.json
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt -r requirements-api.txt
+pip install -r backend/requirements.txt -r backend/requirements-api.txt
 
 # Start API (requires PostgreSQL — use server or local PostgreSQL)
-bash run_api.sh
+bash backend/run_api.sh
 
 # Start frontend dev server
 cd frontend && npm install && npm run dev
@@ -163,7 +169,7 @@ cd frontend && npm install && npm run dev
 
 # Optional: ARQ worker (alternative background mode, needs Redis)
 docker run -d -p 6379:6379 redis:alpine
-bash run_worker.sh
+bash backend/run_worker.sh
 ```
 
 **Dependencies (`requirements-api.txt`):**
@@ -244,8 +250,8 @@ Two modes:
 
 | Mode | Command | Redis | Processes |
 |---|---|---|---|
-| Litestar async (default) | `bash run_api.sh` | No | 1 |
-| ARQ worker | `run_api.sh` + `run_worker.sh` | Yes | 2 |
+| Litestar async (default) | `bash backend/run_api.sh` | No | 1 |
+| ARQ worker | `backend/run_api.sh` + `backend/run_worker.sh` | Yes | 2 |
 
 Tasks: market cache warm (daily 08:30 IST), performance refresh (every 5 min during market hours), open/close summaries, loss alerts.
 
