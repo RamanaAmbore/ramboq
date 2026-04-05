@@ -12,7 +12,7 @@ var/www/.gitconfig
 *.pem
 *.key
 ramboq_ssh/
-data/
+/data/
 dump.rdb
 frontend/node_modules/
 frontend/build/
