@@ -16,9 +16,9 @@ REF="${2:-refs/heads/main}"
 BRANCH="${REF#refs/heads/}"
 
 case "$ENV" in
-  prod) APP_ROOT="/opt/ramboq";     APP_SERVICE="ramboq.service";     API_SERVICE="ramboq_api.service"     ;;
-  dev)  APP_ROOT="/opt/ramboq_dev"; APP_SERVICE="ramboq_dev.service"; API_SERVICE="ramboq_dev_api.service" ;;
-  pod)  APP_ROOT="/opt/ramboq_pod"; APP_SERVICE="ramboq_pod.service"; API_SERVICE=""                       ;;
+  prod) APP_ROOT="/opt/ramboq";     API_SERVICE="ramboq_api.service"     ;;
+  dev)  APP_ROOT="/opt/ramboq_dev"; API_SERVICE="ramboq_dev_api.service" ;;
+  pod)  APP_ROOT="/opt/ramboq_pod"; API_SERVICE="ramboq_pod.service"     ;;
   *) echo "[$TS] ERROR: unknown ENV '$ENV'"; exit 1 ;;
 esac
 
@@ -128,19 +128,8 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     fi
   fi
 
-  # Only restart Streamlit service if it is enabled (Streamlit is being phased out)
-  if systemctl is-enabled --quiet "$APP_SERVICE" 2>/dev/null; then
-    echo "[$TS] Restarting $APP_SERVICE..."
-    sudo systemctl restart "$APP_SERVICE" || echo "[$TS] ERROR: failed to restart $APP_SERVICE"
-  else
-    echo "[$TS] Skipping $APP_SERVICE (disabled)"
-  fi
-
-  # Restart API service if it exists
-  if [ -n "$API_SERVICE" ] && systemctl list-unit-files | grep -q "$API_SERVICE"; then
-    echo "[$TS] Restarting $API_SERVICE..."
-    sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
-  fi
+  echo "[$TS] Restarting $API_SERVICE..."
+  sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
 
   echo "[$TS] Sending startup notification..."
   if [ "$ENV" = "pod" ]; then
