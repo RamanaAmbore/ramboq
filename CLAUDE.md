@@ -67,7 +67,7 @@ All three branches (`main`, `dev`, `pod`) are kept in sync — every feature is 
 - **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
 - **`genai_api.py`** — Gemini 2.5 Flash via `google-genai` with Google Search grounding; falls back to `ramboq_config['market']` static content when `genai: False` in `backend_config.yaml` or when Gemini returns empty/None response (rate limiting)
 - **`mail_utils.py`** — SMTP via Hostinger; respects `cap_in_dev` and `mail` flags in `backend_config.yaml` before sending. `send_email(name, email_id, subject, html_body)`
-- **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`. `is_market_open(now, holiday_set, market_start, market_end)` — returns True if not in holiday_set and within time window; weekends NOT hardcoded as closed to support special trading sessions (Muhurat etc.)
+- **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`. `is_market_open(now, holiday_set, market_start, market_end)` — returns True if not in holiday_set, not a weekend, and within time window. Weekends (Sat/Sun) are rejected. Special trading sessions (Muhurat etc.) need an explicit override when reintroduced.
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 - **`background_refresh.py`** — Daemon thread started once at app startup. Warms market update cache immediately at startup. During market hours: pre-fetches broker data at each interval boundary; sends open summary (15 min after segment open); fires loss alerts. After market close: sends close summary. Segment-aware — handles Equity (NSE/BSE/NFO/CDS) and Commodity (MCX) independently with separate holiday calendars and open/close times.
 - **`alert_utils.py`** — Loss alert and market summary notifications. `send_summary(sum_holdings, sum_positions, ist_display, msg_type, label, df_margins)` — sends open/close summary including a Funds table (Account | Cash | Avail Margin | Used Margin | Collateral) when `df_margins` is provided. `check_and_alert(sum_holdings, sum_positions, alert_state, ist_display, df_margins)` — checks day P&L thresholds AND negative fund balances (cash < 0 or avail margin < 0), fires one row per breached threshold. Both send via Telegram Bot API and SMTP email. Message type prefixes: Telegram `Open|Alert|Close`, email subject `RamboQuant Open:|RamboQuant Alert:|RamboQuant Close:`. Email uses HTML `<table>` formatting; Telegram uses `<code>` monospace block. Non-main branches show `[branch]` tag in all subjects/headers plus `⚠ Branch: <name>` in Telegram and a yellow banner in email body.
@@ -189,7 +189,7 @@ Defined in `backend_config.yaml` under `market_segments`. Background thread hand
 
 - Open summary sent `open_summary_offset_minutes` (default 15) after segment open; close summary sent `close_summary_offset_minutes` (default 15) after segment close
 - Holiday calendars loaded at startup, refreshed on new year
-- Weekends NOT hardcoded as closed — special trading sessions (Muhurat, special Saturday) work correctly since they are absent from the holiday list
+- Weekends (Sat/Sun) are treated as closed across all paths: `is_market_open()`, `_task_close()` in api/background.py, and legacy `background_refresh.py`. Special Saturday sessions (Muhurat etc.) need an explicit override
 - Holdings always belong to equity segment; positions are filtered by `exchange` column
 
 ---
@@ -249,7 +249,7 @@ Key session state variables:
 - **Do not add branch filter rules to hooks.json** — branch routing is handled in `dispatch.sh`, not in `hooks.json`; `hooks.json` only validates the event, repo, and HMAC
 - **Do not use `2>>&1` in systemd ExecStart** — use `2>&1`; the `>>` append variant causes bash syntax errors in service files
 - **Always `chown www-data` after manual server operations** — any file created or modified on the server via SSH (git commands, scp, manual edits) must be owned by `www-data` or deploy scripts will fail silently. After any manual work run: `sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log /opt/ramboq_dev/.git /opt/ramboq_dev/.log /opt/ramboq_pod/.git /opt/ramboq_pod/.log`
-- **Do not hardcode weekends as closed** — use `is_market_open()` with the Kite holiday list; special Saturday trading sessions must work
+- **Weekends are hardcoded as closed** in `is_market_open()`, `_task_close()`, and legacy `background_refresh.py` — all alert/summary paths skip Sat/Sun. Special Saturday trading sessions need an explicit override
 - **Do not add `show_spinner` to `@st.cache_data` on broker/market fetch functions** — background thread pre-warms cache; spinners would show on first load after restart but are misleading since data is already warm
 
 ---
