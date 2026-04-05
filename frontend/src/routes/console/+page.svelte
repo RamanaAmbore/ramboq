@@ -131,7 +131,7 @@
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
   <div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
-  <h1 class="page-heading">Terminal</h1>
+  <h1 class="page-title-chip mb-2">Terminal</h1>
 
   <!-- Command input -->
   <div class="flex gap-2 mb-1">
