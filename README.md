@@ -29,7 +29,7 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 - **Admin dashboard**: User management (create, approve/reject, edit all partner fields), log viewer
 - **Notifications**: Telegram + email alerts for market open/close summaries and loss thresholds
 - **Segment-aware**: Equity (NSE/NFO 09:15–15:30) and Commodity (MCX 09:00–23:30) handled independently
-- **Multi-environment**: prod (ramboq.com), dev (dev.ramboq.com), pod (pod.ramboq.com)
+- **Multi-environment**: prod (ramboq.com), dev (dev.ramboq.com)
 
 ---
 
@@ -162,7 +162,7 @@ cd frontend && npm install && npm run dev
 # open http://localhost:5173
 
 # Optional: ARQ worker (alternative background mode, needs Redis)
-podman run -d -p 6379:6379 redis:alpine
+docker run -d -p 6379:6379 redis:alpine
 bash run_worker.sh
 ```
 
@@ -182,17 +182,16 @@ asyncpg~=0.30
 
 ## Deployment
 
-Three environments, auto-deployed on `git push` via GitHub webhook:
+Two environments, auto-deployed on `git push` via GitHub webhook:
 
 | Environment | Branch | Server path | Port | Domain |
 |---|---|---|---|---|
 | Production | `main` | `/opt/ramboq` | 8502 | ramboq.com |
 | Development | non-main | `/opt/ramboq_dev` | 8503 | dev.ramboq.com |
-| Pod (container) | `pod` | `/opt/ramboq_pod` | 8504 | pod.ramboq.com |
 
 **Flow**: `git push` → GitHub webhook → nginx → webhook listener (port 9001) → `dispatch.sh` → `deploy.sh` → git pull + pip install + systemctl restart
 
-All three branches (`main`, `dev`, `pod`) are permanent and kept in sync.
+Both branches (`main`, `dev`) are permanent and kept in sync.
 
 ---
 

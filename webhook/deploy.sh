@@ -1,8 +1,8 @@
 #!/bin/bash
-# Unified deploy script — handles prod, dev, and pod environments.
+# Unified deploy script — handles prod and dev environments.
 # Called by /etc/webhook/dispatch.sh with ENV and REF arguments.
 # Usage: deploy.sh <ENV> <REF>
-#   ENV : prod | dev | pod
+#   ENV : prod | dev
 #   REF : refs/heads/<branch>  (e.g. refs/heads/main)
 #
 # Phase 3: Streamlit removed. Services now run uvicorn (Litestar + SvelteKit SPA).
@@ -18,7 +18,6 @@ BRANCH="${REF#refs/heads/}"
 case "$ENV" in
   prod) APP_ROOT="/opt/ramboq";     API_SERVICE="ramboq_api.service"     ;;
   dev)  APP_ROOT="/opt/ramboq_dev"; API_SERVICE="ramboq_dev_api.service" ;;
-  pod)  APP_ROOT="/opt/ramboq_pod"; API_SERVICE="ramboq_pod.service"     ;;
   *) echo "[$TS] ERROR: unknown ENV '$ENV'"; exit 1 ;;
 esac
 
@@ -62,16 +61,12 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)
 
   # --- Restore / merge server-specific config flags ---
-  if [ "$ENV" = "pod" ]; then
-    [ -f "$CONFIG_BAK" ] && mv "$CONFIG_BAK" "setup/yaml/backend_config.yaml"
-  else
-    if [ -f "$CONFIG_BAK" ]; then
-      for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
-        val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
-        [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/backend_config.yaml"
-      done
-      rm -f "$CONFIG_BAK"
-    fi
+  if [ -f "$CONFIG_BAK" ]; then
+    for key in enforce_password_standard cap_in_dev genai telegram mail notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
+      val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
+      [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "setup/yaml/backend_config.yaml"
+    done
+    rm -f "$CONFIG_BAK"
   fi
 
   # Write current branch into config
@@ -97,51 +92,34 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     fi
   fi
 
-  # --- Pod: build Podman image ---
-  if [ "$ENV" = "pod" ]; then
-    echo "[$TS] Building Podman image ramboq-pod:latest..."
-    sudo podman build -t ramboq-pod:latest "$APP_ROOT" \
-      && echo "[$TS] Podman image built successfully" \
-      || { echo "[$TS] ERROR: Podman image build failed"; exit 1; }
-  fi
+  # --- Install Python deps + build SvelteKit frontend ---
+  source venv/bin/activate
 
-  # --- Prod / dev: install Python deps + build SvelteKit frontend ---
-  if [ "$ENV" != "pod" ]; then
-    source venv/bin/activate
+  # Install Python dependencies (API layer only)
+  pip install --no-cache-dir -r requirements-api.txt \
+    && echo "[$TS] Python deps installed" \
+    || { echo "[$TS] ERROR: pip install failed"; exit 1; }
 
-    # Install Python dependencies (API layer only — no Streamlit)
-    pip install --no-cache-dir -r requirements-api.txt \
-      && echo "[$TS] Python deps installed" \
-      || { echo "[$TS] ERROR: pip install failed"; exit 1; }
-
-    # Build SvelteKit frontend
-    if command -v npm &>/dev/null && [ -f "$APP_ROOT/frontend/package.json" ]; then
-      echo "[$TS] Building SvelteKit frontend..."
-      cd "$APP_ROOT/frontend"
-      npm install --prefer-offline 2>&1 | tail -3
-      npm run build \
-        && echo "[$TS] SvelteKit build complete" \
-        || echo "[$TS] WARNING: SvelteKit build failed (non-fatal)"
-      cd "$APP_ROOT"
-    else
-      echo "[$TS] npm not found or no frontend — skipping SvelteKit build"
-    fi
+  # Build SvelteKit frontend
+  if command -v npm &>/dev/null && [ -f "$APP_ROOT/frontend/package.json" ]; then
+    echo "[$TS] Building SvelteKit frontend..."
+    cd "$APP_ROOT/frontend"
+    npm install --prefer-offline 2>&1 | tail -3
+    npm run build \
+      && echo "[$TS] SvelteKit build complete" \
+      || echo "[$TS] WARNING: SvelteKit build failed (non-fatal)"
+    cd "$APP_ROOT"
+  else
+    echo "[$TS] npm not found or no frontend — skipping SvelteKit build"
   fi
 
   echo "[$TS] Restarting $API_SERVICE..."
   sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
 
   echo "[$TS] Sending startup notification..."
-  if [ "$ENV" = "pod" ]; then
-    sleep 5
-    sudo podman exec ramboq-pod-app python /app/webhook/notify_deploy.py \
-      && echo "[$TS] Startup notification done" \
-      || echo "[$TS] WARNING: startup notification failed"
-  else
-    python "$APP_ROOT/webhook/notify_deploy.py" \
-      && echo "[$TS] Startup notification done" \
-      || echo "[$TS] WARNING: startup notification failed"
-  fi
+  python "$APP_ROOT/webhook/notify_deploy.py" \
+    && echo "[$TS] Startup notification done" \
+    || echo "[$TS] WARNING: startup notification failed"
 
   echo "[$TS] Deployment complete"
 } >> "$LOG" 2>&1

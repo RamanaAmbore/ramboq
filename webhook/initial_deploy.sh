@@ -179,7 +179,7 @@ setup_environment() {
     local clone_url="${ssh_clone_url:-$REPO_HTTPS}"
     local capabilities="True"
     local notify_on_startup="False"
-    if [ "$branch" != "main" ] && [[ "$branch" != pod* ]]; then
+    if [ "$branch" != "main" ]; then
         notify_on_startup="True"
     fi
 
@@ -236,7 +236,7 @@ setup_environment() {
 retry_count: 3
 conn_reset_hours: 23
 
-# Log file paths (relative to app working directory — works uniformly for prod, dev, and pod)
+# Log file paths (relative to app working directory — works uniformly for prod and dev)
 file_log_file: .log/log_file
 error_log_file: .log/error_file
 short_file_log_file: .log/short_log_file
@@ -251,7 +251,7 @@ console_log_level: 40
 enforce_password_standard: False
 
 # cap_in_dev: master switch for production capabilities in this environment.
-# True on prod/pod and dev — enables GenAI, Telegram, email. Set False to silence everything.
+# True on prod and dev — enables GenAI, Telegram, email. Set False to silence everything.
 cap_in_dev: True
 
 # Production capability flags — each independently enables one capability when cap_in_dev is True.
@@ -365,16 +365,13 @@ log_step "5. Configuring sudoers for www-data"
 SUDOERS_FILE="/etc/sudoers.d/ramboq"
 
 tee "$SUDOERS_FILE" > /dev/null <<'EOF'
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq.service
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_dev.service
-www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_pod.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_api.service
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_dev_api.service
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart ramboq_hook.service
 www-data ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
 www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx
 www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/etc/nginx/sites-available/. /etc/nginx/sites-available/
 www-data ALL=(ALL) NOPASSWD: /bin/cp -r /opt/ramboq/var/www/html/. /var/www/html/
-www-data ALL=(ALL) NOPASSWD: /usr/bin/podman build -t ramboq-pod\:latest *
-www-data ALL=(ALL) NOPASSWD: /usr/bin/podman exec ramboq-pod-app *
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -c > /dev/null && log_ok "Configured sudoers at $SUDOERS_FILE" || log_err "sudoers syntax error — check $SUDOERS_FILE manually"

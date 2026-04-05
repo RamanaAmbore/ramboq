@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run the ARQ background worker.
 # Replaces the background_refresh.py threading loop in Phase 2.
-# Requires Redis running: podman run -d -p 6379:6379 redis:alpine
+# Requires Redis running on port 6379
 #
 # Usage:
 #   bash run_worker.sh

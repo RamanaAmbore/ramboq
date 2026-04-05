@@ -80,7 +80,7 @@ def is_prod_capable():
     Returns True if production capabilities are enabled for this environment.
 
     Controlled solely by cap_in_dev in backend_config.yaml — no code changes needed
-    to enable or disable capabilities. Set to True on prod/pod servers. Set to False
+    to enable or disable capabilities. Set to True on prod servers. Set to False
     on dev to avoid consuming CPU/bandwidth when prod is running in parallel.
 
     Each capability also has its own flag (genai, telegram, mail). Both this
