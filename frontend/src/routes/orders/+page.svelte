@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, logTime } from '$lib/stores';
+  import { authStore, clientTimestamp, logTime, parseLogLineTime } from '$lib/stores';
   import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
 
@@ -214,7 +214,9 @@
   const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
   return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
+  const t = parseLogLineTime(l);
+  const rest = t ? l.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*-?\s*/, '') : l;
   const cls = l.includes('ERROR') ? 'log-error' : l.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${l}</span>`;
+  return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 </div>

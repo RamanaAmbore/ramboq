@@ -91,3 +91,11 @@ export function logTime(iso) {
   const est = d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'America/New_York' });
   return `${ist} IST|${est} EST`;
 }
+
+/** Parse the leading 'YYYY-MM-DD HH:MM:SS[,ms]' timestamp from a python log line
+ *  (treated as UTC) and return short IST|EST. Returns null if not found. */
+export function parseLogLineTime(line) {
+  const m = line?.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  if (!m) return null;
+  return logTime(`${m[1]}T${m[2]}Z`);
+}

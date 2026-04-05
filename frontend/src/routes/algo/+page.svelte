@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, logTime } from '$lib/stores';
+  import { authStore, clientTimestamp, logTime, parseLogLineTime } from '$lib/stores';
   import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
 
   let agents      = $state([]);
@@ -282,9 +282,10 @@
 
 <pre class="log-panel h-[50vh]">{#if logTab === 'agent'}{#if agentEvents.length}{@html agentEvents.map(e => {
   const t = logTime(e.timestamp);
-  const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
-  return `<span class="${cls}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition || ''}</span>`;
+  return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition || ''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'system'}{#if systemLog.length}{@html systemLog.map(line => {
+  const t = parseLogLineTime(line);
+  const rest = t ? line.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*-?\s*/, '') : line;
   const cls = line.includes('ERROR') ? 'log-error' : line.includes('WARNING') ? 'log-warning' : 'log-info';
-  return `<span class="${cls}">${line}</span>`;
+  return `<span class="${cls}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{:else if logTab === 'terminal'}<span class="log-debug">Use the Terminal page to run commands.</span>{:else}<span class="log-debug">No order events.</span>{/if}</pre>
