@@ -81,3 +81,13 @@ export function clientTimestamp() {
   const est = now.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
   return `${ist} | ${est}`;
 }
+
+/** Short HH:MM:SS IST|EST for log entries. Input: ISO string or Date. */
+export function logTime(iso) {
+  if (!iso) return '';
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (isNaN(d)) return '';
+  const ist = d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'Asia/Kolkata' });
+  const est = d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'America/New_York' });
+  return `${ist} IST|${est} EST`;
+}

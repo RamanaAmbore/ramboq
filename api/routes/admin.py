@@ -9,6 +9,7 @@ DELETE /api/admin/users/{username}  — deactivate a user
 All routes require admin JWT via admin_guard.
 """
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -25,7 +26,9 @@ from src.helpers.utils import config
 
 logger = get_logger(__name__)
 
-_LOG_FILE = Path(config.get("file_log_file", ".log/log_file"))
+_LOG_PREFIX = os.environ.get("RAMBOQ_LOG_PREFIX", "")
+_raw_path = Path(config.get("file_log_file", ".log/log_file"))
+_LOG_FILE = _raw_path.with_name(_LOG_PREFIX + _raw_path.name)
 
 
 def _resolve_log() -> Path:

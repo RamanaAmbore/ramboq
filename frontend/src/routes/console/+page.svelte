@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { authStore, clientTimestamp } from '$lib/stores';
+  import { authStore, clientTimestamp, logTime } from '$lib/stores';
   import { goto } from '$app/navigation';
 
   let command      = $state('');
@@ -176,7 +176,7 @@
     >{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
       `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
     ).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}<span class="log-debug">Order events appear here.</span>{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
-      const t = e.timestamp?.slice(11,19) || '';
+      const t = logTime(e.timestamp);
       const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
       return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
     }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if logLines.length}{@html logLines.map(l => {

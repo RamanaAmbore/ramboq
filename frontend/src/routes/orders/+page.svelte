@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp } from '$lib/stores';
+  import { authStore, clientTimestamp, logTime } from '$lib/stores';
   import { fetchOrders, fetchAccounts, placeOrder, cancelOrder } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
 
@@ -71,8 +71,10 @@
     try {
       const res = await fetch('/api/agents/events/recent?n=50', { headers: authHeaders() });
       const data = await res.json().catch(() => []);
-      const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled','action_success','action_failed']);
-      orderLog = (Array.isArray(data) ? data : []).filter(e => ORDER_TYPES.has(e.event_type));
+      const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);
+      orderLog = (Array.isArray(data) ? data : []).filter(e =>
+        ORDER_TYPES.has(e.event_type) ||
+        (e.event_type?.startsWith('action_') && /place_order|chase_close/i.test(e.trigger_condition || '')));
     } catch (e) { /* ignore */ }
   }
   async function loadAgentLog() {
@@ -204,11 +206,11 @@
 <pre class="log-panel flex-1 min-h-0">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
   `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
 ).join('\n\n')}{:else}<span class="log-debug">Place an order above…</span>{/if}{:else if logTab === 'order'}{#if orderLog.length}{@html orderLog.map(e => {
-  const t = e.timestamp?.slice(11,19) || '';
+  const t = logTime(e.timestamp);
   const cls = e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-triggered';
   return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
-  const t = e.timestamp?.slice(11,19) || '';
+  const t = logTime(e.timestamp);
   const cls = e.event_type === 'triggered' ? 'log-agent-triggered' : e.event_type === 'alert_sent' ? 'log-agent-alert' : e.event_type?.includes('success') ? 'log-agent-success' : e.event_type?.includes('fail') ? 'log-agent-failed' : 'log-agent-default';
   return `<span class="${cls}">[${t}] ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
