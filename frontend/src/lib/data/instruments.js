@@ -105,10 +105,10 @@ function _todayIST() {
 }
 
 async function _fetchAndCache() {
+  const { authStore } = await import('$lib/stores');
+  const token = authStore.getToken();
   const res = await fetch('/api/instruments/', {
-    headers: { ...(window.localStorage.getItem('ramboq_jwt')
-      ? { Authorization: `Bearer ${window.localStorage.getItem('ramboq_jwt')}` }
-      : {}) },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error(`instruments fetch ${res.status}`);
   const data = await res.json();
