@@ -10,38 +10,100 @@ Complete server setup and deployment reference for all three environments.
 Developer (local)
     │  git push origin <branch>
     ▼
-GitHub → POST https://webhook.ramboq.com/hooks/update (HMAC-SHA256 signed)
+GitHub → POST https://webhook.ramboq.com/hooks/ramboq-deploy (HMAC-SHA256 signed)
     ▼
-Nginx (port 443, webhook.ramboq.com) → proxy to port 9001
+Nginx (port 443, webhook.ramboq.com) → proxy to 127.0.0.1:9001
     ▼
-Webhook listener (ramboq_hook.service, port 9001, www-data)
+Webhook listener (ramboq_hook.service, port 9001, www-data) — ONE shared service
     │  Validates: push event + repo name + HMAC signature
+    │  Extracts `ref` from JSON payload
     │  Calls: /etc/webhook/dispatch.sh <ref>
     ▼
-dispatch.sh — routes by branch:
-    ├── main         → /opt/ramboq/webhook/deploy.sh prod main
-    ├── pod*         → /opt/ramboq_pod/webhook/deploy.sh pod <ref>
-    └── any other    → /opt/ramboq_dev/webhook/deploy.sh dev <ref>
+/etc/webhook/dispatch.sh — routes by branch:
+    ├── refs/heads/main   → /opt/ramboq/webhook/deploy.sh prod <ref>
+    ├── refs/heads/pod*   → /opt/ramboq_pod/webhook/deploy.sh pod <ref>
+    └── all others        → /opt/ramboq_dev/webhook/deploy.sh dev <ref>
     ▼
-deploy.sh — git pull, pip install, config merge, systemctl restart
+deploy.sh <ENV> <REF> — env-scoped build + restart:
+    ├── cd into APP_ROOT (env-specific)
+    ├── git pull the requested branch
+    ├── preserve server-local config flags
+    ├── write deploy_branch into backend_config.yaml
+    ├── pip install + npm run build
+    └── systemctl restart <env API service>
     ▼
 App running:
-    ├── ramboq.com      (port 8502) — Streamlit + Litestar API (port 8000)
-    ├── dev.ramboq.com  (port 8503) — Streamlit + Litestar API (port 8001)
-    └── pod.ramboq.com  (port 8504) — Podman container
+    ├── ramboq.com      → Litestar API port 8000 (ramboq_api.service) → DB `ramboq`
+    ├── dev.ramboq.com  → Litestar API port 8001 (ramboq_dev_api.service) → DB `ramboq_dev`
+    └── pod.ramboq.com  → Podman container `ramboq-pod-app` (ramboq_pod.service)
 ```
 
 ---
 
 ## Environments
 
-| Environment | Branch | Server path | Streamlit port | API port | Domain | Database |
+| Environment | Branch | Server path | API port | Domain | Database | API service |
 |---|---|---|---|---|---|---|
-| Production | `main` | `/opt/ramboq` | 8502 | 8000 | ramboq.com | `ramboq` |
-| Development | non-main | `/opt/ramboq_dev` | 8503 | 8001 | dev.ramboq.com | `ramboq_dev` |
-| Pod (container) | `pod` | `/opt/ramboq_pod` | 8504 | — | pod.ramboq.com | `ramboq_dev` |
+| Production | `main` | `/opt/ramboq` | 8000 | ramboq.com | `ramboq` | `ramboq_api.service` |
+| Development | non-main | `/opt/ramboq_dev` | 8001 | dev.ramboq.com | `ramboq_dev` | `ramboq_dev_api.service` |
+| Pod (container) | `pod` | `/opt/ramboq_pod` | — | pod.ramboq.com | `ramboq_dev` | `ramboq_pod.service` |
 
-All three branches (`main`, `dev`, `pod`) are permanent — never deleted from GitHub.
+All three branches (`main`, `dev`, `pod`) are permanent — never deleted from GitHub. Streamlit services (`ramboq.service`, `ramboq_dev.service`) are disabled — Streamlit has been phased out.
+
+---
+
+## How Environment Isolation Works
+
+Environments share the same codebase but differ through several mechanisms:
+
+### 1. `ENV` arg passed by dispatch.sh
+`deploy.sh <ENV>` sets `APP_ROOT`, `APP_SERVICE`, `API_SERVICE` via a case statement — everything downstream keys off these variables.
+
+### 2. `deploy_branch` in `backend_config.yaml`
+Every deploy writes the current branch name into `setup/yaml/backend_config.yaml`:
+```yaml
+deploy_branch: main   # or dev, or pod
+```
+This value is **always overwritten fresh** (never preserved). `api/database.py` reads it at startup to pick the database: `main` → `ramboq`, anything else → `ramboq_dev`. Alert/email subjects are tagged with `[branch]` for non-main deploys using the same field.
+
+### 3. Server-local config flags (preserved across deploys)
+Before `git pull`, `deploy.sh` backs up `backend_config.yaml` to `/tmp`, pulls the new version from git, then overlays these keys from the backup:
+```
+enforce_password_standard, cap_in_dev, genai, telegram, mail,
+notify_on_startup, alert_loss_abs, alert_loss_pct, alert_cooldown_minutes
+```
+This lets prod and dev keep different values (e.g. `notify_on_startup: true` on dev, `false` on prod; different alert thresholds) without ever committing them. Adding a new such flag requires appending it to the `for key in …` loop in `deploy.sh`.
+
+### 4. Systemd service files
+Each env has its own API service with a different `WorkingDirectory` and `--port`:
+
+| Service | WorkingDirectory | Port | Env var |
+|---|---|---|---|
+| `ramboq_api.service` | `/opt/ramboq` | 8000 | `RAMBOQ_LOG_PREFIX=api_` |
+| `ramboq_dev_api.service` | `/opt/ramboq_dev` | 8001 | `RAMBOQ_LOG_PREFIX=api_` |
+| `ramboq_pod.service` | container | — | set inside image |
+
+`RAMBOQ_LOG_PREFIX=api_` makes the API write to `api_log_file` / `api_error_file`, separate from the legacy Streamlit `log_file` in the same `.log/` directory.
+
+### 5. Nginx site configs
+`etc/nginx/sites-available/ramboq.com` proxies to 8000; `dev.ramboq.com` proxies to 8001; `pod.ramboq.com` proxies to 8504. Synced to `/etc/nginx/sites-available/` by prod deploy when `etc/` files change.
+
+### 6. `secrets.yaml` (gitignored, per-server)
+Hand-placed on each server path. Contains Kite keys, SMTP creds, DB password, Telegram token, JWT cookie secret. Never committed; update all three server copies individually via SSH.
+
+### What's shared across environments
+- `ramboq_hook.service` (single webhook listener on port 9001)
+- `/etc/webhook/dispatch.sh` and `/etc/webhook/hooks.json` (single copy, routes by branch)
+- PostgreSQL instance (same server, separate databases per env)
+
+### What deploy.sh restarts
+| Env | Restarts |
+|---|---|
+| `prod` | `ramboq_api.service` only (Streamlit skipped — disabled) |
+| `dev` | `ramboq_dev_api.service` only (Streamlit skipped — disabled) |
+| `pod` | `ramboq_pod.service` (Podman container) |
+
+Deploy notification (`notify_deploy.py`) reports status of all 3 services (`ramboq_api`, `ramboq_dev_api`, `ramboq_hook`) in every message — this is informational cross-env visibility, not the list of what was restarted.
 
 ---
 
@@ -186,12 +248,14 @@ sudo ss -tlnp | grep 9001
 
 All service files are in `webhook/` and installed to `/etc/systemd/system/`.
 
-| File | Service | Port | Purpose |
-|---|---|---|---|
-| `ramboq.service` | ramboq.service | 8502 | Prod Streamlit app |
-| `ramboq_dev.service` | ramboq_dev.service | 8503 | Dev Streamlit app |
-| `ramboq_pod.service` | ramboq_pod.service | 8504 | Podman container |
-| `ramboq_hook.service` | ramboq_hook.service | 9001 | Webhook listener (shared) |
+| File | Service | Port | Purpose | Status |
+|---|---|---|---|---|
+| `ramboq_api.service` | ramboq_api.service | 8000 | Prod Litestar API (uvicorn) | enabled |
+| `ramboq_dev_api.service` | ramboq_dev_api.service | 8001 | Dev Litestar API (uvicorn) | enabled |
+| `ramboq_hook.service` | ramboq_hook.service | 9001 | Webhook listener (shared, env-agnostic) | enabled |
+| `ramboq_pod.service` | ramboq_pod.service | container | Podman container (pod branch only) | enabled |
+| `ramboq.service` | ramboq.service | 8502 | Prod Streamlit (legacy, phased out) | **disabled** |
+| `ramboq_dev.service` | ramboq_dev.service | 8503 | Dev Streamlit (legacy, phased out) | **disabled** |
 
 After updating a service file:
 ```bash
@@ -238,10 +302,12 @@ The built files at `frontend/build/` are served by Litestar as static files.
 
 ## Config Merge on Deploy
 
-`deploy.sh` merges backend_config.yaml on every deploy:
+`deploy.sh` merges `backend_config.yaml` on every deploy:
 - Repo config is the base (picks up new fields)
-- These server flags are preserved: `enforce_password_standard`, `cap_in_dev`, `genai`, `telegram`, `mail`, `notify_on_startup`
+- Server flags preserved: `enforce_password_standard`, `cap_in_dev`, `genai`, `telegram`, `mail`, `notify_on_startup`, `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes`
 - `deploy_branch` is always set fresh by the deploy script
+
+To add a new server-local flag: append its name to the `for key in …` loop in [webhook/deploy.sh](webhook/deploy.sh) and default it to a safe value in the repo's `backend_config.yaml`.
 
 ---
 
@@ -276,8 +342,10 @@ Each environment has its own `.log/` directory:
 |---|---|---|
 | `hook_debug.log` | deploy.sh | Deploy script output |
 | `hook.log` | ramboq_hook.service | Webhook listener output (shared, prod only) |
-| `error_file` | systemd service tee | All Streamlit stdout+stderr |
-| `log_file` | ramboq_logger.py | Full Python app log (5MB rotating × 5) |
+| `api_log_file` | Litestar API (RAMBOQ_LOG_PREFIX=api_) | API app log — read by `/api/admin/logs` |
+| `api_error_file` | Litestar API systemd tee | API stdout+stderr (5MB rotating × 5) |
+| `api_short_log_file`, `api_short_error_file` | ramboq_logger.py | Last 50 lines each |
+| `log_file`, `error_file` | legacy Streamlit | Stale once Streamlit is disabled |
 
 ---
 
@@ -322,22 +390,27 @@ PGPASSWORD='<password>' psql -U rambo_admin -h localhost -d ramboq -c 'SELECT 1;
 ## Useful Commands
 
 ```bash
-# Service status
-sudo systemctl status ramboq.service ramboq_dev.service ramboq_hook.service
+# Service status (active services)
+sudo systemctl status ramboq_api.service ramboq_dev_api.service ramboq_hook.service
 
 # Live logs
-tail -f /opt/ramboq/.log/hook_debug.log         # prod deploys
-tail -f /opt/ramboq/.log/log_file                # prod app log
+tail -f /opt/ramboq/.log/hook_debug.log              # prod deploys
+tail -f /opt/ramboq_dev/.log/hook_debug.log          # dev deploys
+tail -f /opt/ramboq/.log/api_log_file                # prod API app log
+tail -f /opt/ramboq_dev/.log/api_log_file            # dev API app log
 
 # Manual deploy (bypass webhook)
-bash /opt/ramboq/webhook/deploy.sh prod main
-bash /opt/ramboq_dev/webhook/deploy.sh dev dev
+sudo -u www-data bash /opt/ramboq/webhook/deploy.sh prod refs/heads/main
+sudo -u www-data bash /opt/ramboq_dev/webhook/deploy.sh dev refs/heads/dev
 
 # Confirm ports
-sudo ss -tlnp | grep -E '8502|8503|8504|9001|8000|8001'
+sudo ss -tlnp | grep -E '8000|8001|9001'
 
 # Reload all services
 sudo systemctl daemon-reload
-sudo systemctl restart ramboq.service ramboq_dev.service ramboq_hook.service
+sudo systemctl restart ramboq_api.service ramboq_dev_api.service ramboq_hook.service
 sudo nginx -t && sudo systemctl reload nginx
+
+# Disable Streamlit (one-time)
+sudo systemctl disable --now ramboq.service ramboq_dev.service
 ```
