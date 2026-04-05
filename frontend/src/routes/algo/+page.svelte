@@ -168,7 +168,7 @@
 </svelte:head>
 
 <div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">AI Agents</h1>
+<h1 class="page-heading">AI Agents</h1>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
