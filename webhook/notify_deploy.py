@@ -52,12 +52,9 @@ def main():
 
     # Services that were restarted by this deploy (per-env)
     import subprocess
-    env_services = {
-        "main": ["ramboq_api.service"],
-        "pod":  ["ramboq_pod.service"],
-    }.get(branch, ["ramboq_dev_api.service"])
+    env_service = "ramboq_api.service" if branch == "main" else "ramboq_dev_api.service"
     # Always include the shared webhook listener
-    all_services = env_services + ["ramboq_hook.service"]
+    all_services = [env_service, "ramboq_hook.service"]
 
     services_status = []
     for svc in all_services:

@@ -8,8 +8,6 @@ BRANCH="${REF#refs/heads/}"
 
 if [ "$BRANCH" = "main" ]; then
     exec /opt/ramboq/webhook/deploy.sh prod "$REF"
-elif echo "$BRANCH" | grep -q "^pod"; then
-    exec /opt/ramboq_pod/webhook/deploy.sh pod "$REF"
 else
     exec /opt/ramboq_dev/webhook/deploy.sh dev "$REF"
 fi

@@ -2,7 +2,7 @@
 retry_count: 3
 conn_reset_hours: 23
 
-# Log file paths (relative to app working directory — works uniformly for prod, dev, and pod)
+# Log file paths (relative to app working directory — works uniformly for prod and dev)
 file_log_file: .log/log_file
 error_log_file: .log/error_file
 short_file_log_file: .log/short_log_file
@@ -17,7 +17,7 @@ console_log_level: 40
 enforce_password_standard: False
 
 # cap_in_dev: master switch for production capabilities in this environment.
-# True on prod/pod and dev — enables GenAI, Telegram, email. Set False to silence everything.
+# True on prod and dev — enables GenAI, Telegram, email. Set False to silence everything.
 cap_in_dev: True
 
 # Production capability flags — each independently enables one capability when cap_in_dev is True.

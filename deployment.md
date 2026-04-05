@@ -1,6 +1,6 @@
 # RamboQuant — Deployment Guide
 
-Complete server setup and deployment reference for all three environments.
+Complete server setup and deployment reference for both environments.
 
 ---
 
@@ -21,7 +21,6 @@ Webhook listener (ramboq_hook.service, port 9001, www-data) — ONE shared servi
     ▼
 /etc/webhook/dispatch.sh — routes by branch:
     ├── refs/heads/main   → /opt/ramboq/webhook/deploy.sh prod <ref>
-    ├── refs/heads/pod*   → /opt/ramboq_pod/webhook/deploy.sh pod <ref>
     └── all others        → /opt/ramboq_dev/webhook/deploy.sh dev <ref>
     ▼
 deploy.sh <ENV> <REF> — env-scoped build + restart:
@@ -34,8 +33,7 @@ deploy.sh <ENV> <REF> — env-scoped build + restart:
     ▼
 App running:
     ├── ramboq.com      → Litestar API port 8000 (ramboq_api.service) → DB `ramboq`
-    ├── dev.ramboq.com  → Litestar API port 8001 (ramboq_dev_api.service) → DB `ramboq_dev`
-    └── pod.ramboq.com  → Podman container `ramboq-pod-app` (ramboq_pod.service)
+    └── dev.ramboq.com  → Litestar API port 8001 (ramboq_dev_api.service) → DB `ramboq_dev`
 ```
 
 ---
@@ -46,9 +44,8 @@ App running:
 |---|---|---|---|---|---|---|
 | Production | `main` | `/opt/ramboq` | 8000 | ramboq.com | `ramboq` | `ramboq_api.service` |
 | Development | non-main | `/opt/ramboq_dev` | 8001 | dev.ramboq.com | `ramboq_dev` | `ramboq_dev_api.service` |
-| Pod (container) | `pod` | `/opt/ramboq_pod` | — | pod.ramboq.com | `ramboq_dev` | `ramboq_pod.service` |
 
-All three branches (`main`, `dev`, `pod`) are permanent — never deleted from GitHub. Streamlit services (`ramboq.service`, `ramboq_dev.service`) are disabled — Streamlit has been phased out.
+Both branches (`main`, `dev`) are permanent — never deleted from GitHub. Streamlit services (`ramboq.service`, `ramboq_dev.service`) are disabled — Streamlit has been phased out.
 
 ---
 
@@ -62,7 +59,7 @@ Environments share the same codebase but differ through several mechanisms:
 ### 2. `deploy_branch` in `backend_config.yaml`
 Every deploy writes the current branch name into `setup/yaml/backend_config.yaml`:
 ```yaml
-deploy_branch: main   # or dev, or pod
+deploy_branch: main   # or dev
 ```
 This value is **always overwritten fresh** (never preserved). `api/database.py` reads it at startup to pick the database: `main` → `ramboq`, anything else → `ramboq_dev`. Alert/email subjects are tagged with `[branch]` for non-main deploys using the same field.
 
@@ -81,15 +78,14 @@ Each env has its own API service with a different `WorkingDirectory` and `--port
 |---|---|---|---|
 | `ramboq_api.service` | `/opt/ramboq` | 8000 | `RAMBOQ_LOG_PREFIX=api_` |
 | `ramboq_dev_api.service` | `/opt/ramboq_dev` | 8001 | `RAMBOQ_LOG_PREFIX=api_` |
-| `ramboq_pod.service` | container | — | set inside image |
 
 `RAMBOQ_LOG_PREFIX=api_` makes the API write to `api_log_file` / `api_error_file`, separate from the legacy Streamlit `log_file` in the same `.log/` directory.
 
 ### 5. Nginx site configs
-`etc/nginx/sites-available/ramboq.com` proxies to 8000; `dev.ramboq.com` proxies to 8001; `pod.ramboq.com` proxies to 8504. Synced to `/etc/nginx/sites-available/` by prod deploy when `etc/` files change.
+`etc/nginx/sites-available/ramboq.com` proxies to 8000; `dev.ramboq.com` proxies to 8001. Synced to `/etc/nginx/sites-available/` by prod deploy when `etc/` files change.
 
 ### 6. `secrets.yaml` (gitignored, per-server)
-Hand-placed on each server path. Contains Kite keys, SMTP creds, DB password, Telegram token, JWT cookie secret. Never committed; update all three server copies individually via SSH.
+Hand-placed on each server path. Contains Kite keys, SMTP creds, DB password, Telegram token, JWT cookie secret. Never committed; update both server copies individually via SSH.
 
 ### What's shared across environments
 - `ramboq_hook.service` (single webhook listener on port 9001)
@@ -101,7 +97,6 @@ Hand-placed on each server path. Contains Kite keys, SMTP creds, DB password, Te
 |---|---|
 | `prod` | `ramboq_api.service` only (Streamlit skipped — disabled) |
 | `dev` | `ramboq_dev_api.service` only (Streamlit skipped — disabled) |
-| `pod` | `ramboq_pod.service` (Podman container) |
 
 Deploy notification (`notify_deploy.py`) reports status of all 3 services (`ramboq_api`, `ramboq_dev_api`, `ramboq_hook`) in every message — this is informational cross-env visibility, not the list of what was restarted.
 
@@ -114,7 +109,6 @@ Deploy notification (`notify_deploy.py`) reports status of all 3 services (`ramb
 - PostgreSQL 17
 - Node.js 20+ (for SvelteKit build)
 - nginx, certbot, systemd
-- Podman (for pod environment only)
 
 ---
 
@@ -130,7 +124,7 @@ This handles: system packages, SSH setup, git clone, venv, pip install, log dire
 
 **After the script, do manually:**
 1. Place `secrets.yaml` with real credentials (see below)
-2. Set Cloudflare DNS records (grey cloud for webhook/dev/pod)
+2. Set Cloudflare DNS records (grey cloud for webhook/dev)
 3. Run certbot for SSL
 4. Add GitHub webhook
 5. Set up PostgreSQL databases
@@ -152,7 +146,7 @@ The API selects the database by `deploy_branch` in `backend_config.yaml`:
 
 ### Secrets File
 
-Hand-place `setup/yaml/secrets.yaml` on all three server paths. Never committed to git.
+Hand-place `setup/yaml/secrets.yaml` on both server paths. Never committed to git.
 
 ```yaml
 # SMTP
@@ -189,11 +183,10 @@ alert_emails:
   - <email>
 ```
 
-Update on all three servers individually:
+Update on both servers individually:
 ```bash
 sudo nano /opt/ramboq/setup/yaml/secrets.yaml
 sudo nano /opt/ramboq_dev/setup/yaml/secrets.yaml
-sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
 ```
 
 ---
@@ -203,7 +196,7 @@ sudo nano /opt/ramboq_pod/setup/yaml/secrets.yaml
 **Prerequisite:** DNS must resolve to server IP (grey cloud in Cloudflare).
 
 ```bash
-sudo certbot --nginx -d ramboq.com -d www.ramboq.com -d webhook.ramboq.com -d dev.ramboq.com -d pod.ramboq.com
+sudo certbot --nginx -d ramboq.com -d www.ramboq.com -d webhook.ramboq.com -d dev.ramboq.com
 ```
 
 Auto-renewal via systemd timer:
@@ -222,9 +215,8 @@ sudo certbot renew --dry-run
 | A | `www` | server IP | Orange (proxied) |
 | A | `webhook` | server IP | **Grey (DNS only)** |
 | A | `dev` | server IP | **Grey (DNS only)** |
-| A | `pod` | server IP | **Grey (DNS only)** |
 
-`webhook`, `dev`, and `pod` **must** be grey cloud — Cloudflare proxy breaks webhook HMAC validation and certbot HTTP challenges.
+`webhook` and `dev` **must** be grey cloud — Cloudflare proxy breaks webhook HMAC validation and certbot HTTP challenges.
 
 ---
 
@@ -253,7 +245,6 @@ All service files are in `webhook/` and installed to `/etc/systemd/system/`.
 | `ramboq_api.service` | ramboq_api.service | 8000 | Prod Litestar API (uvicorn) | enabled |
 | `ramboq_dev_api.service` | ramboq_dev_api.service | 8001 | Dev Litestar API (uvicorn) | enabled |
 | `ramboq_hook.service` | ramboq_hook.service | 9001 | Webhook listener (shared, env-agnostic) | enabled |
-| `ramboq_pod.service` | ramboq_pod.service | container | Podman container (pod branch only) | enabled |
 | `ramboq.service` | ramboq.service | 8502 | Prod Streamlit (legacy, phased out) | **disabled** |
 | `ramboq_dev.service` | ramboq_dev.service | 8503 | Dev Streamlit (legacy, phased out) | **disabled** |
 
@@ -311,29 +302,6 @@ To add a new server-local flag: append its name to the `for key in …` loop in 
 
 ---
 
-## Podman Environment
-
-The `pod` branch runs inside a Podman container.
-
-```bash
-# First-time setup
-sudo apt install -y podman
-sudo mkdir -p /opt/ramboq_pod
-sudo chown www-data:www-data /opt/ramboq_pod
-sudo -u www-data git clone <repo> /opt/ramboq_pod
-sudo -u www-data git -C /opt/ramboq_pod checkout pod
-```
-
-Secrets are volume-mounted at runtime (never baked into the image):
-```
--v /opt/ramboq_pod/setup/yaml:/app/setup/yaml:ro
--v /opt/ramboq_pod/.log:/app/.log:rw
-```
-
-Container name: `ramboq-pod-app` (set by `--name` in service file).
-
----
-
 ## Log Files
 
 Each environment has its own `.log/` directory:
@@ -370,12 +338,11 @@ sudo systemctl status ramboq.service
 # Always run after manual server operations
 sudo chown -R www-data:www-data /opt/ramboq/.git /opt/ramboq/.log
 sudo chown -R www-data:www-data /opt/ramboq_dev/.git /opt/ramboq_dev/.log
-sudo chown -R www-data:www-data /opt/ramboq_pod/.git /opt/ramboq_pod/.log
 ```
 
 ### 502 Bad Gateway
 ```bash
-sudo ss -tlnp | grep -E '8502|8503|8504'
+sudo ss -tlnp | grep -E '8502|8503'
 tail -50 /opt/ramboq/.log/error_file
 sudo nginx -t
 ```

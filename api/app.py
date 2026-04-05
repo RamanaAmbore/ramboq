@@ -44,7 +44,6 @@ cors_config = CORSConfig(
         "http://localhost:5173",   # SvelteKit dev server
         "https://ramboq.com",
         "https://dev.ramboq.com",
-        "https://pod.ramboq.com",
     ],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

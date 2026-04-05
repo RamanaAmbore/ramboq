@@ -163,7 +163,7 @@ bash run_api.sh
 cd frontend && npm install && npm run dev
 
 # Optional: ARQ worker (alternative to Litestar background tasks)
-podman run -d -p 6379:6379 redis:alpine
+docker run -d -p 6379:6379 redis:alpine
 bash run_worker.sh
 ```
 
@@ -229,5 +229,5 @@ multi-server setups where the worker runs on a different machine.
 ## Branch strategy
 
 - `new` — active migration work
-- `dev` / `main` / `pod` — production branches; never rebased or force-pushed
-- Migration work merged to `dev` → `main` → `pod` when each phase is production-ready
+- `dev` / `main` — production branches; never rebased or force-pushed
+- Migration work merged to `dev` → `main` when each phase is production-ready
