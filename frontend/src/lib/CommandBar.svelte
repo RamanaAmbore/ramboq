@@ -197,6 +197,7 @@
 
   export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; }
   export function setValue(v) { value = v; cursor = v.length; refreshSuggestions(); refreshErrors(); }
+  export function refresh() { refreshSuggestions(); refreshErrors(); }
   export { submit };
 </script>
 

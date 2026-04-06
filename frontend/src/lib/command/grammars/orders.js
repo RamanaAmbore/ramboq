@@ -156,11 +156,18 @@ function orderIdSuggest(prefix, ctx) {
 
 // In-memory cache of recent LTPs keyed by `${exchange}:${tradingsymbol}`
 const _ltpCache = new Map();
+const _pendingLtp = new Set();
+// Callback invoked by CommandBar so suggestions can re-render when the
+// async quote fetch completes.
+let _onQuoteLoaded = null;
+export function setQuoteLoadedCallback(fn) { _onQuoteLoaded = fn; }
 
 async function _fetchLtp(exchange, tradingsymbol) {
   const key = `${exchange}:${tradingsymbol}`;
   const cached = _ltpCache.get(key);
-  if (cached && Date.now() - cached.at < 30000) return cached; // 30s cache
+  if (cached && Date.now() - cached.at < 30000) return cached;
+  if (_pendingLtp.has(key)) return null; // avoid duplicate in-flight requests
+  _pendingLtp.add(key);
   try {
     const { authStore } = await import('$lib/stores');
     const token = authStore.getToken();
@@ -171,8 +178,10 @@ async function _fetchLtp(exchange, tradingsymbol) {
     const data = await res.json();
     const entry = { ltp: data.ltp, bid: data.bid, ask: data.ask, at: Date.now() };
     _ltpCache.set(key, entry);
+    if (_onQuoteLoaded) _onQuoteLoaded();
     return entry;
   } catch { return null; }
+  finally { _pendingLtp.delete(key); }
 }
 
 function priceSuggest(prefix, ctx) {

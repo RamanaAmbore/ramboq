@@ -8,7 +8,7 @@
   import OrderDetail from '$lib/OrderDetail.svelte';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, buildOrderPayload } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -126,6 +126,9 @@
     loadOrders(); loadCurrentLog();
     loadAccounts().catch(() => {});
     loadInstruments().catch(() => {});
+    // When an async quote fetch completes, re-render the command bar so the
+    // price ladder popup appears without the user having to type another char.
+    setQuoteLoadedCallback(() => cmdBar?.refresh());
     unsub = createPerformanceSocket(() => loadOrders());
     logInterval = setInterval(loadCurrentLog, 30000);
   });
