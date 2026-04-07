@@ -103,7 +103,7 @@
       // Enforce minimum prefix length for large-list roles (symbol/strike/etc.)
       // Verb, account, kwarg-key, and fixed-value roles (orderType, instType, chase)
       // always show. Free-text roles require `minPrefixLen` chars typed.
-      const alwaysShowRoles = new Set(['verb', 'account', 'kwarg-key', 'orderType', 'instType', 'order_id', 'qty', 'price', 'strike', 'expiry', 'chase']);
+      const alwaysShowRoles = new Set(['verb', 'account', 'orderType', 'instType', 'order_id', 'qty', 'price', 'strike', 'expiry', 'chase']);
       const currentPrefix = _currentPrefix();
       const isGatedRole = !alwaysShowRoles.has(newRole) && !newRole?.startsWith('kwarg:');
       if (isGatedRole && currentPrefix.length < minPrefixLen) {
