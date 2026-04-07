@@ -250,13 +250,13 @@
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-[0.55rem] flex flex-wrap gap-x-2">
-          <span><span class="text-gray-500">qty:</span><span class="text-gray-700">{o.filled_quantity}/{o.quantity}</span></span>
-          <span><span class="text-gray-500">type:</span><span class="text-gray-700">{o.order_type}</span></span>
-          <span><span class="text-gray-500">price:</span><span class="text-gray-700">{o.average_price || o.price || '—'}</span></span>
-          <span><span class="text-gray-500">product:</span><span class="text-gray-700">{o.product}</span></span>
-          <span><span class="text-gray-500">exch:</span><span class="text-gray-700">{o.exchange}</span></span>
-          {#if o.status_message}<span><span class="text-gray-500">msg:</span><span class="text-gray-700">{o.status_message}</span></span>{/if}
+        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2">
+          <span>qty:<b>{o.filled_quantity}/{o.quantity}</b></span>
+          <span>type:<b>{o.order_type}</b></span>
+          <span>price:<b>{o.average_price || o.price || '—'}</b></span>
+          <span>product:<b>{o.product}</b></span>
+          <span>exch:<b>{o.exchange}</b></span>
+          {#if o.status_message}<span>msg:<b>{o.status_message}</b></span>{/if}
         </div>
       </button>
     {/each}
