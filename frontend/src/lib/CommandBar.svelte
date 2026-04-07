@@ -40,6 +40,7 @@
   let suggList  = $state(/** @type {string[]} */([]));
   let role      = $state(/** @type {string|null} */(null));
   let hint      = $state(/** @type {string|null} */(null));
+  let flow      = $state(/** @type {string[]} */([]));
   let errors    = $state(/** @type {string[]} */([]));
   let taEl;
   let suggListEl = $state(/** @type {HTMLDivElement | null} */(null));
@@ -55,8 +56,18 @@
     return eq >= 0 ? tok.slice(eq + 1) : tok;
   }
 
+  function _computeFlow(currentRole) {
+    if (!grammar || !currentRole || currentRole === 'verb' || currentRole === 'kwarg-key' || currentRole?.startsWith('kwarg:')) return [];
+    const verbName = value.trim().split(/\s+/)[0]?.toLowerCase();
+    const verb = grammar.verbs?.[verbName];
+    if (!verb?.tokens) return [];
+    const idx = verb.tokens.findIndex(t => t.role === currentRole);
+    if (idx < 0) return [];
+    return verb.tokens.slice(idx).map(t => t.role);
+  }
+
   function refreshSuggestions() {
-    if (!grammar) { suggList = []; return; }
+    if (!grammar) { suggList = []; flow = []; return; }
     try {
       const result = suggestAt(value, cursor, grammar, context);
       let newList = result.suggestions || [];
@@ -65,7 +76,7 @@
       // Enforce minimum prefix length for large-list roles (symbol/strike/etc.)
       // Verb, account, kwarg-key, and fixed-value roles (orderType, instType, chase)
       // always show. Free-text roles require `minPrefixLen` chars typed.
-      const alwaysShowRoles = new Set(['verb', 'account', 'kwarg-key', 'orderType', 'instType', 'order_id', 'qty', 'price', 'strike']);
+      const alwaysShowRoles = new Set(['verb', 'account', 'kwarg-key', 'orderType', 'instType', 'order_id', 'qty', 'price', 'strike', 'expiry', 'chase']);
       const currentPrefix = _currentPrefix();
       const isGatedRole = !alwaysShowRoles.has(newRole) && !newRole?.startsWith('kwarg:');
       if (isGatedRole && currentPrefix.length < minPrefixLen) {
@@ -74,6 +85,7 @@
       suggList = newList;
       role = newRole;
       hint = result.hint;
+      flow = _computeFlow(newRole);
       // On role change (new token), initialize suggIdx to suggester's focus hint
       // (e.g. ATM strike) or 0; otherwise clamp existing suggIdx.
       if (roleChanged) {
@@ -90,7 +102,7 @@
         queueMicrotask(_scrollActiveIntoView);
       }
     } catch (e) {
-      suggList = []; suggOpen = false;
+      suggList = []; suggOpen = false; flow = [];
     }
   }
 
@@ -237,7 +249,11 @@
 
   {#if showHelp}
     <div class="text-[0.6rem] mt-0.5 flex gap-3 items-center flex-wrap">
-      {#if role}
+      {#if flow.length > 0}
+        <span class="token-flow">
+          {#each flow as f, i}<span class={f === role ? 'flow-current' : 'flow-dim'}>{f}</span>{#if i < flow.length - 1}<span class="flow-arrow">›</span>{/if}{/each}
+        </span>
+      {:else if role}
         <span class="role-badge">{role}</span>
       {/if}
       {#if hint}<span class="text-muted opacity-70">{hint}</span>{/if}
@@ -304,5 +320,29 @@
     border-radius: 0.25rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+  }
+  .token-flow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.55rem;
+  }
+  .flow-current {
+    color: #fff;
+    font-weight: 700;
+    background: #f59e0b;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.2rem;
+    text-transform: uppercase;
+  }
+  .flow-dim {
+    color: #64748b;
+    opacity: 0.5;
+  }
+  .flow-arrow {
+    color: #64748b;
+    opacity: 0.35;
+    margin: 0 0.05rem;
   }
 </style>
