@@ -168,7 +168,7 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
     }
     let values = [];
     if (spec.values) values = spec.values.filter(x => x.toUpperCase().startsWith((v || '').toUpperCase())).map(x => `${k}=${x}`);
-    else if (spec.suggest) values = (spec.suggest(v || '', _buildCtx(verb, tokens, context)) || []).map(x => `${k}=${x}`);
+    else if (spec.suggest) values = (spec.suggest(v || '', _buildCtx(verb, tokens, context, verbName)) || []).map(x => `${k}=${x}`);
     return { suggestions: values, role: `kwarg:${k}`, hint: spec.hint || null };
   }
 
@@ -185,7 +185,7 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
   const priorSpecIdxs = _alignPositionalSpecs(verb, priorPositional);
   let startPos = (priorSpecIdxs.length > 0 ? priorSpecIdxs[priorSpecIdxs.length - 1] + 1 : 0);
   const prefix = activeTok ? activeTok.text : '';
-  const priorCtx = _buildCtx(verb, tokens.slice(0, Math.max(1, stopIdx)), context);
+  const priorCtx = _buildCtx(verb, tokens.slice(0, Math.max(1, stopIdx)), context, verbName);
 
   // If the spec at startPos is optional AND the prefix doesn't match its values,
   // surface BOTH the optional values AND the next required spec's suggestions
@@ -218,7 +218,7 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
       role: 'kwarg-key', hint: null,
     };
   }
-  const ctx = _buildCtx(verb, tokens, context);
+  const ctx = _buildCtx(verb, tokens, context, verbName);
   let values = [];
   if (spec.values) values = spec.values.filter(x => x.toUpperCase().startsWith(prefix.toUpperCase()));
   else if (spec.suggest) values = spec.suggest(prefix, ctx) || [];
@@ -226,8 +226,9 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
 }
 
 /** Build a context object from already-typed positional tokens. */
-function _buildCtx(verb, tokens, extraContext) {
+function _buildCtx(verb, tokens, extraContext, verbName) {
   const ctx = { ...extraContext };
+  if (verbName) ctx._verb = verbName;
   // Collect positional tokens and their alignment to specs
   const positionalTexts = [];
   for (let i = 1; i < tokens.length; i++) {

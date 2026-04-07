@@ -76,11 +76,39 @@ function strikeSuggest(prefix, ctx) {
   if (!underlying) return [];
   const expiry = nearestExpiry(underlying, mapped);
   if (!expiry) return [];
-  const strikes = listStrikes(underlying, mapped, expiry);
-  if (strikes.length === 0) return [];
+  const allStrikes = listStrikes(underlying, mapped, expiry);
+  if (allStrikes.length === 0) return [];
 
-  // Fetch quotes for all strikes to check bid/ask availability + spread
-  // For now, mark each strike and kick off background fetches
+  // Find ATM from equity LTP (or cached option LTP)
+  const eq = findEquity(underlying);
+  let atmPrice = 0;
+  if (eq) {
+    const eqKey = `${eq.e}:${eq.s}`;
+    const eqEntry = _ltpCache.get(eqKey);
+    if (eqEntry) {
+      atmPrice = eqEntry.ltp;
+    } else {
+      _fetchLtp(eq.e, eq.s); // kick off background fetch
+    }
+  }
+
+  // Narrow to ±15 strikes around ATM (or show all if no ATM yet)
+  let strikes = allStrikes;
+  let atmIdx = 0;
+  if (atmPrice > 0) {
+    // Find nearest strike to ATM
+    let bestDist = Infinity;
+    for (let i = 0; i < allStrikes.length; i++) {
+      const dist = Math.abs(allStrikes[i] - atmPrice);
+      if (dist < bestDist) { bestDist = dist; atmIdx = i; }
+    }
+    const lo = Math.max(0, atmIdx - 15);
+    const hi = Math.min(allStrikes.length, atmIdx + 16);
+    strikes = allStrikes.slice(lo, hi);
+    atmIdx = atmIdx - lo; // adjust for sliced array
+  }
+
+  // Build labels with quote info
   const labels = strikes.map(k => {
     const opt = findOption(underlying, mapped, k, expiry);
     if (!opt) return String(k);
@@ -100,8 +128,8 @@ function strikeSuggest(prefix, ctx) {
   });
 
   if (!prefix) {
-    const mid = Math.floor(labels.length / 2);
-    Object.defineProperty(labels, '_focusIndex', { value: mid, enumerable: false });
+    // Focus on ATM strike
+    Object.defineProperty(labels, '_focusIndex', { value: atmIdx, enumerable: false });
     return labels;
   }
   return labels.filter(s => s.startsWith(prefix));
