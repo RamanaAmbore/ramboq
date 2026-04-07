@@ -413,6 +413,7 @@
     color: #e2e8f0;
     width: 100%;
     display: block;
+    overflow-y: auto;
   }
   .cmd-suggest {
     position: absolute;
