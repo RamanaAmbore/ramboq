@@ -19,26 +19,47 @@ from backend.shared.helpers.utils import generate_totp, secrets, config
 _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
 
 
-class _SourceIPAdapter(HTTPAdapter):
-    """Bind outgoing connections to a specific source IP.
+def _make_bound_session(source_ip):
+    """Create a requests.Session that binds all connections to a specific source IP.
 
-    Kite restricts the same IP per app. Each account binds to a different
-    IP via source_ip in secrets.yaml. Supports both IPv4 and IPv6 source.
+    Patches urllib3.create_connection to bind the socket to source_ip after
+    resolving the destination with AF_UNSPEC (dual-stack safe).
 
-    Usage in secrets.yaml:
-        kite_accounts:
-          ZG0790:
-            source_ip: "69.62.78.136"
-          ZJ6294:
-            source_ip: "2a02:4780:12:9e1d::1"
+    Kite restricts the same IP per app. Each account binds to a different IP.
     """
-    def __init__(self, source_ip, **kwargs):
-        self._source_ip = source_ip
-        super().__init__(**kwargs)
+    import urllib3.util.connection as _uc
+    _orig_create = _uc.create_connection
 
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs['source_address'] = (self._source_ip, 0)
-        super().init_poolmanager(*args, **kwargs)
+    def _bound_create(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+                      source_address=None, socket_options=None):
+        host, port = address
+        err = None
+        for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                sock.bind((source_ip, 0, 0, 0) if af == socket.AF_INET6 else (source_ip, 0))
+                if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                sock.connect(sa)
+                return sock
+            except OSError as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if err is not None:
+            raise err
+        raise OSError(f"getaddrinfo for {host!r} returned empty list")
+
+    sess = requests.Session()
+    # Patch at module level just for this session's pool manager init
+    _uc.create_connection = _bound_create
+    # Force pool manager creation with the patched create_connection
+    adapter = HTTPAdapter()
+    sess.mount('https://', adapter)
+    sess.mount('http://', adapter)
+    return sess
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
@@ -130,9 +151,7 @@ class KiteConnection:
         """Create a KiteConnect instance, bound to source_ip if configured."""
         kite = KiteConnect(api_key=self.api_key)
         if self._source_ip and hasattr(kite, 'reqsession'):
-            adapter = _SourceIPAdapter(self._source_ip)
-            kite.reqsession.mount('https://', adapter)
-            kite.reqsession.mount('http://', adapter)
+            kite.reqsession = _make_bound_session(self._source_ip)
         return kite
 
     def init_kite_conn(self, test_conn=False):
