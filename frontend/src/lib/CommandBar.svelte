@@ -213,6 +213,31 @@
   function onInput(e) {
     value = e.target.value;
     cursor = e.target.selectionStart;
+
+    // Kwarg shortcut: if user typed a single char after a space that matches
+    // a shortcut key, replace it with the full kwarg= prefix
+    const shortcuts = grammar?.kwargShortcuts;
+    if (shortcuts && cursor >= 2) {
+      const before = value.slice(0, cursor);
+      const lastChar = before.slice(-1);
+      const prevChar = before.slice(-2, -1);
+      if (prevChar === ' ' && shortcuts[lastChar]) {
+        const kwarg = shortcuts[lastChar];
+        const newVal = before.slice(0, -1) + kwarg + '=' + value.slice(cursor);
+        value = newVal;
+        cursor = before.length - 1 + kwarg.length + 1;
+        queueMicrotask(() => {
+          if (taEl) {
+            taEl.value = value;
+            taEl.setSelectionRange(cursor, cursor);
+          }
+          refreshSuggestions();
+          refreshErrors();
+        });
+        return;
+      }
+    }
+
     refreshSuggestions();
     refreshErrors();
   }

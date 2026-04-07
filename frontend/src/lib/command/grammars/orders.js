@@ -342,7 +342,11 @@ for (const [name, def] of Object.entries(GRAMMAR_DOC.verbs)) {
   };
 }
 
-export const orderGrammar = { verbs: _wiredVerbs };
+export const orderGrammar = {
+  verbs: _wiredVerbs,
+  // Single-key shortcuts: typing this key auto-expands to kwarg=
+  kwargShortcuts: { p: 'product', P: 'product' },
+};
 
 // ---------------------------------------------------------------------------
 // Symbol resolution
