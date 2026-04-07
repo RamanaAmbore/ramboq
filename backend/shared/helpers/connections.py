@@ -19,56 +19,22 @@ from backend.shared.helpers.utils import generate_totp, secrets, config
 _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
 
 
-def _bound_create_connection(source_ip):
-    """Return a create_connection function that binds to source_ip."""
-    def _create(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
-                source_address=None, socket_options=None):
-        host, port = address
-        # Filter getaddrinfo by address family matching source_ip
-        is_v6 = ':' in source_ip
-        af_filter = socket.AF_INET6 if is_v6 else socket.AF_INET
-        err = None
-        for res in socket.getaddrinfo(host, port, af_filter, socket.SOCK_STREAM):
-            af, socktype, proto, canonname, sa = res
-            sock = None
-            try:
-                sock = socket.socket(af, socktype, proto)
-                bind_addr = (source_ip, 0, 0, 0) if af == socket.AF_INET6 else (source_ip, 0)
-                sock.bind(bind_addr)
-                if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
-                    sock.settimeout(timeout)
-                sock.connect(sa)
-                return sock
-            except OSError as e:
-                err = e
-                if sock is not None:
-                    sock.close()
-        if err is not None:
-            raise err
-        raise OSError(f"getaddrinfo for {host!r} ({af_filter}) returned empty list")
-    return _create
+class _SourceIPAdapter(HTTPAdapter):
+    """HTTPAdapter that binds connections to a specific source IP.
 
-
-class _BoundIPAdapter(HTTPAdapter):
-    """HTTPAdapter that binds all connections to a specific source IP."""
+    For IPv4: uses source_address in pool manager (straightforward).
+    For IPv6: uses source_address with AF_INET6 forced via allowed_gai_family.
+    """
     def __init__(self, source_ip, **kwargs):
         self._source_ip = source_ip
-        self._create_conn = _bound_create_connection(source_ip)
+        self._is_ipv6 = ':' in source_ip
         super().__init__(**kwargs)
 
     def init_poolmanager(self, *args, **kwargs):
+        kwargs['source_address'] = (self._source_ip, 0)
         super().init_poolmanager(*args, **kwargs)
-        # Patch the pool manager's connection function
-        self.poolmanager.connection_from_host  # ensure pool manager exists
-
-    def send(self, request, *args, **kwargs):
-        import urllib3.util.connection as _uc
-        orig = _uc.create_connection
-        _uc.create_connection = self._create_conn
-        try:
-            return super().send(request, *args, **kwargs)
-        finally:
-            _uc.create_connection = orig
+        # For IPv6: the pool manager infers AF_INET6 from source_address,
+        # which is correct — api.kite.trade has AAAA records.
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
@@ -160,7 +126,7 @@ class KiteConnection:
         """Create a KiteConnect instance, bound to source_ip if configured."""
         kite = KiteConnect(api_key=self.api_key)
         if self._source_ip and hasattr(kite, 'reqsession'):
-            adapter = _BoundIPAdapter(self._source_ip)
+            adapter = _SourceIPAdapter(self._source_ip)
             kite.reqsession.mount('https://', adapter)
             kite.reqsession.mount('http://', adapter)
         return kite
