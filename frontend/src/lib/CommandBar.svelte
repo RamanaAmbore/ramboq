@@ -81,7 +81,14 @@
       pairs.push({ role: spec.role, value: val !== undefined ? String(val) : '', status });
     }
     for (const [k, v] of Object.entries(kwargs)) {
-      pairs.push({ role: k, value: String(v), status: 'filled' });
+      pairs.push({ role: k, value: String(v), status: v ? 'filled' : 'current' });
+    }
+    // Also show kwarg being typed (key= with no value yet) from current role
+    if (currentRole?.startsWith('kwarg:')) {
+      const kw = currentRole.slice(6);
+      if (!(kw in kwargs)) {
+        pairs.push({ role: kw, value: '', status: 'current' });
+      }
     }
     return enrichPairs ? enrichPairs(pairs, ctx) : pairs;
   }
@@ -214,27 +221,29 @@
     value = e.target.value;
     cursor = e.target.selectionStart;
 
-    // Kwarg shortcut: if user typed a single char after a space that matches
-    // a shortcut key, replace it with the full kwarg= prefix
+    // Kwarg shortcut: typing 'p'/'P' at end of line → expand to 'product='
+    // Only once (skip if already present), only at end of input.
     const shortcuts = grammar?.kwargShortcuts;
-    if (shortcuts && cursor >= 2) {
-      const before = value.slice(0, cursor);
-      const lastChar = before.slice(-1);
-      const prevChar = before.slice(-2, -1);
-      if (prevChar === ' ' && shortcuts[lastChar]) {
+    if (shortcuts && cursor === value.length && cursor >= 2) {
+      const lastChar = value.slice(-1);
+      const prevChar = value.slice(-2, -1);
+      if ((prevChar === ' ' || prevChar === '') && shortcuts[lastChar]) {
         const kwarg = shortcuts[lastChar];
-        const newVal = before.slice(0, -1) + kwarg + '=' + value.slice(cursor);
-        value = newVal;
-        cursor = before.length - 1 + kwarg.length + 1;
-        queueMicrotask(() => {
-          if (taEl) {
-            taEl.value = value;
-            taEl.setSelectionRange(cursor, cursor);
-          }
-          refreshSuggestions();
-          refreshErrors();
-        });
-        return;
+        // Skip if already used
+        if (!value.includes(kwarg + '=')) {
+          const newVal = value.slice(0, -1) + kwarg + '=';
+          value = newVal;
+          cursor = newVal.length;
+          queueMicrotask(() => {
+            if (taEl) {
+              taEl.value = value;
+              taEl.setSelectionRange(cursor, cursor);
+            }
+            refreshSuggestions();
+            refreshErrors();
+          });
+          return;
+        }
       }
     }
 
