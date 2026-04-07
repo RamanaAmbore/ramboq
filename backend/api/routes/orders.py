@@ -183,15 +183,17 @@ class OrdersController(Controller):
         try:
             body = await request.json()
             order_id = body.get("order_id", "")
+            account = body.get("user_id", "")
             status = body.get("status", "")
             tradingsymbol = body.get("tradingsymbol", "")
             txn = body.get("transaction_type", "")
             qty = body.get("quantity", 0)
             price = body.get("average_price") or body.get("price", 0)
             status_msg = body.get("status_message") or ""
+            masked = mask_column(pd.Series([account]))[0] if account else ""
 
-            logger.info(f"Postback: {order_id} {status} {txn} {qty} {tradingsymbol} "
-                        f"price={price} msg={status_msg}")
+            logger.info(f"Postback: {order_id} [{masked}] {status} {txn} {qty} "
+                        f"{tradingsymbol} price={price} msg={status_msg}")
 
             # Invalidate orders cache so next fetch gets fresh data
             invalidate("orders")
@@ -200,6 +202,7 @@ class OrdersController(Controller):
             broadcast(json.dumps({
                 "event": "order_update",
                 "order_id": order_id,
+                "account": masked,
                 "status": status,
                 "tradingsymbol": tradingsymbol,
                 "transaction_type": txn,
