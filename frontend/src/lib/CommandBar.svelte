@@ -283,6 +283,20 @@
       }
     }
 
+    // Clean up shortcut kwargs if their value was deleted from textarea
+    if (Object.keys(_shortcutKwargs).length > 0) {
+      const tokens = value.trim().split(/\s+/).map(t => t.toUpperCase());
+      const updated = /** @type {Record<string,string>} */ ({});
+      for (const [k, v] of Object.entries(_shortcutKwargs)) {
+        if (tokens.includes(v.toUpperCase())) updated[k] = v;
+      }
+      if (Object.keys(updated).length !== Object.keys(_shortcutKwargs).length) {
+        _shortcutKwargs = updated;
+      }
+    }
+    // Reset pending kwarg if user backspaces
+    if (_pendingKwarg) { _pendingKwarg = null; }
+
     refreshSuggestions();
     refreshErrors();
   }
@@ -382,6 +396,8 @@
     border-radius: 0.375rem;
     background: #0f1724;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
@@ -393,6 +409,7 @@
     padding: 0.3rem 0.5rem 0.2rem;
     border-bottom: 1px solid rgba(51,65,85,0.3);
     align-items: center;
+    flex-shrink: 0;
   }
   .cmd-input-inner {
     border: none !important;
@@ -404,6 +421,8 @@
     width: 100%;
     display: block;
     overflow-y: auto;
+    flex: 1;
+    min-height: 0;
   }
   .cmd-suggest {
     position: absolute;
