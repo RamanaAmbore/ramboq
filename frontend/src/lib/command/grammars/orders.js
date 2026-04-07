@@ -32,6 +32,18 @@ const _pendingLtp = new Set();
 let _onQuoteLoaded = null;
 export function setQuoteLoadedCallback(fn) { _onQuoteLoaded = fn; }
 
+/** Get cached equity LTP for a symbol. Kicks off fetch if not cached. */
+export function getLtp(symbol) {
+  try {
+    const eq = findEquity(String(symbol).toUpperCase());
+    if (!eq) return null;
+    const key = `${eq.e}:${eq.s}`;
+    const entry = _ltpCache.get(key);
+    if (!entry) { _fetchLtp(eq.e, eq.s); return null; }
+    return entry.ltp;
+  } catch { return null; }
+}
+
 async function _fetchLtp(exchange, tradingsymbol) {
   const key = `${exchange}:${tradingsymbol}`;
   const cached = _ltpCache.get(key);

@@ -8,7 +8,7 @@
   import OrderDetail from '$lib/OrderDetail.svelte';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol, getLtp } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -113,6 +113,16 @@
   }
 
   const maskAcct = (/** @type {string} */ a) => a ? a.replace(/\d/g, '#') : a;
+
+  function orderEnrichPairs(pairs) {
+    return pairs.map(p => {
+      if (p.role === 'symbol' && p.status === 'filled' && p.value) {
+        const ltp = getLtp(p.value);
+        if (ltp) return { ...p, value: `${p.value}:${ltp}` };
+      }
+      return p;
+    });
+  }
   const statusColor = (/** @type {string} */ s) => {
     const c = s?.toUpperCase();
     if (c === 'COMPLETE') return 'border-green-500 bg-green-50';
@@ -169,6 +179,7 @@
         placeholder="buy ZG#### CALL NIFTY 22500 25APR 50 LIMIT 12.5 MED"
         onsubmit={runParsed}
         previewFn={previewSymbol}
+        enrichPairs={orderEnrichPairs}
         disabled={running}
       />
     </div>

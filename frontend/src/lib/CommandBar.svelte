@@ -28,6 +28,7 @@
     initialValue = '',
     minPrefixLen = 3,
     previewFn = null,
+    enrichPairs = null,
     class: cls = '',
   } = $props();
 
@@ -81,7 +82,7 @@
     for (const [k, v] of Object.entries(kwargs)) {
       pairs.push({ role: k, value: String(v), status: 'filled' });
     }
-    return pairs;
+    return enrichPairs ? enrichPairs(pairs, ctx) : pairs;
   }
 
   function refreshSuggestions() {
