@@ -107,15 +107,27 @@ class KiteConnection:
 
     def _extract_request_token(self, kite_url):
         """Follow Kite OAuth redirect to extract request_token.
-        The redirect_url is localhost (not running), so the final redirect
-        fails. We extract the token from either the response URL or the
-        connection-error message."""
+        The redirect_url points to a non-running localhost port, so the
+        redirect either fails (ConnectionError) or lands somewhere unexpected.
+        We extract the token from:
+          1. The final response URL query params
+          2. Any intermediate redirect URL in response history
+          3. The ConnectionError message (contains the failed URL)
+        """
         request_token = None
         try:
-            resp = self.session.get(kite_url)
-            # Redirect succeeded (unlikely with localhost) — extract from URL
+            resp = self.session.get(kite_url, allow_redirects=True, timeout=5)
+            # Check final URL
             params = parse_qs(urlparse(resp.url).query)
             request_token = params.get('request_token', [None])[0]
+            # If not in final URL, check redirect history
+            if not request_token:
+                for r in resp.history:
+                    p = parse_qs(urlparse(r.headers.get('Location', '')).query)
+                    tok = p.get('request_token', [None])[0]
+                    if tok:
+                        request_token = tok
+                        break
         except Exception as e:
             # Expected: redirect to localhost fails with ConnectionError.
             # The redirect URL (with request_token) is in the error message.
