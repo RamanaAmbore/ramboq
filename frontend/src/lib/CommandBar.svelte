@@ -398,7 +398,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    max-height: 14rem;
+    height: 14rem;
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
