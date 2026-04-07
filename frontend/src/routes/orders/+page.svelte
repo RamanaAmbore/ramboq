@@ -199,7 +199,7 @@
         disabled={running}
       />
     </div>
-    <div class="flex flex-col gap-2 justify-evenly">
+    <div class="flex flex-col justify-between h-full">
       <button onclick={() => cmdBar?.submit()} disabled={running}
         class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">Submit</button>
       <button onclick={() => cmdBar?.clear()}
