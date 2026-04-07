@@ -398,6 +398,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    max-height: 14rem;
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
@@ -410,6 +411,8 @@
     border-bottom: 1px solid rgba(51,65,85,0.3);
     align-items: center;
     flex-shrink: 0;
+    max-height: 3rem;
+    overflow-y: auto;
   }
   .cmd-input-inner {
     border: none !important;
