@@ -240,16 +240,6 @@
       if (_pendingKwarg) _pendingKwarg = null;
       suggOpen = false;
     } else if (e.key === 'Enter' && !e.shiftKey) {
-      // If suggestion is open AND the user is mid-token → apply; else submit
-      if (suggOpen && suggList.length > 0) {
-        const trimmedBefore = value.slice(0, cursor);
-        const endsWithSpace = trimmedBefore.endsWith(' ') || trimmedBefore === '';
-        if (!endsWithSpace) {
-          e.preventDefault();
-          applyCurrent();
-          return;
-        }
-      }
       e.preventDefault();
       submit();
     }
