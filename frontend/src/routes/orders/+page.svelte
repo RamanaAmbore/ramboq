@@ -182,7 +182,9 @@
         grammar={orderGrammar}
         context={cmdContext}
         rows={3}
-        placeholder="buy ZG#### CALL NIFTY 22500 25APR 50 LIMIT 12.5 MED"
+        placeholder={cmdContext.openOrders?.length
+          ? "buy | sell | cancel | modify"
+          : "buy | sell"}
         onsubmit={runParsed}
         previewFn={previewSymbol}
         enrichPairs={orderEnrichPairs}
