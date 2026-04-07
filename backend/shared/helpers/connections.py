@@ -195,24 +195,26 @@ class KiteConnection:
     def get_kite_conn(self, test_conn=False):
         """Return kite connection, refreshing if older than CONN_RESET_HOURS."""
         now = timestamp_indian()
-        if (
-                self._conn_created_at is None
-                or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
-        ):
-            self._conn_created_at = now
-            formatted_datetime = self._conn_created_at.strftime('%A, %B %d, %Y, %I:%M %p')
-            logger.info(f'Kite connection refreshed at {formatted_datetime}')
+        expired = (
+            self._conn_created_at is None
+            or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
+        )
+
+        if expired or test_conn:
+            if expired:
+                self._conn_created_at = now
+                formatted = self._conn_created_at.strftime('%A, %B %d, %Y, %I:%M %p')
+                logger.info(f'Kite connection refreshed at {formatted}')
 
             # Try cached token first — avoids full login/2FA
             if not self._access_token:
                 self._try_restore_token()
             if self._access_token:
-                # Token exists (from cache or previous init) — verify it works
                 return self.kite
 
-            test_conn = True
+            # No cached token — do full login
+            self.init_kite_conn(test_conn=True)
 
-        self.init_kite_conn(test_conn=test_conn)
         return self.kite
 
     @retry_kite_conn(RETRY_COUNT)
