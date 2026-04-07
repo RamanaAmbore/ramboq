@@ -166,10 +166,6 @@
         class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
     </div>
   </div>
-  <div class="text-[0.5rem] text-muted">
-    <code>buy|sell ACCT [CALL|PUT|FUT|EQ] SYMBOL [strike] QTY MARKET|LIMIT [price] [chase=1-10]</code> ·
-    <code>cancel ORDER_ID</code> · <code>modify ORDER_ID price=X qty=N</code>
-  </div>
 </div>
 
 <!-- Status Dashboard -->

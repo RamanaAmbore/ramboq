@@ -40,7 +40,7 @@
   let suggList  = $state(/** @type {string[]} */([]));
   let role      = $state(/** @type {string|null} */(null));
   let hint      = $state(/** @type {string|null} */(null));
-  let flow      = $state(/** @type {string[]} */([]));
+  let parsedPairs = $state(/** @type {{role:string, value:string, status:string}[]} */([]));
   let errors    = $state(/** @type {string[]} */([]));
   let taEl;
   let suggListEl = $state(/** @type {HTMLDivElement | null} */(null));
@@ -56,18 +56,36 @@
     return eq >= 0 ? tok.slice(eq + 1) : tok;
   }
 
-  function _computeFlow(currentRole) {
-    if (!grammar || !currentRole || currentRole === 'verb' || currentRole === 'kwarg-key' || currentRole?.startsWith('kwarg:')) return [];
+  function _computeParsedPairs(currentRole) {
+    if (!grammar) return [];
     const verbName = value.trim().split(/\s+/)[0]?.toLowerCase();
+    if (!verbName) return [];
     const verb = grammar.verbs?.[verbName];
     if (!verb?.tokens) return [];
-    const idx = verb.tokens.findIndex(t => t.role === currentRole);
-    if (idx < 0) return [];
-    return verb.tokens.slice(idx).map(t => t.role);
+    let args = {}, kwargs = {}, ctx = { ...context };
+    try {
+      const p = parse(value, grammar, context);
+      args = p.args || {}; kwargs = p.kwargs || {};
+      ctx = { ...context, ...args, ...kwargs };
+    } catch {}
+    const pairs = [];
+    for (const spec of verb.tokens) {
+      const isFilled = spec.role in args;
+      if (typeof spec.required === 'function' && !spec.required(ctx) && !isFilled) continue;
+      const val = args[spec.role];
+      let status = 'pending';
+      if (val !== undefined) status = 'filled';
+      else if (spec.role === currentRole) status = 'current';
+      pairs.push({ role: spec.role, value: val !== undefined ? String(val) : '', status });
+    }
+    for (const [k, v] of Object.entries(kwargs)) {
+      pairs.push({ role: k, value: String(v), status: 'filled' });
+    }
+    return pairs;
   }
 
   function refreshSuggestions() {
-    if (!grammar) { suggList = []; flow = []; return; }
+    if (!grammar) { suggList = []; parsedPairs = []; return; }
     try {
       const result = suggestAt(value, cursor, grammar, context);
       let newList = result.suggestions || [];
@@ -85,7 +103,7 @@
       suggList = newList;
       role = newRole;
       hint = result.hint;
-      flow = _computeFlow(newRole);
+      parsedPairs = _computeParsedPairs(newRole);
       // On role change (new token), initialize suggIdx to suggester's focus hint
       // (e.g. ATM strike) or 0; otherwise clamp existing suggIdx.
       if (roleChanged) {
@@ -102,7 +120,7 @@
         queueMicrotask(_scrollActiveIntoView);
       }
     } catch (e) {
-      suggList = []; suggOpen = false; flow = [];
+      suggList = []; suggOpen = false; parsedPairs = [];
     }
   }
 
@@ -248,11 +266,18 @@
   {/if}
 
   {#if showHelp}
-    <div class="text-[0.6rem] mt-0.5 flex gap-3 items-center flex-wrap">
-      {#if flow.length > 0}
-        <span class="token-flow">
-          {#each flow as f, i}<span class={f === role ? 'flow-current' : 'flow-dim'}>{f}</span>{#if i < flow.length - 1}<span class="flow-arrow">›</span>{/if}{/each}
-        </span>
+    <div class="text-[0.6rem] mt-0.5 flex gap-2 items-center flex-wrap">
+      {#if parsedPairs.length > 0}
+        {#each parsedPairs as p}
+          <span class="pair pair-{p.status}">
+            <span class="pair-key">{p.role}:</span>
+            {#if p.value}
+              <span class="pair-val">{p.value}</span>
+            {:else if p.status === 'current'}
+              <span class="pair-cursor">_</span>
+            {/if}
+          </span>
+        {/each}
       {:else if role}
         <span class="role-badge">{role}</span>
       {/if}
@@ -321,28 +346,43 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-  .token-flow {
+  .pair {
     display: inline-flex;
     align-items: center;
     gap: 0.15rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.55rem;
-  }
-  .flow-current {
-    color: #fff;
-    font-weight: 700;
-    background: #f59e0b;
-    padding: 0.05rem 0.35rem;
+    padding: 0.05rem 0.3rem;
     border-radius: 0.2rem;
+    border: 1px solid transparent;
+  }
+  .pair-filled {
+    background: rgba(34,197,94,0.1);
+    border-color: rgba(34,197,94,0.25);
+  }
+  .pair-filled .pair-key { color: #4ade80; }
+  .pair-current {
+    background: rgba(245,158,11,0.15);
+    border-color: rgba(245,158,11,0.4);
+  }
+  .pair-current .pair-key { color: #fbbf24; }
+  .pair-pending {
+    background: rgba(100,116,139,0.06);
+    border-color: rgba(100,116,139,0.12);
+  }
+  .pair-pending .pair-key { color: #475569; }
+  .pair-key {
+    font-weight: 600;
     text-transform: uppercase;
+    font-size: 0.5rem;
   }
-  .flow-dim {
-    color: #64748b;
-    opacity: 0.5;
+  .pair-val {
+    color: #e2e8f0;
+    font-weight: 500;
   }
-  .flow-arrow {
-    color: #64748b;
-    opacity: 0.35;
-    margin: 0 0.05rem;
+  .pair-cursor {
+    color: #fbbf24;
+    animation: blink 1s step-end infinite;
   }
+  @keyframes blink { 50% { opacity: 0; } }
 </style>
