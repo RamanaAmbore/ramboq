@@ -4,10 +4,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+import urllib3.util.connection
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.connection import create_connection as _orig_create_connection
 from kiteconnect import KiteConnect
+
+# Force IPv4 for all outgoing connections. The server has IPv6 addresses
+# but outbound IPv6 to external hosts (kite.zerodha.com, api.kite.trade)
+# hangs. Python's requests/urllib3 tries IPv6 first when available.
+urllib3.util.connection.HAS_IPV6 = False
 
 from backend.shared.helpers.date_time_utils import timestamp_indian
 from backend.shared.helpers.decorators import retry_kite_conn
@@ -19,11 +24,6 @@ from backend.shared.helpers.utils import generate_totp, secrets, config
 _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
 
 
-## NOTE: source_ip binding via HTTPAdapter is disabled.
-## urllib3's source_address causes connection hangs due to address family
-## conflicts. Without explicit binding, Kite sees the server's default
-## outgoing IP. Whitelist the server's actual outgoing IP (check with
-## `curl -4 ifconfig.me` and `curl -6 ifconfig.me`) on each Kite app.
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
