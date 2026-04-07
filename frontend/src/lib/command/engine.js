@@ -214,8 +214,8 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
     }
     return {
       suggestions: combined.slice(0, 40),
-      role: nextSpec ? nextSpec.role : optSpec.role,
-      hint: nextSpec ? (nextSpec.hint || null) : (optSpec.hint || null),
+      role: optSpec.role,
+      hint: optSpec.hint || null,
     };
   }
   startPos = _skipOptionalSpecs(verb, startPos, prefix, priorCtx);

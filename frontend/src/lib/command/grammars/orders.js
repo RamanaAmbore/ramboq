@@ -126,11 +126,11 @@ function qtySuggest(prefix, ctx) {
     const ls = inst.ls || 1;
     const isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
     if (isFO && ls > 1) {
-      // Show as: lots (lots × lot_size = total)
-      // e.g. "1 (1 × 50 = 50)", "2 (2 × 50 = 100)"
-      // Inserted value is just the lots number; label is display-only
+      // Show as: lots ( × lot_size = total)
+      // e.g. "1 ( × 50 = 50)", "2 ( × 50 = 100)"
+      // Inserted value is just the lots number; bracket is display-only
       const lots = prefix ? [Number(prefix) || 1] : [1, 2, 3, 5, 10];
-      return lots.map(n => `${n} (${n} × ${ls} = ${n * ls})`);
+      return lots.map(n => `${n} ( × ${ls} = ${n * ls})`);
     }
     // Equity: plain share counts
     if (prefix) return [];
