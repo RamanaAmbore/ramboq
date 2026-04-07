@@ -135,35 +135,27 @@ class KiteConnection:
         self.setup_access_token(request_token)
 
     def _extract_request_token(self, kite_url):
-        """Extract request_token from Kite OAuth flow.
-        Don't follow redirects — the final redirect goes to the configured
-        redirect_url (localhost) which may hang. Instead, read the Location
-        header from each 302 and extract the token from it.
+        """Extract request_token from Kite OAuth redirect.
+
+        The Kite redirect URL must point to a non-running port (e.g.
+        http://localhost:8080) so the redirect always fails with a
+        ConnectionError. The request_token is extracted from the error
+        message which contains the full redirect URL.
+
+        IMPORTANT: The Kite redirect URL in the developer console MUST use
+        a port that is NOT running on the server (8080 recommended).
+        Using a port that IS running (e.g. 8000/8001) causes SSL hangs.
         """
-        request_token = None
         try:
-            resp = self.session.get(kite_url, allow_redirects=False, timeout=10)
-            # Follow redirects manually, stopping when we find request_token
-            for _ in range(10):  # max redirects
-                location = resp.headers.get('Location', '')
-                params = parse_qs(urlparse(location).query)
-                tok = params.get('request_token', [None])[0]
-                if tok:
-                    request_token = tok
-                    break
-                if not location or resp.status_code not in (301, 302, 303, 307, 308):
-                    break
-                # Follow this redirect (but not the next one blindly)
-                resp = self.session.get(location, allow_redirects=False, timeout=10)
+            self.session.get(kite_url)
         except Exception as e:
-            # Fallback: parse token from error message
             err = str(e)
             if 'request_token=' in err:
                 try:
-                    request_token = err.split("request_token=")[1].split("&")[0].split()[0]
+                    return err.split("request_token=")[1].split("&")[0].split()[0]
                 except (IndexError, ValueError):
                     pass
-        return request_token
+        return None
 
     @retry_kite_conn(RETRY_COUNT)
     def get_kite_conn(self, test_conn=False):
