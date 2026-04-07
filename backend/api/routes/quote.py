@@ -40,7 +40,7 @@ class QuoteResponse(msgspec.Struct):
 def _fetch_ltp(exchange: str, tradingsymbol: str) -> QuoteResponse:
     conns = Connections()
     account = next(iter(conns.conn))
-    kite = conns.conn[account].kite
+    kite = conns.conn[account].get_kite_conn()
     key = f"{exchange}:{tradingsymbol}"
 
     bid = ask = None
@@ -66,14 +66,15 @@ def _fetch_ltp(exchange: str, tradingsymbol: str) -> QuoteResponse:
             bid = depth_buy[0].price
         if depth_sell:
             ask = depth_sell[0].price
-    except Exception:
+    except Exception as e:
         # Fallback to ltp-only
+        logger.warning(f"Quote depth failed for {key}: {e}")
         try:
             data = kite.ltp([key])
             row = data.get(key) or {}
             ltp = float(row.get("last_price") or 0.0)
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.error(f"Quote LTP fallback failed for {key}: {e2}")
 
     return QuoteResponse(
         tradingsymbol=tradingsymbol,
