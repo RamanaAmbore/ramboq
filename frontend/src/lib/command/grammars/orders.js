@@ -104,21 +104,20 @@ function strikeSuggest(prefix, ctx) {
     }
   }
 
-  // Narrow to ±15 strikes around ATM (or show all if no ATM yet)
-  let strikes = allStrikes;
-  let atmIdx = 0;
+  // Find nearest strike to ATM, or fall back to middle of list
+  let atmIdx = Math.floor(allStrikes.length / 2);
   if (atmPrice > 0) {
-    // Find nearest strike to ATM
     let bestDist = Infinity;
     for (let i = 0; i < allStrikes.length; i++) {
       const dist = Math.abs(allStrikes[i] - atmPrice);
       if (dist < bestDist) { bestDist = dist; atmIdx = i; }
     }
-    const lo = Math.max(0, atmIdx - 15);
-    const hi = Math.min(allStrikes.length, atmIdx + 16);
-    strikes = allStrikes.slice(lo, hi);
-    atmIdx = atmIdx - lo; // adjust for sliced array
   }
+  // Narrow to ±15 strikes around ATM
+  const lo = Math.max(0, atmIdx - 15);
+  const hi = Math.min(allStrikes.length, atmIdx + 16);
+  const strikes = allStrikes.slice(lo, hi);
+  atmIdx = atmIdx - lo; // adjust for sliced array
 
   // Build labels with quote info
   const labels = strikes.map(k => {

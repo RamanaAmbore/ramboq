@@ -46,6 +46,7 @@
   let taEl;
   let suggListEl = $state(/** @type {HTMLDivElement | null} */(null));
   let prevRole = '';
+  let prevFocus = -1;
 
   function _currentPrefix() {
     // The text of the token currently under the cursor (or empty if at a space).
@@ -105,11 +106,16 @@
       role = newRole;
       hint = result.hint;
       parsedPairs = _computeParsedPairs(newRole);
-      // On role change (new token), initialize suggIdx to suggester's focus hint
-      // (e.g. ATM strike) or 0; otherwise clamp existing suggIdx.
+      // Apply _focusIndex on role change OR when it changes (e.g. ATM
+      // recalculated after async equity quote arrives).
+      const focus = /** @type {any} */ (newList)._focusIndex;
+      const hasFocus = typeof focus === 'number' && focus >= 0 && focus < newList.length;
       if (roleChanged) {
-        const focus = /** @type {any} */ (newList)._focusIndex;
-        suggIdx = (typeof focus === 'number' && focus >= 0 && focus < newList.length) ? focus : 0;
+        suggIdx = hasFocus ? focus : 0;
+        prevFocus = hasFocus ? focus : -1;
+      } else if (hasFocus && focus !== prevFocus) {
+        suggIdx = focus;
+        prevFocus = focus;
       } else {
         suggIdx = Math.min(suggIdx, Math.max(0, newList.length - 1));
       }
