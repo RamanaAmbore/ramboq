@@ -237,16 +237,14 @@
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
-        <div class="flex items-center justify-between mb-1">
-          <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.quantity}</span>
+        <div class="flex items-center justify-between mb-0.5">
+          <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.tradingsymbol}</span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-xs font-medium text-primary mb-0.5">{o.tradingsymbol}</div>
-        <div class="grid grid-cols-2 gap-x-2 text-[0.55rem] text-text/70">
-          <div>Acct: {o.account}</div><div>Exch: {o.exchange}</div>
-          <div>Type: {o.order_type}</div><div>Price: {o.average_price || o.price || '—'}</div>
-          <div>Filled: {o.filled_quantity}/{o.quantity}</div><div>Product: {o.product}</div>
+        <div class="grid grid-cols-3 gap-x-2 text-[0.55rem] text-text/70">
+          <div>{o.account}</div><div>{o.order_type} {o.average_price || o.price || '—'}</div><div>{o.filled_quantity}/{o.quantity} {o.product}</div>
+          <div>{o.exchange}</div><div>{o.status_message || ''}</div><div></div>
         </div>
       </button>
     {/each}
