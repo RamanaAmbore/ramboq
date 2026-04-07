@@ -199,13 +199,13 @@
         disabled={running}
       />
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-2 justify-evenly">
       <button onclick={() => cmdBar?.submit()} disabled={running}
         class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">Submit</button>
       <button onclick={() => cmdBar?.clear()}
         class="text-[0.65rem] py-1 px-3 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100">Clear</button>
       <button onclick={loadOrders} disabled={loading}
-        class="text-[0.65rem] py-1 px-3 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">Refresh</button>
+        class="text-[0.65rem] py-1 px-3 rounded border border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">Refresh</button>
     </div>
   </div>
 </div>
