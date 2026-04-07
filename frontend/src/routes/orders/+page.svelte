@@ -59,7 +59,7 @@
         const payload = buildOrderPayload(parsed);
         const res = await placeOrder(payload);
         addResult('✓', `Order placed`, {
-          verb: parsed.verb.toUpperCase(), account: maskAcct(parsed.args.account),
+          verb: parsed.verb.toUpperCase(), account: parsed.args.account,
           symbol: payload.tradingsymbol, exchange: payload.exchange,
           qty: String(payload.quantity), type: payload.order_type,
           price: String(payload.price || ''), product: payload.product,
@@ -117,8 +117,6 @@
     else if (logTab === 'agent') loadAgentLog();
     else if (logTab === 'system') loadSystemLog();
   }
-
-  const maskAcct = (/** @type {string} */ a) => a ? a.replace(/\d/g, '#') : a;
 
   function orderEnrichPairs(pairs) {
     return pairs.map(p => {
@@ -245,7 +243,7 @@
         </div>
         <div class="text-xs font-medium text-primary mb-0.5">{o.tradingsymbol}</div>
         <div class="grid grid-cols-2 gap-x-2 text-[0.55rem] text-text/70">
-          <div>Acct: {maskAcct(o.account)}</div><div>Exch: {o.exchange}</div>
+          <div>Acct: {o.account}</div><div>Exch: {o.exchange}</div>
           <div>Type: {o.order_type}</div><div>Price: {o.average_price || o.price || '—'}</div>
           <div>Filled: {o.filled_quantity}/{o.quantity}</div><div>Product: {o.product}</div>
         </div>
