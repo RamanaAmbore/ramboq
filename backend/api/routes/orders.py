@@ -153,7 +153,7 @@ class OrdersController(Controller):
             return PlaceOrderResponse(order_id=str(order_id), account=masked)
         except Exception as e:
             logger.error(f"Place order failed [{masked}]: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
 
     @put("/{order_id:str}")
     async def modify_order(self, order_id: str, data: ModifyOrderRequest) -> ModifyOrderResponse:
@@ -173,7 +173,7 @@ class OrdersController(Controller):
             return ModifyOrderResponse(order_id=order_id)
         except Exception as e:
             logger.error(f"Modify order failed [{masked}] {order_id}: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
 
     @post("/postback", guards=[])
     async def order_postback(self, request: Request) -> dict:
@@ -232,7 +232,7 @@ class OrdersController(Controller):
             return CancelOrderResponse(order_id=order_id)
         except Exception as e:
             logger.error(f"Cancel order failed [{masked}] {order_id}: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
 
 
 class AccountsController(Controller):
