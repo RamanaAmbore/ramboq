@@ -98,6 +98,7 @@
   }
 
   function refreshSuggestions() {
+    if (_pendingKwarg) { parsedPairs = _computeParsedPairs(`kwarg:${_pendingKwarg}`); return; }
     if (!grammar) { suggList = []; parsedPairs = []; return; }
     try {
       const result = suggestAt(value, cursor, grammar, context);
@@ -251,8 +252,9 @@
       if ((prevChar === ' ' || prevChar === '') && shortcuts[lastChar]) {
         const kwarg = shortcuts[lastChar];
         if (!(kwarg in _shortcutKwargs)) {
-          // Erase the typed char, activate kwarg popup
-          value = value.slice(0, -1).trimEnd();
+          // Erase the typed char
+          value = value.slice(0, -1);
+          if (!value.endsWith(' ')) value = value.trimEnd() + ' ';
           cursor = value.length;
           _pendingKwarg = kwarg;
           queueMicrotask(() => {
