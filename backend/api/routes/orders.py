@@ -104,10 +104,9 @@ def _fetch_orders() -> OrdersResponse:
     rows: list[OrderRow] = []
     for account, kite_conn in conn.items():
         try:
-            kite   = kite_conn.get_kite_conn()
-            masked = mask_column(pd.Series([account]))[0]
+            kite = kite_conn.get_kite_conn()
             for o in reversed(kite.orders() or []):
-                rows.append(_row_from_dict(o, masked))
+                rows.append(_row_from_dict(o, account))
         except Exception as e:
             logger.error(f"Orders list failed for {account}: {e}")
     return OrdersResponse(rows=rows, refreshed_at=timestamp_display())

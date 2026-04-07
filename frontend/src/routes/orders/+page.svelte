@@ -112,6 +112,7 @@
     else if (logTab === 'system') loadSystemLog();
   }
 
+  const maskAcct = (/** @type {string} */ a) => a ? a.replace(/\d/g, '#') : a;
   const statusColor = (/** @type {string} */ s) => {
     const c = s?.toUpperCase();
     if (c === 'COMPLETE') return 'border-green-500 bg-green-50';
@@ -212,7 +213,7 @@
         </div>
         <div class="text-xs font-medium text-primary mb-0.5">{o.tradingsymbol}</div>
         <div class="grid grid-cols-2 gap-x-2 text-[0.55rem] text-text/70">
-          <div>Acct: {o.account}</div><div>Exch: {o.exchange}</div>
+          <div>Acct: {maskAcct(o.account)}</div><div>Exch: {o.exchange}</div>
           <div>Type: {o.order_type}</div><div>Price: {o.average_price || o.price || '—'}</div>
           <div>Filled: {o.filled_quantity}/{o.quantity}</div><div>Product: {o.product}</div>
         </div>

@@ -373,14 +373,31 @@ export function buildOrderPayload(parsed) {
   });
   const product = kwargs.product
     || (inst.t === 'EQ' ? 'CNC' : (inst.t === 'FUT' || inst.t === 'CE' || inst.t === 'PE') ? 'NRML' : 'MIS');
+  // F&O: multiply lots by lot_size to get total quantity for Kite
+  const isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+  const ls = inst.ls || 1;
+  const quantity = (isFO && ls > 1) ? args.qty * ls : args.qty;
+
+  // SL/SL-M: user-entered price is the trigger price
+  const ot = args.orderType.toUpperCase();
+  let price = args.price || 0;
+  let trigger_price = 0;
+  if (ot === 'SL') {
+    trigger_price = price;  // trigger at this level, then limit at same price
+  } else if (ot === 'SL-M') {
+    trigger_price = price;  // trigger at this level, then market
+    price = 0;
+  }
+
   return {
     account: args.account,
     tradingsymbol: inst.s,
     exchange: inst.e,
-    quantity: args.qty,
+    quantity,
     transaction_type: verb.toUpperCase(),
-    order_type: args.orderType.toUpperCase(),
-    price: args.price || 0,
+    order_type: ot,
+    price,
+    trigger_price,
     product,
     variety: 'regular',
     validity: 'DAY',
