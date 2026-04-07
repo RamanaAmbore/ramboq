@@ -38,7 +38,7 @@ Both branches (`main`, `dev`) are kept in sync — every feature is developed on
 
 ### Helpers (`backend/shared/helpers/`)
 - **`broker_apis.py`** — `fetch_holdings()`, `fetch_positions()`, `fetch_margins()` — each decorated with `@for_all_accounts`; returns a list (one DataFrame per account). `fetch_holidays(exchange)` — calls `kite.holidays(exchange)`, returns set of holiday dates for the current year; used by background refresh for NSE and MCX calendars.
-- **`connections.py`** — `Connections` singleton (extends `SingletonBase`) holds one `KiteConnection` per account; handles Kite 2FA login, TOTP, and access token refresh. Re-authenticates after 23 hours (`conn_reset_hours` in `backend_config.yaml`)
+- **`connections.py`** — `Connections` singleton (extends `SingletonBase`) holds one `KiteConnection` per account; handles Kite 2FA login, TOTP, and access token refresh. Re-authenticates after 23 hours (`conn_reset_hours` in `backend_config.yaml`). Supports per-account `source_ip` binding (IPv6) to work around Kite's one-IP-per-app restriction — see Multi-Account IP Binding section below.
 - **`decorators.py`** — `@for_all_accounts` iterates all accounts or a single one; `@retry_kite_conn()` retries with `test_conn=True` from attempt 2; `@track_it()` logs execution time; `@lock_it_for_update` / `@update_lock` for thread safety
 - **`singleton_base.py`** — Thread-safe singleton via double-checked locking; `_instances` dict keyed by class
 - **`utils.py`** — YAML loaders (run at module import), `get_image_bin_file()`, `get_path()`, `get_nearest_time()`, `add_comma_to_df_numbers()`, validators (email, phone, password, PIN, captcha), `CustomDict`
@@ -180,6 +180,42 @@ Defined in `backend_config.yaml` under `market_segments`. Background thread hand
 | Close summary (per segment) | `close_summary_offset_minutes` (15) after segment close, once per day |
 | Loss alert check | Every performance fetch during market hours |
 | Agent engine `run_cycle()` | Every performance fetch; skips `schedule: market_hours` agents when no segment is open |
+
+---
+
+## Multi-Account Kite IP Binding
+
+Kite Connect restricts one IP per app. Each Zerodha account uses a separate Kite app (different API key), so multiple accounts on the same server need different source IPs.
+
+**Solution:** The server has a `/48` IPv6 subnet (`2a02:4780:12:9e1d::/48`) — effectively unlimited addresses. Each account binds to a unique IPv6 via `source_ip` in `secrets.yaml`.
+
+| Account | Source IP | Kite Whitelist |
+|---|---|---|
+| ZG0790 | default (IPv4 `69.62.78.136`) | `69.62.78.136` |
+| ZJ6294 | `2a02:4780:12:9e1d::1` | `2a02:4780:12:9e1d::1` |
+| (future) | `2a02:4780:12:9e1d::2` | `2a02:4780:12:9e1d::2` |
+
+### Adding a new account
+
+1. Choose the next IPv6: `2a02:4780:12:9e1d::N`
+2. Add it to the server: `sudo ip -6 addr add 2a02:4780:12:9e1d::N/48 dev eth0`
+3. Make persistent: add to `/etc/netplan/` config
+4. Add to `secrets.yaml`:
+   ```yaml
+   kite_accounts:
+     NEW_ACCT:
+       api_key: ...
+       api_secret: ...
+       password: ...
+       totp_token: ...
+       source_ip: "2a02:4780:12:9e1d::N"
+   ```
+5. Whitelist `2a02:4780:12:9e1d::N` in the new account's Kite developer console
+6. Restart the API service
+
+### Implementation
+
+`_SourceIPAdapter` (in `connections.py`) extends `requests.HTTPAdapter` to set `source_address` on the urllib3 pool manager. Both KiteConnect's internal `reqsession` and the login `session` are patched with this adapter when `source_ip` is configured.
 
 ---
 
