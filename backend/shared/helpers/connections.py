@@ -19,22 +19,11 @@ from backend.shared.helpers.utils import generate_totp, secrets, config
 _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
 
 
-class _SourceIPAdapter(HTTPAdapter):
-    """HTTPAdapter that binds connections to a specific source IP.
-
-    For IPv4: uses source_address in pool manager (straightforward).
-    For IPv6: uses source_address with AF_INET6 forced via allowed_gai_family.
-    """
-    def __init__(self, source_ip, **kwargs):
-        self._source_ip = source_ip
-        self._is_ipv6 = ':' in source_ip
-        super().__init__(**kwargs)
-
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs['source_address'] = (self._source_ip, 0)
-        super().init_poolmanager(*args, **kwargs)
-        # For IPv6: the pool manager infers AF_INET6 from source_address,
-        # which is correct — api.kite.trade has AAAA records.
+## NOTE: source_ip binding via HTTPAdapter is disabled.
+## urllib3's source_address causes connection hangs due to address family
+## conflicts. Without explicit binding, Kite sees the server's default
+## outgoing IP. Whitelist the server's actual outgoing IP (check with
+## `curl -4 ifconfig.me` and `curl -6 ifconfig.me`) on each Kite app.
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
@@ -123,13 +112,8 @@ class KiteConnection:
                         f"{(datetime.now(timezone.utc) - created).seconds // 3600}h)")
 
     def _new_kite(self):
-        """Create a KiteConnect instance, bound to source_ip if configured."""
-        kite = KiteConnect(api_key=self.api_key)
-        if self._source_ip and hasattr(kite, 'reqsession'):
-            adapter = _SourceIPAdapter(self._source_ip)
-            kite.reqsession.mount('https://', adapter)
-            kite.reqsession.mount('http://', adapter)
-        return kite
+        """Create a KiteConnect instance."""
+        return KiteConnect(api_key=self.api_key)
 
     def init_kite_conn(self, test_conn=False):
         """Returns KiteConnect instance, initializing it if necessary."""
