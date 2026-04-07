@@ -52,17 +52,30 @@
   }
 
   function _orderLogHtml() {
-    // Merge command history (order results) + agent order events, newest first
-    const cmdLines = cmdHistory.map(h => {
+    // Command bar order results + postback updates only
+    const lines = cmdHistory.map(h => {
       const cls = h.result.startsWith('✓') ? 'log-agent-success' : h.result.startsWith('✗') ? 'log-agent-failed' : 'log-info';
       return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.cmd} → ${h.result}</span>`;
     });
-    const evtLines = filteredOrder().map(e => {
-      const t = logTime(e.timestamp);
-      return `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+    return lines.length ? lines.join('\n') : '<span class="log-debug">No order events.</span>';
+  }
+
+  function _terminalHtml() {
+    // Order log + Agent log merged
+    const cmdLines = cmdHistory.map(h => {
+      const cls = h.result.startsWith('✓') ? 'log-agent-success' : h.result.startsWith('✗') ? 'log-agent-failed' : 'log-info';
+      return { ts: h.time, html: `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.cmd} → ${h.result}</span>` };
     });
-    const all = [...cmdLines, ...evtLines];
-    return all.length ? all.join('\n') : '<span class="log-debug">No order events.</span>';
+    const orderLines = filteredOrder().map(e => {
+      const t = logTime(e.timestamp);
+      return { ts: t, html: `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
+    });
+    const agentLines = agentLog.map(e => {
+      const t = logTime(e.timestamp);
+      return { ts: t, html: `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
+    });
+    const all = [...cmdLines, ...orderLines, ...agentLines];
+    return all.length ? all.map(x => x.html).join('\n') : '<span class="log-debug">No events.</span>';
   }
 
   function setTab(id) {
@@ -80,9 +93,7 @@
   {/each}
 </div>
 
-<pre class="log-panel {heightClass}">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
-  `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
+<pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
