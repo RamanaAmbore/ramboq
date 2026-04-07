@@ -27,8 +27,11 @@
     disabled = false,
     initialValue = '',
     minPrefixLen = 3,
+    previewFn = null,
     class: cls = '',
   } = $props();
+
+  let symbolPreview = $state('');
 
   let value     = $state(initialValue);
   let cursor    = $state(0);
@@ -98,12 +101,13 @@
   }
 
   function refreshErrors() {
-    if (!grammar || !value.trim()) { errors = []; return; }
+    if (!grammar || !value.trim()) { errors = []; symbolPreview = ''; return; }
     try {
       const p = parse(value, grammar, context);
       errors = p.errors || [];
+      symbolPreview = (previewFn && errors.length === 0) ? (previewFn(p) || '') : '';
     } catch (e) {
-      errors = [e.message];
+      errors = [e.message]; symbolPreview = '';
     }
   }
 
@@ -230,11 +234,12 @@
   {/if}
 
   {#if showHelp}
-    <div class="text-[0.6rem] mt-0.5 flex gap-3 items-center">
+    <div class="text-[0.6rem] mt-0.5 flex gap-3 items-center flex-wrap">
       {#if role}
         <span class="role-badge">{role}</span>
       {/if}
       {#if hint}<span class="text-muted opacity-70">{hint}</span>{/if}
+      {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
       {#if errors.length > 0}<span class="text-red-500">{errors.join(' · ')}</span>{/if}
     </div>
   {/if}
@@ -277,6 +282,15 @@
   .cmd-suggest-item.active { background: rgba(245,158,11,0.2); color: #fbbf24; }
   :global(.text-accent) { color: #f59e0b; }
 
+  .symbol-preview {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #22d3ee;
+    background: rgba(34,211,238,0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+  }
   .role-badge {
     display: inline-block;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

@@ -2,21 +2,13 @@
 #
 # Language-agnostic schema (loadable from Python AND JavaScript).
 # Suggester / resolver hooks are referenced by name ("kind: symbol") and
-# implemented separately in each runtime (frontend/src/lib/data/*,
-# backend equivalents for the agent/shell commands).
+# implemented separately in each runtime.
 #
-# Grammar shape:
-#   verbs: map of verb_name → { tokens: [TokenSpec], kwargs: {name → KwargSpec} }
+# Token flow for buy/sell:
+#   account → instType → symbol(3+ chars) → strike(CALL/PUT) → expiry(non-EQ)
+#   → qty → orderType → price(non-MARKET) → chase(non-MARKET)
 #
-# TokenSpec fields:
-#   role       — semantic name (shown as hint)
-#   kind       — which runtime suggester to use (symbol/account/order_type/qty/price/order_id/chase_level/expiry)
-#   values     — static list (overrides `kind`)
-#   required   — true | "if:<kwarg/role>!=VALUE" | omitted (default false)
-#   parse      — "int" | "float" | "upper" | "str" (default: str)
-#   hint       — short help text
-#
-# KwargSpec fields: same as TokenSpec minus `required` and `role` (key is the role).
+# The resolved Kite tradingsymbol is shown in brackets at the end as a preview.
 
 verbs:
   buy:
@@ -29,36 +21,41 @@ verbs:
         values: [CALL, PUT, FUT, EQ]
         required: false
         parse: upper
-        hint: "optional: CALL | PUT | FUT (default: EQ)"
+        hint: "CALL | PUT | FUT | EQ (default: EQ)"
       - role: symbol
         kind: symbol
         required: true
-        hint: "underlying (RELIANCE, NIFTY, BANKNIFTY, …)"
+        hint: "underlying — type 3+ chars"
       - role: strike
         kind: strike
         required: "if:instType==CALL|PUT"
         parse: float
-        hint: "strike price (CALL/PUT only)"
+        hint: "strike price (* = wide spread)"
+      - role: expiry
+        kind: expiry
+        required: "if:instType==CALL|PUT|FUT"
+        hint: "expiry date"
       - role: qty
         kind: qty
         required: true
         parse: int
+        hint: "quantity (lots × lot_size for F&O)"
       - role: orderType
-        values: [MARKET, LIMIT, SL, SL-M]
+        values: [LIMIT, SL, SL-M, MARKET]
         required: true
         parse: upper
+        hint: "LIMIT | SL | SL-M | MARKET"
       - role: price
         kind: price
         required: "if:orderType!=MARKET"
         parse: float
+        hint: "limit/trigger price"
+      - role: chase
+        values: [LOW, MED, HIGH]
+        required: false
+        parse: upper
+        hint: "chase aggressiveness (non-MARKET only)"
     kwargs:
-      chase:
-        kind: chase_level
-        parse: int
-        hint: "1-10 (1=patient, 10=aggressive)"
-      expiry:
-        kind: expiry
-        hint: "YYYY-MM-DD override (defaults to nearest)"
       product:
         values: [MIS, NRML, CNC]
 
@@ -72,36 +69,41 @@ verbs:
         values: [CALL, PUT, FUT, EQ]
         required: false
         parse: upper
-        hint: "optional: CALL | PUT | FUT (default: EQ)"
+        hint: "CALL | PUT | FUT | EQ (default: EQ)"
       - role: symbol
         kind: symbol
         required: true
-        hint: "underlying (RELIANCE, NIFTY, BANKNIFTY, …)"
+        hint: "underlying — type 3+ chars"
       - role: strike
         kind: strike
         required: "if:instType==CALL|PUT"
         parse: float
-        hint: "strike price (CALL/PUT only)"
+        hint: "strike price (* = wide spread)"
+      - role: expiry
+        kind: expiry
+        required: "if:instType==CALL|PUT|FUT"
+        hint: "expiry date"
       - role: qty
         kind: qty
         required: true
         parse: int
+        hint: "quantity (lots × lot_size for F&O)"
       - role: orderType
-        values: [MARKET, LIMIT, SL, SL-M]
+        values: [LIMIT, SL, SL-M, MARKET]
         required: true
         parse: upper
+        hint: "LIMIT | SL | SL-M | MARKET"
       - role: price
         kind: price
         required: "if:orderType!=MARKET"
         parse: float
+        hint: "limit/trigger price"
+      - role: chase
+        values: [LOW, MED, HIGH]
+        required: false
+        parse: upper
+        hint: "chase aggressiveness (non-MARKET only)"
     kwargs:
-      chase:
-        kind: chase_level
-        parse: int
-        hint: "1-10"
-      expiry:
-        kind: expiry
-        hint: "YYYY-MM-DD override"
       product:
         values: [MIS, NRML, CNC]
 
@@ -124,19 +126,11 @@ verbs:
       qty:
         parse: int
       chase:
-        kind: chase_level
-        parse: int
-        hint: "1-10"
+        values: [LOW, MED, HIGH]
+        parse: upper
 
-# Chase level → engine config (band in ticks, retry seconds)
+# Chase level → engine config
 chase_levels:
-  "1":  { band_ticks: 10, retry_seconds: 60 }
-  "2":  { band_ticks: 9,  retry_seconds: 54 }
-  "3":  { band_ticks: 8,  retry_seconds: 48 }
-  "4":  { band_ticks: 7,  retry_seconds: 42 }
-  "5":  { band_ticks: 6,  retry_seconds: 36 }
-  "6":  { band_ticks: 5,  retry_seconds: 30 }
-  "7":  { band_ticks: 4,  retry_seconds: 24 }
-  "8":  { band_ticks: 3,  retry_seconds: 18 }
-  "9":  { band_ticks: 2,  retry_seconds: 12 }
-  "10": { band_ticks: 1,  retry_seconds: 6 }
+  LOW:  { band_ticks: 8, retry_seconds: 60 }
+  MED:  { band_ticks: 4, retry_seconds: 30 }
+  HIGH: { band_ticks: 1, retry_seconds: 10 }

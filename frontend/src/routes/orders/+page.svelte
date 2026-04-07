@@ -8,7 +8,7 @@
   import OrderDetail from '$lib/OrderDetail.svelte';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -153,8 +153,9 @@
         grammar={orderGrammar}
         context={cmdContext}
         rows={3}
-        placeholder="buy ZG#### NIFTY22500CE 1 LIMIT 12.5 chase=5"
+        placeholder="buy ZG#### CALL NIFTY 22500 25APR 50 LIMIT 12.5 MED"
         onsubmit={runParsed}
+        previewFn={previewSymbol}
         disabled={running}
       />
     </div>

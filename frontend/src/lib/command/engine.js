@@ -84,12 +84,12 @@ function _positionalIndex(tokens, i) {
   return n;
 }
 
-/** Advance posIdx past optional positional specs whose fixed `values` don't match token text. */
-function _skipOptionalSpecs(verb, posIdx, tokenText, accumulatedCtx = {}) {
+/** Advance posIdx past optional positional specs whose fixed `values` don't match token text.
+ *  When `forSuggest` is true (cursor is at this position), stop at optional specs so they
+ *  can be offered as suggestions — don't skip them. */
+function _skipOptionalSpecs(verb, posIdx, tokenText, accumulatedCtx = {}, forSuggest = false) {
   while (posIdx < verb.tokens.length) {
     const spec = verb.tokens[posIdx];
-    // If required is a function, evaluate it against accumulated context;
-    // skip the spec if not required.
     if (typeof spec.required === 'function') {
       if (!spec.required(accumulatedCtx)) { posIdx++; continue; }
       break;
@@ -97,6 +97,8 @@ function _skipOptionalSpecs(verb, posIdx, tokenText, accumulatedCtx = {}) {
     const req = spec.required;
     const hasFixedValues = Array.isArray(spec.values) && spec.values.length > 0;
     if (!req && hasFixedValues) {
+      // When suggesting (empty prefix or partial), show this spec's values
+      if (forSuggest) break;
       const up = String(tokenText).toUpperCase();
       const inList = spec.values.some(v => String(v).toUpperCase() === up);
       if (!inList) { posIdx++; continue; }
@@ -199,10 +201,10 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
       const vals = optSpec.values.filter(x => x.toUpperCase().startsWith(prefix.toUpperCase()));
       return { suggestions: vals, role: optSpec.role, hint: optSpec.hint || null };
     }
-    // Empty prefix: combine optional values + next spec's values/suggestions
+    // Empty prefix: show optional values first
     const combined = [];
     if (!prefix) combined.push(...optSpec.values);
-    const nextPos = _skipOptionalSpecs(verb, startPos, prefix, priorCtx);
+    const nextPos = _skipOptionalSpecs(verb, startPos + 1, prefix, priorCtx, false);
     const nextSpec = verb.tokens[nextPos];
     if (nextSpec) {
       let nextVals = [];
