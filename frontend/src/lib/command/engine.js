@@ -211,8 +211,9 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
   startPos = _skipOptionalSpecs(verb, startPos, prefix, priorCtx);
   const spec = verb.tokens[startPos];
   if (!spec) {
-    // Past last positional — suggest kwarg names
-    const kwNames = Object.keys(verb.kwargs || {});
+    // Past last positional — suggest kwarg names (exclude already-used ones)
+    const usedKw = new Set(tokens.filter(t => t.kwarg).map(t => t.kwarg.key));
+    const kwNames = Object.keys(verb.kwargs || {}).filter(n => !usedKw.has(n));
     return {
       suggestions: kwNames.filter(n => n.startsWith(prefix)).map(n => `${n}=`),
       role: 'kwarg-key', hint: null,
