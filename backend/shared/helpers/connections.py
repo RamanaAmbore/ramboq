@@ -4,7 +4,7 @@ from urllib.parse import urlparse, parse_qs
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.connection import allowed_gai_family as _orig_gai_family
+from urllib3.util.connection import create_connection as _orig_create_connection
 from kiteconnect import KiteConnect
 
 from backend.shared.helpers.date_time_utils import timestamp_indian
@@ -14,17 +14,28 @@ from backend.shared.helpers.singleton_base import SingletonBase
 from backend.shared.helpers.utils import generate_totp, secrets, config
 
 
-class _IPv6Adapter(HTTPAdapter):
-    """Force connections through IPv6 so Kite sees a different source IP."""
+class _SourceIPAdapter(HTTPAdapter):
+    """Bind outgoing connections to a specific source IP.
+
+    Kite restricts the same IP across multiple apps. Each account can bind
+    to a different IPv6 address from the server's /48 subnet so Kite sees
+    unique source IPs.
+
+    Usage in secrets.yaml:
+        kite_accounts:
+          ZG0790:       # default — uses server's primary IPv4
+          ZJ6294:
+            source_ip: "2a02:4780:12:9e1d::1"
+          ZK_NEW:
+            source_ip: "2a02:4780:12:9e1d::2"
+    """
+    def __init__(self, source_ip, **kwargs):
+        self._source_ip = source_ip
+        super().__init__(**kwargs)
+
     def init_poolmanager(self, *args, **kwargs):
-        import urllib3.util.connection
-        # Temporarily override to prefer AF_INET6
-        _orig = urllib3.util.connection.allowed_gai_family
-        urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET6
-        try:
-            super().init_poolmanager(*args, **kwargs)
-        finally:
-            urllib3.util.connection.allowed_gai_family = _orig
+        kwargs['source_address'] = (self._source_ip, 0)
+        super().init_poolmanager(*args, **kwargs)
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
@@ -45,7 +56,7 @@ class KiteConnection:
         self.api_key = credentials["api_key"]
         self._api_secret = credentials["api_secret"]
         self.totp_token = credentials['totp_token']
-        self._prefer_ipv6 = credentials.get('prefer_ipv6', False)
+        self._source_ip = credentials.get('source_ip', None)
 
         self.login_url = secrets['kite_login_url']
         self.twofa_url = secrets['kite_twofa_url']
@@ -56,26 +67,23 @@ class KiteConnection:
         self.kite = self._new_kite()
 
         self.session = requests.Session()
-        if self._prefer_ipv6:
-            self.session.mount('https://', _IPv6Adapter())
-            self.session.mount('http://', _IPv6Adapter())
+        if self._source_ip:
+            adapter = _SourceIPAdapter(self._source_ip)
+            self.session.mount('https://', adapter)
+            self.session.mount('http://', adapter)
 
         # track connection creation time
         self._conn_created_at = None
 
         self.init_kite_conn()
 
-    def _patch_kite_ipv6(self, kite):
-        """Mount IPv6 adapter on KiteConnect's internal requests session."""
-        if hasattr(kite, 'reqsession'):
-            kite.reqsession.mount('https://', _IPv6Adapter())
-            kite.reqsession.mount('http://', _IPv6Adapter())
-
     def _new_kite(self):
-        """Create a KiteConnect instance, patched for IPv6 if needed."""
+        """Create a KiteConnect instance, bound to source_ip if configured."""
         kite = KiteConnect(api_key=self.api_key)
-        if self._prefer_ipv6:
-            self._patch_kite_ipv6(kite)
+        if self._source_ip and hasattr(kite, 'reqsession'):
+            adapter = _SourceIPAdapter(self._source_ip)
+            kite.reqsession.mount('https://', adapter)
+            kite.reqsession.mount('http://', adapter)
         return kite
 
     def init_kite_conn(self, test_conn=False):
