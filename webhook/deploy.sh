@@ -119,6 +119,9 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     "$APP_ROOT/frontend/.svelte-kit" "$APP_ROOT/frontend/build" \
     "$APP_ROOT/frontend/node_modules" 2>/dev/null || true
 
+  # Clear stale Kite token cache — forces fresh login after deploy
+  rm -f "$APP_ROOT/.log/kite_tokens.json" 2>/dev/null || true
+
   echo "[$TS] Restarting $API_SERVICE..."
   sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
 
