@@ -263,9 +263,13 @@ function priceSuggest(prefix, ctx) {
 }
 
 function orderIdSuggest(prefix, ctx) {
-  const ids = ctx.openOrderIds || [];
-  if (!prefix) return ids.slice(0, 20);
-  return ids.filter(id => id.startsWith(prefix)).slice(0, 20);
+  const orders = ctx.openOrders || [];
+  const labels = orders.map(o => {
+    const price = o.price ? `@${o.price}` : '';
+    return `${o.order_id} (${o.transaction_type} ${o.quantity} ${o.tradingsymbol} ${price} ${o.account})`;
+  });
+  if (!prefix) return labels.slice(0, 20);
+  return labels.filter(s => s.startsWith(prefix)).slice(0, 20);
 }
 
 const SUGGESTERS = {

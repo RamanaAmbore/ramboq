@@ -29,9 +29,8 @@
 
   // context for CommandBar — keeps openOrderIds fresh so cancel/modify suggest them
   const cmdContext = $derived({
-    openOrderIds: orders
-      .filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING')
-      .map(o => o.order_id),
+    openOrders: orders
+      .filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING'),
   });
 
   function authHeaders() {
