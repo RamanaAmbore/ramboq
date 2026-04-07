@@ -113,6 +113,12 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     echo "[$TS] npm not found or no frontend — skipping SvelteKit build"
   fi
 
+  # Fix ownership — manual SSH operations (builds, git) may leave root-owned files
+  # that block the next www-data deploy. Fix .svelte-kit, build, node_modules, .git, .log.
+  sudo chown -R www-data:www-data "$APP_ROOT/.git" "$APP_ROOT/.log" \
+    "$APP_ROOT/frontend/.svelte-kit" "$APP_ROOT/frontend/build" \
+    "$APP_ROOT/frontend/node_modules" 2>/dev/null || true
+
   echo "[$TS] Restarting $API_SERVICE..."
   sudo systemctl restart "$API_SERVICE" || echo "[$TS] ERROR: failed to restart $API_SERVICE"
 
