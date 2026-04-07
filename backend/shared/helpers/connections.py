@@ -135,31 +135,28 @@ class KiteConnection:
         self.setup_access_token(request_token)
 
     def _extract_request_token(self, kite_url):
-        """Follow Kite OAuth redirect to extract request_token.
-        The redirect_url points to a non-running localhost port, so the
-        redirect either fails (ConnectionError) or lands somewhere unexpected.
-        We extract the token from:
-          1. The final response URL query params
-          2. Any intermediate redirect URL in response history
-          3. The ConnectionError message (contains the failed URL)
+        """Extract request_token from Kite OAuth flow.
+        Don't follow redirects — the final redirect goes to the configured
+        redirect_url (localhost) which may hang. Instead, read the Location
+        header from each 302 and extract the token from it.
         """
         request_token = None
         try:
-            resp = self.session.get(kite_url, allow_redirects=True, timeout=5)
-            # Check final URL
-            params = parse_qs(urlparse(resp.url).query)
-            request_token = params.get('request_token', [None])[0]
-            # If not in final URL, check redirect history
-            if not request_token:
-                for r in resp.history:
-                    p = parse_qs(urlparse(r.headers.get('Location', '')).query)
-                    tok = p.get('request_token', [None])[0]
-                    if tok:
-                        request_token = tok
-                        break
+            resp = self.session.get(kite_url, allow_redirects=False, timeout=10)
+            # Follow redirects manually, stopping when we find request_token
+            for _ in range(10):  # max redirects
+                location = resp.headers.get('Location', '')
+                params = parse_qs(urlparse(location).query)
+                tok = params.get('request_token', [None])[0]
+                if tok:
+                    request_token = tok
+                    break
+                if not location or resp.status_code not in (301, 302, 303, 307, 308):
+                    break
+                # Follow this redirect (but not the next one blindly)
+                resp = self.session.get(location, allow_redirects=False, timeout=10)
         except Exception as e:
-            # Expected: redirect to localhost fails with ConnectionError.
-            # The redirect URL (with request_token) is in the error message.
+            # Fallback: parse token from error message
             err = str(e)
             if 'request_token=' in err:
                 try:
