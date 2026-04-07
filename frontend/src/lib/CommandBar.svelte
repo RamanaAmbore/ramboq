@@ -410,8 +410,6 @@
     padding: 0.3rem 0.5rem 0.2rem;
     border-top: 1px solid rgba(51,65,85,0.3);
     align-items: center;
-    flex-shrink: 0;
-    max-height: 3rem;
     overflow-y: auto;
   }
   .cmd-input-inner {
@@ -424,8 +422,7 @@
     width: 100%;
     display: block;
     overflow-y: auto;
-    flex: 1;
-    min-height: 0;
+    flex-shrink: 0;
   }
   .cmd-suggest {
     position: absolute;
