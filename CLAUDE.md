@@ -187,35 +187,42 @@ Defined in `backend_config.yaml` under `market_segments`. Background thread hand
 
 Kite Connect restricts one IP per app. Each Zerodha account uses a separate Kite app (different API key), so multiple accounts on the same server need different source IPs.
 
-**Solution:** The server has a `/48` IPv6 subnet (`2a02:4780:12:9e1d::/48`) — effectively unlimited addresses. Each account binds to a unique IPv6 via `source_ip` in `secrets.yaml`.
+**Solution:** All accounts use IPv6 addresses from the server's `/48` subnet (`2a02:4780:12:9e1d::/48`). Each account binds to a unique IPv6 via `source_ip` in `secrets.yaml`. Every account **must** have `source_ip` set — without it, the OS may choose IPv4 or IPv6 unpredictably.
 
 | Account | Source IP | Kite Whitelist |
 |---|---|---|
-| ZG0790 | default (IPv4 `69.62.78.136`) | `69.62.78.136` |
-| ZJ6294 | `2a02:4780:12:9e1d::1` | `2a02:4780:12:9e1d::1` |
-| (future) | `2a02:4780:12:9e1d::2` | `2a02:4780:12:9e1d::2` |
+| ZG0790 | `2a02:4780:12:9e1d::2` | `2a02:4780:12:9e1d::2` |
+| ZJ6294 | `2a02:4780:12:9e1d::3` | `2a02:4780:12:9e1d::3` |
+| (future) | `2a02:4780:12:9e1d::4` | `2a02:4780:12:9e1d::4` |
+
+Server IPv4 (`69.62.78.136`) is **not used** for Kite — only for web traffic. `::1` is reserved as the server's primary IPv6. Account IPs start from `::2`.
 
 ### Adding a new account
 
-1. Choose the next IPv6: `2a02:4780:12:9e1d::N`
+1. Choose the next IPv6: `2a02:4780:12:9e1d::N` (N starts at 4 for the next account)
 2. Add it to the server: `sudo ip -6 addr add 2a02:4780:12:9e1d::N/48 dev eth0`
-3. Make persistent: add to `/etc/netplan/` config
-4. Add to `secrets.yaml`:
+3. Make persistent: add to `/etc/netplan/50-cloud-init.yaml` under `addresses:`
+4. Add to `secrets.yaml` on **both** server paths (`/opt/ramboq/` and `/opt/ramboq_dev/`):
    ```yaml
    kite_accounts:
      NEW_ACCT:
+       source_ip: "2a02:4780:12:9e1d::N"
        api_key: ...
        api_secret: ...
        password: ...
        totp_token: ...
-       source_ip: "2a02:4780:12:9e1d::N"
    ```
 5. Whitelist `2a02:4780:12:9e1d::N` in the new account's Kite developer console
-6. Restart the API service
+6. Clear token cache: `rm /opt/ramboq/.log/kite_tokens.json /opt/ramboq_dev/.log/kite_tokens.json`
+7. Restart both API services
+
+### Token caching
+
+Access tokens are cached in `.log/kite_tokens.json` (per-environment, gitignored). On startup, cached tokens are restored without login/2FA. Full login only on cache miss or token expiry (23h). Clear the cache file when changing `source_ip` or API credentials.
 
 ### Implementation
 
-`_SourceIPAdapter` (in `connections.py`) extends `requests.HTTPAdapter` to set `source_address` on the urllib3 pool manager. Both KiteConnect's internal `reqsession` and the login `session` are patched with this adapter when `source_ip` is configured.
+`_SourceIPAdapter` (in `connections.py`) extends `requests.HTTPAdapter` to set `source_address` on the urllib3 pool manager. Both KiteConnect's internal `reqsession` and the login `session` are patched with this adapter. The adapter is applied to every account that has `source_ip` configured.
 
 ---
 

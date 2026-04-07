@@ -22,17 +22,16 @@ _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log
 class _SourceIPAdapter(HTTPAdapter):
     """Bind outgoing connections to a specific source IP.
 
-    Kite restricts the same IP across multiple apps. Each account can bind
-    to a different IPv6 address from the server's /48 subnet so Kite sees
-    unique source IPs.
+    Kite restricts the same IP across multiple apps. All accounts use
+    unique IPv6 addresses from the server's /48 subnet. Every account
+    must have source_ip set in secrets.yaml.
 
     Usage in secrets.yaml:
         kite_accounts:
-          ZG0790:       # default — uses server's primary IPv4
-          ZJ6294:
-            source_ip: "2a02:4780:12:9e1d::1"
-          ZK_NEW:
+          ZG0790:
             source_ip: "2a02:4780:12:9e1d::2"
+          ZJ6294:
+            source_ip: "2a02:4780:12:9e1d::3"
     """
     def __init__(self, source_ip, **kwargs):
         self._source_ip = source_ip
