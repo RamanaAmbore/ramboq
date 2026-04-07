@@ -47,6 +47,9 @@
   let suggListEl = $state(/** @type {HTMLDivElement | null} */(null));
   let prevRole = '';
   let prevFocus = -1;
+  // Shortcut kwargs tracked separately — not in textarea
+  let _shortcutKwargs = $state(/** @type {Record<string,string>} */ ({}));
+  let _pendingKwarg = $state(/** @type {string|null} */ (null));
 
   function _currentPrefix() {
     // The text of the token currently under the cursor (or empty if at a space).
@@ -83,12 +86,13 @@
     for (const [k, v] of Object.entries(kwargs)) {
       pairs.push({ role: k, value: String(v), status: v ? 'filled' : 'current' });
     }
-    // Also show kwarg being typed (key= with no value yet) from current role
-    if (currentRole?.startsWith('kwarg:')) {
-      const kw = currentRole.slice(6);
-      if (!(kw in kwargs)) {
-        pairs.push({ role: kw, value: '', status: 'current' });
-      }
+    // Show shortcut kwargs as chips
+    for (const [k, v] of Object.entries(_shortcutKwargs)) {
+      if (!(k in kwargs)) pairs.push({ role: k, value: v, status: 'filled' });
+    }
+    // Show pending kwarg being selected
+    if (_pendingKwarg && !(_pendingKwarg in kwargs) && !(_pendingKwarg in _shortcutKwargs)) {
+      pairs.push({ role: _pendingKwarg, value: '', status: 'current' });
     }
     return enrichPairs ? enrichPairs(pairs, ctx) : pairs;
   }
@@ -160,11 +164,25 @@
   function applyCurrent() {
     if (suggList.length === 0) return false;
     const pick = suggList[suggIdx];
+
+    // If pending kwarg shortcut, store value separately (not in textarea)
+    if (_pendingKwarg) {
+      const val = pick.includes('=') ? pick.split('=')[1] : pick;
+      _shortcutKwargs = { ..._shortcutKwargs, [_pendingKwarg]: val };
+      _pendingKwarg = null;
+      suggOpen = false;
+      queueMicrotask(() => {
+        if (taEl) taEl.focus();
+        refreshSuggestions();
+        refreshErrors();
+      });
+      return true;
+    }
+
     const result = applySuggestion(value, cursor, pick);
     value = result.line;
     cursor = result.cursor;
     suggOpen = false;
-    // Update textarea DOM cursor after Svelte applies the new value
     queueMicrotask(() => {
       if (taEl) {
         taEl.focus();
@@ -179,11 +197,14 @@
   function submit() {
     if (!value.trim()) return;
     const p = parse(value, grammar, context);
+    // Inject shortcut kwargs into parsed result
+    if (Object.keys(_shortcutKwargs).length > 0) {
+      Object.assign(p.kwargs, _shortcutKwargs);
+    }
     if (onsubmitRaw) onsubmitRaw(p);
     if (!p.errors || p.errors.length === 0) {
       onsubmit(p);
     } else {
-      // Show all errors (including "missing X") on explicit submit
       errors = p.errors || [];
     }
   }
@@ -200,6 +221,7 @@
     } else if (e.key === 'Tab') {
       if (applyCurrent()) e.preventDefault();
     } else if (e.key === 'Escape') {
+      if (_pendingKwarg) _pendingKwarg = null;
       suggOpen = false;
     } else if (e.key === 'Enter' && !e.shiftKey) {
       // If suggestion is open AND the user is mid-token → apply; else submit
@@ -221,26 +243,33 @@
     value = e.target.value;
     cursor = e.target.selectionStart;
 
-    // Kwarg shortcut: typing 'p'/'P' at end of line → expand to 'product='
-    // Only once (skip if already present), only at end of input.
+    // Kwarg shortcut: typing 'p'/'P' at end → activate kwarg popup (not in textarea)
     const shortcuts = grammar?.kwargShortcuts;
-    if (shortcuts && cursor === value.length && cursor >= 2) {
+    if (shortcuts && cursor === value.length && cursor >= 2 && !_pendingKwarg) {
       const lastChar = value.slice(-1);
       const prevChar = value.slice(-2, -1);
       if ((prevChar === ' ' || prevChar === '') && shortcuts[lastChar]) {
         const kwarg = shortcuts[lastChar];
-        // Skip if already used
-        if (!value.includes(kwarg + '=')) {
-          const newVal = value.slice(0, -1) + kwarg + '=';
-          value = newVal;
-          cursor = newVal.length;
+        if (!(kwarg in _shortcutKwargs)) {
+          // Erase the typed char, activate kwarg popup
+          value = value.slice(0, -1).trimEnd();
+          cursor = value.length;
+          _pendingKwarg = kwarg;
           queueMicrotask(() => {
             if (taEl) {
               taEl.value = value;
               taEl.setSelectionRange(cursor, cursor);
             }
-            refreshSuggestions();
-            refreshErrors();
+            // Show kwarg values as suggestions
+            const verb = grammar.verbs?.[value.trim().split(/\s+/)[0]?.toLowerCase()];
+            const spec = verb?.kwargs?.[kwarg];
+            if (spec?.values) {
+              suggList = spec.values;
+              role = `kwarg:${kwarg}`;
+              suggIdx = 0;
+              suggOpen = true;
+              parsedPairs = _computeParsedPairs(role);
+            }
           });
           return;
         }
@@ -275,7 +304,7 @@
   // every context change would re-run the (expensive) symbol suggester every
   // time the parent polls orders/websocket, freezing the input.
 
-  export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; }
+  export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; _shortcutKwargs = {}; _pendingKwarg = null; }
   export function setValue(v) { value = v; cursor = v.length; refreshSuggestions(); refreshErrors(); }
   export function refresh() { refreshSuggestions(); refreshErrors(); }
   export { submit };
