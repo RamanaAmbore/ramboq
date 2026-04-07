@@ -134,12 +134,18 @@
     return 'border-gray-300 bg-white';
   };
   const txnColor = (/** @type {string} */ t) => t === 'BUY' ? 'text-green-600' : 'text-red-600';
-  const ACCT_COLORS = ['text-amber-700', 'text-indigo-600', 'text-rose-600', 'text-emerald-700'];
+  // Each account gets a unique color pair: [text color, bg highlight for chips]
+  const ACCT_STYLES = [
+    { text: 'color:#b45309', bg: 'border-left:2px solid #b45309' },  // amber
+    { text: 'color:#ca8a04', bg: 'border-left:2px solid #ca8a04' },  // yellow
+    { text: 'color:#0d9488', bg: 'border-left:2px solid #0d9488' },  // teal
+    { text: 'color:#7c3aed', bg: 'border-left:2px solid #7c3aed' },  // violet
+  ];
   const _acctList = /** @type {string[]} */ ([]);
-  const acctColor = (/** @type {string} */ a) => {
+  const acctStyle = (/** @type {string} */ a) => {
     let idx = _acctList.indexOf(a);
     if (idx < 0) { _acctList.push(a); idx = _acctList.length - 1; }
-    return ACCT_COLORS[idx % ACCT_COLORS.length];
+    return ACCT_STYLES[idx % ACCT_STYLES.length];
   };
 
   onMount(() => {
@@ -245,17 +251,17 @@
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-gray-900">{o.tradingsymbol}</span></span>
+          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span style="{acctStyle(o.account).text}">{o.account}</span> <span class="text-gray-600">{o.tradingsymbol}</span></span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-[0.55rem] text-text/70 flex flex-wrap gap-x-2">
-          <span><span class="text-text/40">qty:</span>{o.filled_quantity}/{o.quantity}</span>
-          <span><span class="text-text/40">type:</span>{o.order_type}</span>
-          <span><span class="text-text/40">price:</span>{o.average_price || o.price || '—'}</span>
-          <span><span class="text-text/40">product:</span>{o.product}</span>
-          <span><span class="text-text/40">exch:</span>{o.exchange}</span>
-          {#if o.status_message}<span><span class="text-text/40">msg:</span>{o.status_message}</span>{/if}
+        <div class="text-[0.55rem] flex flex-wrap gap-x-2 pl-0.5" style="{acctStyle(o.account).bg}">
+          <span><span class="text-gray-400">qty:</span><span class="text-gray-600">{o.filled_quantity}/{o.quantity}</span></span>
+          <span><span class="text-gray-400">type:</span><span class="text-gray-600">{o.order_type}</span></span>
+          <span><span class="text-gray-400">price:</span><span class="text-gray-600">{o.average_price || o.price || '—'}</span></span>
+          <span><span class="text-gray-400">product:</span><span class="text-gray-600">{o.product}</span></span>
+          <span><span class="text-gray-400">exch:</span><span class="text-gray-600">{o.exchange}</span></span>
+          {#if o.status_message}<span><span class="text-gray-400">msg:</span><span class="text-gray-600">{o.status_message}</span></span>{/if}
         </div>
       </button>
     {/each}
