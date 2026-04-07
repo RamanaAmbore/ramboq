@@ -155,8 +155,15 @@
       const p = parse(value, grammar, context);
       // Only show errors that are NOT "missing X" — those are expected while
       // the user is still typing. Show only validation errors (wrong value, etc.)
-      errors = (p.errors || []).filter(e => !e.startsWith('missing '));
-      symbolPreview = (previewFn && (p.errors || []).length === 0) ? (previewFn(p) || '') : '';
+      // Filter: "missing X" (still typing) and "unexpected token: VALUE" for shortcut kwargs
+      const kwVals = new Set(Object.values(_shortcutKwargs).map(v => v.toUpperCase()));
+      errors = (p.errors || []).filter(e =>
+        !e.startsWith('missing ') &&
+        !(e.startsWith('unexpected token: ') && kwVals.has(e.slice(18).toUpperCase()))
+      );
+      // Inject shortcut kwargs for preview
+      if (Object.keys(_shortcutKwargs).length > 0) Object.assign(p.kwargs, _shortcutKwargs);
+      symbolPreview = (previewFn && (p.errors || []).filter(e => !e.startsWith('missing ') && !e.startsWith('unexpected token:')).length === 0) ? (previewFn(p) || '') : '';
     } catch (e) {
       errors = [e.message]; symbolPreview = '';
     }
@@ -166,14 +173,22 @@
     if (suggList.length === 0) return false;
     const pick = suggList[suggIdx];
 
-    // If pending kwarg shortcut, store value separately (not in textarea)
+    // If pending kwarg shortcut, store value and show it in textarea
     if (_pendingKwarg) {
       const val = pick.includes('=') ? pick.split('=')[1] : pick;
       _shortcutKwargs = { ..._shortcutKwargs, [_pendingKwarg]: val };
       _pendingKwarg = null;
+      // Append bare value to textarea
+      const needsSpace = value.length > 0 && !value.endsWith(' ');
+      value = value + (needsSpace ? ' ' : '') + val + ' ';
+      cursor = value.length;
       suggOpen = false;
       queueMicrotask(() => {
-        if (taEl) taEl.focus();
+        if (taEl) {
+          taEl.focus();
+          taEl.value = value;
+          taEl.setSelectionRange(cursor, cursor);
+        }
         refreshSuggestions();
         refreshErrors();
       });
