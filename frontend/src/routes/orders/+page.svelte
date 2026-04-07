@@ -134,7 +134,7 @@
     return 'border-gray-300 bg-white';
   };
   const txnColor = (/** @type {string} */ t) => t === 'BUY' ? 'text-green-600' : 'text-red-600';
-  const ACCT_COLORS = ['text-blue-600', 'text-purple-600', 'text-teal-600', 'text-orange-600'];
+  const ACCT_COLORS = ['text-amber-700', 'text-indigo-600', 'text-rose-600', 'text-emerald-700'];
   const _acctList = /** @type {string[]} */ ([]);
   const acctColor = (/** @type {string} */ a) => {
     let idx = _acctList.indexOf(a);
@@ -245,7 +245,7 @@
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-cyan-600">{o.tradingsymbol}</span></span>
+          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-gray-900">{o.tradingsymbol}</span></span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
