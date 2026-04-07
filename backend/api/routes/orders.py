@@ -5,17 +5,21 @@ GET  /api/orders/           — list all orders across all accounts (cached 15s)
 POST /api/orders/place      — place a new order for a specific account
 PUT  /api/orders/{order_id} — modify an open order
 DELETE /api/orders/{order_id} — cancel an open order
+POST /api/orders/postback   — Kite postback: real-time order status updates
 GET  /api/accounts/         — list accounts (masked display + unmasked ID for order form)
 """
 
+import json
+
 import pandas as pd
-from litestar import Controller, delete, get, post, put
+from litestar import Controller, Request, delete, get, post, put
 from litestar.exceptions import HTTPException
 from litestar.params import Parameter
 from litestar.status_codes import HTTP_200_OK
 
 from backend.api.auth_guard import jwt_guard
 from backend.api.cache import get_or_fetch, invalidate
+from backend.api.routes.ws import broadcast
 from backend.api.schemas import (
     AccountInfo,
     AccountsResponse,
@@ -170,6 +174,44 @@ class OrdersController(Controller):
         except Exception as e:
             logger.error(f"Modify order failed [{masked}] {order_id}: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+    @post("/postback", guards=[])
+    async def order_postback(self, request: Request) -> dict:
+        """Kite postback — receives real-time order status updates.
+        No JWT guard — Kite sends this directly. Authenticated by the
+        postback secret configured in the Kite developer console."""
+        try:
+            body = await request.json()
+            order_id = body.get("order_id", "")
+            status = body.get("status", "")
+            tradingsymbol = body.get("tradingsymbol", "")
+            txn = body.get("transaction_type", "")
+            qty = body.get("quantity", 0)
+            price = body.get("average_price") or body.get("price", 0)
+            status_msg = body.get("status_message") or ""
+
+            logger.info(f"Postback: {order_id} {status} {txn} {qty} {tradingsymbol} "
+                        f"price={price} msg={status_msg}")
+
+            # Invalidate orders cache so next fetch gets fresh data
+            invalidate("orders")
+
+            # Push real-time update to all connected WebSocket clients
+            broadcast(json.dumps({
+                "event": "order_update",
+                "order_id": order_id,
+                "status": status,
+                "tradingsymbol": tradingsymbol,
+                "transaction_type": txn,
+                "quantity": qty,
+                "price": price,
+                "status_message": status_msg,
+            }))
+
+            return {"status": "ok"}
+        except Exception as e:
+            logger.error(f"Postback error: {e}")
+            return {"status": "error", "detail": str(e)}
 
     @delete("/{order_id:str}", status_code=HTTP_200_OK)
     async def cancel_order(

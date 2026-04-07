@@ -130,7 +130,19 @@
     // When an async quote fetch completes, re-render the command bar so the
     // price ladder popup appears without the user having to type another char.
     setQuoteLoadedCallback(() => cmdBar?.refresh());
-    unsub = createPerformanceSocket(() => loadOrders());
+    unsub = createPerformanceSocket((msg) => {
+      if (msg.event === 'order_update') {
+        // Real-time order status from Kite postback
+        const t = new Date().toLocaleTimeString('en-IN', { hour12: false });
+        const entry = `${msg.status} ${msg.transaction_type} ${msg.quantity} ${msg.tradingsymbol}` +
+          (msg.price ? ` @ ${msg.price}` : '') +
+          (msg.status_message ? ` — ${msg.status_message}` : '');
+        cmdHistory = [{ cmd: `[postback] ${msg.order_id}`, result: entry, time: t }, ...cmdHistory].slice(0, 100);
+        loadOrders();  // refresh order cards
+      } else if (msg.event === 'performance_updated') {
+        loadOrders();
+      }
+    });
     logInterval = setInterval(loadCurrentLog, 30000);
   });
   onDestroy(() => { unsub?.(); if (logInterval) clearInterval(logInterval); });

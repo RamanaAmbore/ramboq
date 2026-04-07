@@ -51,7 +51,7 @@ export function createPerformanceSocket(onMessage) {
       if (e.data === 'pong') return; // heartbeat reply — ignore
       try {
         const msg = JSON.parse(e.data);
-        if (msg?.event === 'performance_updated') onMessage(msg);
+        if (msg?.event) onMessage(msg);
       } catch {
         // ignore non-JSON frames
       }
