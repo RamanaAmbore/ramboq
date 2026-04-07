@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import urlparse, parse_qs
 
 import requests
 from kiteconnect import KiteConnect
@@ -55,21 +56,35 @@ class KiteConnection:
 
         self.totp_authenticate(request_id)
 
-        try:
-            kite_url = self.kite.login_url()
-            logger.info("Kite login URL received.")
-            self.session.get(kite_url)
-            request_token = ""
-        except Exception as e:
-            # Extract request token from URL exception
-            try:
-                request_token = str(e).split("request_token=")[1].split("&")[0].split()[0]
-                logger.info(f"Request Token received: {request_token}")
-            except Exception:
-                logger.error("Failed to extract request token.")
-                raise
-
+        kite_url = self.kite.login_url()
+        logger.info("Kite login URL received.")
+        request_token = self._extract_request_token(kite_url)
+        if not request_token:
+            raise RuntimeError("Failed to extract request_token from Kite redirect")
+        logger.info(f"Request Token received: {request_token}")
         self.setup_access_token(request_token)
+
+    def _extract_request_token(self, kite_url):
+        """Follow Kite OAuth redirect to extract request_token.
+        The redirect_url is localhost (not running), so the final redirect
+        fails. We extract the token from either the response URL or the
+        connection-error message."""
+        request_token = None
+        try:
+            resp = self.session.get(kite_url)
+            # Redirect succeeded (unlikely with localhost) — extract from URL
+            params = parse_qs(urlparse(resp.url).query)
+            request_token = params.get('request_token', [None])[0]
+        except Exception as e:
+            # Expected: redirect to localhost fails with ConnectionError.
+            # The redirect URL (with request_token) is in the error message.
+            err = str(e)
+            if 'request_token=' in err:
+                try:
+                    request_token = err.split("request_token=")[1].split("&")[0].split()[0]
+                except (IndexError, ValueError):
+                    pass
+        return request_token
 
     @retry_kite_conn(RETRY_COUNT)
     def get_kite_conn(self, test_conn=False):
