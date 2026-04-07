@@ -202,6 +202,8 @@
     <div class="flex flex-col gap-1">
       <button onclick={() => cmdBar?.submit()} disabled={running}
         class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">Submit</button>
+      <button onclick={() => cmdBar?.clear()}
+        class="btn-secondary text-[0.65rem] py-1 px-3">Clear</button>
       <button onclick={loadOrders} disabled={loading}
         class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
     </div>
