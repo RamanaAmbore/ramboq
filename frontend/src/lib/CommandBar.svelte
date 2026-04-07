@@ -175,6 +175,9 @@
     if (onsubmitRaw) onsubmitRaw(p);
     if (!p.errors || p.errors.length === 0) {
       onsubmit(p);
+    } else {
+      // Show all errors (including "missing X") on explicit submit
+      errors = p.errors || [];
     }
   }
 
