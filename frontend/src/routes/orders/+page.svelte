@@ -203,9 +203,9 @@
       <button onclick={() => cmdBar?.submit()} disabled={running}
         class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">Submit</button>
       <button onclick={() => cmdBar?.clear()}
-        class="btn-secondary text-[0.65rem] py-1 px-3">Clear</button>
+        class="text-[0.65rem] py-1 px-3 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100">Clear</button>
       <button onclick={loadOrders} disabled={loading}
-        class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-50">Refresh</button>
+        class="text-[0.65rem] py-1 px-3 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">Refresh</button>
     </div>
   </div>
 </div>
