@@ -238,13 +238,17 @@
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.tradingsymbol}</span>
+          <span class="font-semibold text-xs {txnColor(o.transaction_type)}">{o.transaction_type} {o.account} {o.tradingsymbol}</span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="grid grid-cols-3 gap-x-2 text-[0.55rem] text-text/70">
-          <div>{o.account}</div><div>{o.order_type} {o.average_price || o.price || '—'}</div><div>{o.filled_quantity}/{o.quantity} {o.product}</div>
-          <div>{o.exchange}</div><div>{o.status_message || ''}</div><div></div>
+        <div class="text-[0.55rem] text-text/70 flex flex-wrap gap-x-2">
+          <span><span class="text-text/40">qty:</span>{o.filled_quantity}/{o.quantity}</span>
+          <span><span class="text-text/40">type:</span>{o.order_type}</span>
+          <span><span class="text-text/40">price:</span>{o.average_price || o.price || '—'}</span>
+          <span><span class="text-text/40">product:</span>{o.product}</span>
+          <span><span class="text-text/40">exch:</span>{o.exchange}</span>
+          {#if o.status_message}<span><span class="text-text/40">msg:</span>{o.status_message}</span>{/if}
         </div>
       </button>
     {/each}
