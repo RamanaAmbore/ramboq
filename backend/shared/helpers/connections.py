@@ -9,9 +9,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from kiteconnect import KiteConnect
 
-# Force IPv4 for all outgoing connections. The server has IPv6 addresses
-# but outbound IPv6 to external hosts (kite.zerodha.com, api.kite.trade)
-# hangs. Python's requests/urllib3 tries IPv6 first when available.
+# Force IPv4 globally. Server's outbound IPv6 hangs for most hosts.
+# KiteConnect API sessions for accounts with source_ip get a per-session
+# override to use IPv6 (api.kite.trade supports IPv6 and it works).
 urllib3.util.connection.HAS_IPV6 = False
 
 from backend.shared.helpers.date_time_utils import timestamp_indian
@@ -22,6 +22,29 @@ from backend.shared.helpers.utils import generate_totp, secrets, config
 
 # Token cache — JSON file per environment (lives in .log/ which is gitignored)
 _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
+
+
+class _IPv6SourceAdapter(HTTPAdapter):
+    """Force IPv6 with a specific source address for KiteConnect API calls.
+    Used when an account needs a different IP than the server's default IPv4.
+    Only applied to KiteConnect.reqsession (api.kite.trade), never to login.
+    """
+    def __init__(self, source_ip, **kwargs):
+        self._source_ip = source_ip
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs['source_address'] = (self._source_ip, 0)
+        super().init_poolmanager(*args, **kwargs)
+
+    def send(self, request, *args, **kwargs):
+        # Temporarily re-enable IPv6 for this request
+        old = urllib3.util.connection.HAS_IPV6
+        urllib3.util.connection.HAS_IPV6 = True
+        try:
+            return super().send(request, *args, **kwargs)
+        finally:
+            urllib3.util.connection.HAS_IPV6 = old
 
 
 
@@ -112,8 +135,13 @@ class KiteConnection:
                         f"{(datetime.now(timezone.utc) - created).seconds // 3600}h)")
 
     def _new_kite(self):
-        """Create a KiteConnect instance."""
-        return KiteConnect(api_key=self.api_key)
+        """Create a KiteConnect instance, with IPv6 source binding if configured."""
+        kite = KiteConnect(api_key=self.api_key)
+        if self._source_ip and ':' in self._source_ip and hasattr(kite, 'reqsession'):
+            adapter = _IPv6SourceAdapter(self._source_ip)
+            kite.reqsession.mount('https://', adapter)
+            kite.reqsession.mount('http://', adapter)
+        return kite
 
     def init_kite_conn(self, test_conn=False):
         """Returns KiteConnect instance, initializing it if necessary."""
