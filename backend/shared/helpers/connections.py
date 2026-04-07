@@ -36,21 +36,9 @@ class _SourceIPAdapter(HTTPAdapter):
         self._source_ip = source_ip
         super().__init__(**kwargs)
 
-    def send(self, request, *args, **kwargs):
-        """Monkey-patch urllib3 create_connection for this request to bind source IP."""
-        import urllib3.util.connection as _uc
-        _orig = _uc.create_connection
-        src = self._source_ip
-
-        def _bound_create(address, *a, **kw):
-            kw['source_address'] = (src, 0)
-            return _orig(address, *a, **kw)
-
-        _uc.create_connection = _bound_create
-        try:
-            return super().send(request, *args, **kwargs)
-        finally:
-            _uc.create_connection = _orig
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs['source_address'] = (self._source_ip, 0)
+        super().init_poolmanager(*args, **kwargs)
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
@@ -116,11 +104,10 @@ class KiteConnection:
 
         self.kite = self._new_kite()
 
+        # Login session uses plain requests (no source_ip binding).
+        # Login goes to kite.zerodha.com which doesn't need IP whitelisting.
+        # Only KiteConnect API calls (api.kite.trade) need the source IP.
         self.session = requests.Session()
-        if self._source_ip:
-            adapter = _SourceIPAdapter(self._source_ip)
-            self.session.mount('https://', adapter)
-            self.session.mount('http://', adapter)
 
         # track connection creation time
         self._conn_created_at = None
