@@ -312,7 +312,7 @@
           tabindex="-1"
           onmousedown={(e) => { e.preventDefault(); pickSuggestion(i); }}
           class="cmd-suggest-item {i === suggIdx ? 'active' : ''}"
-        >{item}</button>
+        >{role?.startsWith('kwarg:') && item.includes('=') ? item.split('=')[1] : item}</button>
       {/each}
     </div>
   {/if}

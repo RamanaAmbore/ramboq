@@ -246,17 +246,17 @@
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-gray-600">{o.tradingsymbol}</span></span>
+          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="{o.status === 'COMPLETE' ? 'text-green-700' : o.status === 'REJECTED' || o.status === 'CANCELLED' ? 'text-red-600' : 'text-amber-700'}">{o.tradingsymbol}</span></span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2">
-          <span>qty:<b>{o.filled_quantity}/{o.quantity}</b></span>
-          <span>type:<b>{o.order_type}</b></span>
-          <span>price:<b>{o.average_price || o.price || '—'}</b></span>
-          <span>product:<b>{o.product}</b></span>
-          <span>exch:<b>{o.exchange}</b></span>
-          {#if o.status_message}<span>msg:<b>{o.status_message}</b></span>{/if}
+        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
+          <span>QTY:<b>{o.filled_quantity}/{o.quantity}</b></span>
+          <span>TYPE:<b>{o.order_type}</b></span>
+          <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>
+          <span>PRODUCT:<b>{o.product}</b></span>
+          <span>EXCH:<b>{o.exchange}</b></span>
+          {#if o.status_message}<span>MSG:<b>{o.status_message}</b></span>{/if}
         </div>
       </button>
     {/each}
