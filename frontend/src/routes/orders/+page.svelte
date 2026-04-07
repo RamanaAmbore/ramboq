@@ -46,29 +46,31 @@
     finally { loading = false; }
   }
 
-  function addResult(/** @type {string} */ cmd, /** @type {string} */ result) {
+  function addResult(/** @type {string} */ status, /** @type {string} */ message, /** @type {Record<string,string>} */ fields = {}) {
     const t = new Date().toLocaleTimeString('en-IN', { hour12: false });
-    cmdHistory = [{ cmd, result, time: t }, ...cmdHistory].slice(0, 100);
-    logTab = 'order';  // auto-switch to show result in order log
+    cmdHistory = [{ status, message, fields, time: t }, ...cmdHistory].slice(0, 100);
+    logTab = 'order';
   }
 
   async function runParsed(parsed) {
-    const display = `${parsed.verb} ${Object.values(parsed.args).join(' ')}`
-      + (Object.keys(parsed.kwargs || {}).length
-        ? ' ' + Object.entries(parsed.kwargs).map(([k,v]) => `${k}=${v}`).join(' ')
-        : '');
     running = true;
     try {
       if (parsed.verb === 'buy' || parsed.verb === 'sell') {
         const payload = buildOrderPayload(parsed);
         const res = await placeOrder(payload);
-        addResult(display, `✓ ${parsed.verb.toUpperCase()} ${parsed.args.qty} ${payload.tradingsymbol} | ID: ${res.order_id}`);
+        addResult('✓', `Order placed`, {
+          verb: parsed.verb.toUpperCase(), account: maskAcct(parsed.args.account),
+          symbol: payload.tradingsymbol, exchange: payload.exchange,
+          qty: String(payload.quantity), type: payload.order_type,
+          price: String(payload.price || ''), product: payload.product,
+          id: res.order_id,
+        });
       } else if (parsed.verb === 'cancel') {
         const id = parsed.args.order_id;
         const ord = orders.find(o => o.order_id === id);
         if (!ord) throw new Error(`order ${id} not found`);
         await cancelOrder(id, ord.account);
-        addResult(display, `✓ Cancelled ${id}`);
+        addResult('✓', `Order cancelled`, { id, symbol: ord.tradingsymbol });
       } else if (parsed.verb === 'modify') {
         const id = parsed.args.order_id;
         const ord = orders.find(o => o.order_id === id);
@@ -77,12 +79,15 @@
         if (parsed.kwargs.price != null) p.price = parsed.kwargs.price;
         if (parsed.kwargs.qty != null) p.quantity = parsed.kwargs.qty;
         await modifyOrder(id, p);
-        addResult(display, `✓ Modified ${id}`);
+        const mods = {};
+        if (parsed.kwargs.price != null) mods.price = String(parsed.kwargs.price);
+        if (parsed.kwargs.qty != null) mods.qty = String(parsed.kwargs.qty);
+        addResult('✓', `Order modified`, { id, ...mods });
       }
       await loadOrders();
       cmdBar?.clear();
     } catch (e) {
-      addResult(display, `✗ ${e.message}`);
+      addResult('✗', e.message, {});
     } finally {
       running = false;
     }
@@ -143,13 +148,16 @@
     setQuoteLoadedCallback(() => cmdBar?.refresh());
     unsub = createPerformanceSocket((msg) => {
       if (msg.event === 'order_update') {
-        // Real-time order status from Kite postback
-        const t = new Date().toLocaleTimeString('en-IN', { hour12: false });
-        const entry = `${msg.status} ${msg.transaction_type} ${msg.quantity} ${msg.tradingsymbol}` +
-          (msg.price ? ` @ ${msg.price}` : '') +
-          (msg.status_message ? ` — ${msg.status_message}` : '');
-        cmdHistory = [{ cmd: `[postback] ${msg.order_id}`, result: entry, time: t }, ...cmdHistory].slice(0, 100);
-        loadOrders();  // refresh order cards
+        const fields = {
+          status: msg.status, verb: msg.transaction_type,
+          symbol: msg.tradingsymbol, qty: String(msg.quantity || ''),
+          ...(msg.price ? { price: String(msg.price) } : {}),
+          ...(msg.account ? { account: msg.account } : {}),
+          id: msg.order_id,
+        };
+        const statusIcon = msg.status === 'COMPLETE' ? '✓' : msg.status === 'REJECTED' ? '✗' : '⟳';
+        addResult(statusIcon, `Postback: ${msg.status}${msg.status_message ? ' — ' + msg.status_message : ''}`, fields);
+        loadOrders();
       } else if (msg.event === 'performance_updated') {
         loadOrders();
       }

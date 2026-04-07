@@ -136,6 +136,8 @@
 .log-panel .log-agent-failed      { color: #f87171; background: rgba(248,113,113,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-default     { color: #9ca3af; }
 .log-panel .log-ts                { color: #fde047; font-weight: 700; margin-right: 4px; }
+.log-panel .log-chip              { display: inline-block; font-size: 0.6rem; padding: 0 0.3rem; margin: 0 0.1rem; border-radius: 0.2rem; background: rgba(100,116,139,0.15); border: 1px solid rgba(100,116,139,0.2); }
+.log-panel .log-chip-key          { color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-right: 0.15rem; font-size: 0.5rem; }
 
 /* ── Shared button styles ─────────────────────────────────────────────────── */
 @layer components {

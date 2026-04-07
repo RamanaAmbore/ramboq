@@ -3,7 +3,7 @@
 
   /** @type {{
    *   heightClass?: string,
-   *   cmdHistory?: Array<{cmd: string, result: string, time: string}>,
+   *   cmdHistory?: Array<{status: string, message: string, fields?: Record<string,string>, time: string}>,
    *   orderLog?: Array<any>,
    *   agentLog?: Array<any>,
    *   systemLog?: string[],
@@ -51,21 +51,21 @@
       (e.event_type?.startsWith('action_') && /place_order|chase_close/i.test(e.trigger_condition || '')));
   }
 
+  function _cmdEntryHtml(h) {
+    const cls = h.status === '✓' ? 'log-agent-success' : h.status === '✗' ? 'log-agent-failed' : 'log-info';
+    const chips = h.fields ? Object.entries(h.fields)
+      .map(([k, v]) => `<span class="log-chip"><span class="log-chip-key">${k}:</span>${v}</span>`)
+      .join(' ') : '';
+    return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.status} ${h.message} ${chips}</span>`;
+  }
+
   function _orderLogHtml() {
-    // Command bar order results + postback updates only
-    const lines = cmdHistory.map(h => {
-      const cls = h.result.startsWith('✓') ? 'log-agent-success' : h.result.startsWith('✗') ? 'log-agent-failed' : 'log-info';
-      return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.cmd} → ${h.result}</span>`;
-    });
+    const lines = cmdHistory.map(h => _cmdEntryHtml(h));
     return lines.length ? lines.join('\n') : '<span class="log-debug">No order events.</span>';
   }
 
   function _terminalHtml() {
-    // Order log + Agent log merged
-    const cmdLines = cmdHistory.map(h => {
-      const cls = h.result.startsWith('✓') ? 'log-agent-success' : h.result.startsWith('✗') ? 'log-agent-failed' : 'log-info';
-      return { ts: h.time, html: `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.cmd} → ${h.result}</span>` };
-    });
+    const cmdLines = cmdHistory.map(h => ({ ts: h.time, html: _cmdEntryHtml(h) }));
     const orderLines = filteredOrder().map(e => {
       const t = logTime(e.timestamp);
       return { ts: t, html: `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
