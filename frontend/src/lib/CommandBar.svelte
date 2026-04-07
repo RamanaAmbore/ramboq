@@ -238,19 +238,36 @@
 </script>
 
 <div class="cmdbar {cls}">
-  <textarea
-    bind:this={taEl}
-    {placeholder}
-    {rows}
-    {disabled}
-    class="field-input cmd-input font-mono text-xs w-full"
-    value={value}
-    oninput={onInput}
-    onkeydown={onKeydown}
-    onselect={onSelect}
-    onfocus={onFocus}
-    onblur={onBlur}
-  ></textarea>
+  <div class="cmd-container">
+    {#if parsedPairs.length > 0}
+      <div class="cmd-pairs">
+        {#each parsedPairs as p}
+          <span class="pair pair-{p.status}">
+            <span class="pair-key">{p.role}:</span>
+            {#if p.value}
+              <span class="pair-val">{p.value}</span>
+            {:else if p.status === 'current'}
+              <span class="pair-cursor">_</span>
+            {/if}
+          </span>
+        {/each}
+        {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
+      </div>
+    {/if}
+    <textarea
+      bind:this={taEl}
+      {placeholder}
+      {rows}
+      {disabled}
+      class="cmd-input-inner font-mono text-xs w-full"
+      value={value}
+      oninput={onInput}
+      onkeydown={onKeydown}
+      onselect={onSelect}
+      onfocus={onFocus}
+      onblur={onBlur}
+    ></textarea>
+  </div>
 
   {#if suggOpen && suggList.length > 0}
     <div class="cmd-suggest" bind:this={suggListEl}>
@@ -265,24 +282,9 @@
     </div>
   {/if}
 
-  {#if showHelp}
-    <div class="text-[0.6rem] mt-0.5 flex gap-2 items-center flex-wrap">
-      {#if parsedPairs.length > 0}
-        {#each parsedPairs as p}
-          <span class="pair pair-{p.status}">
-            <span class="pair-key">{p.role}:</span>
-            {#if p.value}
-              <span class="pair-val">{p.value}</span>
-            {:else if p.status === 'current'}
-              <span class="pair-cursor">_</span>
-            {/if}
-          </span>
-        {/each}
-      {:else if role}
-        <span class="role-badge">{role}</span>
-      {/if}
+  {#if showHelp && (hint || errors.length > 0)}
+    <div class="text-[0.55rem] mt-0.5 flex gap-3 items-center">
       {#if hint}<span class="text-muted opacity-70">{hint}</span>{/if}
-      {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
       {#if errors.length > 0}<span class="text-red-500">{errors.join(' · ')}</span>{/if}
     </div>
   {/if}
@@ -292,6 +294,33 @@
   .cmdbar {
     position: relative;
     width: 100%;
+  }
+  .cmd-container {
+    border: 1px solid #334155;
+    border-radius: 0.375rem;
+    background: #0f1724;
+    overflow: hidden;
+  }
+  .cmd-container:focus-within {
+    border-color: #f59e0b66;
+  }
+  .cmd-pairs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.3rem 0.5rem 0.2rem;
+    border-bottom: 1px solid rgba(51,65,85,0.3);
+    align-items: center;
+  }
+  .cmd-input-inner {
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    resize: none;
+    padding: 0.35rem 0.5rem;
+    color: #e2e8f0;
+    width: 100%;
+    display: block;
   }
   .cmd-suggest {
     position: absolute;
@@ -333,18 +362,6 @@
     background: rgba(34,211,238,0.1);
     padding: 0.1rem 0.4rem;
     border-radius: 0.25rem;
-  }
-  .role-badge {
-    display: inline-block;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-weight: 700;
-    font-size: 0.65rem;
-    color: #fff;
-    background: #f59e0b;
-    padding: 0.1rem 0.5rem;
-    border-radius: 0.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
   }
   .pair {
     display: inline-flex;
