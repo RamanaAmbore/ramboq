@@ -189,7 +189,7 @@ function qtySuggest(prefix, ctx) {
       return lots.map(n => {
         const total = n * ls;
         const liq = _liquidityTag(totalDepth, total);
-        return `${n} ( × ${ls} = ${total})${liq}`;
+        return `${n} (×${ls}=${total})${liq}`;
       });
     }
     // Equity: plain share counts with liquidity
