@@ -201,19 +201,9 @@ export function suggestAt(line, cursorPos, grammar, context = {}) {
       const vals = optSpec.values.filter(x => x.toUpperCase().startsWith(prefix.toUpperCase()));
       return { suggestions: vals, role: optSpec.role, hint: optSpec.hint || null };
     }
-    // Empty prefix: show optional values first
-    const combined = [];
-    if (!prefix) combined.push(...optSpec.values);
-    const nextPos = _skipOptionalSpecs(verb, startPos + 1, prefix, priorCtx, false);
-    const nextSpec = verb.tokens[nextPos];
-    if (nextSpec) {
-      let nextVals = [];
-      if (nextSpec.values) nextVals = nextSpec.values.filter(x => x.toUpperCase().startsWith(prefix.toUpperCase()));
-      else if (nextSpec.suggest) nextVals = nextSpec.suggest(prefix, priorCtx) || [];
-      combined.push(...nextVals);
-    }
+    // Empty prefix: show ONLY the optional values (not the next spec's large list)
     return {
-      suggestions: combined.slice(0, 40),
+      suggestions: optSpec.values,
       role: optSpec.role,
       hint: optSpec.hint || null,
     };
