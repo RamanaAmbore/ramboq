@@ -51,6 +51,20 @@
       (e.event_type?.startsWith('action_') && /place_order|chase_close/i.test(e.trigger_condition || '')));
   }
 
+  function _orderLogHtml() {
+    // Merge command history (order results) + agent order events, newest first
+    const cmdLines = cmdHistory.map(h => {
+      const cls = h.result.startsWith('✓') ? 'log-agent-success' : h.result.startsWith('✗') ? 'log-agent-failed' : 'log-info';
+      return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.cmd} → ${h.result}</span>`;
+    });
+    const evtLines = filteredOrder().map(e => {
+      const t = logTime(e.timestamp);
+      return `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+    });
+    const all = [...cmdLines, ...evtLines];
+    return all.length ? all.join('\n') : '<span class="log-debug">No order events.</span>';
+  }
+
   function setTab(id) {
     logTab = id;
     onTabChange(id);
@@ -68,10 +82,7 @@
 
 <pre class="log-panel {heightClass}">{#if logTab === 'terminal'}{#if cmdHistory.length}{@html cmdHistory.map(h =>
   `<span class="log-info"><span class="text-green-400">$ ${h.cmd}</span></span>\n<span class="log-debug">${h.result}</span>`
-).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}{#if filteredOrder().length}{@html filteredOrder().map(e => {
-  const t = logTime(e.timestamp);
-  return `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No order events.</span>{/if}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
+).join('\n\n')}{:else}<span class="log-debug">Command results appear here.</span>{/if}{:else if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {

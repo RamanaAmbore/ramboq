@@ -49,7 +49,7 @@
   function addResult(/** @type {string} */ cmd, /** @type {string} */ result) {
     const t = new Date().toLocaleTimeString('en-IN', { hour12: false });
     cmdHistory = [{ cmd, result, time: t }, ...cmdHistory].slice(0, 100);
-    logTab = 'terminal';  // auto-switch to show result
+    logTab = 'order';  // auto-switch to show result in order log
   }
 
   async function runParsed(parsed) {
