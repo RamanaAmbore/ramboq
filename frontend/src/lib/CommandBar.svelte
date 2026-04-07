@@ -104,8 +104,10 @@
     if (!grammar || !value.trim()) { errors = []; symbolPreview = ''; return; }
     try {
       const p = parse(value, grammar, context);
-      errors = p.errors || [];
-      symbolPreview = (previewFn && errors.length === 0) ? (previewFn(p) || '') : '';
+      // Only show errors that are NOT "missing X" — those are expected while
+      // the user is still typing. Show only validation errors (wrong value, etc.)
+      errors = (p.errors || []).filter(e => !e.startsWith('missing '));
+      symbolPreview = (previewFn && (p.errors || []).length === 0) ? (previewFn(p) || '') : '';
     } catch (e) {
       errors = [e.message]; symbolPreview = '';
     }
