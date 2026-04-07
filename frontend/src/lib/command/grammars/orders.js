@@ -46,7 +46,11 @@ async function _fetchLtp(exchange, tradingsymbol) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    const entry = { ltp: data.ltp, bid: data.bid, ask: data.ask, at: Date.now() };
+    const entry = {
+      ltp: data.ltp, bid: data.bid, ask: data.ask,
+      depth_buy: data.depth_buy || [], depth_sell: data.depth_sell || [],
+      volume: data.volume || 0, at: Date.now(),
+    };
     _ltpCache.set(key, entry);
     if (_onQuoteLoaded) _onQuoteLoaded();
     return entry;
@@ -115,6 +119,13 @@ function expirySuggest(prefix, ctx) {
   return listExpiries(underlying, mapped).slice(0, 20);
 }
 
+function _liquidityTag(totalDepth, qty) {
+  if (!totalDepth || totalDepth <= 0) return '';
+  if (qty <= totalDepth * 0.1) return ' ✓';
+  if (qty <= totalDepth * 0.5) return ' ~';
+  return ' ✗';
+}
+
 function qtySuggest(prefix, ctx) {
   try {
     const inst = resolveInstrument({
@@ -125,21 +136,39 @@ function qtySuggest(prefix, ctx) {
     });
     const ls = inst.ls || 1;
     const isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+
+    // Get total depth for liquidity indicator
+    const cacheKey = `${inst.e}:${inst.s}`;
+    const entry = _ltpCache.get(cacheKey);
+    if (!entry) _fetchLtp(inst.e, inst.s); // trigger background fetch
+    const totalBid = (entry?.depth_buy || []).reduce((s, d) => s + d.quantity, 0);
+    const totalAsk = (entry?.depth_sell || []).reduce((s, d) => s + d.quantity, 0);
+    const totalDepth = totalBid + totalAsk;
+
     if (isFO && ls > 1) {
-      // Show as: lots ( × lot_size = total)
-      // e.g. "1 ( × 50 = 50)", "2 ( × 50 = 100)"
-      // Inserted value is just the lots number; bracket is display-only
       const lots = prefix ? [Number(prefix) || 1] : [1, 2, 3, 5, 10];
-      return lots.map(n => `${n} ( × ${ls} = ${n * ls})`);
+      return lots.map(n => {
+        const total = n * ls;
+        const liq = _liquidityTag(totalDepth, total);
+        return `${n} ( × ${ls} = ${total})${liq}`;
+      });
     }
-    // Equity: plain share counts
-    if (prefix) return [];
-    return ['1', '5', '10', '25', '50', '100', '500'];
+    // Equity: plain share counts with liquidity
+    const counts = prefix ? [Number(prefix) || 1] : [1, 5, 10, 25, 50, 100, 500];
+    return counts.map(n => {
+      const liq = _liquidityTag(totalDepth, n);
+      return liq ? `${n} (${liq.trim()})` : String(n);
+    });
   } catch {
-    // Fallback when instrument can't be resolved yet
     if (prefix) return [];
     return ['1', '5', '10', '25', '50', '100', '500'];
   }
+}
+
+function _depthMap(depthArr) {
+  const m = new Map();
+  for (const d of depthArr) m.set(+d.price.toFixed(2), d);
+  return m;
 }
 
 function priceSuggest(prefix, ctx) {
@@ -158,27 +187,36 @@ function priceSuggest(prefix, ctx) {
     const ltp = entry.ltp;
     const tick = inst.ts || 0.05;
     const orderType = (ctx.orderType || 'LIMIT').toUpperCase();
+    const bidMap = _depthMap(entry.depth_buy || []);
+    const askMap = _depthMap(entry.depth_sell || []);
 
     if (orderType === 'SL' || orderType === 'SL-M') {
-      // Show % trigger prices
+      // Show % trigger prices with depth info
       const isBuy = ctx._verb === 'buy';
       const pcts = isBuy ? [5, 10, 20] : [-5, -10, -20];
       return pcts.map(pct => {
         const price = +(ltp * (1 + pct / 100)).toFixed(2);
-        const rounded = Math.round(price / tick) * tick;
-        return `${rounded.toFixed(2)} (${pct > 0 ? '+' : ''}${pct}% of ${ltp.toFixed(2)})`;
+        const rounded = +(Math.round(price / tick) * tick).toFixed(2);
+        return `${rounded} (${pct > 0 ? '+' : ''}${pct}% of ${ltp.toFixed(2)})`;
       });
     }
 
-    // LIMIT: show ATM ± 10 ticks centered on LTP
+    // LIMIT: show ATM ± 10 ticks with depth annotations
     const atm = Math.round(ltp / tick) * tick;
     const steps = [];
     for (let i = -10; i <= 10; i++) {
       const p = +(atm + i * tick).toFixed(2);
-      if (p > 0) steps.push(String(p));
+      if (p <= 0) continue;
+      const bid = bidMap.get(p);
+      const ask = askMap.get(p);
+      let label = String(p);
+      if (bid) label += ` (bid ${bid.quantity})`;
+      else if (ask) label += ` (ask ${ask.quantity})`;
+      if (+p.toFixed(2) === +ltp.toFixed(2)) label += ' ◀ LTP';
+      steps.push(label);
     }
     const atmStr = String(+atm.toFixed(2));
-    const focus = steps.indexOf(atmStr);
+    const focus = steps.findIndex(s => s.startsWith(atmStr));
     if (focus >= 0) Object.defineProperty(steps, '_focusIndex', { value: focus, enumerable: false });
     if (!prefix) return steps;
     return steps.filter(s => s.startsWith(prefix));

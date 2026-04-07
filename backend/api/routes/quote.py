@@ -19,6 +19,12 @@ from backend.shared.helpers.ramboq_logger import get_logger
 logger = get_logger(__name__)
 
 
+class DepthLevel(msgspec.Struct):
+    price: float
+    quantity: int
+    orders: int = 0
+
+
 class QuoteResponse(msgspec.Struct):
     tradingsymbol: str
     exchange: str
@@ -26,6 +32,9 @@ class QuoteResponse(msgspec.Struct):
     tick_size: float
     bid: Optional[float] = None
     ask: Optional[float] = None
+    depth_buy: list[DepthLevel] = []
+    depth_sell: list[DepthLevel] = []
+    volume: int = 0
 
 
 def _fetch_ltp(exchange: str, tradingsymbol: str) -> QuoteResponse:
@@ -33,29 +42,49 @@ def _fetch_ltp(exchange: str, tradingsymbol: str) -> QuoteResponse:
     account = next(iter(conns.conn))
     kite = conns.conn[account].kite
     key = f"{exchange}:{tradingsymbol}"
-    data = kite.ltp([key])
-    row = data.get(key) or {}
-    ltp = float(row.get("last_price") or 0.0)
 
-    # Also try to get depth if available
     bid = ask = None
+    depth_buy: list[DepthLevel] = []
+    depth_sell: list[DepthLevel] = []
+    volume = 0
+    ltp = 0.0
+
     try:
         full = kite.quote([key]).get(key) or {}
+        ltp = float(full.get("last_price") or 0.0)
+        volume = int(full.get("volume") or 0)
         depth = full.get("depth") or {}
-        buy = depth.get("buy") or []
-        sell = depth.get("sell") or []
-        if buy: bid = float(buy[0].get("price") or 0.0) or None
-        if sell: ask = float(sell[0].get("price") or 0.0) or None
+        for level in (depth.get("buy") or [])[:5]:
+            p, q, o = float(level.get("price") or 0), int(level.get("quantity") or 0), int(level.get("orders") or 0)
+            if p > 0:
+                depth_buy.append(DepthLevel(price=p, quantity=q, orders=o))
+        for level in (depth.get("sell") or [])[:5]:
+            p, q, o = float(level.get("price") or 0), int(level.get("quantity") or 0), int(level.get("orders") or 0)
+            if p > 0:
+                depth_sell.append(DepthLevel(price=p, quantity=q, orders=o))
+        if depth_buy:
+            bid = depth_buy[0].price
+        if depth_sell:
+            ask = depth_sell[0].price
     except Exception:
-        pass
+        # Fallback to ltp-only
+        try:
+            data = kite.ltp([key])
+            row = data.get(key) or {}
+            ltp = float(row.get("last_price") or 0.0)
+        except Exception:
+            pass
 
     return QuoteResponse(
         tradingsymbol=tradingsymbol,
         exchange=exchange,
         ltp=ltp,
-        tick_size=0.05,  # overridden by frontend from instruments cache
+        tick_size=0.05,
         bid=bid,
         ask=ask,
+        depth_buy=depth_buy,
+        depth_sell=depth_sell,
+        volume=volume,
     )
 
 
