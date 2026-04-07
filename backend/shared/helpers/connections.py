@@ -22,24 +22,35 @@ _TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log
 class _SourceIPAdapter(HTTPAdapter):
     """Bind outgoing connections to a specific source IP.
 
-    Kite restricts the same IP across multiple apps. All accounts use
-    unique IPv6 addresses from the server's /48 subnet. Every account
-    must have source_ip set in secrets.yaml.
+    Kite restricts the same IP per app. Each account binds to a different
+    IP via source_ip in secrets.yaml. Supports both IPv4 and IPv6 source.
 
     Usage in secrets.yaml:
         kite_accounts:
           ZG0790:
-            source_ip: "2a02:4780:12:9e1d::2"
+            source_ip: "69.62.78.136"
           ZJ6294:
-            source_ip: "2a02:4780:12:9e1d::3"
+            source_ip: "2a02:4780:12:9e1d::1"
     """
     def __init__(self, source_ip, **kwargs):
         self._source_ip = source_ip
         super().__init__(**kwargs)
 
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs['source_address'] = (self._source_ip, 0)
-        super().init_poolmanager(*args, **kwargs)
+    def send(self, request, *args, **kwargs):
+        """Monkey-patch urllib3 create_connection for this request to bind source IP."""
+        import urllib3.util.connection as _uc
+        _orig = _uc.create_connection
+        src = self._source_ip
+
+        def _bound_create(address, *a, **kw):
+            kw['source_address'] = (src, 0)
+            return _orig(address, *a, **kw)
+
+        _uc.create_connection = _bound_create
+        try:
+            return super().send(request, *args, **kwargs)
+        finally:
+            _uc.create_connection = _orig
 
 RETRY_COUNT = config['retry_count']
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
