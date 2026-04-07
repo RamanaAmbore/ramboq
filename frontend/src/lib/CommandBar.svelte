@@ -325,7 +325,7 @@
   // every context change would re-run the (expensive) symbol suggester every
   // time the parent polls orders/websocket, freezing the input.
 
-  export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; _shortcutKwargs = {}; _pendingKwarg = null; }
+  export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; parsedPairs = []; symbolPreview = ''; _shortcutKwargs = {}; _pendingKwarg = null; }
   export function setValue(v) { value = v; cursor = v.length; refreshSuggestions(); refreshErrors(); }
   export function refresh() { refreshSuggestions(); refreshErrors(); }
   export { submit };
