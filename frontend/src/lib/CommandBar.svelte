@@ -333,6 +333,19 @@
 
 <div class="cmdbar {cls}">
   <div class="cmd-container">
+    <textarea
+      bind:this={taEl}
+      {placeholder}
+      {rows}
+      {disabled}
+      class="cmd-input-inner font-mono text-xs w-full"
+      value={value}
+      oninput={onInput}
+      onkeydown={onKeydown}
+      onselect={onSelect}
+      onfocus={onFocus}
+      onblur={onBlur}
+    ></textarea>
     {#if parsedPairs.length > 0}
       <div class="cmd-pairs">
         {#each parsedPairs as p}
@@ -348,19 +361,6 @@
         {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
       </div>
     {/if}
-    <textarea
-      bind:this={taEl}
-      {placeholder}
-      {rows}
-      {disabled}
-      class="cmd-input-inner font-mono text-xs w-full"
-      value={value}
-      oninput={onInput}
-      onkeydown={onKeydown}
-      onselect={onSelect}
-      onfocus={onFocus}
-      onblur={onBlur}
-    ></textarea>
   </div>
 
   {#if suggOpen && suggList.length > 0}
@@ -408,7 +408,7 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     padding: 0.3rem 0.5rem 0.2rem;
-    border-bottom: 1px solid rgba(51,65,85,0.3);
+    border-top: 1px solid rgba(51,65,85,0.3);
     align-items: center;
     flex-shrink: 0;
     max-height: 3rem;
