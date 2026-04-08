@@ -207,7 +207,7 @@
 </div>
 
 <!-- Status Dashboard -->
-<div class="grid grid-cols-5 gap-2 mt-1 mb-1">
+<div class="grid grid-cols-5 gap-2 mt-1 mb-2">
   <button onclick={() => filterStatus = 'all'}
     class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-primary">{orders.length}</div>
@@ -250,10 +250,13 @@
         </div>
         <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
           <span>QTY:<b>{o.filled_quantity}/{o.quantity}</b></span>
-          <span>TYPE:<b>{o.order_type}</b></span>
+          <span>ORDER:<b>{o.order_type}</b></span>
           <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>
+          {#if o.trigger_price}<span>TRIGGER:<b>{o.trigger_price}</b></span>{/if}
           <span>PRODUCT:<b>{o.product}</b></span>
           <span>EXCH:<b>{o.exchange}</b></span>
+          <span>VARIETY:<b>{o.variety}</b></span>
+          {#if o.tag}<span>TAG:<b>{o.tag}</b></span>{/if}
           {#if o.status_message}<span>MSG:<b>{o.status_message}</b></span>{/if}
         </div>
       </button>
