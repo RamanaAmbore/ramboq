@@ -332,20 +332,7 @@
 </script>
 
 <div class="cmdbar {cls}">
-  <div class="cmd-container">
-    <textarea
-      bind:this={taEl}
-      {placeholder}
-      {rows}
-      {disabled}
-      class="cmd-input-inner font-mono text-xs w-full"
-      value={value}
-      oninput={onInput}
-      onkeydown={onKeydown}
-      onselect={onSelect}
-      onfocus={onFocus}
-      onblur={onBlur}
-    ></textarea>
+  <div class="cmd-chips-area">
     {#if parsedPairs.length > 0}
       <div class="cmd-pairs">
         {#each parsedPairs as p}
@@ -361,6 +348,21 @@
         {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
       </div>
     {/if}
+  </div>
+  <div class="cmd-container">
+    <textarea
+      bind:this={taEl}
+      {placeholder}
+      {rows}
+      {disabled}
+      class="cmd-input-inner font-mono text-xs w-full"
+      value={value}
+      oninput={onInput}
+      onkeydown={onKeydown}
+      onselect={onSelect}
+      onfocus={onFocus}
+      onblur={onBlur}
+    ></textarea>
   </div>
 
   {#if suggOpen && suggList.length > 0}
@@ -391,14 +393,14 @@
     position: relative;
     width: 100%;
   }
+  .cmd-chips-area {
+    min-height: 0.25rem;
+  }
   .cmd-container {
     border: 1px solid #334155;
     border-radius: 0.375rem;
     background: #0f1724;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    height: 14rem;
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
@@ -407,10 +409,8 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    padding: 0.3rem 0.5rem 0.2rem;
-    border-top: 1px solid rgba(51,65,85,0.3);
+    padding: 0.15rem 0.5rem;
     align-items: center;
-    overflow-y: auto;
   }
   .cmd-input-inner {
     border: none !important;
@@ -422,7 +422,6 @@
     width: 100%;
     display: block;
     overflow-y: auto;
-    flex-shrink: 0;
   }
   .cmd-suggest {
     position: absolute;
