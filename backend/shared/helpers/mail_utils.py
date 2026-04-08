@@ -1,8 +1,22 @@
+import socket
 import smtplib
 from datetime import date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
+
+
+class _IPv4SMTP(smtplib.SMTP):
+    """Force IPv4 connections — server's outbound IPv6 hangs."""
+    def _get_socket(self, host, port, timeout):
+        for res in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = socket.socket(af, socktype, proto)
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            sock.connect(sa)
+            return sock
+        raise OSError(f"Could not connect to {host}:{port} via IPv4")
 
 from backend.shared.helpers.utils import secrets, ramboq_deploy, is_prod_capable
 
@@ -36,7 +50,7 @@ def send_email(name, email_id, subject, html_body):
 
     try:
         if is_prod_capable() and ramboq_deploy.get('mail', False):
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            with _IPv4SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, recipients, msg.as_string())  # ✅ send to both To & CC
