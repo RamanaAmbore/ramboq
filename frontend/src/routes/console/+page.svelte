@@ -132,20 +132,17 @@
   <h1 class="page-title-chip mb-2">Terminal</h1>
 
   <!-- Command input -->
-  <div class="relative mb-1">
+  <div class="relative mb-2">
     <textarea
       bind:value={command}
-      rows="2"
       class="field-input cmd-input font-mono text-xs w-full"
-      style="padding-bottom:1.5rem"
+      style="height:8rem; padding-bottom:1.5rem"
       placeholder="Shell command, order (buy/sell), or agent command"
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
     ></textarea>
     <div class="absolute bottom-1 right-2 flex gap-1 z-10">
       <button onclick={runCommand} disabled={running || !command.trim()}
-        class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium disabled:opacity-50">
-        {running ? '...' : 'Run'}
-      </button>
+        class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium disabled:opacity-50">{running ? '...' : 'Run'}</button>
       <button onclick={() => { command = ''; }}
         class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
     </div>
