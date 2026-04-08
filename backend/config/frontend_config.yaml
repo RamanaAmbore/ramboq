@@ -148,12 +148,12 @@ footer_name: RamboQuant Analytics LLP
 footer_mobile_text3: Markets carry risk.
 footer_text2: ACU-5195
 footer_desktop_text3: "Disclaimer: Investment in markets is subject to risk. Past performance is not indicative of future results."
-genai_system_msg: You are an expert Indian and global financial markets analyst. Generate professional, clear markdown-formatted daily market reports as per user instructions. Output only the final market report — no preamble, no meta-commentary, no "I will now...", no "Based on my research...", no thinking steps, no source citations or reference numbers like [1][2][3]. Start directly with the report title.
+genai_system_msg: You are an expert Indian and global financial markets analyst. Generate professional, clear markdown-formatted daily market reports as per user instructions. Output only the final market report — no preamble, no meta-commentary, no "I will now...", no "Based on my research...", no thinking steps, no source citations or reference numbers like [1][2][3]. Start directly with the report title. IMPORTANT formatting rules — use ₹ (Unicode rupee sign) for Indian currency, never Rs. or INR. Use $ for USD. Format all numbers with proper Indian comma system (e.g., ₹1,45,000.40). Never use markdown bold markers (**) around or inside currency amounts — use *single asterisks* for emphasis. Never output stray ** before or after numbers.
 genai_user_msg: |
     Generate a daily market report with markdown tags for today with the following structure. Output the report directly — do not include any preamble, search commentary, source citations like [1][2], or closing remarks after the disclaimer. Start immediately with the report title:
     
     Bold all instruments and instrument prices (e.g., *₹ 1,450.40*) with thin space after symbol - Ensure all key stock/index/ETF mentions have prices in brackets and change in prices for the day - Use simple markdown-friendly formatting - Avoid promotional tone — keep it informative and concise. Always wrap prices in markdown bold without using any non-breaking or Unicode spaces between the currency symbol and the number. ✅ Use *₹1,450.40* or *$1,234.56* 🚫 Avoid formats like *₹ 1,450.40* (contains thin or non-breaking space which breaks bold formatting). Show India market and stock news first followed by world market and stock news in each section. Double check the numbers like closing and stock prices from multiple sources. Show title in H3 and section names in H4.Don't show any emojis or icons in headings. Give the output with markdown tags which I can copy paste in code for my website.
-    All numbers should have commas using Indian system. 
+    All numbers with Indian comma system (e.g., ₹1,45,000 not ₹145,000). Use ₹ symbol (not Rs.) for all Indian currency amounts.
   
     **Daily Market Report — [Day, Date, Time in Indian Standard Time] | [Day, Date, Time in Eastern Standard Time]**
     1. *Market Summary* — A quick bullet list of the closing prices and key market highlights including: - NIFTY 50, SENSEX, VIX, Dow Jones, NASDAQ, bitcoin - Gold, Silver, Copper spot, and Goldm and Silverm future prices which are above Rs. 1,00,000 for current month - Crude Oil futures (current month, MCX) price in ₹ per barrel as of 7:00 AM IST before market open - USD/INR closing market exchange rate which is above Rs. 85. If the market is open, show the current price otherwise show closing values and indicate if the value is closing or current in brackets. Double check the data and show only closing prices as I am seeing many errors. Give market commentary after showing the above information.
@@ -162,119 +162,11 @@ genai_user_msg: |
     4. *Portfolio Highlights* — Include only the instruments from [portfolio] that have major corporate actions or significant moves: - Use instrument name, price in ₹ (bolded), and 1-line description of the event
     5. *Insights & Outlook* — Add bullet points on overall market sentiment, sector drivers, and what to watch for tomorrow.
     
-    _Disclaimer: This Market Report is generated using AI and market data sources. Numbers may not be accurate at all times. Please validate from official sources before making investment decisions._
+    _Disclaimer: This market report is generated using AI (Gemini) with Google Search grounding. Prices and data may contain inaccuracies. Always verify from official sources (NSE, BSE, exchanges) before making investment decisions._
     After disclaimer no additional information.
     
     portfolio:
-    • GOLDBEES-E – Gold Benchmark Exchange-Traded Scheme
-    • SILVERBEES – Nippon India Silver ETF
-    • ABFRL – Aditya Birla Fashion and Retail 
-    • ABLBL – Aditya Birla Lifestyle Brands 
-    • ACE – Action Construction Equipment 
-    • ACMESOLAR
-    • ACUTAAS
-    • ADANIGREEN – Adani Green Energy 
-    • ADANIPORTS – Adani Ports and SEZ 
-    • ANANTRAJ – Anant Raj 
-    • ASMTECPP-X
-    • ASTRAMICRO – Astra Microwave Products 
-    • ATGL – Adani Total Gas 
-    • AVANTEL – Avantel 
-    • BATAINDIA – Bata India 
-    • BDL – Bharat Dynamics 
-    • BEL – Bharat Electronics 
-    • BEML 
-    • BHEL – Bharat Heavy Electricals 
-    • CAPLIPOINT – Caplin Point Laboratories 
-    • CEINSYSTECH – Ceinsys Tech 
-    • CGPOWER – CG Power and Industrial Solutions 
-    • DATAPATTNS – Data Patterns (India) 
-    • DIXON – Dixon Technologies 
-    • GENUSPOWER – Genus Power Infrastructures 
-    • GMDC– Gujarat Mineral Development Corp. 
-    • GOLDBEES-E – [already listed under ETF]
-    • GRAVITA – Gravita India 
-    • GRSE – Garden Reach Shipbuilders & Engineers 
-    • GVT&D
-    • HAL – Hindustan Aeronautics 
-    • HCC-T – Hindustan Construction Co. 
-    • HIGHENE-XT
-    • HIKAL  
-    • IDEAFORGE – ideaForge Technology 
-    • IDFCFIRSTB – IDFC First Bank 
-    • IFCI  
-    • INDHOTEL – Indian Hotels Co. 
-    • INDIAMART – IndiaMART InterMESH 
-    • INOXINDIA
-    • INOXWIND – Inox Wind 
-    • IRCTC – Indian Railway Catering and Tourism Corp.
-    • IREDA – Indian Renewable Energy Development Agency 
-    • IRCON – Ircon International 
-    • IRFC – Indian Railway Finance Corp.
-    • JIOFIN – Jio Financial Services 
-    • JUBLPHARMA – Jubilant Pharmova 
-    • KAYNES – Kaynes Technology India 
-    • KOPRAN  
-    • KPITTECH – KPIT Technologies 
-    • LAURUSLABS – Laurus Labs 
-    • MAPMYINDIA – C.E. Info Systems 
-    • MANINDS – Man Industries 
-    • MARINE-BE – Marine Electricals 
-    • MAZDOCK – Mazagon Dock Shipbuilders 
-    • MCX – Multi Commodity Exchange of India 
-    • MIDHANI – Mishra Dhatu Nigam 
-    • MMTC 
-    • MTNL – Mahanagar Telephone Nigam 
-    • NEULANDLAB – Neuland Laboratories 
-    • NH – Narayana Hrudayalaya 
-    • NIBE 
-    • NMDC 
-    • OLECTRA – Olectra Greentech 
-    • OPTIEMUS – Optiemus Infracom 
-    • PARAS – Paras Defence & Space Technologies 
-    • PCJEWELLER – PC Jeweller 
-    • PFC – Power Finance Corporation 
-    • PGEL – PG Electroplast 
-    • POLYMED – Poly Medicure 
-    • PREMEXPLN – Premier Explosives 
-    • RAILTEL – RailTel Corporation of India 
-    • RAYMOND  
-    • RAYMONDREL – Raymond Realty 
-    • REC
-    • RELINFRA-T – Reliance Infrastructure 
-    • RIR – Rane (Madras)  or similar
-    • RPOWER-T – Reliance Power 
-    • RVNL – Rail Vikas Nigam 
-    • SCHNEIDER-T – Schneider Electric Infrastructure 
-    • SCI – Shipping Corporation of India 
-    • SHAKTIPUMP – Shakti Pumps (India) 
-    • SIKA – Sika Interplant Systems 
-    • SJVN 
-    • SOLARINDS – Solar Industries 
-    • SOUTHBANK – South Indian Bank 
-    • STCINDIA-T – State Trading Corporation of India 
-    • SUZLON – Suzlon Energy 
-    • SWSOLAR – Sterling & Wilson Renewable Energy 
-    • SYRMA – Syrma SGS Technology 
-    • TATATECH – Tata Technologies 
-    • TATAELXSI – Tata Elxsi 
-    • TITAGARH – Titagarh Rail Systems 
-    • TITAN – Titan Company 
-    • TRENT  
-    • UNIMECH-T – Unimech Industries 
-    • ZENTEC – Zen Technologies
-    • Advait Energy Transitions
-    • Aurionpro Solutions
-    • Black Box
-    • Ceinsys Tech
-    • E2E Networks
-    • Netweb Technologies
-    • Shilchar Technologies
-    • Techno Electric & Engineering
-    • Tejas Networks
-    • Waaree Energies
-    • Websol Energy System
-    • SOFI  
+    {{PORTFOLIO_SYMBOLS}}
 genai_temperature: 0.8
 genai_max_tokens: 8000
 genai_model: gemini-2.5-flash
