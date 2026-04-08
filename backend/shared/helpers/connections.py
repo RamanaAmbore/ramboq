@@ -74,15 +74,18 @@ def _load_cached_token(account: str) -> tuple[str | None, datetime | None]:
 
 
 def _save_cached_token(account: str, access_token: str) -> None:
-    """Persist an access token for an account."""
+    """Persist an access token for an account. Empty token removes the entry."""
     try:
         data = {}
         if _TOKEN_CACHE_PATH.exists():
             data = json.loads(_TOKEN_CACHE_PATH.read_text())
-        data[account] = {
-            'access_token': access_token,
-            'created_at': datetime.now(timezone.utc).isoformat(),
-        }
+        if not access_token:
+            data.pop(account, None)
+        else:
+            data[account] = {
+                'access_token': access_token,
+                'created_at': datetime.now(timezone.utc).isoformat(),
+            }
         _TOKEN_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         _TOKEN_CACHE_PATH.write_text(json.dumps(data, indent=2))
     except Exception as e:
@@ -204,7 +207,14 @@ class KiteConnection:
             if not self._access_token:
                 self._try_restore_token()
             if self._access_token:
-                return self.kite
+                # Validate token with a lightweight API call
+                try:
+                    self.kite.profile()
+                    return self.kite
+                except Exception as e:
+                    logger.warning(f"Cached token invalid for {self.account}: {e}")
+                    self._access_token = None
+                    _save_cached_token(self.account, '')  # clear stale cache
 
             # No cached token — do full login
             self.init_kite_conn(test_conn=True)
