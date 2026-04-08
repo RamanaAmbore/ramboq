@@ -222,17 +222,12 @@ async def _task_performance(state: dict) -> None:
             ist_display = timestamp_display()
             perf_key    = get_nearest_time(interval=interval)
 
+            # Full portfolio summaries (no segment filtering)
+            all_sum_h = _summarise_holdings(df_holdings, sum_holdings, None)
+            all_sum_p = _summarise_positions(df_positions)
+
             for seg in open_segments:
-                ss            = seg_state[seg['name']]
-                seg_exchanges = seg['exchanges']
-
-                seg_holdings  = df_holdings[df_holdings['exchange'].isin(seg_exchanges)] \
-                                if 'exchange' in df_holdings.columns else df_holdings
-                seg_positions = df_positions[df_positions['exchange'].isin(seg_exchanges)] \
-                                if 'exchange' in df_positions.columns else df_positions
-
-                seg_sum_h = _summarise_holdings(seg_holdings, sum_holdings, seg_exchanges)
-                seg_sum_p = _summarise_positions(seg_positions)
+                ss = seg_state[seg['name']]
 
                 open_trigger = now.replace(
                     hour=seg['hours_start'].hour,
@@ -244,20 +239,20 @@ async def _task_performance(state: dict) -> None:
                     _label = seg['name'].capitalize()
                     _dm = df_margins
                     try:
-                        await _run(lambda: send_summary(seg_sum_h, seg_sum_p, ist_display,
+                        await _run(lambda: send_summary(all_sum_h, all_sum_p, ist_display,
                                                         'open', label=_label, df_margins=_dm))
                         logger.info(f"Background: open summary sent for {seg['name']}")
                     except Exception as e:
                         logger.error(f"Background: open summary failed for {seg['name']}: {e}")
                     ss['last_open'] = today
 
-                # Loss alerts — check thresholds on every performance refresh
-                try:
-                    _as = alert_state
-                    _dm = df_margins
-                    await _run(lambda: check_and_alert(seg_sum_h, seg_sum_p, _as, ist_display, _dm))
-                except Exception as e:
-                    logger.error(f"Background: alert check failed for {seg['name']}: {e}")
+            # Loss alerts — full portfolio, once per refresh
+            try:
+                _as = alert_state
+                _dm = df_margins
+                await _run(lambda: check_and_alert(all_sum_h, all_sum_p, _as, ist_display, _dm))
+            except Exception as e:
+                logger.error(f"Background: alert check failed: {e}")
 
             # Run agent engine with market data context
             try:
@@ -336,14 +331,8 @@ async def _task_close(state: dict) -> None:
                     df_margins  = await _run(_fetch_margins_direct)
                     ist_display = timestamp_display()
 
-                    seg_ex = seg['exchanges']
-                    seg_h  = df_h[df_h['exchange'].isin(seg_ex)] \
-                             if 'exchange' in df_h.columns else df_h
-                    seg_p  = df_p[df_p['exchange'].isin(seg_ex)] \
-                             if 'exchange' in df_p.columns else df_p
-
-                    _sh = _summarise_holdings(seg_h, sum_h, seg_ex)
-                    _sp = _summarise_positions(seg_p)
+                    _sh = _summarise_holdings(df_h, sum_h, None)
+                    _sp = _summarise_positions(df_p)
                     _label = seg['name'].capitalize()
                     _dm = df_margins
                     await _run(lambda: send_summary(_sh, _sp, ist_display, 'close',
