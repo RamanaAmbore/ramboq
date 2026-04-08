@@ -187,7 +187,7 @@
     bind:this={cmdBar}
     grammar={orderGrammar}
     context={cmdContext}
-    rows={4}
+    rows={3}
     placeholder={cmdContext.openOrders?.length
       ? "buy | sell | cancel | modify"
       : "buy | sell"}

@@ -332,8 +332,8 @@
 </script>
 
 <div class="cmdbar {cls}">
-  {#if parsedPairs.length > 0}
-    <div class="cmd-chips-area">
+  <div class="cmd-chips-area">
+    {#if parsedPairs.length > 0}
       <div class="cmd-pairs">
         {#each parsedPairs as p}
           <span class="pair pair-{p.status}">
@@ -347,8 +347,8 @@
         {/each}
         {#if symbolPreview}<span class="symbol-preview">{symbolPreview}</span>{/if}
       </div>
-    </div>
-  {/if}
+    {/if}
+  </div>
   <div class="cmd-container" style="position:relative">
     <textarea
       bind:this={taEl}
@@ -397,19 +397,16 @@
     border: 1px solid #334155;
     border-bottom: none;
     border-radius: 0.375rem 0.375rem 0 0;
-    min-height: 4.5rem;
+    height: 4.5rem;
     padding: 0.2rem 0;
     overflow-y: auto;
   }
   .cmd-container {
     border: 1px solid #334155;
-    border-radius: 0.375rem;
+    border-radius: 0 0 0.375rem 0.375rem;
     background: #0f1724;
     position: relative;
     overflow: visible;
-  }
-  .cmd-chips-area + .cmd-container {
-    border-radius: 0 0 0.375rem 0.375rem;
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
