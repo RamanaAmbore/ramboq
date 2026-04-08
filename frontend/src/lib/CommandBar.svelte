@@ -379,8 +379,8 @@
   {/if}
   </div>
 
-  {#if showHelp}
-    <div class="text-[0.55rem] mt-0.5 flex gap-3 items-center min-h-[1rem]">
+  {#if showHelp && (hint || errors.length > 0)}
+    <div class="text-[0.55rem] flex gap-3 items-center">
       {#if hint}<span class="text-muted opacity-70">{hint}</span>{/if}
       {#if errors.length > 0}<span class="text-red-500">{errors.join(' · ')}</span>{/if}
     </div>

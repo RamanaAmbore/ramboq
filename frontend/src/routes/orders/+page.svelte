@@ -207,7 +207,7 @@
 </div>
 
 <!-- Status Dashboard -->
-<div class="grid grid-cols-5 gap-2 mb-1">
+<div class="grid grid-cols-5 gap-2">
   <button onclick={() => filterStatus = 'all'}
     class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-primary">{orders.length}</div>
