@@ -22,6 +22,9 @@ import requests
 
 from backend.shared.helpers.mail_utils import send_email
 from backend.shared.helpers.ramboq_logger import get_logger
+import urllib3.util.connection
+urllib3.util.connection.HAS_IPV6 = False  # Server IPv6 outbound hangs
+
 from backend.shared.helpers.utils import secrets, config, is_prod_capable
 
 logger = get_logger(__name__)
