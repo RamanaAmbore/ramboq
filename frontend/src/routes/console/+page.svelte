@@ -141,7 +141,7 @@
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
     ></textarea>
     <div class="absolute bottom-3 right-2 flex gap-1 z-10">
-      <button onclick={runCommand} disabled={running || !command.trim()}
+      <button onclick={runCommand} disabled={running}
         class="text-[0.6rem] py-0.5 px-4 rounded-sm border border-emerald-500 bg-emerald-200 text-emerald-900 hover:bg-emerald-300 font-semibold disabled:opacity-50">{running ? '...' : 'Run'}</button>
       <button onclick={() => { command = ''; }}
         class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
