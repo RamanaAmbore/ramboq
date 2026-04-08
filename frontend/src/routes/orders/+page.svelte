@@ -198,7 +198,7 @@
   />
   <div class="absolute bottom-1 right-2 flex gap-1 z-10">
     <button onclick={() => cmdBar?.submit()} disabled={running}
-      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-400 bg-teal-100 text-teal-800 hover:bg-teal-200 font-medium disabled:opacity-50">Submit</button>
+      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-emerald-400 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-medium disabled:opacity-50">Submit</button>
     <button onclick={() => cmdBar?.clear()}
       class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
   </div>
