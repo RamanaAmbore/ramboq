@@ -182,31 +182,25 @@
 {#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
 
 <!-- Order Entry -->
-<div class="mb-3">
-  <div class="flex gap-2 items-start mb-1">
-    <div class="flex-1">
-      <CommandBar
-        bind:this={cmdBar}
-        grammar={orderGrammar}
-        context={cmdContext}
-        rows={4}
-        placeholder={cmdContext.openOrders?.length
-          ? "buy | sell | cancel | modify"
-          : "buy | sell"}
-        onsubmit={runParsed}
-        previewFn={previewSymbol}
-        enrichPairs={orderEnrichPairs}
-        disabled={running}
-      />
-    </div>
-    <div class="flex flex-col justify-between h-full">
-      <button onclick={() => cmdBar?.submit()} disabled={running}
-        class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-50">Submit</button>
-      <button onclick={() => cmdBar?.clear()}
-        class="text-[0.65rem] py-1 px-3 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100">Clear</button>
-      <button onclick={loadOrders} disabled={loading}
-        class="text-[0.65rem] py-1 px-3 rounded border border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">Refresh</button>
-    </div>
+<div class="mb-3 relative">
+  <CommandBar
+    bind:this={cmdBar}
+    grammar={orderGrammar}
+    context={cmdContext}
+    rows={4}
+    placeholder={cmdContext.openOrders?.length
+      ? "buy | sell | cancel | modify"
+      : "buy | sell"}
+    onsubmit={runParsed}
+    previewFn={previewSymbol}
+    enrichPairs={orderEnrichPairs}
+    disabled={running}
+  />
+  <div class="absolute bottom-1 right-1 flex gap-1 z-10">
+    <button onclick={() => cmdBar?.clear()}
+      class="text-[0.6rem] py-0.5 px-2 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 opacity-80 hover:opacity-100">Clear</button>
+    <button onclick={() => cmdBar?.submit()} disabled={running}
+      class="btn-primary text-[0.6rem] py-0.5 px-2 disabled:opacity-50">Submit</button>
   </div>
 </div>
 
