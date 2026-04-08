@@ -182,7 +182,7 @@
 {#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
 
 <!-- Order Entry -->
-<div class="mb-3 relative">
+<div class="mb-1 relative">
   <CommandBar
     bind:this={cmdBar}
     grammar={orderGrammar}
@@ -196,11 +196,11 @@
     enrichPairs={orderEnrichPairs}
     disabled={running}
   />
-  <div class="absolute bottom-5 right-1 flex gap-1 z-10">
+  <div class="absolute bottom-6 right-2 flex gap-1.5 z-10">
     <button onclick={() => cmdBar?.clear()}
-      class="text-[0.6rem] py-0.5 px-2 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 opacity-80 hover:opacity-100">Clear</button>
+      class="text-[0.6rem] py-0.5 px-3 rounded-md border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100">Clear</button>
     <button onclick={() => cmdBar?.submit()} disabled={running}
-      class="btn-primary text-[0.6rem] py-0.5 px-2 disabled:opacity-50">Submit</button>
+      class="text-[0.6rem] py-0.5 px-3 rounded-md border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-50">Submit</button>
   </div>
 </div>
 
