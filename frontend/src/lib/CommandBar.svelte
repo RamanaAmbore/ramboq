@@ -408,6 +408,7 @@
     border-left: 3px solid #f59e0b;
     border-radius: 0 0 0.375rem 0.375rem;
     background: #152033;
+    color: #f1f5f9;
     position: relative;
     overflow: visible;
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
