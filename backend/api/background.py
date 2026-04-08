@@ -170,7 +170,7 @@ async def _task_market(state: dict) -> None:
 async def _task_performance(state: dict) -> None:
     """Refresh performance data every N minutes during market hours."""
     from backend.shared.helpers.broker_apis import fetch_holidays
-    from backend.shared.helpers.alert_utils import send_summary
+    from backend.shared.helpers.alert_utils import send_summary, check_and_alert
     from backend.shared.helpers.summarise import summarise_holdings as _summarise_holdings, summarise_positions as _summarise_positions
     from backend.api.cache import invalidate_all
     from backend.api.routes.ws import broadcast
@@ -243,11 +243,21 @@ async def _task_performance(state: dict) -> None:
                 if ss['last_open'] != today and now >= open_trigger:
                     _label = seg['name'].capitalize()
                     _dm = df_margins
-                    await _run(lambda: send_summary(seg_sum_h, seg_sum_p, ist_display,
-                                                    'open', label=_label, df_margins=_dm))
+                    try:
+                        await _run(lambda: send_summary(seg_sum_h, seg_sum_p, ist_display,
+                                                        'open', label=_label, df_margins=_dm))
+                        logger.info(f"Background: open summary sent for {seg['name']}")
+                    except Exception as e:
+                        logger.error(f"Background: open summary failed for {seg['name']}: {e}")
                     ss['last_open'] = today
 
-                # check_and_alert removed — agents handle alerts now
+                # Loss alerts — check thresholds on every performance refresh
+                try:
+                    _as = alert_state
+                    _dm = df_margins
+                    await _run(lambda: check_and_alert(seg_sum_h, seg_sum_p, _as, ist_display, _dm))
+                except Exception as e:
+                    logger.error(f"Background: alert check failed for {seg['name']}: {e}")
 
             # Run agent engine with market data context
             try:
