@@ -94,6 +94,7 @@
     if (_pendingKwarg && !(_pendingKwarg in kwargs) && !(_pendingKwarg in _shortcutKwargs)) {
       pairs.push({ role: _pendingKwarg, value: '', status: 'current' });
     }
+    ctx._verb = verbName;
     return enrichPairs ? enrichPairs(pairs, ctx) : pairs;
   }
 

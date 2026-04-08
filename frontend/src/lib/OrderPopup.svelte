@@ -4,7 +4,6 @@
   import { placeOrder } from '$lib/api';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { logTime } from '$lib/stores';
 
   let {
     row,
@@ -22,17 +21,20 @@
   const parsed = parseKiteSymbol(row.tradingsymbol);
   const ltp = getLtp(parsed.symbol) || row.close_price || row.average_price || 0;
   const qty = Math.abs(row.quantity);
-  const lotSize = parsed.instType !== 'EQ' ? (qty > 0 ? qty : 1) : 0;
 
-  // Ensure instruments/accounts loaded
+  // Derive the verb from action + position direction
+  const verb = $derived(
+    action ? ((action === 'add') === isLong ? 'BUY' : 'SELL') : null
+  );
+
   loadInstruments().catch(() => {});
   loadAccounts().catch(() => {});
   setQuoteLoadedCallback(() => cmdBar?.refresh());
 
   function buildCommand(act) {
     action = act;
-    const verb = (act === 'add') === isLong ? 'buy' : 'sell';
-    let cmd = `${verb} ${row.account}`;
+    const v = (act === 'add') === isLong ? 'buy' : 'sell';
+    let cmd = `${v} ${row.account}`;
     if (parsed.instType !== 'EQ') cmd += ` ${parsed.instType}`;
     cmd += ` ${parsed.symbol}`;
     if (parsed.strike) cmd += ` ${parsed.strike}`;
@@ -74,33 +76,41 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<!-- Backdrop -->
 <div class="popup-backdrop" onclick={onclose} role="presentation">
-  <!-- Modal -->
   <div class="popup-modal" onclick={(e) => e.stopPropagation()} role="dialog">
-    <!-- Header -->
+    <!-- Header: show underlying details -->
     <div class="popup-header">
-      <div class="flex items-center gap-2">
-        <span class="font-semibold text-sm">
+      <div>
+        <div class="font-semibold text-sm uppercase">
           <span class="{isLong ? 'text-green-700' : 'text-red-600'}">{isLong ? 'LONG' : 'SHORT'}</span>
           <span class="text-blue-700">{row.account}</span>
-          <span class="text-slate-700">{row.tradingsymbol}</span>
-        </span>
-        <span class="text-xs text-gray-500">qty:{qty} ltp:{ltp}</span>
+          <span class="text-slate-700">{parsed.symbol}</span>
+        </div>
+        <div class="text-[0.65rem] text-gray-600 uppercase mt-0.5">
+          {#if parsed.instType !== 'EQ'}
+            <span>{parsed.instType}</span>
+            {#if parsed.strike}<span> STRIKE:{parsed.strike}</span>{/if}
+            {#if parsed.expiry}<span> EXP:{parsed.expiry}</span>{/if}
+          {:else}
+            <span>EQUITY</span>
+          {/if}
+          <span> QTY:{qty}</span>
+          <span> LTP:{ltp}</span>
+        </div>
       </div>
       <button onclick={onclose} class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
     </div>
 
-    <!-- Action buttons -->
+    <!-- Action buttons: Add (green) / Close (red) -->
     <div class="flex gap-2 px-3 py-2">
       <button onclick={() => buildCommand('add')}
-        class="flex-1 text-xs py-1.5 rounded-sm font-medium border
-          {action === 'add' ? 'border-green-500 bg-green-100 text-green-800' : 'border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100'}">
+        class="flex-1 text-xs py-1.5 rounded-sm font-semibold border uppercase
+          {action === 'add' ? 'border-green-500 bg-green-100 text-green-800' : 'border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100'}">
         Add Position
       </button>
       <button onclick={() => buildCommand('close')}
-        class="flex-1 text-xs py-1.5 rounded-sm font-medium border
-          {action === 'close' ? 'border-red-500 bg-red-100 text-red-800' : 'border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100'}">
+        class="flex-1 text-xs py-1.5 rounded-sm font-semibold border uppercase
+          {action === 'close' ? 'border-red-500 bg-red-100 text-red-800' : 'border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100'}">
         Close Position
       </button>
     </div>
@@ -111,17 +121,20 @@
         bind:this={cmdBar}
         grammar={orderGrammar}
         rows={2}
-        placeholder="Select Add or Close above"
+        placeholder="SELECT ADD OR CLOSE ABOVE"
         onsubmit={runParsed}
         previewFn={previewSymbol}
         {enrichPairs}
         disabled={running}
       />
       <div class="absolute bottom-3 right-4 flex gap-1 z-10">
-        <button onclick={() => cmdBar?.submit()} disabled={running || !action}
-          class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-emerald-500 bg-emerald-200 text-emerald-900 hover:bg-emerald-300 font-semibold disabled:opacity-50">Submit</button>
+        {#if verb}
+          <button onclick={() => cmdBar?.submit()} disabled={running}
+            class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
+              {verb === 'BUY' ? 'border-green-500 bg-green-200 text-green-900 hover:bg-green-300' : 'border-red-500 bg-red-200 text-red-900 hover:bg-red-300'}">{verb}</button>
+        {/if}
         <button onclick={() => { cmdBar?.clear(); action = null; result = null; }}
-          class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
+          class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Cancel</button>
       </div>
     </div>
 
@@ -154,7 +167,7 @@
   }
   .popup-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     padding: 0.75rem 0.75rem 0.5rem;
     border-bottom: 1px solid #e2e8f0;

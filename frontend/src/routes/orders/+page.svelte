@@ -16,6 +16,7 @@
   let error         = $state('');
   let success       = $state('');
   let filterStatus  = $state('all');
+  let cmdVerb       = $state('');
   let running       = $state(false);
   let logTab        = $state('order');
   let orderLog      = $state([]);
@@ -117,7 +118,8 @@
     else if (logTab === 'system') loadSystemLog();
   }
 
-  function orderEnrichPairs(pairs) {
+  function orderEnrichPairs(pairs, ctx) {
+    cmdVerb = (ctx?._verb || '').toUpperCase();
     return pairs.map(p => {
       if (p.role === 'symbol' && p.status === 'filled' && p.value) {
         const ltp = getLtp(p.value);
@@ -198,8 +200,11 @@
   />
   <div class="absolute bottom-1 right-2 flex gap-1 z-10">
     <button onclick={() => cmdBar?.submit()} disabled={running}
-      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-emerald-500 bg-emerald-200 text-emerald-900 hover:bg-emerald-300 font-semibold disabled:opacity-50">Submit</button>
-    <button onclick={() => cmdBar?.clear()}
+      class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
+        {cmdVerb === 'BUY' ? 'border-green-500 bg-green-200 text-green-900 hover:bg-green-300'
+        : cmdVerb === 'SELL' ? 'border-red-500 bg-red-200 text-red-900 hover:bg-red-300'
+        : 'border-emerald-500 bg-emerald-200 text-emerald-900 hover:bg-emerald-300'}">{cmdVerb === 'BUY' ? 'BUY' : cmdVerb === 'SELL' ? 'SELL' : 'Submit'}</button>
+    <button onclick={() => { cmdBar?.clear(); cmdVerb = ''; }}
       class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
   </div>
 </div>
