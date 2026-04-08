@@ -132,17 +132,23 @@
   <h1 class="page-title-chip mb-2">Terminal</h1>
 
   <!-- Command input -->
-  <div class="flex gap-2 mb-1">
+  <div class="relative mb-1">
     <textarea
       bind:value={command}
-      rows="4"
-      class="field-input cmd-input font-mono text-xs flex-1"
+      rows="2"
+      class="field-input cmd-input font-mono text-xs w-full"
+      style="padding-bottom:1.5rem"
       placeholder="Shell command, order (buy/sell), or agent command"
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
     ></textarea>
-    <button onclick={runCommand} disabled={running || !command.trim()} class="btn-primary disabled:opacity-50 text-[0.6rem] py-1 px-3">
-      {running ? '...' : 'Run'}
-    </button>
+    <div class="absolute bottom-1 right-2 flex gap-1 z-10">
+      <button onclick={runCommand} disabled={running || !command.trim()}
+        class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium disabled:opacity-50">
+        {running ? '...' : 'Run'}
+      </button>
+      <button onclick={() => { command = ''; }}
+        class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
+    </div>
   </div>
   <div class="text-[0.5rem] text-muted mb-1">
     <code>buy|sell ACCT SYMBOL QTY [LIMIT PRICE]</code> · <code>agent list|status|activate|config</code> · shell
