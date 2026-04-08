@@ -140,7 +140,7 @@
       placeholder="Shell command, order (buy/sell), or agent command"
       onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCommand(); } }}
     ></textarea>
-    <div class="absolute bottom-2 right-2 flex gap-1 z-10">
+    <div class="absolute bottom-3 right-2 flex gap-1 z-10">
       <button onclick={runCommand} disabled={running || !command.trim()}
         class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium disabled:opacity-50">{running ? '...' : 'Run'}</button>
       <button onclick={() => { command = ''; }}
