@@ -364,10 +364,8 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-image: url('/nav_image.png');
-    background-size: cover;
-    background-position: center;
-    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.25), 0 4px 12px rgba(0,0,0,0.2);
+    background-color: #2a4a4a;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   }
   .mobile-nav-item {
     display: block;
