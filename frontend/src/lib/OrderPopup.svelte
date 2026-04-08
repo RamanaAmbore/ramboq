@@ -1,6 +1,6 @@
 <script>
   import CommandBar from '$lib/CommandBar.svelte';
-  import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, setQuoteLoadedCallback, getLtp } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp } from '$lib/command/grammars/orders';
   import { placeOrder } from '$lib/api';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
@@ -20,7 +20,16 @@
   const isLong = row.quantity > 0;
   const parsed = parseKiteSymbol(row.tradingsymbol);
   const ltp = getLtp(parsed.symbol) || row.close_price || row.average_price || 0;
-  const qty = Math.abs(row.quantity);
+  const totalQty = Math.abs(row.quantity);
+
+  // For F&O: convert total qty to lots (grammar multiplies back by lot_size)
+  let lotSize = 1;
+  try {
+    const inst = resolveInstrument(parsed);
+    lotSize = inst.ls || 1;
+  } catch {}
+  const isFO = parsed.instType !== 'EQ';
+  const lots = isFO && lotSize > 1 ? Math.round(totalQty / lotSize) : totalQty;
 
   // Derive the verb from action + position direction
   const verb = $derived(
@@ -39,7 +48,7 @@
     cmd += ` ${parsed.symbol}`;
     if (parsed.strike) cmd += ` ${parsed.strike}`;
     if (parsed.expiry) cmd += ` ${parsed.expiry}`;
-    if (act === 'close') cmd += ` ${qty}`;
+    if (act === 'close') cmd += ` ${lots}`;
     cmd += ' ';  // trailing space so cursor advances past filled tokens
     cmdBar?.setValue(cmd);
   }
@@ -95,7 +104,7 @@
           {:else}
             <span>EQUITY</span>
           {/if}
-          <span> QTY:{qty}</span>
+          <span> QTY:{totalQty}{isFO && lotSize > 1 ? ` (${lots}×${lotSize})` : ''}</span>
           <span> LTP:{ltp}</span>
         </div>
       </div>
