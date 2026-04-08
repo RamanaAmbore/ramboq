@@ -426,7 +426,7 @@
   }
   .cmd-suggest {
     position: absolute;
-    top: calc(100% + 2px);
+    bottom: calc(100% + 2px);
     left: 0;
     min-width: 160px;
     max-width: 100%;
