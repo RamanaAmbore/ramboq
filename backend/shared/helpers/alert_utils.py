@@ -34,11 +34,13 @@ _MSG_TYPES = {
 
 
 def _send_telegram(message: str):
+    import logging
+    _log = logging.getLogger('backend.api.background')
     if not is_prod_capable():
-        logger.info("Telegram skipped — cap_in_dev is False")
+        _log.info("Telegram skipped — cap_in_dev is False")
         return
     if not config.get('telegram', False):
-        logger.info("Telegram skipped — telegram flag is False")
+        _log.info("Telegram skipped — telegram flag is False")
         return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')
@@ -53,11 +55,11 @@ def _send_telegram(message: str):
             timeout=10
         )
         if resp.ok:
-            logger.info("Telegram alert sent")
+            _log.info("Telegram alert sent")
         else:
-            logger.error(f"Telegram send failed: {resp.status_code} {resp.text}")
+            _log.error(f"Telegram send failed: {resp.status_code} {resp.text}")
     except Exception as e:
-        logger.error(f"Telegram error: {e}")
+        _log.error(f"Telegram error: {e}")
 
 
 def _fixed_table(headers, rows):
@@ -113,6 +115,9 @@ def _branch_banner_html(branch: str) -> str:
 def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: str,
               subject_detail: str):
     """Send Telegram + email with correct prefixes for the message type."""
+    import logging
+    _log = logging.getLogger('backend.api.background')
+    _log.info(f"_dispatch called: {msg_type} — {subject_detail}")
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
 
     branch = config.get('deploy_branch', 'main')
