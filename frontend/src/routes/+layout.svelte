@@ -364,10 +364,9 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-image: url('/nav_image.png');
-    background-size: cover;
-    background-position: center;
-    box-shadow: inset 0 0 0 100vw rgba(8, 35, 35, 0.6), 0 4px 8px rgba(0,0,0,0.2);
+    background: linear-gradient(135deg, #1a3a3a 0%, #2f4f4f 50%, #1e3e3e 100%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-bottom: 2px solid #f59e0b;
   }
   .mobile-nav-item {
     display: block;
