@@ -184,7 +184,7 @@
 {#if success}<div class="mb-1 p-1.5 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
 
 <!-- Order Entry -->
-<div class="mb-px relative">
+<div class="mt-2 mb-1 relative">
   <CommandBar
     bind:this={cmdBar}
     grammar={orderGrammar}
