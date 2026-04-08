@@ -118,7 +118,7 @@
 /* ── Log panel styles ────────────────────────────────────────────────────── */
 .log-panel {
   padding: 0.75rem;
-  background-color: #111827;
+  background-color: #152033;
   border-radius: 0.375rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.6rem;
@@ -213,7 +213,7 @@
 
   /* Bloomberg-inspired: deep slate bg, amber left-rule, subtle depth */
   .cmd-input {
-    background: #1a2332;
+    background: #152033;
     border: 1px solid #334155;
     border-left: 3px solid #f59e0b;
     color: #f1f5f9;
