@@ -4,6 +4,7 @@
   import { fetchHoldings, fetchPositions, fetchFunds } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
   import { dataCache } from '$lib/stores';
+  import OrderPopup from '$lib/OrderPopup.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
@@ -12,6 +13,14 @@
   // Read tab from URL ?tab= param; default to 'holdings'
   const validTabs = ['funds', 'positions', 'holdings'];
   let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'funds');
+
+  let orderRow = $state(/** @type {any|null} */(null));
+  let orderSource = $state('holdings');
+
+  function openOrderPopup(row, source) {
+    orderRow = row;
+    orderSource = source;
+  }
 
   function switchTab(/** @type {string} */ id) {
     activeTab = id;
@@ -128,13 +137,14 @@
     { field: 'collateral',   headerName: 'Collateral',   flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
   ];
 
-  function makeGrid(el, colDefs, rowData = []) {
+  function makeGrid(el, colDefs, rowData = [], onRowClick = null) {
     return createGrid(el, {
       columnDefs: colDefs,
       rowData,
       defaultColDef: defaultCol,
       overlayNoRowsTemplate: '<span style="font-size:0.65rem;color:#999">—</span>',
       domLayout: 'autoHeight',
+      ...(onRowClick ? { onRowClicked: (e) => onRowClick(e.data) } : {}),
     });
   }
 
@@ -166,7 +176,7 @@
   }
 
   /** Build per-account AG Grids inside a container div. */
-  function buildAccountGrids(container, rows, colDefs) {
+  function buildAccountGrids(container, rows, colDefs, source = 'holdings') {
     // Destroy existing per-account grids
     const old = container === holdingsAccountsContainer ? holdingsAccountGrids : positionsAccountGrids;
     old.forEach(g => g?.destroy());
@@ -196,6 +206,7 @@
         rowData: rows.filter(r => r.account === acct),
         defaultColDef: defaultCol,
         domLayout: 'autoHeight',
+        onRowClicked: (e) => openOrderPopup(e.data, source),
       });
       grids.push(grid);
     }
@@ -214,10 +225,10 @@
 
     // Build per-account grids
     if (holdingsAccountsContainer && h.rows?.length) {
-      buildAccountGrids(holdingsAccountsContainer, h.rows, holdingsAcctCols);
+      buildAccountGrids(holdingsAccountsContainer, h.rows, holdingsAcctCols, 'holdings');
     }
     if (positionsAccountsContainer && p.rows?.length) {
-      buildAccountGrids(positionsAccountsContainer, p.rows, positionsAcctCols);
+      buildAccountGrids(positionsAccountsContainer, p.rows, positionsAcctCols, 'positions');
     }
   }
 
@@ -238,9 +249,9 @@
 
   onMount(async () => {
     holdingsSummaryGrid  = makeGrid(holdingsSummaryEl,  holdingsSummaryCols);
-    holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols);
+    holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols, [], (r) => openOrderPopup(r, 'holdings'));
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
-    positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols);
+    positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
     fundsGrid            = makeGrid(fundsEl,            fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
@@ -319,6 +330,15 @@
   <h2 class="section-heading">All Holdings</h2>
   <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
 </section>
+
+{#if orderRow}
+  <OrderPopup
+    row={orderRow}
+    source={orderSource}
+    onclose={() => orderRow = null}
+    onordered={loadAll}
+  />
+{/if}
 
 <style>
   .hidden { display: none; }

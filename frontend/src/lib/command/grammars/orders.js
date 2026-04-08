@@ -22,6 +22,7 @@ import { suggestAccounts } from '$lib/data/accounts';
 
 const GRAMMAR_DOC = /** @type {any} */ (yaml.load(yamlText));
 const INST_TYPE_MAP = { CALL: 'CE', PUT: 'PE', FUT: 'FUT', EQ: 'EQ' };
+const INST_TYPE_REVERSE = { CE: 'CALL', PE: 'PUT', FUT: 'FUT', EQ: 'EQ' };
 
 // ---------------------------------------------------------------------------
 // Quote cache (for price suggestions)
@@ -468,4 +469,22 @@ export function previewSymbol(parsed) {
     });
     return `→ ${inst.s} (${inst.e})`;
   } catch { return ''; }
+}
+
+/**
+ * Reverse-map a Kite tradingsymbol back to grammar tokens.
+ * e.g. 'INFY' → { instType: 'EQ', symbol: 'INFY' }
+ *      'NIFTY25APR22500CE' → { instType: 'CALL', symbol: 'NIFTY', strike: '22500', expiry: '2025-04-...' }
+ */
+export function parseKiteSymbol(tradingsymbol) {
+  const inst = getInstrument(tradingsymbol);
+  if (!inst) {
+    // Fallback: assume equity
+    return { instType: 'EQ', symbol: tradingsymbol };
+  }
+  const instType = INST_TYPE_REVERSE[inst.t] || 'EQ';
+  const result = { instType, symbol: inst.u || tradingsymbol };
+  if (inst.k) result.strike = String(inst.k);
+  if (inst.x) result.expiry = inst.x;
+  return result;
 }
