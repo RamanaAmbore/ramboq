@@ -175,14 +175,16 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">Orders</h1>
+<div class="flex items-center justify-between mb-1">
+  <h1 class="page-title-chip">Orders</h1>
+  <span class="text-[0.6rem] text-muted">{clientTimestamp()}</span>
+</div>
 
-{#if error}<div class="mb-2 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
-{#if success}<div class="mb-2 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
+{#if error}<div class="mb-1 p-1.5 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
+{#if success}<div class="mb-1 p-1.5 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}
 
 <!-- Order Entry -->
-<div class="mb-1 relative">
+<div class="mb-0.5 relative">
   <CommandBar
     bind:this={cmdBar}
     grammar={orderGrammar}
@@ -196,57 +198,57 @@
     enrichPairs={orderEnrichPairs}
     disabled={running}
   />
-  <div class="absolute bottom-6 right-2 flex gap-1.5 z-10">
-    <button onclick={() => cmdBar?.clear()}
-      class="text-[0.6rem] py-0.5 px-3 rounded-md border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100">Clear</button>
+  <div class="absolute bottom-6 right-2 flex gap-1 z-10">
     <button onclick={() => cmdBar?.submit()} disabled={running}
-      class="text-[0.6rem] py-0.5 px-3 rounded-md border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-50">Submit</button>
+      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium disabled:opacity-50">Submit</button>
+    <button onclick={() => cmdBar?.clear()}
+      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Clear</button>
   </div>
 </div>
 
 <!-- Status Dashboard -->
-<div class="grid grid-cols-5 gap-2 mb-3">
+<div class="grid grid-cols-5 gap-1.5 mb-1">
   <button onclick={() => filterStatus = 'all'}
-    class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
+    class="rounded border bg-white border-gray-300 py-1 text-center {filterStatus === 'all' ? 'ring-1 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-primary">{orders.length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">All</div>
+    <div class="text-[0.5rem] text-muted uppercase">All</div>
   </button>
   <button onclick={() => filterStatus = 'open'}
-    class="rounded-lg border-2 bg-amber-50 border-amber-400 p-2 text-center {filterStatus === 'open' ? 'ring-2 ring-primary/30' : ''}">
+    class="rounded border bg-amber-50 border-amber-400 py-1 text-center {filterStatus === 'open' ? 'ring-1 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-amber-600">{orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Open</div>
+    <div class="text-[0.5rem] text-muted uppercase">Open</div>
   </button>
   <button onclick={() => filterStatus = 'complete'}
-    class="rounded-lg border-2 bg-green-50 border-green-500 p-2 text-center {filterStatus === 'complete' ? 'ring-2 ring-primary/30' : ''}">
+    class="rounded border bg-green-50 border-green-500 py-1 text-center {filterStatus === 'complete' ? 'ring-1 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-green-600">{orders.filter(o => o.status === 'COMPLETE').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Filled</div>
+    <div class="text-[0.5rem] text-muted uppercase">Filled</div>
   </button>
   <button onclick={() => filterStatus = 'rejected'}
-    class="rounded-lg border-2 bg-red-50 border-red-400 p-2 text-center {filterStatus === 'rejected' ? 'ring-2 ring-primary/30' : ''}">
+    class="rounded border bg-red-50 border-red-400 py-1 text-center {filterStatus === 'rejected' ? 'ring-1 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-red-600">{orders.filter(o => o.status === 'REJECTED').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Rejected</div>
+    <div class="text-[0.5rem] text-muted uppercase">Rejected</div>
   </button>
   <button onclick={() => filterStatus = 'cancelled'}
-    class="rounded-lg border-2 bg-gray-50 border-gray-400 p-2 text-center {filterStatus === 'cancelled' ? 'ring-2 ring-primary/30' : ''}">
+    class="rounded border bg-gray-50 border-gray-400 py-1 text-center {filterStatus === 'cancelled' ? 'ring-1 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-gray-600">{orders.filter(o => o.status === 'CANCELLED').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Cancelled</div>
+    <div class="text-[0.5rem] text-muted uppercase">Cancelled</div>
   </button>
 </div>
 
 <!-- Order Cards -->
 {#if loading && !orders.length}
-  <div class="text-center text-muted text-xs animate-pulse py-4">Loading orders…</div>
+  <div class="text-center text-muted text-xs animate-pulse py-2">Loading orders…</div>
 {:else if orders.length}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 max-h-[8rem] overflow-y-auto">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 mb-1 max-h-[8rem] overflow-y-auto">
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
-        class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
+        class="text-left rounded border {statusColor(o.status)} p-2 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
           <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="{o.status === 'COMPLETE' ? 'text-green-700' : o.status === 'REJECTED' || o.status === 'CANCELLED' ? 'text-red-600' : 'text-amber-700'}">{o.tradingsymbol}</span></span>
-          <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
+          <span class="text-[0.5rem] px-1 py-0.5 rounded-sm font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
+        <div class="text-[0.5rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
           <span>QTY:<b>{o.filled_quantity}/{o.quantity}</b></span>
           <span>TYPE:<b>{o.order_type}</b></span>
           <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>
@@ -258,7 +260,7 @@
     {/each}
   </div>
 {:else}
-  <div class="text-center text-muted text-xs py-2 mb-3">No orders today.</div>
+  <div class="text-center text-muted text-xs py-1 mb-1">No orders today.</div>
 {/if}
 
 <OrderDetail order={selectedOrder}
