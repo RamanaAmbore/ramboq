@@ -196,7 +196,7 @@
     enrichPairs={orderEnrichPairs}
     disabled={running}
   />
-  <div class="absolute bottom-1 right-1 flex gap-1 z-10">
+  <div class="absolute bottom-5 right-1 flex gap-1 z-10">
     <button onclick={() => cmdBar?.clear()}
       class="text-[0.6rem] py-0.5 px-2 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 opacity-80 hover:opacity-100">Clear</button>
     <button onclick={() => cmdBar?.submit()} disabled={running}
