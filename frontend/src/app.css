@@ -129,8 +129,8 @@
 }
 .log-panel .log-error   { color: #f87171; background: rgba(248,113,113,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-warning { color: #fbbf24; background: rgba(251,191,36,0.06); display: block; padding: 0 4px; border-radius: 2px; }
-.log-panel .log-info    { color: #d1d5db; }
-.log-panel .log-debug   { color: #6b7280; }
+.log-panel .log-info    { color: #e2e8f0; }
+.log-panel .log-debug   { color: #94a3b8; }
 .log-panel .log-agent-triggered   { color: #fb923c; background: rgba(251,146,60,0.1); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-alert       { color: #facc15; background: rgba(250,204,21,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-success     { color: #4ade80; background: rgba(74,222,128,0.08); display: block; padding: 0 4px; border-radius: 2px; }
