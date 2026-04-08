@@ -20,10 +20,10 @@
     outline-offset: 2px;
   }
   body {
-    background-color: #f5f5f7;
-    color: #315062;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    font-size: 0.8125rem; /* 13px — smaller base size across all pages */
+    background-color: #fafafa;
+    color: #1e293b;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.875rem; /* 14px — professional terminal standard */
   }
   a { text-decoration: none; }
   img { -webkit-user-drag: none; }
@@ -32,17 +32,17 @@
 /* ── AG Grid — RamboQuant theme ──────────────────────────────────────────── */
 /* Outside @layer so these override AG Grid's imported quartz styles            */
 .ag-theme-ramboq {
-  --ag-header-background-color: #d0e0e0;
-  --ag-header-foreground-color: #2f4f4f;
+  --ag-header-background-color: #2f4f4f;
+  --ag-header-foreground-color: #f1f5f9;
   --ag-header-font-weight: 600;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #315062;
+  --ag-foreground-color: #1e293b;
   --ag-odd-row-background-color: #f8fafa;
   --ag-row-hover-color: #eef3f3;
   --ag-selected-row-background-color: #d0e8e8;
-  --ag-border-color: #f0f4f4;
+  --ag-border-color: #e2e8f0;
   --ag-font-family: 'Inter', 'SF Pro Text', -apple-system, system-ui, sans-serif;
-  --ag-font-size: 0.625rem;
+  --ag-font-size: 0.75rem;
   --ag-row-height: 22px;
   --ag-header-height: 28px;
   --ag-wrapper-border-radius: 8px;
@@ -59,12 +59,12 @@
 .ag-theme-ramboq .ag-root-wrapper {
   border-radius: 8px;
   overflow: hidden;
-  background-color: #d0e0e0 !important;
+  background-color: #2f4f4f !important;
   box-shadow: none !important;
 }
 .ag-theme-ramboq .ag-header {
-  background-color: #d0e0e0 !important;
-  color: #2f4f4f !important;
+  background-color: #2f4f4f !important;
+  color: #f1f5f9 !important;
 }
 .ag-theme-ramboq .ag-body {
   background-color: #ffffff !important;
@@ -72,9 +72,9 @@
 .ag-theme-ramboq .ag-header-cell {
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  font-size: 0.5625rem !important;
+  font-size: 0.6875rem !important;
   font-weight: 600;
-  color: #2f4f4f !important;
+  color: #f1f5f9 !important;
   background-color: transparent !important;
   padding-left: 4px !important;
   padding-right: 4px !important;
@@ -92,9 +92,9 @@
   border-right: 1px solid #f0f4f4 !important;
 }
 .ag-theme-ramboq .ag-row {
-  font-size: 0.625rem !important;
+  font-size: 0.75rem !important;
   font-weight: 400;
-  color: #315062;
+  color: #1e293b;
   letter-spacing: 0.01em;
   text-shadow: 0 0.5px 0.5px rgba(0,0,0,0.15);
 }
@@ -122,15 +122,15 @@
   border-radius: 0.375rem;
   border-left: 3px solid #10b981;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.6rem;
-  line-height: 1.2;
+  font-size: 0.7rem;
+  line-height: 1.35;
   overflow: auto;
   white-space: pre-wrap;
 }
 .log-panel .log-error   { color: #f87171; background: rgba(248,113,113,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-warning { color: #fbbf24; background: rgba(251,191,36,0.06); display: block; padding: 0 4px; border-radius: 2px; }
-.log-panel .log-info    { color: #d1d5db; }
-.log-panel .log-debug   { color: #6b7280; }
+.log-panel .log-info    { color: #e2e8f0; }
+.log-panel .log-debug   { color: #94a3b8; }
 .log-panel .log-agent-triggered   { color: #fb923c; background: rgba(251,146,60,0.1); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-alert       { color: #facc15; background: rgba(250,204,21,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-success     { color: #4ade80; background: rgba(74,222,128,0.08); display: block; padding: 0 4px; border-radius: 2px; }
@@ -192,9 +192,9 @@
 @layer components {
   .field-label {
     display: block;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #6b8e8e;
+    color: #475569;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 0.2rem;
@@ -226,11 +226,12 @@
 
   .page-title-chip {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #0f172a;
-    padding: 0 0 0.25rem 0;
-    border-bottom: 1px solid #cbd5e1;
+    padding: 0 0 0.3rem 0;
+    border-bottom: 2px solid #2f4f4f;
+    letter-spacing: 0.01em;
   }
   .cmd-input:focus {
     border-color: #475569;

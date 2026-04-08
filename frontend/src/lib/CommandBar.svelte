@@ -482,8 +482,8 @@
     align-items: center;
     gap: 0.15rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.55rem;
-    padding: 0.05rem 0.3rem;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
     border-radius: 0.2rem;
     border: 1px solid transparent;
   }
@@ -505,7 +505,7 @@
   .pair-key {
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.5rem;
+    font-size: 0.55rem;
   }
   .pair-val {
     color: #e2e8f0;
