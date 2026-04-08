@@ -244,7 +244,7 @@
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
         class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="{o.status === 'COMPLETE' ? 'text-green-700' : o.status === 'REJECTED' || o.status === 'CANCELLED' ? 'text-red-600' : 'text-amber-700'}">{o.tradingsymbol}</span></span>
+          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-slate-700">{o.tradingsymbol}</span></span>
           <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
@@ -254,7 +254,6 @@
           <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>
           {#if o.trigger_price}<span>TRIGGER:<b>{o.trigger_price}</b></span>{/if}
           <span>PRODUCT:<b>{o.product}</b></span>
-          <span>EXCH:<b>{o.exchange}</b></span>
           <span>VARIETY:<b>{o.variety}</b></span>
           {#if o.tag}<span>TAG:<b>{o.tag}</b></span>{/if}
           {#if o.status_message}<span>MSG:<b>{o.status_message}</b></span>{/if}
