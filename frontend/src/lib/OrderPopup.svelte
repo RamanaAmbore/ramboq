@@ -21,6 +21,7 @@
   const parsed = parseKiteSymbol(row.tradingsymbol);
   const ltp = getLtp(parsed.symbol) || row.close_price || row.average_price || 0;
   const totalQty = Math.abs(row.quantity);
+  const isFO = parsed.instType !== 'EQ';
 
   // For F&O: convert total qty to lots (grammar multiplies back by lot_size)
   let lotSize = 1;
@@ -28,7 +29,6 @@
     const inst = resolveInstrument(parsed);
     lotSize = inst.ls || 1;
   } catch {}
-  const isFO = parsed.instType !== 'EQ';
   const lots = isFO && lotSize > 1 ? Math.round(totalQty / lotSize) : totalQty;
 
   // Derive the verb from action + position direction
@@ -43,14 +43,17 @@
   function buildCommand(act) {
     action = act;
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
-    let cmd = `${v} ${row.account}`;
-    if (parsed.instType !== 'EQ') cmd += ` ${parsed.instType}`;
-    cmd += ` ${parsed.symbol}`;
-    if (parsed.strike) cmd += ` ${parsed.strike}`;
-    if (parsed.expiry) cmd += ` ${parsed.expiry}`;
-    if (act === 'close') cmd += ` ${lots}`;
-    cmd += ' ';  // trailing space so cursor advances past filled tokens
-    cmdBar?.setValue(cmd);
+    // Build command token by token — same order as order page grammar:
+    // verb account [instType] symbol [strike] [expiry] [qty]
+    const tokens = [v, row.account];
+    if (isFO) tokens.push(parsed.instType);  // CALL, PUT, FUT
+    tokens.push(parsed.symbol);               // underlying symbol
+    if (parsed.strike) tokens.push(parsed.strike);
+    if (parsed.expiry) tokens.push(parsed.expiry);
+    if (act === 'close') tokens.push(String(lots));
+
+    // Join with spaces + trailing space to advance cursor to next field
+    cmdBar?.setValue(tokens.join(' ') + ' ');
   }
 
   async function runParsed(p) {
@@ -69,6 +72,7 @@
     }
   }
 
+  // Same enrichPairs as order page — shows symbol:LTP
   function enrichPairs(pairs) {
     return pairs.map(p => {
       if (p.role === 'symbol' && p.status === 'filled' && p.value) {
