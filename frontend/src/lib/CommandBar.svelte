@@ -349,7 +349,7 @@
       </div>
     {/if}
   </div>
-  <div class="cmd-container">
+  <div class="cmd-container" style="position:relative">
     <textarea
       bind:this={taEl}
       {placeholder}
@@ -363,9 +363,7 @@
       onfocus={onFocus}
       onblur={onBlur}
     ></textarea>
-  </div>
-
-  {#if suggOpen && suggList.length > 0}
+    {#if suggOpen && suggList.length > 0}
     <div class="cmd-suggest" bind:this={suggListEl}>
       {#each suggList as item, i}
         <button
@@ -379,6 +377,7 @@
       {/each}
     </div>
   {/if}
+  </div>
 
   {#if showHelp}
     <div class="text-[0.55rem] mt-0.5 flex gap-3 items-center min-h-[1rem]">
@@ -425,7 +424,7 @@
   }
   .cmd-suggest {
     position: absolute;
-    bottom: calc(100% + 2px);
+    top: 0;
     left: 0;
     min-width: 160px;
     max-width: 100%;
