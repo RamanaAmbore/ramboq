@@ -366,7 +366,6 @@
     z-index: 49;
     background: linear-gradient(135deg, #1a3a3a 0%, #2f4f4f 50%, #1e3e3e 100%);
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    border-bottom: 2px solid #f59e0b;
   }
   .mobile-nav-item {
     display: block;
