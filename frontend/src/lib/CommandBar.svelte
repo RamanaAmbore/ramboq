@@ -414,6 +414,7 @@
   }
   .cmd-container:focus-within {
     border-color: #f59e0b66;
+    border-left: 3px solid #f59e0b;
   }
   .cmd-pairs {
     display: flex;
