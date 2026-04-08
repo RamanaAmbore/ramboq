@@ -104,7 +104,7 @@
           {:else}
             <span>EQUITY</span>
           {/if}
-          <span> QTY:{totalQty}{isFO && lotSize > 1 ? ` (${lots}×${lotSize})` : ''}</span>
+          <span> QTY:{isFO && lotSize > 1 ? `${lots} (×${lotSize}=${totalQty})` : totalQty}</span>
           <span> LTP:{ltp}</span>
         </div>
       </div>
