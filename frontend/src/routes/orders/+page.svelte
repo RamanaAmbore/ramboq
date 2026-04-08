@@ -207,31 +207,31 @@
 </div>
 
 <!-- Status Dashboard -->
-<div class="grid grid-cols-5 gap-1.5 mb-1">
+<div class="grid grid-cols-5 gap-2 mb-1">
   <button onclick={() => filterStatus = 'all'}
-    class="rounded border bg-white border-gray-300 py-1 text-center {filterStatus === 'all' ? 'ring-1 ring-primary/30' : ''}">
+    class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-primary">{orders.length}</div>
-    <div class="text-[0.5rem] text-muted uppercase">All</div>
+    <div class="text-[0.55rem] text-muted uppercase">All</div>
   </button>
   <button onclick={() => filterStatus = 'open'}
-    class="rounded border bg-amber-50 border-amber-400 py-1 text-center {filterStatus === 'open' ? 'ring-1 ring-primary/30' : ''}">
+    class="rounded-lg border-2 bg-amber-50 border-amber-400 p-2 text-center {filterStatus === 'open' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-amber-600">{orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length}</div>
-    <div class="text-[0.5rem] text-muted uppercase">Open</div>
+    <div class="text-[0.55rem] text-muted uppercase">Open</div>
   </button>
   <button onclick={() => filterStatus = 'complete'}
-    class="rounded border bg-green-50 border-green-500 py-1 text-center {filterStatus === 'complete' ? 'ring-1 ring-primary/30' : ''}">
+    class="rounded-lg border-2 bg-green-50 border-green-500 p-2 text-center {filterStatus === 'complete' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-green-600">{orders.filter(o => o.status === 'COMPLETE').length}</div>
-    <div class="text-[0.5rem] text-muted uppercase">Filled</div>
+    <div class="text-[0.55rem] text-muted uppercase">Filled</div>
   </button>
   <button onclick={() => filterStatus = 'rejected'}
-    class="rounded border bg-red-50 border-red-400 py-1 text-center {filterStatus === 'rejected' ? 'ring-1 ring-primary/30' : ''}">
+    class="rounded-lg border-2 bg-red-50 border-red-400 p-2 text-center {filterStatus === 'rejected' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-red-600">{orders.filter(o => o.status === 'REJECTED').length}</div>
-    <div class="text-[0.5rem] text-muted uppercase">Rejected</div>
+    <div class="text-[0.55rem] text-muted uppercase">Rejected</div>
   </button>
   <button onclick={() => filterStatus = 'cancelled'}
-    class="rounded border bg-gray-50 border-gray-400 py-1 text-center {filterStatus === 'cancelled' ? 'ring-1 ring-primary/30' : ''}">
+    class="rounded-lg border-2 bg-gray-50 border-gray-400 p-2 text-center {filterStatus === 'cancelled' ? 'ring-2 ring-primary/30' : ''}">
     <div class="text-xs font-bold text-gray-600">{orders.filter(o => o.status === 'CANCELLED').length}</div>
-    <div class="text-[0.5rem] text-muted uppercase">Cancelled</div>
+    <div class="text-[0.55rem] text-muted uppercase">Cancelled</div>
   </button>
 </div>
 
@@ -239,16 +239,16 @@
 {#if loading && !orders.length}
   <div class="text-center text-muted text-xs animate-pulse py-2">Loading orders…</div>
 {:else if orders.length}
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 mb-1 max-h-[8rem] overflow-y-auto">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-1 max-h-[8rem] overflow-y-auto">
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
-        class="text-left rounded border {statusColor(o.status)} p-2 hover:brightness-95 transition">
+        class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
         <div class="flex items-center justify-between mb-0.5">
           <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="{o.status === 'COMPLETE' ? 'text-green-700' : o.status === 'REJECTED' || o.status === 'CANCELLED' ? 'text-red-600' : 'text-amber-700'}">{o.tradingsymbol}</span></span>
-          <span class="text-[0.5rem] px-1 py-0.5 rounded-sm font-medium uppercase
+          <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
             {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
         </div>
-        <div class="text-[0.5rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
+        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
           <span>QTY:<b>{o.filled_quantity}/{o.quantity}</b></span>
           <span>TYPE:<b>{o.order_type}</b></span>
           <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>

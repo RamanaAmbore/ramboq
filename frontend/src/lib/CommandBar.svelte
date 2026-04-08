@@ -393,7 +393,7 @@
     width: 100%;
   }
   .cmd-chips-area {
-    background: #152033;
+    background: #0f1724;
     border: 1px solid #334155;
     border-bottom: none;
     border-radius: 0.375rem 0.375rem 0 0;
@@ -404,7 +404,7 @@
   .cmd-container {
     border: 1px solid #334155;
     border-radius: 0 0 0.375rem 0.375rem;
-    background: #0f1724;
+    background: #152033;
     position: relative;
     overflow: visible;
   }
