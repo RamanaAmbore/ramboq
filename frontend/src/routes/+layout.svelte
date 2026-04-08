@@ -364,7 +364,7 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #3a5f6f;
+    background-color: #4a7a7a;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   }
   .mobile-nav-item {
