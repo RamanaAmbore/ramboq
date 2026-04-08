@@ -40,6 +40,7 @@
     if (parsed.strike) cmd += ` ${parsed.strike}`;
     if (parsed.expiry) cmd += ` ${parsed.expiry}`;
     if (act === 'close') cmd += ` ${qty}`;
+    cmd += ' ';  // trailing space so cursor advances past filled tokens
     cmdBar?.setValue(cmd);
   }
 
@@ -116,7 +117,7 @@
     </div>
 
     <!-- Command bar -->
-    <div class="px-3 pb-2 relative">
+    <div class="px-3 pb-3">
       <CommandBar
         bind:this={cmdBar}
         grammar={orderGrammar}
@@ -127,7 +128,7 @@
         {enrichPairs}
         disabled={running}
       />
-      <div class="absolute bottom-3 right-4 flex gap-1 z-10">
+      <div class="flex justify-end gap-1 mt-1">
         {#if verb}
           <button onclick={() => cmdBar?.submit()} disabled={running}
             class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
