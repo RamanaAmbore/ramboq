@@ -393,9 +393,9 @@
     width: 100%;
   }
   .cmd-chips-area {
-    background: #0f1724;
+    background: #152033;
     border: 1px solid #334155;
-    border-bottom: none;
+    border-bottom: 1px solid #1e2d42;
     border-radius: 0.375rem 0.375rem 0 0;
     height: 4.5rem;
     padding: 0.2rem 0;
