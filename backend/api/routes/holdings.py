@@ -25,7 +25,7 @@ _TTL = 30  # seconds — background task invalidates on each refresh
 
 def _fetch() -> HoldingsResponse:
     raw = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
-    raw['account'] = mask_column(raw['account'])
+    # Account masking removed — admin-only pages show real account IDs
 
     df = pl.from_pandas(raw.fillna(0))
 

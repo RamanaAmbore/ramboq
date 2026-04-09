@@ -25,7 +25,7 @@ _TTL = 30
 
 def _fetch() -> PositionsResponse:
     raw = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
-    raw['account'] = mask_column(raw['account'])
+    # Account masking removed — admin-only pages show real account IDs
 
     df = pl.from_pandas(raw.fillna(0))
 

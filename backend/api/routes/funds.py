@@ -26,7 +26,7 @@ _COL_MAP = {
 
 def _fetch() -> FundsResponse:
     raw = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
-    raw['account'] = mask_column(raw['account'])
+    # Account masking removed — admin-only pages show real account IDs
 
     df = pl.from_pandas(raw.fillna(0))
 
