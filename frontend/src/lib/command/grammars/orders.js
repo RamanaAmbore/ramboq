@@ -508,6 +508,21 @@ export function parseKiteSymbol(tradingsymbol) {
  * Adds symbol:LTP and expanded qty format for F&O.
  * Use in both Orders page and OrderPopup.
  */
+/**
+ * Execute a buy/sell order from parsed command. Returns result object.
+ * Shared between Orders page and OrderPopup.
+ */
+export async function executeBuySell(parsed) {
+  const { placeOrder } = await import('$lib/api');
+  const payload = buildOrderPayload(parsed);
+  const res = await placeOrder(payload);
+  return {
+    order_id: res.order_id,
+    payload,
+    verb: parsed.verb.toUpperCase(),
+  };
+}
+
 export function enrichOrderPairs(pairs, ctx) {
   return pairs.map(p => {
     if (p.role === 'symbol' && p.status === 'filled' && p.value) {

@@ -1,8 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import CommandBar from '$lib/CommandBar.svelte';
-  import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp, enrichOrderPairs } from '$lib/command/grammars/orders';
-  import { placeOrder } from '$lib/api';
+  import { orderGrammar, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp, enrichOrderPairs, executeBuySell } from '$lib/command/grammars/orders';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
 
@@ -17,8 +16,6 @@
   let running = $state(false);
   let result = $state(/** @type {{status:string, message:string}|null} */(null));
   let action = $state(/** @type {'add'|'close'|null} */(null));
-  let cmdFocused = $state(false);
-
   const isLong = row.quantity > 0;
   const totalQty = Math.abs(row.quantity);
 
@@ -81,9 +78,8 @@
     running = true;
     result = null;
     try {
-      const payload = buildOrderPayload(p);
-      const res = await placeOrder(payload);
-      result = { status: '✓', message: `Order placed — ${res.order_id}` };
+      const { order_id } = await executeBuySell(p);
+      result = { status: '✓', message: `Order placed — ${order_id}` };
       onordered();
       setTimeout(onclose, 1500);
     } catch (e) {

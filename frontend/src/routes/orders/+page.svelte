@@ -2,13 +2,13 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp, logTime } from '$lib/stores';
-  import { fetchOrders, placeOrder, cancelOrder, modifyOrder } from '$lib/api';
+  import { fetchOrders, cancelOrder, modifyOrder } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
   import CommandBar from '$lib/CommandBar.svelte';
   import OrderDetail from '$lib/OrderDetail.svelte';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol, enrichOrderPairs } from '$lib/command/grammars/orders';
+  import { orderGrammar, setQuoteLoadedCallback, previewSymbol, enrichOrderPairs, executeBuySell } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -56,14 +56,13 @@
     running = true;
     try {
       if (parsed.verb === 'buy' || parsed.verb === 'sell') {
-        const payload = buildOrderPayload(parsed);
-        const res = await placeOrder(payload);
+        const { order_id, payload, verb } = await executeBuySell(parsed);
         addResult('✓', `Order placed`, {
-          verb: parsed.verb.toUpperCase(), account: parsed.args.account,
+          verb, account: parsed.args.account,
           symbol: payload.tradingsymbol, exchange: payload.exchange,
           qty: String(payload.quantity), type: payload.order_type,
           price: String(payload.price || ''), product: payload.product,
-          id: res.order_id,
+          id: order_id,
         });
       } else if (parsed.verb === 'cancel') {
         const id = parsed.args.order_id;
