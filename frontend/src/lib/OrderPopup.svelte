@@ -20,24 +20,19 @@
   let cmdFocused = $state(false);
 
   const isLong = row.quantity > 0;
-  const parsed = parseKiteSymbol(row.tradingsymbol);
-  const ltp = getLtp(parsed.symbol) || row.close_price || row.average_price || 0;
   const totalQty = Math.abs(row.quantity);
-  const isFO = parsed.instType !== 'EQ';
 
-  let lotSize = 1;
-  try {
-    const inst = resolveInstrument(parsed);
-    lotSize = inst.ls || 1;
-  } catch {}
-  const lots = isFO && lotSize > 1 ? Math.round(totalQty / lotSize) : totalQty;
+  // These are set after instruments load
+  let parsed = $state(/** @type {{instType:string, symbol:string, strike?:string, expiry?:string}} */({ instType: 'EQ', symbol: row.tradingsymbol }));
+  let isFO = $state(false);
+  let lotSize = $state(1);
+  let lots = $state(totalQty);
+  let ltp = $state(row.close_price || row.average_price || 0);
 
   const verb = $derived(
     action ? ((action === 'add') === isLong ? 'BUY' : 'SELL') : null
   );
 
-  loadInstruments().catch(() => {});
-  loadAccounts().catch(() => {});
   setQuoteLoadedCallback(() => cmdBar?.refresh());
 
   function _baseTokens() {
@@ -49,8 +44,21 @@
     return tokens;
   }
 
-  // After mount: set initial command so chips + command area show immediately
+  // After mount: load instruments, parse symbol, show chips
   onMount(async () => {
+    await loadInstruments().catch(() => {});
+    await loadAccounts().catch(() => {});
+
+    // Now instruments are loaded — parse the symbol
+    parsed = parseKiteSymbol(row.tradingsymbol);
+    isFO = parsed.instType !== 'EQ';
+    ltp = getLtp(parsed.symbol) || row.close_price || row.average_price || 0;
+    try {
+      const inst = resolveInstrument(parsed);
+      lotSize = inst.ls || 1;
+    } catch {}
+    lots = isFO && lotSize > 1 ? Math.round(totalQty / lotSize) : totalQty;
+
     await tick();
     const cmd = `buy ${_baseTokens().join(' ')}`;
     cmdBar?.setValue(cmd);
@@ -61,10 +69,8 @@
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
     const tokens = [v, ..._baseTokens()];
     if (act === 'close') {
-      // Pre-fill full qty for close — user can reduce but not exceed
       tokens.push(String(lots));
     }
-    // Join all tokens + trailing space to advance cursor to next field (orderType)
     const cmd = tokens.join(' ') + ' ';
     cmdBar?.setValue(cmd);
   }
