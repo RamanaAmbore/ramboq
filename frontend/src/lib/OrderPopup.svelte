@@ -39,18 +39,25 @@
   loadAccounts().catch(() => {});
   setQuoteLoadedCallback(() => cmdBar?.refresh());
 
-  function buildCommand(act) {
-    action = act;
-    const v = (act === 'add') === isLong ? 'buy' : 'sell';
-    const tokens = [v, row.account];
+  // Build base tokens (without verb) for initial chip display
+  function _baseTokens() {
+    const tokens = [row.account];
     if (isFO) tokens.push(parsed.instType);
     tokens.push(parsed.symbol);
     if (parsed.strike) tokens.push(parsed.strike);
     if (parsed.expiry) tokens.push(parsed.expiry);
+    return tokens;
+  }
+
+  // Show chips immediately with 'buy' as placeholder verb (chips parse from this)
+  const initialCmd = `buy ${_baseTokens().join(' ')}`;
+
+  function buildCommand(act) {
+    action = act;
+    const v = (act === 'add') === isLong ? 'buy' : 'sell';
+    const tokens = [v, ..._baseTokens()];
     if (act === 'close') tokens.push(String(lots));
     cmdBar?.setValue(tokens.join(' ') + ' ');
-    // Don't auto-focus — user clicks command area to start editing
-    cmdFocused = false;
   }
 
   async function runParsed(p) {
@@ -131,11 +138,12 @@
         bind:this={cmdBar}
         grammar={orderGrammar}
         rows={2}
+        initialValue={initialCmd}
         placeholder="SELECT ADD OR CLOSE ABOVE"
         onsubmit={runParsed}
         previewFn={previewSymbol}
         {enrichPairs}
-        disabled={running}
+        disabled={running || !action}
         showHelp={false}
       />
       {#if verb}
