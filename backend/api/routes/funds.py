@@ -2,9 +2,10 @@
 
 import pandas as pd
 import polars as pl
-from litestar import Controller, get
+from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
+from backend.api.auth_guard import is_admin_request
 from backend.api.cache import get_or_fetch
 from backend.api.schemas import FundsResponse, FundsRow
 from backend.shared.helpers import broker_apis
@@ -51,9 +52,14 @@ class FundsController(Controller):
     path = "/api/funds"
 
     @get("/")
-    async def get_funds(self) -> FundsResponse:
+    async def get_funds(self, request: Request) -> FundsResponse:
         try:
-            return await get_or_fetch("funds", _fetch, ttl_seconds=_TTL)
+            resp = await get_or_fetch("funds", _fetch, ttl_seconds=_TTL)
+            if not is_admin_request(request):
+                for r in resp.rows:
+                    if r.account != 'TOTAL':
+                        r.account = mask_column(pd.Series([r.account]))[0]
+            return resp
         except Exception as e:
             logger.error(f"Funds API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

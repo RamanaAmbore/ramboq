@@ -5,6 +5,9 @@ import polars as pl
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
 
+from litestar import Request
+
+from backend.api.auth_guard import is_admin_request
 from backend.api.cache import get_or_fetch
 from backend.api.schemas import HoldingsResponse, HoldingRow, HoldingsSummaryRow
 from backend.shared.helpers import broker_apis
@@ -66,9 +69,15 @@ class HoldingsController(Controller):
     path = "/api/holdings"
 
     @get("/")
-    async def get_holdings(self) -> HoldingsResponse:
+    async def get_holdings(self, request: Request) -> HoldingsResponse:
         try:
-            return await get_or_fetch("holdings", _fetch, ttl_seconds=_TTL)
+            resp = await get_or_fetch("holdings", _fetch, ttl_seconds=_TTL)
+            if not is_admin_request(request):
+                for r in resp.rows:
+                    r.account = mask_column(pd.Series([r.account]))[0]
+                for s in resp.summary:
+                    s.account = mask_column(pd.Series([s.account]))[0]
+            return resp
         except Exception as e:
             logger.error(f"Holdings API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

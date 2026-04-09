@@ -19,6 +19,8 @@ function _authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function _hasToken() { return !!authStore.getToken(); }
+
 /** Handle 401 — clear token and redirect to signin. */
 function _handle401() {
   authStore.logout();
@@ -76,9 +78,10 @@ async function _post(path, payload, { auth = false } = {}) {
 }
 
 // ── Public data endpoints (read-only — no JWT required) ──────────────────────
-export const fetchHoldings  = () => _get('/holdings/');
-export const fetchPositions = () => _get('/positions/');
-export const fetchFunds     = () => _get('/funds/');
+// Pass auth header if available — backend masks accounts for non-admin
+export const fetchHoldings  = () => _get('/holdings/', { auth: _hasToken() });
+export const fetchPositions = () => _get('/positions/', { auth: _hasToken() });
+export const fetchFunds     = () => _get('/funds/', { auth: _hasToken() });
 
 // ── Protected endpoints (require JWT — order mutations) ───────────────────────
 export const fetchOrders    = () => _get('/orders/',    { auth: true });

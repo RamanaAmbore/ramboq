@@ -2,9 +2,10 @@
 
 import pandas as pd
 import polars as pl
-from litestar import Controller, get
+from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
+from backend.api.auth_guard import is_admin_request
 from backend.api.cache import get_or_fetch
 from backend.api.schemas import PositionsResponse, PositionRow, PositionsSummaryRow
 from backend.shared.helpers import broker_apis
@@ -54,9 +55,15 @@ class PositionsController(Controller):
     path = "/api/positions"
 
     @get("/")
-    async def get_positions(self) -> PositionsResponse:
+    async def get_positions(self, request: Request) -> PositionsResponse:
         try:
-            return await get_or_fetch("positions", _fetch, ttl_seconds=_TTL)
+            resp = await get_or_fetch("positions", _fetch, ttl_seconds=_TTL)
+            if not is_admin_request(request):
+                for r in resp.rows:
+                    r.account = mask_column(pd.Series([r.account]))[0]
+                for s in resp.summary:
+                    s.account = mask_column(pd.Series([s.account]))[0]
+            return resp
         except Exception as e:
             logger.error(f"Positions API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))

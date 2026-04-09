@@ -32,3 +32,17 @@ def admin_guard(connection: ASGIConnection, handler: BaseRouteHandler) -> None: 
     payload = getattr(connection.state, "token_payload", {})
     if payload.get("role") != "admin":
         raise NotAuthorizedException("Admin access required")
+
+
+def is_admin_request(connection: ASGIConnection) -> bool:
+    """Check if the request has a valid admin JWT. Does NOT raise — returns False if not."""
+    try:
+        auth_header = connection.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return False
+        token = auth_header.removeprefix("Bearer ").strip()
+        from backend.api.routes.auth import verify_token
+        payload = verify_token(token)
+        return bool(payload and payload.get("role") == "admin")
+    except Exception:
+        return False
