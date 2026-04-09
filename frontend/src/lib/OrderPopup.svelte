@@ -16,6 +16,7 @@
   let running = $state(false);
   let result = $state(/** @type {{status:string, message:string}|null} */(null));
   let action = $state(/** @type {'add'|'close'|null} */(null));
+  let cmdFocused = $state(false);
 
   const isLong = row.quantity > 0;
   const parsed = parseKiteSymbol(row.tradingsymbol);
@@ -23,7 +24,6 @@
   const totalQty = Math.abs(row.quantity);
   const isFO = parsed.instType !== 'EQ';
 
-  // For F&O: convert total qty to lots (grammar multiplies back by lot_size)
   let lotSize = 1;
   try {
     const inst = resolveInstrument(parsed);
@@ -31,7 +31,6 @@
   } catch {}
   const lots = isFO && lotSize > 1 ? Math.round(totalQty / lotSize) : totalQty;
 
-  // Derive the verb from action + position direction
   const verb = $derived(
     action ? ((action === 'add') === isLong ? 'BUY' : 'SELL') : null
   );
@@ -43,17 +42,15 @@
   function buildCommand(act) {
     action = act;
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
-    // Build command token by token — same order as order page grammar:
-    // verb account [instType] symbol [strike] [expiry] [qty]
     const tokens = [v, row.account];
-    if (isFO) tokens.push(parsed.instType);  // CALL, PUT, FUT
-    tokens.push(parsed.symbol);               // underlying symbol
+    if (isFO) tokens.push(parsed.instType);
+    tokens.push(parsed.symbol);
     if (parsed.strike) tokens.push(parsed.strike);
     if (parsed.expiry) tokens.push(parsed.expiry);
     if (act === 'close') tokens.push(String(lots));
-
-    // Join with spaces + trailing space to advance cursor to next field
     cmdBar?.setValue(tokens.join(' ') + ' ');
+    // Don't auto-focus — user clicks command area to start editing
+    cmdFocused = false;
   }
 
   async function runParsed(p) {
@@ -72,7 +69,6 @@
     }
   }
 
-  // Same enrichPairs as order page — shows symbol:LTP
   function enrichPairs(pairs) {
     return pairs.map(p => {
       if (p.role === 'symbol' && p.status === 'filled' && p.value) {
@@ -92,7 +88,7 @@
 
 <div class="popup-backdrop" onclick={onclose} role="presentation">
   <div class="popup-modal" onclick={(e) => e.stopPropagation()} role="dialog">
-    <!-- Header: show underlying details -->
+    <!-- Header -->
     <div class="popup-header">
       <div>
         <div class="font-semibold text-sm uppercase">
@@ -101,7 +97,7 @@
           <span class="text-slate-700">{parsed.symbol}</span>
         </div>
         <div class="text-[0.65rem] text-gray-600 uppercase mt-0.5">
-          {#if parsed.instType !== 'EQ'}
+          {#if isFO}
             <span>{parsed.instType}</span>
             {#if parsed.strike}<span> STRIKE:{parsed.strike}</span>{/if}
             {#if parsed.expiry}<span> EXP:{parsed.expiry}</span>{/if}
@@ -115,7 +111,7 @@
       <button onclick={onclose} class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
     </div>
 
-    <!-- Action buttons: Add (green) / Close (red) -->
+    <!-- Action buttons -->
     <div class="flex gap-2 px-3 py-2">
       <button onclick={() => buildCommand('add')}
         class="flex-1 text-xs py-1.5 rounded-sm font-semibold border uppercase
@@ -129,8 +125,8 @@
       </button>
     </div>
 
-    <!-- Command bar -->
-    <div class="px-3 pb-3">
+    <!-- Command bar — fixed height container to prevent layout shifts -->
+    <div class="popup-cmd-area">
       <CommandBar
         bind:this={cmdBar}
         grammar={orderGrammar}
@@ -140,16 +136,15 @@
         previewFn={previewSymbol}
         {enrichPairs}
         disabled={running}
+        showHelp={false}
       />
-      <div class="flex justify-end gap-1 mt-1">
-        {#if verb}
+      {#if verb}
+        <div class="flex justify-end mt-1 px-1">
           <button onclick={() => cmdBar?.submit()} disabled={running}
             class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
               {verb === 'BUY' ? 'border-green-500 bg-green-200 text-green-900 hover:bg-green-300' : 'border-red-500 bg-red-200 text-red-900 hover:bg-red-300'}">{verb}</button>
-        {/if}
-        <button onclick={() => { cmdBar?.clear(); action = null; result = null; }}
-          class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Cancel</button>
-      </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Result -->
@@ -177,7 +172,7 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
     width: min(95vw, 480px);
     max-height: 90vh;
-    overflow-y: auto;
+    overflow: visible;
   }
   .popup-header {
     display: flex;
@@ -185,5 +180,9 @@
     justify-content: space-between;
     padding: 0.75rem 0.75rem 0.5rem;
     border-bottom: 1px solid #e2e8f0;
+  }
+  .popup-cmd-area {
+    padding: 0.5rem 0.75rem 0.75rem;
+    position: relative;
   }
 </style>
