@@ -502,3 +502,35 @@ export function parseKiteSymbol(tradingsymbol) {
   if (inst.x) result.expiry = inst.x;
   return result;
 }
+
+/**
+ * Shared enrichPairs function for order CommandBars.
+ * Adds symbol:LTP and expanded qty format for F&O.
+ * Use in both Orders page and OrderPopup.
+ */
+export function enrichOrderPairs(pairs, ctx) {
+  return pairs.map(p => {
+    if (p.role === 'symbol' && p.status === 'filled' && p.value) {
+      const ltp = getLtp(p.value);
+      if (ltp) return { ...p, value: `${p.value}:${ltp}` };
+    }
+    if (p.role === 'qty' && p.status === 'filled' && p.value) {
+      try {
+        let ls = ctx?._lotSize || 0;
+        let isFO = false;
+        if (!ls) {
+          const inst = resolveInstrument({ instType: ctx.instType || 'EQ', symbol: ctx.symbol, strike: ctx.strike, expiry: ctx.expiry });
+          ls = inst.ls || 1;
+          isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+        } else {
+          isFO = true;
+        }
+        if (isFO && ls > 1) {
+          const n = Number(p.value) || 0;
+          return { ...p, value: `${n} (×${ls}=${n * ls})` };
+        }
+      } catch {}
+    }
+    return p;
+  });
+}

@@ -8,7 +8,7 @@
   import OrderDetail from '$lib/OrderDetail.svelte';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol, getLtp, resolveInstrument } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, setQuoteLoadedCallback, previewSymbol, enrichOrderPairs } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -120,23 +120,7 @@
 
   function orderEnrichPairs(pairs, ctx) {
     cmdVerb = (ctx?._verb || '').toUpperCase();
-    return pairs.map(p => {
-      if (p.role === 'symbol' && p.status === 'filled' && p.value) {
-        const ltp = getLtp(p.value);
-        if (ltp) return { ...p, value: `${p.value}:${ltp}` };
-      }
-      if (p.role === 'qty' && p.status === 'filled' && p.value) {
-        try {
-          const inst = resolveInstrument({ instType: ctx.instType || 'EQ', symbol: ctx.symbol, strike: ctx.strike, expiry: ctx.expiry });
-          const ls = inst.ls || 1;
-          if ((inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT') && ls > 1) {
-            const n = Number(p.value) || 0;
-            return { ...p, value: `${n} (×${ls}=${n * ls})` };
-          }
-        } catch {}
-      }
-      return p;
-    });
+    return enrichOrderPairs(pairs, ctx);
   }
   const statusColor = (/** @type {string} */ s) => {
     const c = s?.toUpperCase();

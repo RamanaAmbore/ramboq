@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import CommandBar from '$lib/CommandBar.svelte';
-  import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp } from '$lib/command/grammars/orders';
+  import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp, enrichOrderPairs } from '$lib/command/grammars/orders';
   import { placeOrder } from '$lib/api';
   import { loadInstruments } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
@@ -93,18 +93,8 @@
     }
   }
 
-  function enrichPairs(pairs) {
-    return pairs.map(p => {
-      if (p.role === 'symbol' && p.status === 'filled' && p.value) {
-        const l = getLtp(p.value);
-        if (l) return { ...p, value: `${p.value}:${l}` };
-      }
-      if (p.role === 'qty' && p.status === 'filled' && p.value && isFO && lotSize > 1) {
-        const n = Number(p.value) || 0;
-        return { ...p, value: `${n} (×${lotSize}=${n * lotSize})` };
-      }
-      return p;
-    });
+  function enrichPairs(pairs, ctx) {
+    return enrichOrderPairs(pairs, { ...ctx, _lotSize: lotSize });
   }
 
   function onKeydown(e) {
