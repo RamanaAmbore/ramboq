@@ -328,6 +328,7 @@
 
   export function clear() { value = ''; cursor = 0; suggOpen = false; errors = []; parsedPairs = []; symbolPreview = ''; _shortcutKwargs = {}; _pendingKwarg = null; }
   export function setValue(v) { value = v; cursor = v.length; refreshSuggestions(); refreshErrors(); }
+  export function setValueQuiet(v) { value = v; cursor = v.length; suggOpen = false; parsedPairs = _computeParsedPairs(null); refreshErrors(); }
   export function refresh() { refreshSuggestions(); refreshErrors(); }
   export { submit };
 </script>

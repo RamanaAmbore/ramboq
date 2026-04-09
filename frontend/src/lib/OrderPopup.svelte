@@ -61,7 +61,7 @@
 
     await tick();
     const cmd = `buy ${_baseTokens().join(' ')}`;
-    cmdBar?.setValue(cmd);
+    cmdBar?.setValueQuiet(cmd);
   });
 
   function buildCommand(act) {
