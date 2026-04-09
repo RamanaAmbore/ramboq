@@ -158,7 +158,7 @@
       <CommandBar
         bind:this={cmdBar}
         grammar={orderGrammar}
-        context={action === 'close' ? { maxLots: lots } : {}}
+        context={{ ...(action === 'close' ? { maxLots: lots } : {}), _lotSize: lotSize }}
         rows={2}
         placeholder="SELECT ADD OR CLOSE ABOVE"
         onsubmit={runParsed}

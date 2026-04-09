@@ -168,19 +168,27 @@ function _liquidityTag(totalDepth, qty) {
 
 function qtySuggest(prefix, ctx) {
   try {
-    const inst = resolveInstrument({
-      instType: ctx.instType || 'EQ',
-      symbol: ctx.symbol,
-      strike: ctx.strike,
-      expiry: ctx.expiry,
-    });
-    const ls = inst.ls || 1;
-    const isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+    let ls = 1;
+    let isFO = false;
+    let inst = null;
+    try {
+      inst = resolveInstrument({
+        instType: ctx.instType || 'EQ',
+        symbol: ctx.symbol,
+        strike: ctx.strike,
+        expiry: ctx.expiry,
+      });
+      ls = inst.ls || 1;
+      isFO = inst.t === 'CE' || inst.t === 'PE' || inst.t === 'FUT';
+    } catch {
+      ls = ctx._lotSize || 1;
+      isFO = ls > 1 || ['CALL','PUT','FUT'].includes((ctx.instType || '').toUpperCase());
+    }
 
     // Get total depth for liquidity indicator
-    const cacheKey = `${inst.e}:${inst.s}`;
-    const entry = _ltpCache.get(cacheKey);
-    if (!entry) _fetchLtp(inst.e, inst.s); // trigger background fetch
+    const cacheKey = inst ? `${inst.e}:${inst.s}` : '';
+    const entry = cacheKey ? _ltpCache.get(cacheKey) : null;
+    if (inst && !entry) _fetchLtp(inst.e, inst.s);
     const totalBid = (entry?.depth_buy || []).reduce((s, d) => s + d.quantity, 0);
     const totalAsk = (entry?.depth_sell || []).reduce((s, d) => s + d.quantity, 0);
     const totalDepth = totalBid + totalAsk;
