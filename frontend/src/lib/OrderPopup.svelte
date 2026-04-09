@@ -68,12 +68,11 @@
     action = act;
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
     const tokens = [v, ..._baseTokens()];
-    if (act === 'close') {
-      // Pre-fill qty — for single lot close, skip straight to orderType
+    if (act === 'close' && lots <= 1) {
+      // Single lot: pre-fill qty and skip to orderType
       tokens.push(String(lots));
     }
-    // For add: no qty → suggestion popup will show expanded format (1 (×50=50))
-    // For close with qty pre-filled: trailing space advances to orderType
+    // Multiple lots close or add: leave qty empty for user to choose
     const cmd = tokens.join(' ') + ' ';
     cmdBar?.setValue(cmd);
   }
