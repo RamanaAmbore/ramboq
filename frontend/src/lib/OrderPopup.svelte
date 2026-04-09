@@ -1,4 +1,5 @@
 <script>
+  import { onMount, tick } from 'svelte';
   import CommandBar from '$lib/CommandBar.svelte';
   import { orderGrammar, buildOrderPayload, previewSymbol, parseKiteSymbol, resolveInstrument, setQuoteLoadedCallback, getLtp } from '$lib/command/grammars/orders';
   import { placeOrder } from '$lib/api';
@@ -39,7 +40,6 @@
   loadAccounts().catch(() => {});
   setQuoteLoadedCallback(() => cmdBar?.refresh());
 
-  // Build base tokens (without verb) for initial chip display
   function _baseTokens() {
     const tokens = [row.account];
     if (isFO) tokens.push(parsed.instType);
@@ -49,8 +49,12 @@
     return tokens;
   }
 
-  // Show chips immediately with 'buy' as placeholder verb (chips parse from this)
-  const initialCmd = `buy ${_baseTokens().join(' ')}`;
+  // After mount: set initial command so chips + command area show immediately
+  onMount(async () => {
+    await tick();
+    const cmd = `buy ${_baseTokens().join(' ')}`;
+    cmdBar?.setValue(cmd);
+  });
 
   function buildCommand(act) {
     action = act;
@@ -138,7 +142,6 @@
         bind:this={cmdBar}
         grammar={orderGrammar}
         rows={2}
-        initialValue={initialCmd}
         placeholder="SELECT ADD OR CLOSE ABOVE"
         onsubmit={runParsed}
         previewFn={previewSymbol}
