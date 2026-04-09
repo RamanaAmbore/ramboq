@@ -8,24 +8,66 @@ from backend.shared.helpers.utils import secrets, ramboq_config, ramboq_deploy, 
 logger = get_logger(__name__)
 
 
-def _get_portfolio_symbols():
-    """Get unique tradingsymbols from holdings + positions across all accounts."""
+def _extract_underlying(tradingsymbol):
+    """Extract the underlying from a Kite tradingsymbol (e.g. NIFTY25APR22500CE → NIFTY)."""
+    import re
+    m = re.match(r'^([A-Z]+)', tradingsymbol or '')
+    return m.group(1) if m else tradingsymbol
+
+
+def _get_portfolio_details():
+    """Get portfolio holdings + positions with P&L details for the market report prompt."""
     try:
+        import pandas as pd
         from backend.shared.helpers.broker_apis import fetch_holdings, fetch_positions
-        symbols = set()
+
+        lines = []
+        underlyings = set()
+
+        # Holdings
         for df in fetch_holdings():
-            if hasattr(df, 'tradingsymbol'):
-                symbols.update(df['tradingsymbol'].dropna().unique())
+            if df.empty:
+                continue
+            for _, row in df.iterrows():
+                sym = row.get('tradingsymbol', '')
+                if not sym:
+                    continue
+                qty = int(row.get('quantity', 0) or 0)
+                if qty == 0:
+                    continue
+                ltp = float(row.get('close_price', 0) or 0)
+                avg = float(row.get('average_price', 0) or 0)
+                pnl = float(row.get('pnl', 0) or 0)
+                day_chg = float(row.get('day_change_val', 0) or 0)
+                day_pct = float(row.get('day_change_percentage', 0) or 0)
+                lines.append(f"    • {sym} (holding) qty={qty} avg=₹{avg:.2f} ltp=₹{ltp:.2f} pnl=₹{pnl:,.0f} day_change=₹{day_chg:,.0f} ({day_pct:+.1f}%)")
+                underlyings.add(sym)
+
+        # Positions
         for df in fetch_positions():
-            if hasattr(df, 'tradingsymbol'):
-                symbols.update(df['tradingsymbol'].dropna().unique())
-        # Filter out empty and sort
-        result = sorted(s for s in symbols if s and isinstance(s, str))
-        logger.info(f"Portfolio symbols for market report: {len(result)} instruments")
-        return result
+            if df.empty:
+                continue
+            for _, row in df.iterrows():
+                sym = row.get('tradingsymbol', '')
+                if not sym:
+                    continue
+                qty = int(row.get('quantity', 0) or 0)
+                if qty == 0:
+                    continue
+                ltp = float(row.get('close_price', 0) or row.get('last_price', 0) or 0)
+                avg = float(row.get('average_price', 0) or 0)
+                pnl = float(row.get('pnl', 0) or 0)
+                direction = 'long' if qty > 0 else 'short'
+                underlying = _extract_underlying(sym)
+                lines.append(f"    • {sym} ({direction} position) qty={qty} avg=₹{avg:.2f} ltp=₹{ltp:.2f} pnl=₹{pnl:,.0f}")
+                underlyings.add(underlying)
+                underlyings.add(sym)
+
+        logger.info(f"Portfolio for market report: {len(lines)} instruments, {len(underlyings)} underlyings")
+        return '\n'.join(lines) if lines else "    • (no current holdings/positions)", sorted(underlyings)
     except Exception as e:
-        logger.warning(f"Failed to fetch portfolio symbols: {e}")
-        return []
+        logger.warning(f"Failed to fetch portfolio details: {e}")
+        return "    • (no current holdings/positions)", []
 
 
 def get_market_update():
@@ -47,10 +89,12 @@ def get_market_update():
     try:
         client = genai.Client(api_key=secrets["gemini_api_key"])
 
-        # Dynamically inject portfolio symbols from holdings + positions
-        portfolio_symbols = _get_portfolio_symbols()
-        portfolio_text = '\n'.join(f"    • {s}" for s in portfolio_symbols) if portfolio_symbols else "    • (no current holdings/positions)"
+        # Dynamically inject portfolio with P&L details from holdings + positions
+        portfolio_text, underlyings = _get_portfolio_details()
         user_msg = ramboq_config['genai_user_msg'].replace('{{PORTFOLIO_SYMBOLS}}', portfolio_text)
+        # Add underlyings list for the model to focus on
+        underlying_list = ', '.join(underlyings[:50]) if underlyings else 'none'
+        user_msg += f"\n\nKey underlyings to cover (include any major price movements, news, or corporate actions): {underlying_list}"
 
         prompt = (
             f"Current date and time: {formatted_ist} IST | {formatted_est} EST\n\n"
