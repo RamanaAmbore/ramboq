@@ -60,8 +60,13 @@
     action = act;
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
     const tokens = [v, ..._baseTokens()];
-    if (act === 'close') tokens.push(String(lots));
-    cmdBar?.setValue(tokens.join(' ') + ' ');
+    if (act === 'close') {
+      // Pre-fill full qty for close — user can reduce but not exceed
+      tokens.push(String(lots));
+    }
+    // Join all tokens + trailing space to advance cursor to next field (orderType)
+    const cmd = tokens.join(' ') + ' ';
+    cmdBar?.setValue(cmd);
   }
 
   async function runParsed(p) {
@@ -141,6 +146,7 @@
       <CommandBar
         bind:this={cmdBar}
         grammar={orderGrammar}
+        context={action === 'close' ? { maxLots: lots } : {}}
         rows={2}
         placeholder="SELECT ADD OR CLOSE ABOVE"
         onsubmit={runParsed}

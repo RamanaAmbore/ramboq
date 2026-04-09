@@ -186,15 +186,21 @@ function qtySuggest(prefix, ctx) {
     const totalDepth = totalBid + totalAsk;
 
     if (isFO && ls > 1) {
-      const lots = prefix ? [Number(prefix) || 1] : [1, 2, 3, 5, 10];
-      return lots.map(n => {
+      const maxLots = ctx.maxLots || 0;
+      let lotOptions = prefix ? [Number(prefix) || 1] : [1, 2, 3, 5, 10];
+      if (maxLots > 0) lotOptions = lotOptions.filter(n => n <= maxLots);
+      if (maxLots > 0 && !lotOptions.includes(maxLots)) lotOptions.push(maxLots);
+      return lotOptions.map(n => {
         const total = n * ls;
         const liq = _liquidityTag(totalDepth, total);
         return `${n} (×${ls}=${total})${liq}`;
       });
     }
     // Equity: plain share counts with liquidity
-    const counts = prefix ? [Number(prefix) || 1] : [1, 5, 10, 25, 50, 100, 500];
+    const maxQty = ctx.maxLots || 0;
+    let counts = prefix ? [Number(prefix) || 1] : [1, 5, 10, 25, 50, 100, 500];
+    if (maxQty > 0) counts = counts.filter(n => n <= maxQty);
+    if (maxQty > 0 && !counts.includes(maxQty)) counts.push(maxQty);
     return counts.map(n => {
       const liq = _liquidityTag(totalDepth, n);
       return liq ? `${n} (${liq.trim()})` : String(n);
