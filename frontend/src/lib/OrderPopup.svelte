@@ -69,8 +69,11 @@
     const v = (act === 'add') === isLong ? 'buy' : 'sell';
     const tokens = [v, ..._baseTokens()];
     if (act === 'close') {
+      // Pre-fill qty — for single lot close, skip straight to orderType
       tokens.push(String(lots));
     }
+    // For add: no qty → suggestion popup will show expanded format (1 (×50=50))
+    // For close with qty pre-filled: trailing space advances to orderType
     const cmd = tokens.join(' ') + ' ';
     cmdBar?.setValue(cmd);
   }
@@ -96,6 +99,10 @@
       if (p.role === 'symbol' && p.status === 'filled' && p.value) {
         const l = getLtp(p.value);
         if (l) return { ...p, value: `${p.value}:${l}` };
+      }
+      if (p.role === 'qty' && p.status === 'filled' && p.value && isFO && lotSize > 1) {
+        const n = Number(p.value) || 0;
+        return { ...p, value: `${n} (×${lotSize}=${n * lotSize})` };
       }
       return p;
     });
