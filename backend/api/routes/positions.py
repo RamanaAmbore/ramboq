@@ -27,7 +27,9 @@ def _fetch() -> PositionsResponse:
     raw = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
     # Account masking removed — admin-only pages show real account IDs
 
-    df = pl.from_pandas(raw.fillna(0))
+    numeric = raw.select_dtypes(include='number').columns
+    raw[numeric] = raw[numeric].fillna(0)
+    df = pl.from_pandas(raw)
 
     row_cols = [c for c in _ROW_COLS if c in df.columns]
     df_rows = df.select(row_cols)

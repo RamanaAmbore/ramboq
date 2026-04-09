@@ -28,7 +28,9 @@ def _fetch() -> FundsResponse:
     raw = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
     # Account masking removed — admin-only pages show real account IDs
 
-    df = pl.from_pandas(raw.fillna(0))
+    numeric = raw.select_dtypes(include='number').columns
+    raw[numeric] = raw[numeric].fillna(0)
+    df = pl.from_pandas(raw)
 
     # Rename broker column names to schema names
     rename = {k: v for k, v in _COL_MAP.items() if k in df.columns}

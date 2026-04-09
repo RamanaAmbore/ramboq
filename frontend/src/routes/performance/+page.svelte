@@ -3,7 +3,7 @@
   import { createGrid, ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
   import { fetchHoldings, fetchPositions, fetchFunds } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
-  import { dataCache } from '$lib/stores';
+  import { dataCache, authStore } from '$lib/stores';
   import OrderPopup from '$lib/OrderPopup.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
@@ -18,6 +18,7 @@
   let orderSource = $state('holdings');
 
   function openOrderPopup(row, source) {
+    if ($authStore.user?.role !== 'admin') return;
     orderRow = row;
     orderSource = source;
   }
