@@ -124,6 +124,10 @@ def get_market_update(strict: bool = False):
             f"{user_msg}"
         )
 
+        # gemini-2.5-flash consumes part of max_output_tokens on internal "thinking"
+        # before emitting the answer. Cap thinking to a small budget so the full
+        # response fits within max_output_tokens — otherwise the market report
+        # gets truncated mid-sentence.
         response = client.models.generate_content(
             model=ramboq_config.get('genai_model', 'gemini-2.5-flash'),
             contents=prompt,
@@ -132,6 +136,9 @@ def get_market_update(strict: bool = False):
                 tools=[types.Tool(google_search=types.GoogleSearch())],
                 temperature=float(ramboq_config['genai_temperature']),
                 max_output_tokens=int(ramboq_config['genai_max_tokens']),
+                thinking_config=types.ThinkingConfig(
+                    thinking_budget=int(ramboq_config.get('genai_thinking_budget', 512)),
+                ),
             ),
         )
 

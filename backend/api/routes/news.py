@@ -1,10 +1,10 @@
 """
-Stock-market news feed.
+Stock-market news feed — headlines persisted in Postgres.
 
-Fetches Google News RSS for a financial-markets query, accumulates headlines
-throughout the day, and resets every morning at 07:00 IST (aligned with the
-daily market-report refresh). Gated by the `news` flag in backend_config.yaml
-(combined with `cap_in_dev`) so dev can silence it independently of prod.
+Accumulates headlines throughout the day and wipes the table every morning at
+07:00 IST (aligned with the daily market-report refresh). The feature is:
+  - Always on in production (deploy_branch == 'main') as long as cap_in_dev is True.
+  - On any non-main branch, gated by `news_in_dev` in backend_config.yaml.
 """
 
 import threading
@@ -15,8 +15,11 @@ from email.utils import parsedate_to_datetime
 
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
+from sqlalchemy import select, delete
 
 from backend.api.cache import get_or_fetch
+from backend.api.database import async_session
+from backend.api.models import NewsHeadline
 from backend.api.schemas import NewsItem, NewsResponse
 from backend.shared.helpers.date_time_utils import (
     timestamp_display,
@@ -28,21 +31,26 @@ from backend.shared.helpers.utils import config, is_prod_capable
 
 logger = get_logger(__name__)
 
-_CACHE_TTL = 600  # 10 minutes — duration the route caches the accumulated list
+_CACHE_TTL = 600  # 10-minute route-level coalescing; the DB holds the accumulator
 _FEED = (
     "https://news.google.com/rss/search?"
     "q=stock+market+OR+nifty+OR+sensex+OR+dow+OR+nasdaq+OR+S%26P+500&hl=en-US&gl=US&ceid=US:en"
 )
 
-# Accumulator — headlines seen since the last 07:00 IST reset. Keyed by link for
-# deduplication; the stored tuple carries the parsed UTC datetime for sorting.
-_accum_by_link: dict[str, tuple[datetime, NewsItem]] = {}
-_accum_lock = threading.Lock()
+_reset_lock = threading.Lock()
 _last_reset: date | None = None
 
 
 def _news_enabled() -> bool:
-    return bool(is_prod_capable() and config.get('news'))
+    """
+    Prod: always on when cap_in_dev is True.
+    Non-prod: additionally requires news_in_dev == True.
+    """
+    if not is_prod_capable():
+        return False
+    if config.get('deploy_branch') == 'main':
+        return True
+    return bool(config.get('news_in_dev', True))
 
 
 def _fmt_stamp(dt: datetime) -> str:
@@ -57,32 +65,39 @@ def _fmt_stamp(dt: datetime) -> str:
         return ""
 
 
-def _maybe_reset() -> None:
-    """Clear the accumulator once per day after 07:00 IST (morning rollover)."""
+async def _maybe_reset() -> None:
+    """Truncate news_headlines once per day after 07:00 IST (morning rollover)."""
     global _last_reset
     now = timestamp_indian()
     today = now.date()
     seven_am = now.replace(hour=7, minute=0, second=0, microsecond=0)
-    with _accum_lock:
-        if now >= seven_am and _last_reset != today:
-            _accum_by_link.clear()
+    with _reset_lock:
+        due = (now >= seven_am and _last_reset != today)
+        if due:
             _last_reset = today
-            logger.info("News: accumulator reset for new trading day")
+    if due:
+        try:
+            async with async_session() as s:
+                await s.execute(delete(NewsHeadline))
+                await s.commit()
+            logger.info("News: headlines table cleared for new trading day")
+        except Exception as e:
+            logger.error(f"News: reset failed: {e}")
 
 
-def _fetch_rss() -> list[tuple[datetime, NewsItem]]:
-    """Fetch Google News RSS and return a list of (utc_dt, NewsItem) tuples."""
+def _fetch_rss() -> list[tuple[datetime, dict]]:
+    """Fetch Google News RSS, return newest 50 items as (utc_dt, dict)."""
     req = urllib.request.Request(_FEED, headers={"User-Agent": "RamboQuant/1.0"})
     with urllib.request.urlopen(req, timeout=8) as r:
         data = r.read()
     root = ET.fromstring(data)
-    out: list[tuple[datetime, NewsItem]] = []
+    out: list[tuple[datetime, dict]] = []
     for item in list(root.iterfind(".//item"))[:50]:
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
         pub = (item.findtext("pubDate") or "").strip()
         src_el = item.find("source")
-        source = (src_el.text if src_el is not None else "") or ""
+        source = ((src_el.text if src_el is not None else "") or "").strip()
         if not title or not link or not pub:
             continue
         try:
@@ -91,29 +106,58 @@ def _fetch_rss() -> list[tuple[datetime, NewsItem]]:
                 dt = dt.replace(tzinfo=timezone.utc)
         except Exception:
             continue
-        out.append((dt, NewsItem(
-            title=title, link=link, source=source.strip(), timestamp=_fmt_stamp(dt),
-        )))
+        out.append((dt, {
+            "link": link, "title": title, "source": source,
+            "published_at": dt, "timestamp_display": _fmt_stamp(dt),
+        }))
     return out
 
 
-def _fetch_and_accumulate() -> NewsResponse:
-    """Merge fresh RSS items into the accumulator and return sorted result."""
+async def _fetch_and_accumulate() -> NewsResponse:
+    """Fetch RSS, insert new links into DB, return the full accumulated list."""
     if not _news_enabled():
         return NewsResponse(items=[], refreshed_at=timestamp_display())
 
-    _maybe_reset()
+    await _maybe_reset()
+
     try:
         fresh = _fetch_rss()
     except Exception as e:
         logger.error(f"News fetch failed: {e}")
         fresh = []
 
-    with _accum_lock:
-        for dt, item in fresh:
-            _accum_by_link.setdefault(item.link, (dt, item))
-        sorted_pairs = sorted(_accum_by_link.values(), key=lambda p: p[0], reverse=True)
-        items = [pair[1] for pair in sorted_pairs]
+    try:
+        async with async_session() as s:
+            if fresh:
+                existing = await s.execute(
+                    select(NewsHeadline.link).where(
+                        NewsHeadline.link.in_([row["link"] for _, row in fresh])
+                    )
+                )
+                have = {r[0] for r in existing}
+                added = 0
+                for _dt, row in fresh:
+                    if row["link"] in have:
+                        continue
+                    s.add(NewsHeadline(**row))
+                    added += 1
+                if added:
+                    await s.commit()
+                    logger.info(f"News: +{added} new headlines (total fetched {len(fresh)})")
+
+            rows = await s.execute(
+                select(NewsHeadline).order_by(NewsHeadline.published_at.desc())
+            )
+            items = [
+                NewsItem(
+                    title=h.title, link=h.link,
+                    source=h.source or "", timestamp=h.timestamp_display or "",
+                )
+                for h in rows.scalars().all()
+            ]
+    except Exception as e:
+        logger.error(f"News DB query failed: {e}")
+        items = []
 
     return NewsResponse(items=items, refreshed_at=timestamp_display())
 

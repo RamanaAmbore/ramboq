@@ -193,3 +193,24 @@ class MarketReport(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+
+# ---------------------------------------------------------------------------
+# News headlines — accumulated throughout the day, truncated at 07:00 IST
+# ---------------------------------------------------------------------------
+
+class NewsHeadline(Base):
+    __tablename__ = "news_headlines"
+
+    link: Mapped[str]          = mapped_column(Text, primary_key=True)
+    title: Mapped[str]         = mapped_column(Text, nullable=False)
+    source: Mapped[str]        = mapped_column(String(128), nullable=False, default="")
+    timestamp_display: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

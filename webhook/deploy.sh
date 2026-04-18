@@ -62,7 +62,7 @@ LOG="$APP_ROOT/.log/hook_debug.log"
 
   # --- Restore / merge server-specific config flags ---
   if [ -f "$CONFIG_BAK" ]; then
-    for key in enforce_password_standard cap_in_dev genai telegram mail news notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
+    for key in enforce_password_standard cap_in_dev genai telegram mail news_in_dev genai_thinking_budget notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
       val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
       [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "backend/config/backend_config.yaml"
     done

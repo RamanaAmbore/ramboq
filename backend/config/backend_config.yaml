@@ -25,8 +25,14 @@ cap_in_dev: True
 genai: True               # GenAI market update (Gemini)
 telegram: True            # Telegram alert notifications
 mail: True                # Email notifications (SMTP)
-news: True                # Market news feed (Google News RSS) — False to silence /api/news on dev
 notify_on_startup: True   # Send test Telegram+email on each deploy to confirm notifications work (set False on prod)
+
+# Dev-only toggles — IGNORED on prod (deploy_branch == 'main') where they're always on.
+news_in_dev: True         # Market news feed (Google News RSS) on dev; prod ignores this and always runs
+
+# Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
+# it here so the actual market-report response has room (avoids mid-sentence truncation).
+genai_thinking_budget: 512
 
 # Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
 deploy_branch: main

@@ -46,7 +46,7 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     """Create all tables (idempotent)."""
     async with engine.begin() as conn:
-        from backend.api.models import User, Agent, AgentEvent, MarketReport  # noqa: F401 — ensure model registered
+        from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline  # noqa: F401 — ensure model registered
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database: tables verified")
 
