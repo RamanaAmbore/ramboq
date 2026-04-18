@@ -138,6 +138,7 @@
       defaultColDef: defaultCol,
       overlayNoRowsTemplate: '<span style="font-size:0.65rem;color:#999">—</span>',
       domLayout: 'autoHeight',
+      getRowClass,
       ...(onRowClick ? { onRowClicked: (e) => onRowClick(e.data) } : {}),
     });
   }
@@ -286,10 +287,8 @@
   onMount(async () => {
     holdingsSummaryGrid  = makeGrid(holdingsSummaryEl,  holdingsSummaryCols);
     holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols, [], (r) => openOrderPopup(r, 'holdings'));
-    holdingsAllGrid.setGridOption('getRowClass', getRowClass);
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
     positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
-    positionsAllGrid.setGridOption('getRowClass', getRowClass);
     fundsGrid            = makeGrid(fundsEl,             fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
@@ -378,14 +377,8 @@
 
 <style>
   .hidden { display: none; }
-  :global(.totals-row) {
-    font-weight: 700 !important;
-    background-color: rgba(0, 0, 0, 0.04) !important;
-  }
-
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #d97706; }
-  .perf-dark :global(.totals-row)      { background-color: rgba(255,255,255,0.05) !important; }
 
   /* Tabs */
   .perf-dark :global(button[class*="border-primary"])    { border-color: #d97706 !important; color: #fbbf24 !important; }

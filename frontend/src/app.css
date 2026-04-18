@@ -106,6 +106,15 @@
   background-color: rgba(0,0,0,0.05) !important;
 }
 
+/* AG Grid: totals row — bold, shared across all themes */
+.ag-row.totals-row {
+  font-weight: 700 !important;
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+.ag-theme-algo .ag-row.totals-row {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
 /* AG Grid: show blank row when no data */
 .ag-theme-ramboq .ag-overlay-no-rows-wrapper {
   padding: 8px;
