@@ -1,5 +1,7 @@
 <script>
+  import { onMount } from 'svelte';
   import { logTime, parseLogLineTime } from '$lib/stores';
+  import { fetchNews } from '$lib/api';
 
   /** @type {{
    *   heightClass?: string,
@@ -21,12 +23,31 @@
   } = $props();
 
   let logTab = $state(initialTab);
+  let newsItems = $state(/** @type {Array<{title:string,link:string,source:string,timestamp:string}>} */ ([]));
+  let newsLoading = $state(false);
+  let newsInterval;
+
+  async function loadNews() {
+    newsLoading = true;
+    try {
+      const data = await fetchNews();
+      newsItems = data?.items || [];
+    } catch (_) { /* ignore */ }
+    newsLoading = false;
+  }
+
+  onMount(() => {
+    loadNews();
+    newsInterval = setInterval(loadNews, 10 * 60 * 1000);
+    return () => { if (newsInterval) clearInterval(newsInterval); };
+  });
 
   const TABS = [
     ['order', 'Order Log'],
     ['terminal', 'Terminal'],
     ['agent', 'Agent Log'],
     ['system', 'System Log'],
+    ['news', 'News'],
   ];
 
   const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);
@@ -96,7 +117,13 @@
 <pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{@html newsItems.map(n => {
+  const safeTitle = (n.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const safeLink  = (n.link || '').replace(/"/g,'&quot;');
+  const safeSrc   = (n.source || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const src = safeSrc ? ` <span class="log-chip"><span class="log-chip-key">src:</span>${safeSrc}</span>` : '';
+  return `<span class="log-info"><span class="log-ts">[${n.timestamp}]</span> <a href="${safeLink}" target="_blank" rel="noopener">${safeTitle}</a>${src}</span>`;
+}).join('\n')}{:else}<span class="log-debug">No headlines.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
   const t = parseLogLineTime(l);
   const rest = t ? stripTs(l) : l;
   return `<span class="${sysClass(l)}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;

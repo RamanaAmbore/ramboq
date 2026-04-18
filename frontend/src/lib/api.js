@@ -89,6 +89,7 @@ export const fetchAccounts  = () => _get('/accounts/', { auth: true });
 
 // ── Public endpoints (no JWT needed) ─────────────────────────────────────────
 export const fetchMarket = () => _get('/market/');
+export const fetchNews   = () => _get('/news/');
 export const fetchPost   = () => _get('/config/post');
 export const fetchAbout  = () => _get('/config/about');
 

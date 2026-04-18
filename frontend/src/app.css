@@ -114,14 +114,14 @@
   text-transform: uppercase !important;
 }
 .ag-theme-ramboq .ag-row.totals-row {
-  background-color: #0c1830 !important;
+  background-color: #2a3d60 !important;
   color: #e8d9a8 !important;
   border-top: 1px solid rgba(200,168,75,0.55) !important;
   border-bottom: 1px solid rgba(200,168,75,0.55) !important;
 }
 .ag-theme-ramboq .ag-row.totals-row .ag-cell { border-right: 1px solid rgba(255,255,255,0.12) !important; }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: #0a1020 !important;
+  background-color: #1f2c46 !important;
   color: #fbbf24 !important;
   border-top: 1px solid rgba(251,191,36,0.55) !important;
   border-bottom: 1px solid rgba(251,191,36,0.55) !important;

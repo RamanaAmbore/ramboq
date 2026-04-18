@@ -102,6 +102,22 @@ class MarketResponse(msgspec.Struct):
 
 
 # ---------------------------------------------------------------------------
+# Market news headlines
+# ---------------------------------------------------------------------------
+
+class NewsItem(msgspec.Struct):
+    title: str
+    link: str
+    source: str
+    timestamp: str  # "Mon, April 20, 2026, 09:30 AM IST | Mon, April 20, 2026, 12:00 AM EDT"
+
+
+class NewsResponse(msgspec.Struct):
+    items: list[NewsItem]
+    refreshed_at: str
+
+
+# ---------------------------------------------------------------------------
 # Post / Insights
 # ---------------------------------------------------------------------------
 

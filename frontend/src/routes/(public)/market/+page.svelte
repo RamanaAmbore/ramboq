@@ -25,9 +25,9 @@
       } else if (/^####\s/.test(raw)) {
         if (inList) { html += '</ul>'; inList = false; }
         html += `<h4 class="md-h4">${line.replace(/^####\s/, '')}</h4>`;
-      } else if (/^[-*]\s/.test(raw)) {
+      } else if (/^\s*[-*•]\s+/.test(raw)) {
         if (!inList) { html += '<ul class="md-ul">'; inList = true; }
-        html += `<li class="md-li">${line.replace(/^[-*]\s/, '')}</li>`;
+        html += `<li class="md-li">${line.replace(/^\s*[-*•]\s+/, '')}</li>`;
       } else if (/^---/.test(raw)) {
         if (inList) { html += '</ul>'; inList = false; }
         html += '<hr class="md-hr">';

@@ -146,6 +146,8 @@ def get_market_update(strict: bool = False):
         resp = resp.replace('**', '')                             # drop stray **
         resp = re.sub(r'\*(\S(?:[^*\n]*?\S)?)\*', r'\1', resp)   # *text* → text
         resp = re.sub(r'(?<!\w)_(\S(?:[^_\n]*?\S)?)_(?!\w)', r'\1', resp)  # _text_ → text
+        # Normalize all list markers: leading spaces + * or - or • + any ws → "* "
+        resp = re.sub(r'(?m)^[ \t]*[-*•][ \t]+', '* ', resp)
 
         logger.info(resp)
         return resp
