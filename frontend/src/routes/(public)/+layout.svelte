@@ -337,7 +337,13 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.55);
   }
   :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.09); color: #fff; }
-  :global(.pub-nav-btn-active) { background: rgba(200,168,75,0.25); color: #f0d070; font-weight: 600; }
+  :global(.pub-nav-btn-active) {
+    background: rgba(200,168,75,0.25);
+    color: #f0d070;
+    font-weight: 600;
+    border-left: 2px solid #c8a84b;
+    padding-left: calc(0.65rem - 2px);
+  }
 
   /* Algo link */
   .pub-nav-algo-btn {
