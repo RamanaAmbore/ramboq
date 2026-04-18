@@ -212,7 +212,7 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background-color: #1a2744;
+    background-color: #1e5f5f;
     background-image:
       repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
@@ -322,7 +322,7 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #1a2744;
+    background-color: #1e5f5f;
     background-image:
       repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
@@ -361,7 +361,7 @@
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background: #1a2744;
+    background: #1e5f5f;
     border-top: 1px solid rgba(212,146,12,0.3);
     height: 1.4rem;
     display: flex;
