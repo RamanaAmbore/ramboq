@@ -317,4 +317,38 @@
   }
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
   .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
+
+  /* ── Status-driven surface card — used across algo pages ─────────────────── */
+  :global(.algo-status-card) {
+    background: #0d1829;
+    border: 1.5px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+    color: #c8d8f0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  :global(.algo-status-card[data-status="active"]) {
+    border-color: rgba(34,197,94,0.6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(34,197,94,0.18);
+  }
+  :global(.algo-status-card[data-status="inactive"]) {
+    border-color: rgba(180,200,230,0.18);
+    opacity: 0.82;
+  }
+  :global(.algo-status-card[data-status="triggered"]) {
+    border-color: rgba(239,68,68,0.75);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(239,68,68,0.22);
+  }
+  :global(.algo-status-card[data-status="running"]) {
+    border-color: rgba(251,191,36,0.65);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(251,191,36,0.18);
+  }
+  :global(.algo-status-card[data-status="cooldown"]) {
+    border-color: rgba(251,191,36,0.4);
+  }
+  :global(.algo-status-card[data-status="error"]) {
+    border-color: rgba(220,38,38,0.85);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(220,38,38,0.28);
+  }
 </style>

@@ -120,17 +120,11 @@
     ws.onclose = () => setTimeout(connectWS, 3000);
   }
 
-  const statusBorder = (/** @type {string} */ s) => ({
-    active: 'border-green-500', inactive: 'border-gray-300',
-    triggered: 'border-red-500', running: 'border-orange-400',
-    cooldown: 'border-amber-400', error: 'border-red-600',
-  }[s] || 'border-gray-300');
-
   const statusDot = (/** @type {string} */ s) => ({
-    active: 'bg-green-500', inactive: 'bg-gray-400',
-    triggered: 'bg-red-500', running: 'bg-orange-400',
-    cooldown: 'bg-amber-400', error: 'bg-red-600',
-  }[s] || 'bg-gray-400');
+    active: 'bg-green-500', inactive: 'bg-slate-500',
+    triggered: 'bg-red-500', running: 'bg-amber-400',
+    cooldown: 'bg-amber-300', error: 'bg-red-600',
+  }[s] || 'bg-slate-500');
 
   const eventColor = (/** @type {string} */ t) => ({
     triggered: 'text-orange-600', alert_sent: 'text-yellow-600',
@@ -192,38 +186,38 @@
 <!-- Agent Cards Grid -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
   {#each agents as agent}
-    <div class="rounded-lg border-2 {statusBorder(agent.status)} bg-white p-3 {agent.status === 'triggered' ? 'animate-pulse' : ''}">
+    <div class="algo-status-card {agent.status === 'triggered' ? 'animate-pulse' : ''}" data-status={agent.status}>
       <!-- Header -->
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full {statusDot(agent.status)}"></span>
-          <span class="font-semibold text-xs text-primary">{agent.name}</span>
+          <span class="font-semibold text-xs text-[#fbbf24]">{agent.name}</span>
         </div>
         <button
           onclick={() => toggle(agent)}
-          class="text-[0.6rem] px-2 py-0.5 rounded font-medium
+          class="text-[0.6rem] px-2 py-0.5 rounded font-medium border
             {agent.status !== 'inactive'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-100 text-gray-500'}"
+              ? 'bg-green-500/15 text-green-400 border-green-500/40'
+              : 'bg-slate-700/40 text-slate-400 border-slate-500/30'}"
         >{agent.status !== 'inactive' ? 'ON' : 'OFF'}</button>
       </div>
 
       <!-- Conditions -->
-      <div class="text-[0.6rem] text-text/70 mb-1">
-        <span class="text-muted">If:</span> {conditionSummary(agent.conditions)}
+      <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
+        <span class="text-[#7e97b8]">If:</span> {conditionSummary(agent.conditions)}
       </div>
 
       <!-- Channels + Actions -->
-      <div class="text-[0.6rem] text-text/70 mb-1">
-        <span class="text-muted">Alert:</span> {channelSummary(agent.events)}
-        <span class="mx-1">|</span>
-        <span class="text-muted">Do:</span> {actionSummary(agent.actions)}
+      <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
+        <span class="text-[#7e97b8]">Alert:</span> {channelSummary(agent.events)}
+        <span class="mx-1 text-[#7e97b8]">|</span>
+        <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
       </div>
 
       <!-- Stats + Edit -->
-      <div class="flex items-center justify-between text-[0.55rem] text-muted mt-2">
+      <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
         <span>Last: {agent.last_triggered_at?.slice(0, 16) || '—'} | #{agent.trigger_count}</span>
-        <button onclick={() => startEdit(agent)} class="text-primary hover:underline">Edit</button>
+        <button onclick={() => startEdit(agent)} class="text-[#fbbf24] hover:underline">Edit</button>
       </div>
     </div>
   {/each}
@@ -231,7 +225,7 @@
 
 <!-- Agent Editor (inline) -->
 {#if editing}
-  <div class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+  <div class="algo-status-card p-4 mb-4" data-status="inactive">
     <div class="flex items-center justify-between mb-3">
       <h3 class="section-heading">Edit: {editing}</h3>
       <button onclick={() => editing = null} class="text-xs text-muted hover:text-text">Cancel</button>
