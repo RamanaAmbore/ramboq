@@ -163,7 +163,7 @@
   /* ── Viewport / card shell ─────────────────────────────────────────────── */
   .pub-viewport {
     min-height: 100vh;
-    background-color: #c8cfd8;
+    background-color: #c2ccca;
     background-image: repeating-linear-gradient(
       135deg,
       transparent,
@@ -199,8 +199,8 @@
     display: flex;
     flex-direction: column;
     background-color: #f4f5f8;
-    border-left:  1px solid #bcc2cc;
-    border-right: 1px solid #bcc2cc;
+    border-left:  1px solid #b4c0bc;
+    border-right: 1px solid #b4c0bc;
     box-shadow: -3px 0 10px rgba(0,0,0,0.18), 3px 0 10px rgba(0,0,0,0.18);
     margin-top: 4px;
     margin-bottom: 4px;
@@ -250,7 +250,7 @@
     font-weight: 500;
     border-radius: 0.25rem;
     background: transparent;
-    color: rgba(220, 230, 245, 0.85);
+    color: rgba(210, 235, 228, 0.88);
     border: none;
     cursor: pointer;
     letter-spacing: 0.02em;
@@ -261,7 +261,7 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
   :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.10); color: #fff; }
-  :global(.pub-nav-btn-active) { background: rgba(212,146,12,0.28); color: #ffd060; font-weight: 600; }
+  :global(.pub-nav-btn-active) { background: rgba(232,168,32,0.28); color: #ffd060; font-weight: 600; }
 
   /* Algo link — stands apart with gold border */
   .pub-nav-algo-btn {
@@ -269,9 +269,9 @@
     font-size: 0.65rem;
     font-weight: 600;
     border-radius: 0.25rem;
-    background: rgba(212,146,12,0.2);
+    background: rgba(232,168,32,0.2);
     color: #ffd060;
-    border: 1px solid rgba(212,146,12,0.5);
+    border: 1px solid rgba(232,168,32,0.5);
     cursor: pointer;
     letter-spacing: 0.03em;
     transition: background-color 0.08s;
@@ -279,7 +279,7 @@
     white-space: nowrap;
     margin-right: 0.25rem;
   }
-  .pub-nav-algo-btn:hover { background: rgba(212,146,12,0.35); }
+  .pub-nav-algo-btn:hover { background: rgba(232,168,32,0.35); }
 
   /* Sign-in button */
   .pub-nav-signin {
@@ -287,9 +287,9 @@
     font-size: 0.7rem;
     font-weight: 700;
     border-radius: 0.25rem;
-    background: rgba(212,146,12,0.25);
+    background: rgba(232,168,32,0.25);
     color: #ffd060;
-    border: 1px solid rgba(212,146,12,0.55);
+    border: 1px solid rgba(232,168,32,0.55);
     cursor: pointer;
     transition: background-color 0.08s;
     outline: none !important;
@@ -297,13 +297,13 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.4);
     letter-spacing: 0.03em;
   }
-  .pub-nav-signin:hover { background: rgba(212,146,12,0.4); color: #fff; }
+  .pub-nav-signin:hover { background: rgba(232,168,32,0.4); color: #fff; }
 
   /* User pill */
   .pub-user-pill {
     font-size: 0.72rem;
     font-weight: 500;
-    color: rgba(210, 225, 245, 0.7);
+    color: rgba(200, 230, 222, 0.75);
     padding: 0.18rem 0.55rem;
     border-radius: 999px;
     background: rgba(255,255,255,0.08);
@@ -317,7 +317,7 @@
     padding: 0.35rem;
     border-radius: 0.25rem;
     background: transparent;
-    color: rgba(220,230,245,0.9);
+    color: rgba(210,235,228,0.9);
     border: none;
     cursor: pointer;
     display: flex;
@@ -342,7 +342,7 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-top: 1px solid rgba(212,146,12,0.35);
+    border-top: 1px solid rgba(232,168,32,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
   .pub-mobile-item {
@@ -352,7 +352,7 @@
     padding: 0.7rem 1.25rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: rgba(215,228,250,0.88);
+    color: rgba(210,232,225,0.88);
     background: transparent;
     border: none;
     border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -362,7 +362,7 @@
   }
   .pub-mobile-item:last-child { border-bottom: none; }
   .pub-mobile-item:hover { background: rgba(255,255,255,0.09); color: #fff; }
-  .pub-mobile-active { color: #ffd060; background: rgba(212,146,12,0.15); }
+  .pub-mobile-active { color: #ffd060; background: rgba(232,168,32,0.15); }
   .pub-mobile-algo { color: #ffd060; font-weight: 600; letter-spacing: 0.02em; }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
@@ -390,6 +390,6 @@
     padding: 0 0.75rem;
   }
   .pub-footer p { width: 100%; }
-  .pub-footer-text { color: rgba(205,220,245,0.78); font-size: 0.65rem; line-height: 1; }
-  .pub-sep { color: #d4920c; font-weight: bold; margin: 0 0.35rem; }
+  .pub-footer-text { color: rgba(200,225,218,0.82); font-size: 0.65rem; line-height: 1; }
+  .pub-sep { color: #e8a820; font-weight: bold; margin: 0 0.35rem; }
 </style>
