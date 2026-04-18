@@ -229,10 +229,13 @@
     padding: 0 1rem;
   }
 
-  /* Logo 1px white border */
+  /* Logo 1px off-white shape outline */
   .pub-logo {
-    border: 1px solid rgba(255,255,255,0.8);
-    border-radius: 3px;
+    filter:
+      drop-shadow(1px 0 0 rgba(220,235,235,0.85))
+      drop-shadow(-1px 0 0 rgba(220,235,235,0.85))
+      drop-shadow(0 1px 0 rgba(220,235,235,0.85))
+      drop-shadow(0 -1px 0 rgba(220,235,235,0.85));
   }
 
 
