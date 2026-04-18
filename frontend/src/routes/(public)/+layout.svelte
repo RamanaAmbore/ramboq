@@ -231,7 +231,7 @@
 
   /* Logo gold wash + white glow */
   .pub-logo {
-    background: rgba(232,168,32,0.14);
+    background: rgba(232,168,32,0.07);
     border-radius: 3px;
     padding: 2px 4px;
     filter:
