@@ -52,7 +52,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
-          <img src="/bull.png" alt="" class="pub-brand-bull" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;" />
+          <img src="/bull.png" alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:brightness(0) invert(1) sepia(50%) saturate(2.5) hue-rotate(5deg) brightness(0.9);" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -88,7 +88,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
-          <img src="/bull.png" alt="" class="pub-brand-bull" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;" />
+          <img src="/bull.png" alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:brightness(0) invert(1) sepia(50%) saturate(2.5) hue-rotate(5deg) brightness(0.9);" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -259,16 +259,6 @@
     line-height: 1;
     margin-right: 1rem;
   }
-  .pub-brand-bull {
-    height: 2.6rem;
-    width: auto;
-    object-fit: contain;
-    display: block;
-    filter:
-      brightness(0) invert(1)
-      sepia(55%) saturate(2.5) hue-rotate(5deg) brightness(0.92)
-      drop-shadow(0 1px 3px rgba(0,0,0,0.45));
-  }
   .pub-brand-text {
     display: flex;
     flex-direction: column;
@@ -300,7 +290,6 @@
     display: block;
     margin-top: 0.03rem;
   }
-  .pub-brand-mobile .pub-brand-bull    { height: 2.25rem; }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.94rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.52rem; }
   .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
