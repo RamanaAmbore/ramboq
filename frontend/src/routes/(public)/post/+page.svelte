@@ -70,6 +70,7 @@
   </div>
 {/if}
 
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
 {#if loading && !content}
   <div class="text-center text-text/40 animate-pulse text-sm py-8">
     Loading…
@@ -81,6 +82,7 @@
     {@html renderMarkdown(content)}
   </div>
 {/if}
+</div>
 
 <style>
   :global(.md-body .md-h3) {

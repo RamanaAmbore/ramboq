@@ -86,21 +86,23 @@
   {/if}
 </div>
 
-{#if error}
-  <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
-{/if}
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
+  {#if error}
+    <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
+  {/if}
 
-{#if !content && loading}
-  <div class="text-center text-text/40 text-sm animate-pulse py-8">
-    Loading market report…
-  </div>
-{:else if content}
-  <div class="market-report w-full">
-    {@html renderMarkdown(content)}
-  </div>
-{:else if !loading}
-  <p class="text-text/40 text-sm">No market update available.</p>
-{/if}
+  {#if !content && loading}
+    <div class="text-center text-text/40 text-sm animate-pulse py-8">
+      Loading market report…
+    </div>
+  {:else if content}
+    <div class="market-report w-full">
+      {@html renderMarkdown(content)}
+    </div>
+  {:else if !loading}
+    <p class="text-text/40 text-sm">No market update available.</p>
+  {/if}
+</div>
 
 <style>
   :global(.market-report .md-h3) {

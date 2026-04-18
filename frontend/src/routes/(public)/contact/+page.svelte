@@ -31,6 +31,7 @@
 </svelte:head>
 
 <div class="max-w-sm mx-auto">
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <h1 class="page-heading">Contact</h1>
   {#if success}
     <div class="mb-4 p-3 rounded bg-green-50 text-green-700 text-sm border border-green-200">{success}</div>
@@ -64,5 +65,6 @@
     >
       {submitting ? 'Sending…' : 'Send Message'}
     </button>
+  </div>
   </div>
 </div>

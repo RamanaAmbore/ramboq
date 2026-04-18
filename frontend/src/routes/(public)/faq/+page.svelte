@@ -130,11 +130,11 @@
   <meta name="description" content="Frequently asked questions about RamboQuant Analytics partnership and investment process." />
 </svelte:head>
 
-<div class="text-[0.65rem] text-muted mb-4">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
 
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
 <h1 class="page-heading">Frequently Asked Questions</h1>
 
-<!-- FAQ accordion — clean, no outer card -->
 <div class="faq-list mb-10">
   {#each faqs as faq, i}
     <div class="faq-item {open === i ? 'faq-open' : ''}">
@@ -173,6 +173,7 @@
       </div>
     </div>
   {/each}
+</div>
 </div>
 
 <style>
