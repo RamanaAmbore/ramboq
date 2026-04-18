@@ -51,8 +51,10 @@
     <!-- Desktop navbar -->
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
-        <a href="/about" class="shrink-0 mr-5" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none pub-logo" />
+        <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
+          <span class="pub-brand-name">RAMBO QUANT</span>
+          <span class="pub-brand-sub">ANALYTICS LLP</span>
+          <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
         </a>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -82,8 +84,10 @@
 
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
-        <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none pub-logo" />
+        <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
+          <span class="pub-brand-name">RAMBO QUANT</span>
+          <span class="pub-brand-sub">ANALYTICS LLP</span>
+          <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
         </a>
         <div class="flex items-center gap-2">
           {#if $authStore.user}
@@ -229,19 +233,52 @@
     padding: 0 1rem;
   }
 
-  /* Logo teal wash + white glow */
-  .pub-logo {
-    background: rgba(22,53,53,0.5);
-    border-radius: 3px;
-    padding: 2px 4px;
-    filter:
-      drop-shadow(1px 0 0 rgba(255,255,255,0.38))
-      drop-shadow(-1px 0 0 rgba(255,255,255,0.38))
-      drop-shadow(0 1px 0 rgba(255,255,255,0.38))
-      drop-shadow(0 -1px 0 rgba(255,255,255,0.38));
+  /* ── Brand text logo ────────────────────────────────────────────────────── */
+  .pub-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    text-decoration: none;
+    line-height: 1;
+    padding: 0.1rem 0;
+    border-left: 2px solid rgba(232,168,32,0.55);
+    padding-left: 0.6rem;
   }
-
-
+  .pub-brand-name {
+    font-size: 1rem;
+    font-weight: 900;
+    color: #ffd060;
+    letter-spacing: 0.07em;
+    font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
+    text-shadow:
+      -1px -1px 0 rgba(255,255,255,0.45),
+       1px -1px 0 rgba(255,255,255,0.45),
+      -1px  1px 0 rgba(255,255,255,0.45),
+       1px  1px 0 rgba(255,255,255,0.45),
+       0 0 8px rgba(232,168,32,0.4);
+  }
+  .pub-brand-sub {
+    font-size: 0.47rem;
+    font-weight: 700;
+    color: rgba(255,208,96,0.65);
+    letter-spacing: 0.18em;
+    font-family: 'Trebuchet MS', Arial, sans-serif;
+    text-transform: uppercase;
+  }
+  .pub-brand-tagline {
+    font-size: 0.44rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.88);
+    letter-spacing: 0.13em;
+    background: rgba(0,0,0,0.32);
+    padding: 0.1rem 0.28rem;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 0.04rem;
+  }
+  .pub-brand-mobile .pub-brand-name { font-size: 0.88rem; }
+  .pub-brand-mobile .pub-brand-sub  { font-size: 0.42rem; }
+  .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
 
   /* Nav buttons */
   :global(.pub-nav-btn) {
