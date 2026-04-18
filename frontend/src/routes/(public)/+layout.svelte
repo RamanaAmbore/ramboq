@@ -163,7 +163,14 @@
   /* ── Viewport / card shell ─────────────────────────────────────────────── */
   .pub-viewport {
     min-height: 100vh;
-    background-color: #dde2e8;
+    background-color: #c8cfd8;
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 40px,
+      rgba(255,255,255,0.04) 40px,
+      rgba(255,255,255,0.04) 41px
+    );
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -171,18 +178,18 @@
 
   .pub-accent-top, .pub-accent-bottom {
     position: fixed;
-    height: 3px;
+    height: 4px;
     z-index: 200;
     max-width: 958px;
     width: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, #1a2744 0%, #b8830a 40%, #c9940f 60%, #1a2744 100%);
+    background: linear-gradient(90deg, #1a2744 0%, #d4920c 35%, #f0b020 50%, #d4920c 65%, #1a2744 100%);
   }
   .pub-accent-top    { top: 0; }
   .pub-accent-bottom { bottom: 0; }
   @media (max-width: 767px) {
-    .pub-accent-top { height: 4px; }
+    .pub-accent-top { height: 5px; }
   }
 
   .pub-card {
@@ -191,21 +198,26 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: #f8f9fb;
-    border-left:  1px solid #c8cdd6;
-    border-right: 1px solid #c8cdd6;
-    box-shadow: -2px 0 6px rgba(0,0,0,0.12), 2px 0 6px rgba(0,0,0,0.12);
-    margin-top: 3px;
-    margin-bottom: 3px;
+    background-color: #f4f5f8;
+    border-left:  1px solid #bcc2cc;
+    border-right: 1px solid #bcc2cc;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.18), 3px 0 10px rgba(0,0,0,0.18);
+    margin-top: 4px;
+    margin-bottom: 4px;
+    position: relative;
   }
 
   /* ── Navbar ─────────────────────────────────────────────────────────────── */
   .pub-navbar {
     position: sticky;
-    top: 3px;
+    top: 4px;
     z-index: 50;
-    background: linear-gradient(160deg, #1a2744 0%, #1e3a5f 55%, #152038 100%);
-    border-bottom: 2px solid #b8830a;
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: local;
+    box-shadow: inset 0 0 0 100vw rgba(14, 28, 60, 0.72);
+    border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
 
@@ -233,7 +245,7 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
   :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.10); color: #fff; }
-  :global(.pub-nav-btn-active) { background: rgba(184,131,10,0.22); color: #f0c060; font-weight: 600; }
+  :global(.pub-nav-btn-active) { background: rgba(212,146,12,0.28); color: #ffd060; font-weight: 600; }
 
   /* Algo link — stands apart with gold border */
   .pub-nav-algo-btn {
@@ -241,9 +253,9 @@
     font-size: 0.65rem;
     font-weight: 600;
     border-radius: 0.25rem;
-    background: rgba(184,131,10,0.15);
-    color: #f0c060;
-    border: 1px solid rgba(184,131,10,0.4);
+    background: rgba(212,146,12,0.2);
+    color: #ffd060;
+    border: 1px solid rgba(212,146,12,0.5);
     cursor: pointer;
     letter-spacing: 0.03em;
     transition: background-color 0.08s;
@@ -251,24 +263,25 @@
     white-space: nowrap;
     margin-right: 0.25rem;
   }
-  .pub-nav-algo-btn:hover { background: rgba(184,131,10,0.28); }
+  .pub-nav-algo-btn:hover { background: rgba(212,146,12,0.35); }
 
   /* Sign-in button */
   .pub-nav-signin {
-    padding: 0.22rem 0.75rem;
+    padding: 0.22rem 0.85rem;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     border-radius: 0.25rem;
-    background: rgba(184,131,10,0.2);
-    color: #f0c060;
-    border: 1px solid rgba(184,131,10,0.45);
+    background: rgba(212,146,12,0.25);
+    color: #ffd060;
+    border: 1px solid rgba(212,146,12,0.55);
     cursor: pointer;
     transition: background-color 0.08s;
     outline: none !important;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    letter-spacing: 0.03em;
   }
-  .pub-nav-signin:hover { background: rgba(184,131,10,0.32); color: #fff; }
+  .pub-nav-signin:hover { background: rgba(212,146,12,0.4); color: #fff; }
 
   /* User pill */
   .pub-user-pill {
@@ -306,18 +319,20 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background: linear-gradient(180deg, #1e3060 0%, #162040 100%);
-    border-top: 1px solid rgba(184,131,10,0.3);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    box-shadow: inset 0 0 0 100vw rgba(10, 20, 50, 0.80), 0 6px 20px rgba(0,0,0,0.4);
+    border-top: 1px solid rgba(212,146,12,0.35);
   }
   .pub-mobile-item {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.65rem 1.25rem;
+    padding: 0.7rem 1.25rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: rgba(210,225,245,0.85);
+    color: rgba(215,228,250,0.88);
     background: transparent;
     border: none;
     border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -326,9 +341,9 @@
     outline: none !important;
   }
   .pub-mobile-item:last-child { border-bottom: none; }
-  .pub-mobile-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .pub-mobile-active { color: #f0c060; background: rgba(184,131,10,0.12); }
-  .pub-mobile-algo { color: #f0c060; font-weight: 600; letter-spacing: 0.02em; }
+  .pub-mobile-item:hover { background: rgba(255,255,255,0.09); color: #fff; }
+  .pub-mobile-active { color: #ffd060; background: rgba(212,146,12,0.15); }
+  .pub-mobile-algo { color: #ffd060; font-weight: 600; letter-spacing: 0.02em; }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
   .pub-content {
@@ -338,10 +353,13 @@
 
   .pub-footer {
     position: sticky;
-    bottom: 3px;
+    bottom: 4px;
     z-index: 40;
-    background: linear-gradient(160deg, #1a2744 0%, #1e3a5f 55%, #152038 100%);
-    border-top: 1px solid rgba(184,131,10,0.25);
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center bottom;
+    box-shadow: inset 0 0 0 100vw rgba(10, 20, 50, 0.72);
+    border-top: 1px solid rgba(212,146,12,0.3);
     height: 1.4rem;
     display: flex;
     align-items: center;
@@ -349,6 +367,6 @@
     padding: 0 0.75rem;
   }
   .pub-footer p { width: 100%; }
-  .pub-footer-text { color: rgba(200,215,240,0.75); font-size: 0.65rem; line-height: 1; }
-  .pub-sep { color: #b8830a; font-weight: bold; margin: 0 0.35rem; }
+  .pub-footer-text { color: rgba(205,220,245,0.78); font-size: 0.65rem; line-height: 1; }
+  .pub-sep { color: #d4920c; font-weight: bold; margin: 0 0.35rem; }
 </style>
