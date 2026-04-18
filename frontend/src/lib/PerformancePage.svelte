@@ -371,7 +371,7 @@
   }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
-  .perf-dark :global(.section-heading) { color: #d97706; }
+  .perf-dark :global(.section-heading) { color: #fbbf24; }
 
   .perf-dark .acct-select {
     background: #0d1829;

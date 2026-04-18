@@ -239,7 +239,7 @@
   }
   .algo-user-role {
     font-size: 0.5rem;
-    color: #d97706;
+    color: #fbbf24;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;

@@ -397,7 +397,7 @@
   .cmd-chips-area {
     background: #152033;
     border: 1px solid #334155;
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid #fbbf24;
     border-bottom: 1px solid #1e2d42;
     border-radius: 0.375rem 0.375rem 0 0;
     height: 4.5rem;
@@ -407,7 +407,7 @@
   }
   .cmd-container {
     border: 1px solid #334155;
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid #fbbf24;
     border-radius: 0 0 0.375rem 0.375rem;
     background: #152033;
     color: #f1f5f9;
@@ -416,8 +416,8 @@
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
   }
   .cmd-container:focus-within {
-    border-color: #f59e0b66;
-    border-left: 3px solid #f59e0b;
+    border-color: #fbbf2466;
+    border-left: 3px solid #fbbf24;
   }
   .cmd-pairs {
     display: flex;
@@ -427,7 +427,7 @@
     align-items: center;
   }
   .cmd-input-inner {
-    caret-color: #f59e0b;
+    caret-color: #fbbf24;
     border: none !important;
     outline: none !important;
     background: transparent !important;
@@ -467,8 +467,8 @@
     white-space: nowrap;
   }
   .cmd-suggest-item:hover { background: rgba(255,255,255,0.06); }
-  .cmd-suggest-item.active { background: rgba(245,158,11,0.2); color: #fbbf24; }
-  :global(.text-accent) { color: #f59e0b; }
+  .cmd-suggest-item.active { background: rgba(251,191,36,0.2); color: #fbbf24; }
+  :global(.text-accent) { color: #fbbf24; }
 
   .symbol-preview {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

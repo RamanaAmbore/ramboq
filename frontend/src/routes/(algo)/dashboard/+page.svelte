@@ -13,11 +13,11 @@
   .algo-page-title {
     font-size: 0.75rem;
     font-weight: 700;
-    color: #d97706;
+    color: #fbbf24;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-family: ui-monospace, monospace;
-    border-bottom: 1px solid rgba(217,119,6,0.25);
+    border-bottom: 1px solid rgba(251,191,36,0.25);
     padding-bottom: 0.35rem;
     margin-bottom: 1rem;
   }
