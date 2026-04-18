@@ -452,8 +452,8 @@
     outline: none !important;
   }
   .pub-mobile-item:last-child { border-bottom: none; }
-  .pub-mobile-item:hover { background: rgba(200,168,75,0.09); color: #f0d070; border-left-color: rgba(200,168,75,0.4); }
-  .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.14); border-left-color: #c8a84b; font-weight: 600; }
+  .pub-mobile-item:hover { background: rgba(200,168,75,0.09); color: #f0d070; border-left-color: rgba(240,208,112,0.5); }
+  .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.14); border-left-color: #f0d070; font-weight: 600; }
   .pub-mobile-algo   { color: #f0d070; font-weight: 600; letter-spacing: 0.02em; border-top: 1px solid rgba(200,168,75,0.15); margin-top: 0.1rem; }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
