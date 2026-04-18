@@ -290,6 +290,10 @@
     line-height: 1.1;
     margin-bottom: 0;
     padding-bottom: 0;
+    display: block;
+    width: 100%;
+    text-align: justify;
+    text-align-last: justify;
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
   }
   .pub-brand-tagline {
