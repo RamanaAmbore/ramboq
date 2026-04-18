@@ -55,7 +55,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(240,200,78,0.75)) drop-shadow(0 0 6px rgba(200,168,75,0.45));" />
+          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -82,6 +82,9 @@
         {#if $authStore.user}
           <span class="pub-user-pill">
             {$authStore.user.display_name.toLowerCase()}
+            {#if $authStore.user.role === 'admin'}
+              <span class="pub-user-role">admin</span>
+            {/if}
           </span>
           <button onclick={signOut} class="pub-nav-btn">Sign Out</button>
         {:else}
@@ -92,7 +95,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(240,200,78,0.75)) drop-shadow(0 0 6px rgba(200,168,75,0.45));" />
+          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -104,6 +107,9 @@
           {#if $authStore.user}
             <span class="pub-user-pill text-[0.6rem]">
               {$authStore.user.display_name.toLowerCase()}
+              {#if $authStore.user.role === 'admin'}
+                <span class="pub-user-role">admin</span>
+              {/if}
             </span>
           {/if}
           <button
@@ -380,6 +386,14 @@
     border: 1px solid rgba(255,255,255,0.12);
     margin-right: 0.2rem;
     white-space: nowrap;
+  }
+  .pub-user-role {
+    font-size: 0.5rem;
+    color: #fbbf24;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-left: 0.3rem;
   }
 
   /* Hamburger */
