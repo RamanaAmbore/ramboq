@@ -218,17 +218,17 @@
         135deg,
         transparent,
         transparent 18px,
-        rgba(255,255,255,0.018) 18px,
-        rgba(255,255,255,0.018) 19px
+        rgba(255,255,255,0.045) 18px,
+        rgba(255,255,255,0.045) 19px
       ),
       repeating-linear-gradient(
         45deg,
         transparent,
         transparent 18px,
-        rgba(255,255,255,0.018) 18px,
-        rgba(255,255,255,0.018) 19px
+        rgba(255,255,255,0.045) 18px,
+        rgba(255,255,255,0.045) 19px
       ),
-      linear-gradient(to right, #0f1b30, #1e2f50, #0f1b30);
+      linear-gradient(to bottom, #0f1b30, #1a2744);
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -239,9 +239,10 @@
     padding: 0 1rem;
   }
 
-  /* Logo — brighten dark teal elements so they're visible on dark navy */
+  /* Logo — white on dark navbar */
   :global(.logo-glow) {
-    filter: brightness(3.5);
+    filter: brightness(0) invert(1);
+    opacity: 0.92;
   }
 
 
@@ -343,17 +344,17 @@
         135deg,
         transparent,
         transparent 18px,
-        rgba(255,255,255,0.018) 18px,
-        rgba(255,255,255,0.018) 19px
+        rgba(255,255,255,0.045) 18px,
+        rgba(255,255,255,0.045) 19px
       ),
       repeating-linear-gradient(
         45deg,
         transparent,
         transparent 18px,
-        rgba(255,255,255,0.018) 18px,
-        rgba(255,255,255,0.018) 19px
+        rgba(255,255,255,0.045) 18px,
+        rgba(255,255,255,0.045) 19px
       ),
-      linear-gradient(to right, #0f1b30, #1e2f50, #0f1b30);
+      linear-gradient(to bottom, #0f1b30, #1a2744);
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
