@@ -227,7 +227,8 @@
         transparent 18px,
         rgba(255,255,255,0.018) 18px,
         rgba(255,255,255,0.018) 19px
-      );
+      ),
+      linear-gradient(90deg, #1a2744 0%, #1e2d4a 40%, #1a2744 100%);
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -351,7 +352,8 @@
         transparent 18px,
         rgba(255,255,255,0.018) 18px,
         rgba(255,255,255,0.018) 19px
-      );
+      ),
+      linear-gradient(90deg, #1a2744 0%, #1e2d4a 40%, #1a2744 100%);
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
