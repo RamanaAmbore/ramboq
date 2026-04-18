@@ -293,14 +293,13 @@
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
   }
   .pub-brand-tagline {
-    font-size: 0.43rem;
+    font-size: 0.4rem;
     font-weight: 500;
     color: rgba(255,255,255,0.82);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.03em;
     display: block;
-    padding-top: 0.1rem;
-    border-top: 1px solid rgba(255,255,255,0.52);
-    margin-top: 0.08rem;
+    padding-top: 0.04rem;
+    margin-top: 0;
   }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.66rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.5rem; }
