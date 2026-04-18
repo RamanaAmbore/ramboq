@@ -229,11 +229,16 @@
     padding: 0 1rem;
   }
 
-  /* Logo gold wash */
+  /* Logo gold wash + white glow */
   .pub-logo {
     background: rgba(232,168,32,0.07);
     border-radius: 3px;
     padding: 2px 4px;
+    filter:
+      drop-shadow(1px 0 0 rgba(255,255,255,0.38))
+      drop-shadow(-1px 0 0 rgba(255,255,255,0.38))
+      drop-shadow(0 1px 0 rgba(255,255,255,0.38))
+      drop-shadow(0 -1px 0 rgba(255,255,255,0.38));
   }
 
 
