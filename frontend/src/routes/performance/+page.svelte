@@ -64,6 +64,7 @@
       : value > 0
         ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
         : { color: '#999' };
+  const totalsRowStyle = () => ({ fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.04)' });
   const qtyStyle = ({ value }) =>
     value < 0
       ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
@@ -82,6 +83,8 @@
   };
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
+
+  const getRowClass = (params) => params.data?.account === 'TOTAL' ? 'totals-row' : '';
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';
@@ -217,10 +220,39 @@
   }
 
   function applyData(h, p, f) {
+    // Build totals rows
+    const holdingsTotals = h.rows?.length
+      ? {
+          account: 'TOTAL',
+          tradingsymbol: '',
+          pnl: h.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
+          pnl_percentage: h.rows.reduce((s, r) => s + (Number(r.pnl_percentage) || 0), 0),
+          day_change_val: h.rows.reduce((s, r) => s + (Number(r.day_change_val) || 0), 0),
+          day_change_percentage: 0,
+          quantity: h.rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+          average_price: null,
+          close_price: null,
+          cur_val: h.rows.reduce((s, r) => s + (Number(r.cur_val) || 0), 0),
+        }
+      : null;
+
+    const positionsTotals = p.rows?.length
+      ? {
+          account: 'TOTAL',
+          tradingsymbol: '',
+          pnl: p.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
+          unrealised: p.rows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
+          realised: p.rows.reduce((s, r) => s + (Number(r.realised) || 0), 0),
+          quantity: p.rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+          average_price: null,
+          close_price: null,
+        }
+      : null;
+
     updateGrid(holdingsSummaryGrid,  h.summary ?? []);
-    updateGrid(holdingsAllGrid,      h.rows    ?? []);
+    updateGrid(holdingsAllGrid,      h.rows ? [...h.rows, holdingsTotals] : []);
     updateGrid(positionsSummaryGrid, p.summary ?? []);
-    updateGrid(positionsAllGrid,     p.rows    ?? []);
+    updateGrid(positionsAllGrid,     p.rows ? [...p.rows, positionsTotals] : []);
     updateGrid(fundsGrid,            f.rows    ?? []);
     lastRefresh = h.refreshed_at ?? '';
 
@@ -251,8 +283,10 @@
   onMount(async () => {
     holdingsSummaryGrid  = makeGrid(holdingsSummaryEl,  holdingsSummaryCols);
     holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols, [], (r) => openOrderPopup(r, 'holdings'));
+    holdingsAllGrid.setGridOption('getRowClass', getRowClass);
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
     positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
+    positionsAllGrid.setGridOption('getRowClass', getRowClass);
     fundsGrid            = makeGrid(fundsEl,            fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
@@ -343,4 +377,8 @@
 
 <style>
   .hidden { display: none; }
+  :global(.totals-row) {
+    font-weight: bold;
+    background-color: rgba(0, 0, 0, 0.04) !important;
+  }
 </style>
