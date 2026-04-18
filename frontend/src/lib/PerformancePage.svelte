@@ -10,7 +10,7 @@
 
   ModuleRegistry.registerModules([AllCommunityModule]);
 
-  const { theme = 'ag-theme-ramboq', allowOrders = false } = $props();
+  const { theme = 'ag-theme-ramboq', allowOrders = false, maskAccounts = true } = $props();
   const isDark = $derived(theme === 'ag-theme-algo');
 
   // Read tab from URL ?tab= param; default to 'positions'
@@ -62,7 +62,7 @@
   const pctFmt  = ({ value }) =>
     value == null ? '' : `${Number(value).toFixed(2)}%`;
   const maskAcct = ({ value }) =>
-    value ? String(value).replace(/\d/g, '#') : value;
+    maskAccounts && value ? String(value).replace(/\d/g, '#') : value;
   const loss  = () => ({ color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)'  });
   const gain  = () => ({ color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)'  });
   const zero  = () => ({ color: '#999' });
