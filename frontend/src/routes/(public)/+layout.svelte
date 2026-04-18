@@ -239,10 +239,9 @@
     padding: 0 1rem;
   }
 
-  /* Logo — white on dark navbar */
+  /* Logo — lift dark teal to visible on dark navy */
   :global(.logo-glow) {
-    filter: brightness(0) invert(1);
-    opacity: 0.92;
+    filter: brightness(2) saturate(0.7);
   }
 
 
