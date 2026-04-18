@@ -43,7 +43,7 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-16">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:2.8rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(1px 0 0 #d97706) drop-shadow(-1px 0 0 #d97706) drop-shadow(0 1px 0 #d97706) drop-shadow(0 -1px 0 #d97706) drop-shadow(0 0 4px rgba(217,119,6,0.7));" />
+          <img src={bullSrc} alt="" style="height:2.8rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(1px 0 0 #f0c84e) drop-shadow(-1px 0 0 #f0c84e) drop-shadow(0 1px 0 #f0c84e) drop-shadow(0 -1px 0 #f0c84e) drop-shadow(0 0 4px rgba(240,200,78,0.6));" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
 
@@ -67,7 +67,7 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-16">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:2.4rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(1px 0 0 #d97706) drop-shadow(-1px 0 0 #d97706) drop-shadow(0 1px 0 #d97706) drop-shadow(0 -1px 0 #d97706) drop-shadow(0 0 4px rgba(217,119,6,0.7));" />
+          <img src={bullSrc} alt="" style="height:2.4rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(1px 0 0 #f0c84e) drop-shadow(-1px 0 0 #f0c84e) drop-shadow(0 1px 0 #f0c84e) drop-shadow(0 -1px 0 #f0c84e) drop-shadow(0 0 4px rgba(240,200,78,0.6));" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
         <button
