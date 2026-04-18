@@ -43,7 +43,7 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-16">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="display:block;" />
+          <img src={bullSrc} alt="" style="height:2.8rem;width:auto;display:block;" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
 
@@ -67,7 +67,7 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-16">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="display:block;" />
+          <img src={bullSrc} alt="" style="height:2.4rem;width:auto;display:block;" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
         <button
