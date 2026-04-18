@@ -247,51 +247,40 @@
   .pub-brand {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.09rem;
     text-decoration: none;
     line-height: 1;
     padding: 0.1rem 0 0.1rem 0.65rem;
-    border-left: 2px solid rgba(200,168,75,0.6);
+    border-left: 2px solid #c8a84b;
     margin-right: 1rem;
   }
   .pub-brand-name {
-    font-size: 1.05rem;
+    font-size: 1.08rem;
     font-weight: 900;
-    color: #e8c86a;
+    color: #ffffff;
     letter-spacing: 0.06em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
-    text-shadow:
-      -1px -1px 0 rgba(255,255,255,0.75),
-       1px -1px 0 rgba(255,255,255,0.75),
-      -1px  1px 0 rgba(255,255,255,0.75),
-       1px  1px 0 rgba(255,255,255,0.75),
-      -2px  0   0 rgba(255,255,255,0.35),
-       2px  0   0 rgba(255,255,255,0.35),
-       0 0 10px rgba(200,168,75,0.45);
+    text-shadow: 0 1px 10px rgba(200,168,75,0.55), 0 0 2px rgba(0,0,0,0.4);
   }
   .pub-brand-sub {
     font-size: 0.58rem;
-    font-weight: 700;
-    color: rgba(232,200,106,0.75);
-    letter-spacing: 0.2em;
+    font-weight: 600;
+    color: #c8a84b;
+    letter-spacing: 0.18em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
   }
   .pub-brand-tagline {
-    font-size: 0.44rem;
-    font-weight: 600;
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 0.14em;
-    background: rgba(0,0,0,0.38);
-    padding: 0.1rem 0.3rem;
-    border-radius: 2px;
-    display: inline-block;
-    margin-top: 0.05rem;
-    border-left: 1px solid rgba(200,168,75,0.5);
+    font-size: 0.43rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.52);
+    letter-spacing: 0.06em;
+    display: block;
+    margin-top: 0.04rem;
   }
-  .pub-brand-mobile .pub-brand-name    { font-size: 0.92rem; }
+  .pub-brand-mobile .pub-brand-name    { font-size: 0.94rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.52rem; }
-  .pub-brand-mobile .pub-brand-tagline { font-size: 0.41rem; }
+  .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
 
   /* Nav buttons */
   :global(.pub-nav-btn) {
