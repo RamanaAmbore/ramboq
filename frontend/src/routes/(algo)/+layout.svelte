@@ -172,7 +172,7 @@
   .algo-brand-name {
     font-size: 0.72rem;
     font-weight: 800;
-    color: #d97706;
+    color: #fbbf24;
     letter-spacing: 0.08em;
     font-family: ui-monospace, monospace;
     line-height: 1;
