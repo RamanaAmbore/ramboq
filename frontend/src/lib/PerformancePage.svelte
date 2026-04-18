@@ -13,9 +13,9 @@
   const { theme = 'ag-theme-ramboq' } = $props();
   const isDark = $derived(theme === 'ag-theme-algo');
 
-  // Read tab from URL ?tab= param; default to 'holdings'
+  // Read tab from URL ?tab= param; default to 'positions'
   const validTabs = ['positions', 'holdings'];
-  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'holdings');
+  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'positions');
 
   let orderRow = $state(/** @type {any|null} */(null));
   let orderSource = $state('holdings');
@@ -38,19 +38,17 @@
   let error       = $state('');
 
   // Static grid refs
+  let fundsEl            = null;
   let holdingsSummaryEl  = null;
   let holdingsAllEl      = null;
-  let holdingsFundsEl    = null;
   let positionsSummaryEl = null;
   let positionsAllEl     = null;
-  let positionsFundsEl   = null;
 
+  let fundsGrid            = null;
   let holdingsSummaryGrid  = null;
   let holdingsAllGrid      = null;
-  let holdingsFundsGrid    = null;
   let positionsSummaryGrid = null;
   let positionsAllGrid     = null;
-  let positionsFundsGrid   = null;
 
   let holdingsAccountsContainer = null;
   let positionsAccountsContainer = null;
@@ -259,8 +257,7 @@
     updateGrid(holdingsAllGrid,      h.rows ? [...h.rows, holdingsTotals] : []);
     updateGrid(positionsSummaryGrid, p.summary ?? []);
     updateGrid(positionsAllGrid,     p.rows ? [...p.rows, positionsTotals] : []);
-    updateGrid(holdingsFundsGrid,     f.rows    ?? []);
-    updateGrid(positionsFundsGrid,    f.rows    ?? []);
+    updateGrid(fundsGrid,             f.rows    ?? []);
     lastRefresh = h.refreshed_at ?? '';
 
     if (holdingsAccountsContainer && h.rows?.length) {
@@ -293,8 +290,7 @@
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
     positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
     positionsAllGrid.setGridOption('getRowClass', getRowClass);
-    holdingsFundsGrid    = makeGrid(holdingsFundsEl,    fundsCols);
-    positionsFundsGrid   = makeGrid(positionsFundsEl,   fundsCols);
+    fundsGrid            = makeGrid(fundsEl,             fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
       applyData(dataCache.holdings, dataCache.positions, dataCache.funds);
@@ -310,8 +306,8 @@
 
   onDestroy(() => {
     unsub?.();
-    [holdingsSummaryGrid, holdingsAllGrid, holdingsFundsGrid,
-     positionsSummaryGrid, positionsAllGrid, positionsFundsGrid,
+    [fundsGrid, holdingsSummaryGrid, holdingsAllGrid,
+     positionsSummaryGrid, positionsAllGrid,
      ...holdingsAccountGrids, ...positionsAccountGrids]
       .forEach(g => g?.destroy());
   });
@@ -336,6 +332,9 @@
   </button>
 </div>
 
+<h2 class="section-heading">Fund Balances</h2>
+<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
+
 <div class="flex gap-0.5 mb-3">
   {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
     <button
@@ -353,10 +352,7 @@
   <div bind:this={positionsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Positions</h2>
-  <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
-
-  <h2 class="section-heading">Fund Balances</h2>
-  <div bind:this={positionsFundsEl} class="ag-theme-quartz {theme} w-full"></div>
+  <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 <section class:hidden={activeTab !== 'holdings'}>
@@ -366,10 +362,7 @@
   <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Holdings</h2>
-  <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
-
-  <h2 class="section-heading">Fund Balances</h2>
-  <div bind:this={holdingsFundsEl} class="ag-theme-quartz {theme} w-full"></div>
+  <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 {#if orderRow}
