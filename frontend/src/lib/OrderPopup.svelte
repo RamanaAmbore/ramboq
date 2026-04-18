@@ -105,12 +105,12 @@
     <!-- Header -->
     <div class="popup-header">
       <div>
-        <div class="font-semibold text-sm uppercase">
-          <span class="{isLong ? 'text-green-700' : 'text-red-600'}">{isLong ? 'LONG' : 'SHORT'}</span>
-          <span class="text-blue-700">{row.account}</span>
-          <span class="text-slate-700">{parsed.symbol}</span>
+        <div class="popup-symbol">
+          <span class="{isLong ? 'pos-long' : 'pos-short'}">{isLong ? 'LONG' : 'SHORT'}</span>
+          <span class="pos-account">{row.account}</span>
+          <span class="pos-name">{parsed.symbol}</span>
         </div>
-        <div class="text-[0.65rem] text-gray-600 uppercase mt-0.5">
+        <div class="popup-meta">
           {#if isFO}
             <span>{parsed.instType}</span>
             {#if parsed.strike}<span> STRIKE:{parsed.strike}</span>{/if}
@@ -122,19 +122,17 @@
           <span> LTP:{ltp}</span>
         </div>
       </div>
-      <button onclick={onclose} class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+      <button onclick={onclose} class="popup-close">&times;</button>
     </div>
 
     <!-- Action buttons -->
-    <div class="flex gap-2 px-3 py-2">
+    <div class="popup-actions">
       <button onclick={() => buildCommand('add')}
-        class="flex-1 text-xs py-1.5 rounded-sm font-semibold border uppercase
-          {action === 'add' ? 'border-green-500 bg-green-100 text-green-800' : 'border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100'}">
+        class="popup-action-btn {action === 'add' ? 'popup-action-add-active' : 'popup-action-idle'}">
         Add Position
       </button>
       <button onclick={() => buildCommand('close')}
-        class="flex-1 text-xs py-1.5 rounded-sm font-semibold border uppercase
-          {action === 'close' ? 'border-red-500 bg-red-100 text-red-800' : 'border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100'}">
+        class="popup-action-btn {action === 'close' ? 'popup-action-close-active' : 'popup-action-idle'}">
         Close Position
       </button>
     </div>
@@ -156,15 +154,14 @@
       {#if verb}
         <div class="flex justify-end mt-1 px-1">
           <button onclick={() => cmdBar?.submit()} disabled={running}
-            class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
-              {verb === 'BUY' ? 'border-green-500 bg-green-200 text-green-900 hover:bg-green-300' : 'border-red-500 bg-red-200 text-red-900 hover:bg-red-300'}">{verb}</button>
+            class="popup-submit-btn {verb === 'BUY' ? 'popup-submit-buy' : 'popup-submit-sell'}">{verb}</button>
         </div>
       {/if}
     </div>
 
     <!-- Result -->
     {#if result}
-      <div class="px-3 pb-2 text-xs {result.status === '✓' ? 'text-green-700' : 'text-red-600'}">
+      <div class="popup-result {result.status === '✓' ? 'popup-result-ok' : 'popup-result-err'}">
         {result.status} {result.message}
       </div>
     {/if}
@@ -176,15 +173,16 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.6);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .popup-modal {
-    background: #fff;
-    border-radius: 0.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    background: #0d1829;
+    border: 1px solid #1e2d45;
+    border-radius: 4px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
     width: min(95vw, 480px);
     max-height: 90vh;
     overflow: visible;
@@ -193,11 +191,98 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 0.75rem 0.75rem 0.5rem;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 0.65rem 0.75rem 0.5rem;
+    background: #0a1020;
+    border-bottom: 1px solid rgba(217,119,6,0.35);
+    border-radius: 4px 4px 0 0;
   }
+  .popup-symbol {
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+  }
+  .pos-long    { color: #4ade80; }
+  .pos-short   { color: #f87171; }
+  .pos-account { color: #fbbf24; }
+  .pos-name    { color: #e2e8f0; }
+  .popup-meta {
+    font-size: 0.58rem;
+    color: rgba(180,200,230,0.55);
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-top: 0.2rem;
+  }
+  .popup-close {
+    background: transparent;
+    border: none;
+    color: rgba(180,200,230,0.5);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.06s;
+  }
+  .popup-close:hover { color: #fbbf24; }
+  .popup-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #0d1829;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .popup-action-btn {
+    flex: 1;
+    font-size: 0.65rem;
+    padding: 0.3rem 0;
+    border-radius: 2px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid;
+    transition: background 0.06s;
+  }
+  .popup-action-idle {
+    border-color: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: rgba(180,200,230,0.6);
+  }
+  .popup-action-idle:hover { background: rgba(255,255,255,0.08); color: rgba(180,200,230,0.9); }
+  .popup-action-add-active   { border-color: #22c55e; background: rgba(34,197,94,0.15);  color: #4ade80; }
+  .popup-action-close-active { border-color: #ef4444; background: rgba(239,68,68,0.15);  color: #f87171; }
   .popup-cmd-area {
-    padding: 0.5rem 0.75rem 0.75rem;
+    padding: 0.5rem 0.75rem 0.6rem;
     position: relative;
   }
+  .popup-submit-btn {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.9rem;
+    border-radius: 2px;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    border: 1px solid;
+    transition: background 0.06s;
+  }
+  .popup-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .popup-submit-buy  { border-color: #22c55e; background: rgba(34,197,94,0.2);  color: #4ade80; }
+  .popup-submit-buy:hover:not(:disabled)  { background: rgba(34,197,94,0.35); }
+  .popup-submit-sell { border-color: #ef4444; background: rgba(239,68,68,0.2);  color: #f87171; }
+  .popup-submit-sell:hover:not(:disabled) { background: rgba(239,68,68,0.35); }
+  .popup-result {
+    padding: 0.35rem 0.75rem 0.5rem;
+    font-size: 0.65rem;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.04em;
+  }
+  .popup-result-ok  { color: #4ade80; }
+  .popup-result-err { color: #f87171; }
 </style>

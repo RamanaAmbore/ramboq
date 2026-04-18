@@ -266,9 +266,9 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    padding: 0 0 0 0.6rem;
+    padding: 0 0 0 0.35rem;
     justify-content: center;
-    margin-top: 0.3rem;
+    margin-top: 0.1rem;
   }
   .pub-brand-name {
     font-size: 0.78rem;
@@ -298,8 +298,8 @@
     color: rgba(255,255,255,0.82);
     letter-spacing: 0.03em;
     display: block;
-    padding-top: 0.04rem;
-    margin-top: 0;
+    padding-top: 0;
+    margin-top: 0.22rem;
   }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.66rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.5rem; }

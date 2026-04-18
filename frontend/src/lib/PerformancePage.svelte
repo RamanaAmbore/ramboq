@@ -10,7 +10,7 @@
 
   ModuleRegistry.registerModules([AllCommunityModule]);
 
-  const { theme = 'ag-theme-ramboq' } = $props();
+  const { theme = 'ag-theme-ramboq', allowOrders = false } = $props();
   const isDark = $derived(theme === 'ag-theme-algo');
 
   // Read tab from URL ?tab= param; default to 'positions'
@@ -21,7 +21,7 @@
   let orderSource = $state('holdings');
 
   function openOrderPopup(row, source) {
-    if ($authStore.user?.role !== 'admin') return;
+    if (!allowOrders || $authStore.user?.role !== 'admin') return;
     orderRow = row;
     orderSource = source;
   }
