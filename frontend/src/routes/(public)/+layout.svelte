@@ -241,9 +241,8 @@
   /* Logo — white halo to lift dark elements off dark navbar, gold accent edge */
   :global(.logo-glow) {
     filter:
-      drop-shadow(0 0 3px rgba(255,255,255,0.45))
-      drop-shadow(0 0 1px rgba(255,255,255,0.3))
-      drop-shadow(0 0 1px rgba(212,146,12,0.25));
+      drop-shadow(0 0 2px rgba(255,255,255,0.2))
+      drop-shadow(0 0 1px rgba(212,146,12,0.15));
   }
 
 
