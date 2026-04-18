@@ -229,16 +229,11 @@
     padding: 0 1rem;
   }
 
-  /* Logo light gold wash + gold glow outline */
+  /* Logo off-white background wash */
   .pub-logo {
-    background: rgba(232,168,32,0.08);
+    background: rgba(255,250,240,0.13);
     border-radius: 3px;
     padding: 2px 4px;
-    filter:
-      drop-shadow(1px 0 0 rgba(232,168,32,0.35))
-      drop-shadow(-1px 0 0 rgba(232,168,32,0.35))
-      drop-shadow(0 1px 0 rgba(232,168,32,0.35))
-      drop-shadow(0 -1px 0 rgba(232,168,32,0.35));
   }
 
 
