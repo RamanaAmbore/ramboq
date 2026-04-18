@@ -88,7 +88,7 @@
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
       class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-        {logTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+        {logTab === id ? 'border-[#d97706] text-[#fbbf24]' : 'border-transparent text-[#b4c8e6] hover:text-[#fbbf24]'}"
     >{label}</button>
   {/each}
 </div>

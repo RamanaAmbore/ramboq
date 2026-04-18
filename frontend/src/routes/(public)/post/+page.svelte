@@ -90,7 +90,7 @@
     font-weight: 700;
     color: #1a2744;
     margin: 1.4rem 0 0.4rem;
-    border-left: 3px solid #d4920c;
+    border-left: 3px solid #c8a84b;
     border-bottom: none;
     padding-left: 0.5rem;
   }
