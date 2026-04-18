@@ -184,7 +184,7 @@
     width: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, #1a2744 0%, #d4920c 35%, #f0b020 50%, #d4920c 65%, #1a2744 100%);
+    background: linear-gradient(90deg, #163535 0%, #e8a820 35%, #f5c030 50%, #e8a820 65%, #163535 100%);
   }
   .pub-accent-top    { top: 0; }
   .pub-accent-bottom { bottom: 0; }
@@ -219,7 +219,7 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-bottom: 2px solid #d4920c;
+    border-bottom: 2px solid #e8a820;
     overflow: visible;
   }
 
@@ -379,7 +379,7 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-top: 1px solid rgba(212,146,12,0.3);
+    border-top: 1px solid rgba(232,168,32,0.45);
     height: 1.4rem;
     display: flex;
     align-items: center;
