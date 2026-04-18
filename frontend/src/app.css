@@ -107,18 +107,26 @@
 }
 
 /* AG Grid: totals row — bold + champagne tint, shared across all themes */
+/* Totals row — styled like the column header for maximum visibility */
 .ag-row.totals-row {
-  font-weight: 800 !important;
-  background-color: rgba(200,168,75,0.22) !important;
-  border-top: 2px solid rgba(150,120,50,0.55) !important;
-  border-bottom: 2px solid rgba(150,120,50,0.55) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
 }
+.ag-theme-ramboq .ag-row.totals-row {
+  background-color: #0c1830 !important;
+  color: #e8d9a8 !important;
+  border-top: 1px solid rgba(200,168,75,0.55) !important;
+  border-bottom: 1px solid rgba(200,168,75,0.55) !important;
+}
+.ag-theme-ramboq .ag-row.totals-row .ag-cell { border-right: 1px solid rgba(255,255,255,0.12) !important; }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: rgba(251,191,36,0.22) !important;
-  color: #fde68a !important;
-  border-top: 2px solid rgba(251,191,36,0.6) !important;
-  border-bottom: 2px solid rgba(251,191,36,0.6) !important;
+  background-color: #0a1020 !important;
+  color: #fbbf24 !important;
+  border-top: 1px solid rgba(251,191,36,0.55) !important;
+  border-bottom: 1px solid rgba(251,191,36,0.55) !important;
 }
+.ag-theme-algo .ag-row.totals-row .ag-cell { border-right: 1px solid rgba(251,191,36,0.2) !important; }
 
 /* P&L cell colors — theme-aware, applied via cellClass in PerformancePage */
 .ag-theme-ramboq .pnl-loss { color: #c0392b; background-color: rgba(192,57,43,0.06); }
@@ -152,7 +160,7 @@
   --ag-odd-row-background-color: #233152;
   --ag-row-hover-color: rgba(251,191,36,0.12);
   --ag-selected-row-background-color: rgba(251,191,36,0.22);
-  --ag-border-color: rgba(255,255,255,0.08);
+  --ag-border-color: rgba(255,255,255,0.18);
   --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   --ag-font-size: 0.72rem;
   --ag-row-height: 24px;
@@ -160,7 +168,7 @@
   --ag-wrapper-border-radius: 3px;
   border-radius: 3px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.22);
   box-shadow: none !important;
 }
 /* autoHeight: only remove min-height that pads small tables */
@@ -201,14 +209,15 @@
 .ag-theme-algo .ag-cell {
   padding-left: 4px !important;
   padding-right: 4px !important;
-  border-right: 1px solid rgba(255,255,255,0.06) !important;
+  color: #e2e8f0 !important;
+  border-right: 1px solid rgba(255,255,255,0.12) !important;
 }
 .ag-theme-algo .ag-row {
   font-size: 0.72rem !important;
   font-weight: 400;
-  color: #e2e8f0;
+  color: #e2e8f0 !important;
   letter-spacing: 0.01em;
-  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.12) !important;
 }
 .ag-theme-algo .ag-cell.ag-col-fill {
   background-color: rgba(251,191,36,0.08) !important;
