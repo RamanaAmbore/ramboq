@@ -176,3 +176,20 @@ class AgentEvent(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+
+# ---------------------------------------------------------------------------
+# Market report — single-row cache (id=1). Reused across deploys when <24h old.
+# ---------------------------------------------------------------------------
+
+class MarketReport(Base):
+    __tablename__ = "market_report"
+
+    id: Mapped[int]            = mapped_column(Integer, primary_key=True)
+    content: Mapped[str]       = mapped_column(Text, nullable=False)
+    cycle_date: Mapped[str]    = mapped_column(String(32), nullable=False)
+    refreshed_at: Mapped[str]  = mapped_column(String(128), nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

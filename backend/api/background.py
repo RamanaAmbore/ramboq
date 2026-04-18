@@ -120,31 +120,81 @@ async def _run(fn, *args):
 # Background tasks
 # ---------------------------------------------------------------------------
 
-async def _task_market(state: dict) -> None:
-    """Warm market cache at startup, then every day at 08:30 IST."""
-    from backend.api.routes.market import fetch_fresh
-    from backend.api.cache import invalidate
+async def _load_market_from_db():
+    """Return MarketResponse if a DB row exists and is <24h old, else None."""
+    from datetime import datetime, timezone
+    from backend.api.database import async_session
+    from backend.api.models import MarketReport
+    from backend.api.schemas import MarketResponse
 
-    # Warm once at 07:00 IST daily — only one Gemini call per day
-    # On startup: fetch only if before 07:00 (no report yet today)
-    now = timestamp_indian()
-    today_warm = now.replace(hour=7, minute=0, second=0, microsecond=0)
-    if now < today_warm:
+    try:
+        async with async_session() as s:
+            row = await s.get(MarketReport, 1)
+        if not row:
+            return None
+        age = (datetime.now(timezone.utc) - row.generated_at).total_seconds()
+        if age >= 86400:
+            return None
+        return MarketResponse(content=row.content, cycle_date=row.cycle_date,
+                              refreshed_at=row.refreshed_at)
+    except Exception as e:
+        logger.error(f"Background: market DB load failed: {e}")
+        return None
+
+
+async def _save_market_to_db(resp) -> None:
+    """Upsert id=1 row with the latest market report."""
+    from datetime import datetime, timezone
+    from backend.api.database import async_session
+    from backend.api.models import MarketReport
+
+    try:
+        async with async_session() as s:
+            row = await s.get(MarketReport, 1)
+            now_utc = datetime.now(timezone.utc)
+            if row:
+                row.content = resp.content
+                row.cycle_date = resp.cycle_date
+                row.refreshed_at = resp.refreshed_at
+                row.generated_at = now_utc
+            else:
+                s.add(MarketReport(
+                    id=1, content=resp.content, cycle_date=resp.cycle_date,
+                    refreshed_at=resp.refreshed_at, generated_at=now_utc,
+                ))
+            await s.commit()
+        logger.info("Background: market report saved to DB")
+    except Exception as e:
+        logger.error(f"Background: market DB save failed: {e}")
+
+
+async def _task_market(state: dict) -> None:
+    """
+    Startup: hydrate cache from DB if <24h old, else call Gemini + save.
+    Then daily at 07:00 IST: call Gemini + save.
+    """
+    from backend.api.routes.market import fetch_fresh
+    from backend.api.cache import _store
+    import time as _time
+
+    def _hydrate(resp):
+        _store["market"] = (_time.monotonic() + 86400, resp)
+
+    cached = await _load_market_from_db()
+    if cached:
+        _hydrate(cached)
+        logger.info(f"Background: market cache hydrated from DB (cycle {cached.cycle_date})")
+    else:
         try:
             result = await _run(fetch_fresh)
-            # Put into cache directly
-            from backend.api.cache import _store
-            import time as _time
-            _store["market"] = (_time.monotonic() + 86400, result)
-            logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
+            _hydrate(result)
+            await _save_market_to_db(result)
+            logger.info(f"Background: market generated at startup (cycle {get_cycle_date()})")
         except Exception as e:
-            logger.error(f"Background: market warm failed: {e}")
-    else:
-        logger.info("Background: market task skipping startup warm (past 07:00 IST)")
+            logger.error(f"Background: market startup warm failed: {e}")
 
     while True:
-        # Sleep until 07:00 IST next day
-        now  = timestamp_indian()
+        now = timestamp_indian()
         next_warm = now.replace(hour=7, minute=0, second=0, microsecond=0)
         if now >= next_warm:
             next_warm += timedelta(days=1)
@@ -154,12 +204,10 @@ async def _task_market(state: dict) -> None:
 
         try:
             result = await _run(fetch_fresh)
-            from backend.api.cache import _store
-            import time as _time
-            _store["market"] = (_time.monotonic() + 86400, result)
+            _hydrate(result)
+            await _save_market_to_db(result)
             logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")
 
-            # Broadcast to frontend so market page auto-refreshes
             from backend.api.routes.ws import broadcast
             import json
             broadcast(json.dumps({"event": "market_updated", "refreshed_at": timestamp_display()}))
