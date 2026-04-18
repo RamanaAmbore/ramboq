@@ -328,13 +328,13 @@
 
   /* ── Status-driven surface card — used across algo pages ─────────────────── */
   :global(.algo-status-card) {
-    background: #11203a;
-    border: 1.5px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
+    border: 1.5px solid rgba(255,255,255,0.1);
     border-radius: 6px;
     padding: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
     color: #c8d8f0;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   }
   :global(.algo-status-card[data-status="active"]) {
     border-color: rgba(34,197,94,0.6);
