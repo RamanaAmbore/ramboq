@@ -13,9 +13,9 @@
   const { theme = 'ag-theme-ramboq' } = $props();
   const isDark = $derived(theme === 'ag-theme-algo');
 
-  // Read tab from URL ?tab= param; default to 'funds'
-  const validTabs = ['funds', 'positions', 'holdings'];
-  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'funds');
+  // Read tab from URL ?tab= param; default to 'holdings'
+  const validTabs = ['positions', 'holdings'];
+  let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'holdings');
 
   let orderRow = $state(/** @type {any|null} */(null));
   let orderSource = $state('holdings');
@@ -40,15 +40,17 @@
   // Static grid refs
   let holdingsSummaryEl  = null;
   let holdingsAllEl      = null;
+  let holdingsFundsEl    = null;
   let positionsSummaryEl = null;
   let positionsAllEl     = null;
-  let fundsEl            = null;
+  let positionsFundsEl   = null;
 
   let holdingsSummaryGrid  = null;
   let holdingsAllGrid      = null;
+  let holdingsFundsGrid    = null;
   let positionsSummaryGrid = null;
   let positionsAllGrid     = null;
-  let fundsGrid            = null;
+  let positionsFundsGrid   = null;
 
   let holdingsAccountsContainer = null;
   let positionsAccountsContainer = null;
@@ -257,7 +259,8 @@
     updateGrid(holdingsAllGrid,      h.rows ? [...h.rows, holdingsTotals] : []);
     updateGrid(positionsSummaryGrid, p.summary ?? []);
     updateGrid(positionsAllGrid,     p.rows ? [...p.rows, positionsTotals] : []);
-    updateGrid(fundsGrid,            f.rows    ?? []);
+    updateGrid(holdingsFundsGrid,     f.rows    ?? []);
+    updateGrid(positionsFundsGrid,    f.rows    ?? []);
     lastRefresh = h.refreshed_at ?? '';
 
     if (holdingsAccountsContainer && h.rows?.length) {
@@ -290,7 +293,8 @@
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
     positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
     positionsAllGrid.setGridOption('getRowClass', getRowClass);
-    fundsGrid            = makeGrid(fundsEl,            fundsCols);
+    holdingsFundsGrid    = makeGrid(holdingsFundsEl,    fundsCols);
+    positionsFundsGrid   = makeGrid(positionsFundsEl,   fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
       applyData(dataCache.holdings, dataCache.positions, dataCache.funds);
@@ -306,7 +310,8 @@
 
   onDestroy(() => {
     unsub?.();
-    [holdingsSummaryGrid, holdingsAllGrid, positionsSummaryGrid, positionsAllGrid, fundsGrid,
+    [holdingsSummaryGrid, holdingsAllGrid, holdingsFundsGrid,
+     positionsSummaryGrid, positionsAllGrid, positionsFundsGrid,
      ...holdingsAccountGrids, ...positionsAccountGrids]
       .forEach(g => g?.destroy());
   });
@@ -332,7 +337,7 @@
 </div>
 
 <div class="flex gap-0.5 mb-3">
-  {#each [['funds','Funds'],['positions','Positions'],['holdings','Holdings']] as [id, label]}
+  {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
     <button
       class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
              {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
@@ -341,11 +346,6 @@
   {/each}
 </div>
 
-<section class:hidden={activeTab !== 'funds'}>
-  <h2 class="section-heading">Fund Balances</h2>
-  <div bind:this={fundsEl} class="ag-theme-quartz {theme} w-full"></div>
-</section>
-
 <section class:hidden={activeTab !== 'positions'}>
   <h2 class="section-heading">Summary</h2>
   <div bind:this={positionsSummaryEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
@@ -353,7 +353,10 @@
   <div bind:this={positionsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Positions</h2>
-  <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} w-full"></div>
+  <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
+
+  <h2 class="section-heading">Fund Balances</h2>
+  <div bind:this={positionsFundsEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 <section class:hidden={activeTab !== 'holdings'}>
@@ -363,7 +366,10 @@
   <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Holdings</h2>
-  <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
+  <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
+
+  <h2 class="section-heading">Fund Balances</h2>
+  <div bind:this={holdingsFundsEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 {#if orderRow}
