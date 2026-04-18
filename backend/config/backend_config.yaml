@@ -25,6 +25,7 @@ cap_in_dev: True
 genai: True               # GenAI market update (Gemini)
 telegram: True            # Telegram alert notifications
 mail: True                # Email notifications (SMTP)
+news: True                # Market news feed (Google News RSS) — False to silence /api/news on dev
 notify_on_startup: True   # Send test Telegram+email on each deploy to confirm notifications work (set False on prod)
 
 # Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
