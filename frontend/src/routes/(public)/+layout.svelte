@@ -282,7 +282,7 @@
   .pub-brand-name {
     font-size: 0.78rem;
     font-weight: 900;
-    color: #f0c84e;
+    color: #f0d070;
     letter-spacing: 0.12em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     line-height: 1.1;
@@ -292,7 +292,7 @@
   .pub-brand-sub {
     font-size: 0.58rem;
     font-weight: 700;
-    color: #f0c84e;
+    color: #f0d070;
     letter-spacing: 0.1em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
@@ -328,21 +328,25 @@
     background: transparent;
     color: rgba(215, 228, 255, 0.82);
     border: none;
+    border-bottom: 2px solid transparent;
     cursor: pointer;
     letter-spacing: 0.02em;
-    transition: background-color 0.08s, color 0.08s;
+    transition: background-color 0.08s, color 0.08s, border-bottom-color 0.08s;
     white-space: nowrap;
     outline: none !important;
     -webkit-tap-highlight-color: transparent;
     text-shadow: 0 1px 3px rgba(0,0,0,0.55);
   }
-  :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.09); color: #fff; }
+  :global(.pub-nav-btn:hover) {
+    background: rgba(255,255,255,0.09);
+    color: #fff;
+    border-bottom-color: #c8a84b;
+  }
   :global(.pub-nav-btn-active) {
     background: rgba(200,168,75,0.25);
     color: #f0d070;
     font-weight: 600;
-    border-left: 2px solid #c8a84b;
-    padding-left: calc(0.65rem - 2px);
+    border-bottom-color: #c8a84b;
   }
 
   /* Algo link */
