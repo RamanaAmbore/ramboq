@@ -137,6 +137,11 @@
   border: 1px solid #1e2d45;
   box-shadow: none !important;
 }
+/* autoHeight: only remove min-height that pads small tables */
+.ag-theme-algo .ag-layout-auto-height .ag-center-cols-viewport,
+.ag-theme-algo .ag-layout-auto-height .ag-center-cols-container {
+  min-height: 0 !important;
+}
 .ag-theme-algo .ag-root-wrapper {
   border-radius: 3px;
   overflow: hidden;
