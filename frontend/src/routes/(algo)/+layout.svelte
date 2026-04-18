@@ -337,6 +337,19 @@
   :global(.algo-content .field-input:focus) { border-color: #fbbf24 !important; }
   :global(.algo-content .section-heading) { color: #fbbf24; }
   :global(.algo-content .page-title-chip) { color: #fbbf24; border-color: rgba(251,191,36,0.25); }
+  :global(.algo-content .btn-secondary) {
+    color: #c8d8f0;
+    border-color: rgba(255,255,255,0.2);
+    background: transparent;
+  }
+  :global(.algo-content .btn-secondary:hover:not(:disabled)) {
+    background: rgba(251,191,36,0.1);
+    border-color: rgba(251,191,36,0.5);
+    color: #fbbf24;
+  }
+  :global(.algo-content .btn-tertiary) { color: #c8d8f0; }
+  :global(.algo-content .btn-tertiary:hover) { background: rgba(251,191,36,0.1); color: #fbbf24; }
+  :global(.algo-content .btn-tertiary.active) { color: #fbbf24; background: rgba(251,191,36,0.15); }
 
   /* ── Status-driven surface card — used across algo pages ─────────────────── */
   :global(.algo-status-card) {
