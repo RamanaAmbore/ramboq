@@ -194,24 +194,8 @@
       const acctRows = rows.filter(r => r.account === acct);
 
       const totalsRow = source === 'holdings'
-        ? {
-            account: '', tradingsymbol: 'TOTAL',
-            pnl:                   acctRows.reduce((s, r) => s + (Number(r.pnl)                   || 0), 0),
-            pnl_percentage:        acctRows.reduce((s, r) => s + (Number(r.pnl_percentage)        || 0), 0),
-            day_change_val:        acctRows.reduce((s, r) => s + (Number(r.day_change_val)        || 0), 0),
-            day_change_percentage: 0,
-            quantity:              acctRows.reduce((s, r) => s + (Number(r.quantity)              || 0), 0),
-            average_price: null, close_price: null,
-            cur_val:               acctRows.reduce((s, r) => s + (Number(r.cur_val)               || 0), 0),
-          }
-        : {
-            account: '', tradingsymbol: 'TOTAL',
-            pnl:        acctRows.reduce((s, r) => s + (Number(r.pnl)        || 0), 0),
-            unrealised: acctRows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
-            realised:   acctRows.reduce((s, r) => s + (Number(r.realised)   || 0), 0),
-            quantity:   acctRows.reduce((s, r) => s + (Number(r.quantity)   || 0), 0),
-            average_price: null, close_price: null,
-          };
+        ? makeHoldingsTotals(acctRows)
+        : makePositionsTotals(acctRows);
 
       const section = document.createElement('div');
       section.className = 'mb-4';
@@ -242,35 +226,46 @@
     else positionsAccountGrids = grids;
   }
 
-  function applyData(h, p, f) {
-    // Build totals rows
-    const holdingsTotals = h.rows?.length
-      ? {
-          account: '',
-          tradingsymbol: 'TOTAL',
-          pnl: h.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
-          pnl_percentage: h.rows.reduce((s, r) => s + (Number(r.pnl_percentage) || 0), 0),
-          day_change_val: h.rows.reduce((s, r) => s + (Number(r.day_change_val) || 0), 0),
-          day_change_percentage: 0,
-          quantity: h.rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
-          average_price: null,
-          close_price: null,
-          cur_val: h.rows.reduce((s, r) => s + (Number(r.cur_val) || 0), 0),
-        }
-      : null;
+  function makeHoldingsTotals(rows) {
+    if (!rows?.length) return null;
+    const sum = (f) => rows.reduce((s, r) => s + (Number(r[f]) || 0), 0);
+    const total_pnl         = sum('pnl');
+    const total_cur_val     = sum('cur_val');
+    const total_day_change  = sum('day_change_val');
+    const total_inv_val     = total_cur_val - total_pnl;
+    const total_prev_val    = total_cur_val - total_day_change;
+    return {
+      account: '',
+      tradingsymbol: 'TOTAL',
+      pnl:                   total_pnl,
+      pnl_percentage:        total_inv_val  ? (total_pnl        / total_inv_val  * 100) : 0,
+      day_change_val:        total_day_change,
+      day_change_percentage: total_prev_val ? (total_day_change / total_prev_val * 100) : 0,
+      quantity:              sum('quantity'),
+      average_price: null,
+      close_price:   null,
+      cur_val:               total_cur_val,
+    };
+  }
 
-    const positionsTotals = p.rows?.length
-      ? {
-          account: '',
-          tradingsymbol: 'TOTAL',
-          pnl: p.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
-          unrealised: p.rows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
-          realised: p.rows.reduce((s, r) => s + (Number(r.realised) || 0), 0),
-          quantity: p.rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
-          average_price: null,
-          close_price: null,
-        }
-      : null;
+  function makePositionsTotals(rows) {
+    if (!rows?.length) return null;
+    const sum = (f) => rows.reduce((s, r) => s + (Number(r[f]) || 0), 0);
+    return {
+      account: '',
+      tradingsymbol: 'TOTAL',
+      pnl:        sum('pnl'),
+      unrealised: sum('unrealised'),
+      realised:   sum('realised'),
+      quantity:   sum('quantity'),
+      average_price: null,
+      close_price:   null,
+    };
+  }
+
+  function applyData(h, p, f) {
+    const holdingsTotals  = makeHoldingsTotals(h.rows);
+    const positionsTotals = makePositionsTotals(p.rows);
 
     updateGrid(holdingsSummaryGrid,  h.summary ?? []);
     updateGrid(holdingsAllGrid,      h.rows ? [...h.rows, holdingsTotals] : []);
