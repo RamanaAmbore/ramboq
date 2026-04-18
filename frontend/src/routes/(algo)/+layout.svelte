@@ -232,11 +232,11 @@
     gap: 0.3rem;
     font-size: 0.65rem;
     font-weight: 500;
-    color: rgba(180,200,230,0.6);
+    color: #c8d8f0;
     padding: 0.18rem 0.5rem;
     border-radius: 3px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.07);
+    background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
+    border: 1px solid rgba(255,255,255,0.1);
     margin-right: 0.25rem;
     white-space: nowrap;
     font-family: ui-monospace, monospace;

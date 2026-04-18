@@ -114,9 +114,10 @@
   border-bottom: 1px solid rgba(150,120,50,0.28) !important;
 }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: rgba(200,168,75,0.11) !important;
-  border-top: 1px solid rgba(217,119,6,0.3) !important;
-  border-bottom: 1px solid rgba(217,119,6,0.3) !important;
+  background-color: rgba(251,191,36,0.14) !important;
+  color: #fde68a !important;
+  border-top: 1px solid rgba(251,191,36,0.35) !important;
+  border-bottom: 1px solid rgba(251,191,36,0.35) !important;
 }
 
 /* AG Grid: show blank row when no data */
@@ -134,20 +135,20 @@
   --ag-header-foreground-color: #fbbf24;
   --ag-header-font-weight: 700;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #1e2a38;
-  --ag-background-color: #f0f4f2;
-  --ag-odd-row-background-color: #e8f0ee;
-  --ag-row-hover-color: #d8eae6;
-  --ag-selected-row-background-color: #c8e0da;
-  --ag-border-color: #ccd8d4;
+  --ag-foreground-color: #e2e8f0;
+  --ag-background-color: #1d2a44;
+  --ag-odd-row-background-color: #233152;
+  --ag-row-hover-color: rgba(251,191,36,0.12);
+  --ag-selected-row-background-color: rgba(251,191,36,0.22);
+  --ag-border-color: rgba(255,255,255,0.08);
   --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --ag-font-size: 0.625rem;
-  --ag-row-height: 22px;
+  --ag-font-size: 0.72rem;
+  --ag-row-height: 24px;
   --ag-header-height: 28px;
   --ag-wrapper-border-radius: 3px;
   border-radius: 3px;
   overflow: hidden;
-  border: 1px solid #1e2d45;
+  border: 1px solid rgba(255,255,255,0.1);
   box-shadow: none !important;
 }
 /* autoHeight: only remove min-height that pads small tables */
@@ -158,7 +159,7 @@
 .ag-theme-algo .ag-root-wrapper {
   border-radius: 3px;
   overflow: hidden;
-  background-color: #f0f4f2 !important;
+  background-color: #1d2a44 !important;
   box-shadow: none !important;
 }
 .ag-theme-algo .ag-header {
@@ -167,7 +168,7 @@
   border-bottom: 1px solid rgba(217,119,6,0.4) !important;
 }
 .ag-theme-algo .ag-body {
-  background-color: #f0f4f2 !important;
+  background-color: #1d2a44 !important;
 }
 .ag-theme-algo .ag-header-cell {
   letter-spacing: 0.05em;
@@ -188,23 +189,23 @@
 .ag-theme-algo .ag-cell {
   padding-left: 4px !important;
   padding-right: 4px !important;
-  border-right: 1px solid #1e2d45 !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
 }
 .ag-theme-algo .ag-row {
-  font-size: 0.625rem !important;
+  font-size: 0.72rem !important;
   font-weight: 400;
-  color: #1e2a38;
+  color: #e2e8f0;
   letter-spacing: 0.01em;
-  border-bottom: 1px solid #ccd8d4 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
 }
 .ag-theme-algo .ag-cell.ag-col-fill {
-  background-color: rgba(217,119,6,0.08) !important;
+  background-color: rgba(251,191,36,0.08) !important;
 }
 .ag-theme-algo .ag-header-cell.ag-col-fill {
-  background-color: rgba(217,119,6,0.12) !important;
+  background-color: rgba(251,191,36,0.14) !important;
 }
 .ag-theme-algo .ag-overlay-no-rows-wrapper { padding: 8px; }
-.ag-theme-algo .ag-overlay-no-rows-center { font-size: 0.6rem; color: #4a6080; }
+.ag-theme-algo .ag-overlay-no-rows-center { font-size: 0.7rem; color: #7e97b8; }
 
 /* ── Log panel styles ────────────────────────────────────────────────────── */
 .log-panel {
@@ -228,8 +229,8 @@
 .log-panel .log-agent-failed      { color: #f87171; background: rgba(248,113,113,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-default     { color: #9ca3af; }
 .log-panel .log-ts                { color: #7dd3fc; font-weight: 700; margin-right: 4px; }
-.log-panel .log-chip              { display: inline-block; font-size: 0.6rem; padding: 0 0.3rem; margin: 0 0.1rem; border-radius: 0.2rem; background: rgba(100,116,139,0.15); border: 1px solid rgba(100,116,139,0.2); }
-.log-panel .log-chip-key          { color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-right: 0.15rem; font-size: 0.5rem; }
+.log-panel .log-chip              { display: inline-block; font-size: 0.6rem; padding: 0 0.3rem; margin: 0 0.1rem; border-radius: 0.2rem; background: rgba(39,53,82,0.55); border: 1px solid rgba(255,255,255,0.08); }
+.log-panel .log-chip-key          { color: #7dd3fc; font-weight: 600; text-transform: uppercase; margin-right: 0.15rem; font-size: 0.5rem; }
 
 /* ── Shared button styles ─────────────────────────────────────────────────── */
 @layer components {
