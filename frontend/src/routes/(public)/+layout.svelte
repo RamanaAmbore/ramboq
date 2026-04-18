@@ -52,9 +52,12 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
-          <span class="pub-brand-name">RAMBO QUANT</span>
-          <span class="pub-brand-sub">ANALYTICS LLP</span>
-          <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
+          <img src="/bull.png" alt="" class="pub-brand-bull pointer-events-none" />
+          <div class="pub-brand-text">
+            <span class="pub-brand-name">RAMBO QUANT</span>
+            <span class="pub-brand-sub">ANALYTICS LLP</span>
+            <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
+          </div>
         </a>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -85,9 +88,12 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
-          <span class="pub-brand-name">RAMBO QUANT</span>
-          <span class="pub-brand-sub">ANALYTICS LLP</span>
-          <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
+          <img src="/bull.png" alt="" class="pub-brand-bull pointer-events-none" />
+          <div class="pub-brand-text">
+            <span class="pub-brand-name">RAMBO QUANT</span>
+            <span class="pub-brand-sub">ANALYTICS LLP</span>
+            <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
+          </div>
         </a>
         <div class="flex items-center gap-2">
           {#if $authStore.user}
@@ -246,13 +252,26 @@
   /* ── Brand text logo ────────────────────────────────────────────────────── */
   .pub-brand {
     display: flex;
-    flex-direction: column;
-    gap: 0.09rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.55rem;
     text-decoration: none;
     line-height: 1;
-    padding: 0.1rem 0 0.1rem 0.65rem;
-    border-left: 2px solid #c8a84b;
     margin-right: 1rem;
+  }
+  .pub-brand-bull {
+    height: 2.6rem;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)) brightness(1.08);
+  }
+  .pub-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.09rem;
+    padding: 0.1rem 0 0.1rem 0.6rem;
+    border-left: 2px solid #c8a84b;
   }
   .pub-brand-name {
     font-size: 1.08rem;
@@ -276,8 +295,9 @@
     color: rgba(255,255,255,0.52);
     letter-spacing: 0.06em;
     display: block;
-    margin-top: 0.04rem;
+    margin-top: 0.03rem;
   }
+  .pub-brand-mobile .pub-brand-bull    { height: 2.25rem; }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.94rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.52rem; }
   .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }

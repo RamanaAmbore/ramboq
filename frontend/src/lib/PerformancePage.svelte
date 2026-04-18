@@ -56,10 +56,12 @@
   let holdingsAccountGrids  = [];
   let positionsAccountGrids = [];
 
-  const numFmt = ({ value }) =>
+  const numFmt  = ({ value }) =>
     value == null ? '' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-  const pctFmt = ({ value }) =>
+  const pctFmt  = ({ value }) =>
     value == null ? '' : `${Number(value).toFixed(2)}%`;
+  const maskAcct = ({ value }) =>
+    value ? String(value).replace(/\d/g, '#') : value;
   const loss  = () => ({ color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)'  });
   const gain  = () => ({ color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)'  });
   const zero  = () => ({ color: '#999' });
@@ -81,7 +83,7 @@
   const symFill  = 'ag-col-fill';
 
   const holdingsSummaryCols = [
-    { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75, cellClass: acctFill, headerClass: acctFill },
+    { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'cur_val',               headerName: 'Cur Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'inv_val',               headerName: 'Inv Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'pnl',                   headerName: 'P&L',      flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
@@ -91,7 +93,7 @@
   ];
 
   const holdingsCols = [
-    { field: 'account',               headerName: 'Account',  width: 90, cellClass: acctFill, headerClass: acctFill },
+    { field: 'account',               headerName: 'Account',  width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'tradingsymbol',         headerName: 'Symbol',   width: 120, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'pnl',                   headerName: 'P&L',      width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
@@ -106,12 +108,12 @@
   const holdingsAcctCols = holdingsCols.filter(c => c.field !== 'account');
 
   const positionsSummaryCols = [
-    { field: 'account', headerName: 'Account', width: 90, cellClass: acctFill, headerClass: acctFill },
+    { field: 'account', headerName: 'Account', width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
   ];
 
   const positionsCols = [
-    { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill },
+    { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
@@ -124,7 +126,7 @@
   const positionsAcctCols = positionsCols.filter(c => c.field !== 'account');
 
   const fundsCols = [
-    { field: 'account',      headerName: 'Account',      width: 120, cellClass: acctFill, headerClass: acctFill },
+    { field: 'account',      headerName: 'Account',      width: 120, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'cash',         headerName: 'Cash',         flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
     { field: 'avail_margin', headerName: 'Avail Margin', flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'used_margin',  headerName: 'Used Margin',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
@@ -189,7 +191,7 @@
 
       const heading = document.createElement('h3');
       heading.className = 'section-heading';
-      heading.textContent = acct;
+      heading.textContent = acct.replace(/\d/g, '#');
       section.appendChild(heading);
 
       const gridDiv = document.createElement('div');

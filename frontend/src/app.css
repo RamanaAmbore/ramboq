@@ -106,13 +106,17 @@
   background-color: rgba(0,0,0,0.08) !important;
 }
 
-/* AG Grid: totals row — bold, shared across all themes */
+/* AG Grid: totals row — bold + champagne tint, shared across all themes */
 .ag-row.totals-row {
   font-weight: 700 !important;
-  background-color: rgba(0, 0, 0, 0.04) !important;
+  background-color: rgba(200,168,75,0.13) !important;
+  border-top: 1px solid rgba(150,120,50,0.28) !important;
+  border-bottom: 1px solid rgba(150,120,50,0.28) !important;
 }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: rgba(0, 0, 0, 0.06) !important;
+  background-color: rgba(200,168,75,0.11) !important;
+  border-top: 1px solid rgba(217,119,6,0.3) !important;
+  border-bottom: 1px solid rgba(217,119,6,0.3) !important;
 }
 
 /* AG Grid: show blank row when no data */
