@@ -42,7 +42,7 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-16">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:2.4rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(217,119,6,0.75)) drop-shadow(0 0 6px rgba(217,119,6,0.45));" />
+          <img src={bullSrc} alt="" style="height:1.2rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
         </button>
 
@@ -66,9 +66,13 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-16">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:2.0rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(217,119,6,0.75)) drop-shadow(0 0 6px rgba(217,119,6,0.45));" />
+          <img src={bullSrc} alt="" style="height:1.0rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
         </button>
+        <span class="algo-user-pill">
+          {$authStore.user?.display_name?.toLowerCase() ?? ''}
+          <span class="algo-user-role">admin</span>
+        </span>
         <button
           onclick={() => menuOpen = !menuOpen}
           class="algo-hamburger"
