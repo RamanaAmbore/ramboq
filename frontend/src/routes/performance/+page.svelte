@@ -191,6 +191,28 @@
     const accounts = [...new Set(rows.map(r => r.account))];
 
     for (const acct of accounts) {
+      const acctRows = rows.filter(r => r.account === acct);
+
+      const totalsRow = source === 'holdings'
+        ? {
+            account: 'TOTAL', tradingsymbol: '',
+            pnl:                   acctRows.reduce((s, r) => s + (Number(r.pnl)                   || 0), 0),
+            pnl_percentage:        acctRows.reduce((s, r) => s + (Number(r.pnl_percentage)        || 0), 0),
+            day_change_val:        acctRows.reduce((s, r) => s + (Number(r.day_change_val)        || 0), 0),
+            day_change_percentage: 0,
+            quantity:              acctRows.reduce((s, r) => s + (Number(r.quantity)              || 0), 0),
+            average_price: null, close_price: null,
+            cur_val:               acctRows.reduce((s, r) => s + (Number(r.cur_val)               || 0), 0),
+          }
+        : {
+            account: 'TOTAL', tradingsymbol: '',
+            pnl:        acctRows.reduce((s, r) => s + (Number(r.pnl)        || 0), 0),
+            unrealised: acctRows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
+            realised:   acctRows.reduce((s, r) => s + (Number(r.realised)   || 0), 0),
+            quantity:   acctRows.reduce((s, r) => s + (Number(r.quantity)   || 0), 0),
+            average_price: null, close_price: null,
+          };
+
       const section = document.createElement('div');
       section.className = 'mb-4';
 
@@ -207,9 +229,10 @@
 
       const grid = createGrid(gridDiv, {
         columnDefs: colDefs,
-        rowData: rows.filter(r => r.account === acct),
+        rowData: [...acctRows, totalsRow],
         defaultColDef: defaultCol,
         domLayout: 'autoHeight',
+        getRowClass,
         onRowClicked: (e) => openOrderPopup(e.data, source),
       });
       grids.push(grid);
