@@ -238,9 +238,9 @@
     padding: 0 1rem;
   }
 
-  /* Logo — white halo to lift dark elements off dark navbar, gold accent edge */
+  /* Logo — brighten dark teal elements so they're visible on dark navy */
   :global(.logo-glow) {
-    filter: drop-shadow(0 0 0.5px rgba(255,255,255,0.5));
+    filter: brightness(3.5);
   }
 
 
