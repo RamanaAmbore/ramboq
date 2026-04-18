@@ -141,13 +141,13 @@
   .signin-panel {
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid #d0d8e8;
-    box-shadow: 0 4px 20px rgba(26,39,68,0.12);
+    border: 1px solid #b4c0bc;
+    box-shadow: 0 4px 20px rgba(22,53,53,0.12);
   }
   .signin-header {
-    background: #1a2744;
+    background: #163535;
     padding: 1.5rem 1.5rem 1.25rem;
-    border-bottom: 2px solid #d4920c;
+    border-bottom: 2px solid #e8a820;
   }
   .signin-header-title {
     font-size: 1rem;
@@ -158,7 +158,7 @@
   }
   .signin-header-sub {
     font-size: 0.65rem;
-    color: rgba(200,220,255,0.6);
+    color: rgba(200,232,225,0.65);
     margin-top: 0.2rem;
     letter-spacing: 0.04em;
   }
