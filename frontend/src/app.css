@@ -121,12 +121,12 @@
   --ag-header-foreground-color: #fbbf24;
   --ag-header-font-weight: 700;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #e8f0fc;
-  --ag-background-color: #0d1829;
-  --ag-odd-row-background-color: #0f1e30;
-  --ag-row-hover-color: #1a2d45;
-  --ag-selected-row-background-color: #1e3550;
-  --ag-border-color: #1e2d45;
+  --ag-foreground-color: #1e2a38;
+  --ag-background-color: #f0f4f2;
+  --ag-odd-row-background-color: #e8f0ee;
+  --ag-row-hover-color: #d8eae6;
+  --ag-selected-row-background-color: #c8e0da;
+  --ag-border-color: #ccd8d4;
   --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   --ag-font-size: 0.625rem;
   --ag-row-height: 22px;
@@ -140,7 +140,7 @@
 .ag-theme-algo .ag-root-wrapper {
   border-radius: 3px;
   overflow: hidden;
-  background-color: #0a1020 !important;
+  background-color: #f0f4f2 !important;
   box-shadow: none !important;
 }
 .ag-theme-algo .ag-header {
@@ -149,7 +149,7 @@
   border-bottom: 1px solid rgba(217,119,6,0.4) !important;
 }
 .ag-theme-algo .ag-body {
-  background-color: #0d1829 !important;
+  background-color: #f0f4f2 !important;
 }
 .ag-theme-algo .ag-header-cell {
   letter-spacing: 0.05em;
@@ -175,9 +175,9 @@
 .ag-theme-algo .ag-row {
   font-size: 0.625rem !important;
   font-weight: 400;
-  color: #e8f0fc;
+  color: #1e2a38;
   letter-spacing: 0.01em;
-  border-bottom: 1px solid #1a2840 !important;
+  border-bottom: 1px solid #ccd8d4 !important;
 }
 .ag-theme-algo .ag-cell.ag-col-fill {
   background-color: rgba(217,119,6,0.08) !important;
