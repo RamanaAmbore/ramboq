@@ -264,7 +264,10 @@
     width: auto;
     object-fit: contain;
     display: block;
-    filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)) brightness(1.08);
+    filter:
+      brightness(0) invert(1)
+      sepia(55%) saturate(2.5) hue-rotate(5deg) brightness(0.92)
+      drop-shadow(0 1px 3px rgba(0,0,0,0.45));
   }
   .pub-brand-text {
     display: flex;
