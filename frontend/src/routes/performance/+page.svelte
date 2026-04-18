@@ -84,7 +84,7 @@
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
 
-  const getRowClass = (params) => params.data?.account === 'TOTAL' ? 'totals-row' : '';
+  const getRowClass = (params) => params.data?.tradingsymbol === 'TOTAL' ? 'totals-row' : '';
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';
@@ -195,7 +195,7 @@
 
       const totalsRow = source === 'holdings'
         ? {
-            account: 'TOTAL', tradingsymbol: '',
+            account: '', tradingsymbol: 'TOTAL',
             pnl:                   acctRows.reduce((s, r) => s + (Number(r.pnl)                   || 0), 0),
             pnl_percentage:        acctRows.reduce((s, r) => s + (Number(r.pnl_percentage)        || 0), 0),
             day_change_val:        acctRows.reduce((s, r) => s + (Number(r.day_change_val)        || 0), 0),
@@ -205,7 +205,7 @@
             cur_val:               acctRows.reduce((s, r) => s + (Number(r.cur_val)               || 0), 0),
           }
         : {
-            account: 'TOTAL', tradingsymbol: '',
+            account: '', tradingsymbol: 'TOTAL',
             pnl:        acctRows.reduce((s, r) => s + (Number(r.pnl)        || 0), 0),
             unrealised: acctRows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
             realised:   acctRows.reduce((s, r) => s + (Number(r.realised)   || 0), 0),
@@ -246,8 +246,8 @@
     // Build totals rows
     const holdingsTotals = h.rows?.length
       ? {
-          account: 'TOTAL',
-          tradingsymbol: '',
+          account: '',
+          tradingsymbol: 'TOTAL',
           pnl: h.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
           pnl_percentage: h.rows.reduce((s, r) => s + (Number(r.pnl_percentage) || 0), 0),
           day_change_val: h.rows.reduce((s, r) => s + (Number(r.day_change_val) || 0), 0),
@@ -261,8 +261,8 @@
 
     const positionsTotals = p.rows?.length
       ? {
-          account: 'TOTAL',
-          tradingsymbol: '',
+          account: '',
+          tradingsymbol: 'TOTAL',
           pnl: p.rows.reduce((s, r) => s + (Number(r.pnl) || 0), 0),
           unrealised: p.rows.reduce((s, r) => s + (Number(r.unrealised) || 0), 0),
           realised: p.rows.reduce((s, r) => s + (Number(r.realised) || 0), 0),
