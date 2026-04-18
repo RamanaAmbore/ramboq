@@ -231,7 +231,7 @@
 
   /* Logo off-white background + shape outline */
   .pub-logo {
-    background: rgba(255,250,240,0.13);
+    background: rgba(232,168,32,0.08);
     border-radius: 3px;
     padding: 2px 4px;
     filter:
