@@ -121,7 +121,7 @@
   --ag-header-foreground-color: #fbbf24;
   --ag-header-font-weight: 700;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #c8d8f0;
+  --ag-foreground-color: #e8f0fc;
   --ag-background-color: #0d1829;
   --ag-odd-row-background-color: #0f1e30;
   --ag-row-hover-color: #1a2d45;
@@ -175,7 +175,7 @@
 .ag-theme-algo .ag-row {
   font-size: 0.625rem !important;
   font-weight: 400;
-  color: #c8d8f0;
+  color: #e8f0fc;
   letter-spacing: 0.01em;
   border-bottom: 1px solid #1a2840 !important;
 }
