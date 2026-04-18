@@ -199,8 +199,8 @@
     display: flex;
     flex-direction: column;
     background-color: #f4f5f8;
-    border-left:  1px solid #b4c0bc;
-    border-right: 1px solid #b4c0bc;
+    border-left:  none;
+    border-right: none;
     box-shadow: -3px 0 10px rgba(0,0,0,0.18), 3px 0 10px rgba(0,0,0,0.18);
     margin-top: 4px;
     margin-bottom: 4px;

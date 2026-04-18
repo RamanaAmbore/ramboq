@@ -314,6 +314,6 @@
     gap: 0;
     padding: 0 1rem;
   }
-  .algo-footer-text { font-size: 0.6rem; color: rgba(130,150,180,0.5); font-family: ui-monospace, monospace; }
-  .algo-footer-sep  { font-size: 0.6rem; color: rgba(217,119,6,0.4); margin: 0 0.4rem; }
+  .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
+  .algo-footer-sep  { font-size: 0.6rem; color: rgba(217,119,6,0.6); margin: 0 0.4rem; }
 </style>

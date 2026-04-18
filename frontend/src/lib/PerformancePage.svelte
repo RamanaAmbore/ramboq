@@ -11,6 +11,7 @@
   ModuleRegistry.registerModules([AllCommunityModule]);
 
   const { theme = 'ag-theme-ramboq' } = $props();
+  const isDark = $derived(theme === 'ag-theme-algo');
 
   // Read tab from URL ?tab= param; default to 'funds'
   const validTabs = ['funds', 'positions', 'holdings'];
@@ -59,27 +60,17 @@
     value == null ? '' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const pctFmt = ({ value }) =>
     value == null ? '' : `${Number(value).toFixed(2)}%`;
-  const pnlStyle = ({ value }) =>
-    value < 0
-      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
-      : value > 0
-        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
-        : { color: '#999' };
-  const qtyStyle = ({ value }) =>
-    value < 0
-      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
-      : value > 0
-        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
-        : { color: '#999' };
+  const loss  = () => isDark ? { color: '#f87171', backgroundColor: 'rgba(239,68,68,0.12)'   } : { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)'  };
+  const gain  = () => isDark ? { color: '#4ade80', backgroundColor: 'rgba(74,222,128,0.10)'  } : { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)'   };
+  const zero  = () => isDark ? { color: '#64748b' } : { color: '#999' };
+
+  const pnlStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
+  const qtyStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
   const avgVsLtpStyle = (params) => {
     const avg = params.data?.average_price;
     const ltp = params.data?.close_price;
     if (avg == null || ltp == null) return {};
-    return avg > ltp
-      ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
-      : avg < ltp
-        ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
-        : { color: '#999' };
+    return avg > ltp ? loss() : avg < ltp ? gain() : zero();
   };
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
@@ -321,6 +312,8 @@
   });
 </script>
 
+<div class:perf-dark={isDark}>
+
 {#if error}
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
 {/if}
@@ -382,10 +375,32 @@
   />
 {/if}
 
+</div><!-- /perf-dark -->
+
 <style>
   .hidden { display: none; }
   :global(.totals-row) {
     font-weight: bold;
     background-color: rgba(0, 0, 0, 0.04) !important;
   }
+
+  /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
+  .perf-dark :global(.section-heading) { color: #d97706; }
+  .perf-dark :global(.totals-row)      { background-color: rgba(255,255,255,0.05) !important; }
+
+  /* Tabs */
+  .perf-dark :global(button[class*="border-primary"])    { border-color: #d97706 !important; color: #fbbf24 !important; }
+  .perf-dark :global(button[class*="text-muted"])        { color: rgba(180,200,230,0.6) !important; }
+  .perf-dark :global(button[class*="text-muted"]:hover)  { color: rgba(210,225,250,0.9) !important; }
+
+  /* Refresh button */
+  .perf-dark :global(.btn-secondary) {
+    color: #c8d8f0;
+    border-color: #2a4060;
+    background: transparent;
+  }
+  .perf-dark :global(.btn-secondary:hover:not(:disabled)) { background: rgba(255,255,255,0.06); }
+
+  /* Timestamp */
+  .perf-dark :global(.text-muted) { color: rgba(180,200,230,0.55) !important; }
 </style>
