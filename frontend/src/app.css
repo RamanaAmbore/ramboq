@@ -115,6 +115,79 @@
   color: #999;
 }
 
+/* ── AG Grid — Algo theme (dark amber terminal) ───────────────────────────── */
+.ag-theme-algo {
+  --ag-header-background-color: #0a1020;
+  --ag-header-foreground-color: #fbbf24;
+  --ag-header-font-weight: 700;
+  --ag-header-font-size: 0.6875rem;
+  --ag-foreground-color: #c8d8f0;
+  --ag-background-color: #0d1829;
+  --ag-odd-row-background-color: #0f1e30;
+  --ag-row-hover-color: #1a2d45;
+  --ag-selected-row-background-color: #1e3550;
+  --ag-border-color: #1e2d45;
+  --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ag-font-size: 0.625rem;
+  --ag-row-height: 22px;
+  --ag-header-height: 28px;
+  --ag-wrapper-border-radius: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid #1e2d45;
+  box-shadow: none !important;
+}
+.ag-theme-algo .ag-root-wrapper {
+  border-radius: 3px;
+  overflow: hidden;
+  background-color: #0a1020 !important;
+  box-shadow: none !important;
+}
+.ag-theme-algo .ag-header {
+  background-color: #0a1020 !important;
+  color: #fbbf24 !important;
+  border-bottom: 1px solid rgba(217,119,6,0.4) !important;
+}
+.ag-theme-algo .ag-body {
+  background-color: #0d1829 !important;
+}
+.ag-theme-algo .ag-header-cell {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.5625rem !important;
+  font-weight: 700;
+  color: #fbbf24 !important;
+  background-color: transparent !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+  border-right: 1px solid rgba(217,119,6,0.2) !important;
+}
+.ag-theme-algo .ag-header-cell-menu-button,
+.ag-theme-algo .ag-header-cell-filter-button,
+.ag-theme-algo .ag-header-icon {
+  display: none !important;
+}
+.ag-theme-algo .ag-cell {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+  border-right: 1px solid #1e2d45 !important;
+}
+.ag-theme-algo .ag-row {
+  font-size: 0.625rem !important;
+  font-weight: 400;
+  color: #c8d8f0;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid #1a2840 !important;
+}
+.ag-theme-algo .ag-cell.ag-col-fill {
+  background-color: rgba(217,119,6,0.08) !important;
+}
+.ag-theme-algo .ag-header-cell.ag-col-fill {
+  background-color: rgba(217,119,6,0.12) !important;
+}
+.ag-theme-algo .ag-overlay-no-rows-wrapper { padding: 8px; }
+.ag-theme-algo .ag-overlay-no-rows-center { font-size: 0.6rem; color: #4a6080; }
+
 /* ── Log panel styles ────────────────────────────────────────────────────── */
 .log-panel {
   padding: 0.75rem;

@@ -10,6 +10,8 @@
 
   ModuleRegistry.registerModules([AllCommunityModule]);
 
+  const { theme = 'ag-theme-ramboq' } = $props();
+
   // Read tab from URL ?tab= param; default to 'funds'
   const validTabs = ['funds', 'positions', 'holdings'];
   let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'funds');
@@ -199,7 +201,7 @@
       section.appendChild(heading);
 
       const gridDiv = document.createElement('div');
-      gridDiv.className = 'ag-theme-quartz ag-theme-ramboq w-full';
+      gridDiv.className = `ag-theme-quartz ${theme} w-full`;
       section.appendChild(gridDiv);
 
       container.appendChild(section);
@@ -348,27 +350,27 @@
 
 <section class:hidden={activeTab !== 'funds'}>
   <h2 class="section-heading">Fund Balances</h2>
-  <div bind:this={fundsEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+  <div bind:this={fundsEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 <section class:hidden={activeTab !== 'positions'}>
   <h2 class="section-heading">Summary</h2>
-  <div bind:this={positionsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
+  <div bind:this={positionsSummaryEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
   <div bind:this={positionsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Positions</h2>
-  <div bind:this={positionsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+  <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 <section class:hidden={activeTab !== 'holdings'}>
   <h2 class="section-heading">Summary</h2>
-  <div bind:this={holdingsSummaryEl} class="ag-theme-quartz ag-theme-ramboq mb-4 w-full"></div>
+  <div bind:this={holdingsSummaryEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
   <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
 
   <h2 class="section-heading">All Holdings</h2>
-  <div bind:this={holdingsAllEl} class="ag-theme-quartz ag-theme-ramboq w-full"></div>
+  <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
 {#if orderRow}

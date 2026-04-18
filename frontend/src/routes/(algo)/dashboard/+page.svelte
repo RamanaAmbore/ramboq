@@ -7,7 +7,7 @@
 </script>
 
 <h1 class="algo-page-title">Dashboard</h1>
-<PerformancePage />
+<PerformancePage theme="ag-theme-algo" />
 
 <style>
   .algo-page-title {
