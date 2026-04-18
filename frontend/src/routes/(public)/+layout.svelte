@@ -223,10 +223,6 @@
     padding: 0 1rem;
   }
 
-  /* Logo glow — follows transparent PNG shape */
-  :global(.logo-glow) {
-    filter: drop-shadow(0 0 1px rgba(255,255,255,0.6));
-  }
 
   /* Nav buttons */
   :global(.pub-nav-btn) {
