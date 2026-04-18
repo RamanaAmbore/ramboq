@@ -379,7 +379,7 @@
 <style>
   .hidden { display: none; }
   :global(.totals-row) {
-    font-weight: bold;
+    font-weight: 700 !important;
     background-color: rgba(0, 0, 0, 0.04) !important;
   }
 
