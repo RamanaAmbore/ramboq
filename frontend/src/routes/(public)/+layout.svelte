@@ -6,21 +6,6 @@
   const { children } = $props();
 
   // Action: stretch pub-brand-sub letter-spacing to match pub-brand-name width
-  function matchNameWidth(node) {
-    function update() {
-      const nameEl = node.previousElementSibling;
-      if (!nameEl) return;
-      node.style.letterSpacing = '0';
-      const targetWidth = nameEl.getBoundingClientRect().width;
-      const naturalWidth = node.getBoundingClientRect().width;
-      const extra = targetWidth - naturalWidth;
-      node.style.letterSpacing = (extra / (node.textContent?.length || 1)) + 'px';
-    }
-    update();
-    window.addEventListener('resize', update);
-    return { destroy() { window.removeEventListener('resize', update); } };
-  }
-
   // Portfolio page requires sign-in (any role)
   $effect(() => {
     const path = page.url.pathname;
@@ -73,7 +58,7 @@
           <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
-            <span class="pub-brand-sub" use:matchNameWidth>ANALYTICS LLP</span>
+            <span class="pub-brand-sub">ANALYTICS LLP</span>
             <div class="pub-brand-sep"></div>
             <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
           </div>
@@ -110,7 +95,7 @@
           <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
-            <span class="pub-brand-sub" use:matchNameWidth>ANALYTICS LLP</span>
+            <span class="pub-brand-sub">ANALYTICS LLP</span>
             <div class="pub-brand-sep"></div>
             <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
           </div>
@@ -234,7 +219,7 @@
 
   .pub-card {
     width: 100%;
-    max-width: 960px;
+    max-width: 1280px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -264,7 +249,7 @@
   }
 
   .pub-nav-inner {
-    max-width: 960px;
+    max-width: 1280px;
     margin: 0 auto;
     padding: 0 1rem;
   }
@@ -282,7 +267,7 @@
   .pub-brand-text {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 0;
     padding: 0 0 0 0.35rem;
     justify-content: center;
@@ -302,7 +287,7 @@
     font-size: 0.58rem;
     font-weight: 700;
     color: #f0c84e;
-    /* letter-spacing set dynamically by matchNameWidth action */
+    letter-spacing: 0.1em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.1;
@@ -311,7 +296,7 @@
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
   }
   .pub-brand-sep {
-    width: 100%;
+    align-self: stretch;
     border-top: 1px solid rgba(200,168,75,0.55);
     margin: 0.12rem 0 0.08rem;
   }
