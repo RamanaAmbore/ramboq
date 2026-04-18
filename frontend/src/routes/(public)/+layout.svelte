@@ -54,7 +54,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;" />
+          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(255,210,60,0.75)) drop-shadow(0 0 1px rgba(255,210,60,0.5));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -90,7 +90,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;" />
+          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(255,210,60,0.75)) drop-shadow(0 0 1px rgba(255,210,60,0.5));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -264,25 +264,28 @@
   .pub-brand-text {
     display: flex;
     flex-direction: column;
-    gap: 0.09rem;
+    gap: 0;
     padding: 0.1rem 0 0.1rem 0.6rem;
     border-left: 2px solid #c8a84b;
   }
   .pub-brand-name {
-    font-size: 1.08rem;
+    font-size: 0.9rem;
     font-weight: 900;
     color: #ffffff;
     letter-spacing: 0.06em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     text-shadow: 0 1px 10px rgba(200,168,75,0.55), 0 0 2px rgba(0,0,0,0.4);
+    line-height: 1.15;
   }
   .pub-brand-sub {
-    font-size: 0.58rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: #c8a84b;
     letter-spacing: 0.18em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
+    line-height: 1.2;
+    margin-bottom: 0.28rem;
   }
   .pub-brand-tagline {
     font-size: 0.43rem;
@@ -290,10 +293,9 @@
     color: rgba(255,255,255,0.52);
     letter-spacing: 0.06em;
     display: block;
-    margin-top: 0.03rem;
   }
-  .pub-brand-mobile .pub-brand-name    { font-size: 0.94rem; }
-  .pub-brand-mobile .pub-brand-sub     { font-size: 0.52rem; }
+  .pub-brand-mobile .pub-brand-name    { font-size: 0.78rem; }
+  .pub-brand-mobile .pub-brand-sub     { font-size: 0.62rem; }
   .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
 
   /* Nav buttons */
