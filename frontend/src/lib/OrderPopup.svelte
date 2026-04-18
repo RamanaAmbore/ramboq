@@ -179,10 +179,10 @@
     justify-content: center;
   }
   .popup-modal {
-    background: #0d1829;
-    border: 1px solid #1e2d45;
-    border-radius: 4px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
     width: min(95vw, 480px);
     max-height: 90vh;
     overflow: visible;
@@ -192,9 +192,9 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 0.65rem 0.75rem 0.5rem;
-    background: #0a1020;
-    border-bottom: 1px solid rgba(217,119,6,0.35);
-    border-radius: 4px 4px 0 0;
+    background: rgba(10,16,32,0.5);
+    border-bottom: 1px solid rgba(251,191,36,0.35);
+    border-radius: 6px 6px 0 0;
   }
   .popup-symbol {
     font-size: 0.72rem;
@@ -233,30 +233,30 @@
     display: flex;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: #0d1829;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: transparent;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
   }
   .popup-action-btn {
     flex: 1;
     font-size: 0.65rem;
-    padding: 0.3rem 0;
-    border-radius: 2px;
+    padding: 0.35rem 0;
+    border-radius: 3px;
     font-weight: 700;
     font-family: ui-monospace, monospace;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
     border: 1px solid;
-    transition: background 0.06s;
+    transition: background 0.08s, border-color 0.08s, color 0.08s;
   }
   .popup-action-idle {
-    border-color: rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.04);
-    color: rgba(180,200,230,0.6);
+    border-color: rgba(255,255,255,0.14);
+    background: rgba(39,53,82,0.55);
+    color: rgba(200,216,240,0.75);
   }
-  .popup-action-idle:hover { background: rgba(255,255,255,0.08); color: rgba(180,200,230,0.9); }
-  .popup-action-add-active   { border-color: #22c55e; background: rgba(34,197,94,0.15);  color: #4ade80; }
-  .popup-action-close-active { border-color: #ef4444; background: rgba(239,68,68,0.15);  color: #f87171; }
+  .popup-action-idle:hover { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.45); color: #fbbf24; }
+  .popup-action-add-active   { border-color: rgba(34,197,94,0.65); background: rgba(34,197,94,0.2);  color: #4ade80; }
+  .popup-action-close-active { border-color: rgba(239,68,68,0.65); background: rgba(239,68,68,0.2);  color: #f87171; }
   .popup-cmd-area {
     padding: 0.5rem 0.75rem 0.6rem;
     position: relative;
