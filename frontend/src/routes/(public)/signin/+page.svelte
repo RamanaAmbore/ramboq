@@ -57,7 +57,6 @@
   <div class="signin-panel">
     <div class="signin-header">
       <div class="signin-header-title">Partner Portal</div>
-      <div class="signin-header-sub">RamboQuant Analytics LLP</div>
     </div>
     <div class="signin-body">
       <!-- Tab selector -->
@@ -155,12 +154,6 @@
     color: #fff;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-  }
-  .signin-header-sub {
-    font-size: 0.65rem;
-    color: rgba(200,232,225,0.65);
-    margin-top: 0.2rem;
-    letter-spacing: 0.04em;
   }
   .signin-body {
     background: #fff;
