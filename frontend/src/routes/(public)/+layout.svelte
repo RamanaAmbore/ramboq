@@ -212,7 +212,11 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background: #1a2744;
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: local;
+    box-shadow: inset 0 0 0 100vw rgba(14, 28, 60, 0.72);
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -320,9 +324,11 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background: #1a2744;
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    box-shadow: inset 0 0 0 100vw rgba(10, 20, 50, 0.80), 0 6px 20px rgba(0,0,0,0.4);
     border-top: 1px solid rgba(212,146,12,0.35);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
   .pub-mobile-item {
     display: block;
@@ -354,7 +360,10 @@
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background: #1a2744;
+    background-image: url('/nav_image.png');
+    background-size: cover;
+    background-position: center bottom;
+    box-shadow: inset 0 0 0 100vw rgba(10, 20, 50, 0.72);
     border-top: 1px solid rgba(212,146,12,0.3);
     height: 1.4rem;
     display: flex;
