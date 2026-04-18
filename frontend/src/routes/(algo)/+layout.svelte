@@ -40,10 +40,10 @@
   <div class="algo-card">
     <!-- Top bar -->
     <header class="algo-navbar">
-      <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
+      <div class="algo-nav-inner hidden md:flex items-center gap-1 h-16">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
+          <img src={bullSrc} alt="" style="height:2.8rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
 
@@ -65,9 +65,9 @@
       </div>
 
       <!-- Mobile -->
-      <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
+      <div class="algo-nav-inner md:hidden flex items-center justify-between h-16">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:1.5rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
+          <img src={bullSrc} alt="" style="height:2.4rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
         <button
