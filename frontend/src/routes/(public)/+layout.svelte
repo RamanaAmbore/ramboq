@@ -184,7 +184,7 @@
     width: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, #0e2e2e 0%, #d4920c 35%, #f0b020 50%, #d4920c 65%, #0e2e2e 100%);
+    background: linear-gradient(90deg, #1a2744 0%, #d4920c 35%, #f0b020 50%, #d4920c 65%, #1a2744 100%);
   }
   .pub-accent-top    { top: 0; }
   .pub-accent-bottom { bottom: 0; }
@@ -212,23 +212,15 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background-color: #163535;
+    background-color: #1a2744;
     background-image:
       repeating-linear-gradient(
         135deg,
         transparent,
-        transparent 18px,
-        rgba(255,255,255,0.045) 18px,
-        rgba(255,255,255,0.045) 19px
-      ),
-      repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 18px,
-        rgba(255,255,255,0.045) 18px,
-        rgba(255,255,255,0.045) 19px
-      ),
-      linear-gradient(to bottom, #0a2424, #163535);
+        transparent 12px,
+        rgba(255,255,255,0.025) 12px,
+        rgba(255,255,255,0.025) 13px
+      );
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -333,23 +325,15 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #163535;
+    background-color: #1a2744;
     background-image:
       repeating-linear-gradient(
         135deg,
         transparent,
-        transparent 18px,
-        rgba(255,255,255,0.045) 18px,
-        rgba(255,255,255,0.045) 19px
-      ),
-      repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 18px,
-        rgba(255,255,255,0.045) 18px,
-        rgba(255,255,255,0.045) 19px
-      ),
-      linear-gradient(to bottom, #0a2424, #163535);
+        transparent 12px,
+        rgba(255,255,255,0.025) 12px,
+        rgba(255,255,255,0.025) 13px
+      );
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
@@ -383,7 +367,7 @@
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background: #163535;
+    background: #1a2744;
     border-top: 1px solid rgba(212,146,12,0.3);
     height: 1.4rem;
     display: flex;
