@@ -299,7 +299,7 @@
     letter-spacing: 0.03em;
     display: block;
     padding-top: 0;
-    margin-top: 0.22rem;
+    margin-top: 0.12rem;
   }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.66rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.5rem; }
@@ -397,35 +397,32 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #0c1830;
-    background-image:
-      linear-gradient(rgba(8,14,30,0.82), rgba(8,14,30,0.82)),
-      url('/nav_image.png');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    border-top: 1px solid rgba(200,168,75,0.35);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    background: linear-gradient(160deg, #1a2e4a 0%, #0f1f38 50%, #0c1830 100%);
+    border-top: 2px solid rgba(200,168,75,0.55);
+    border-bottom: 1px solid rgba(200,168,75,0.2);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(200,168,75,0.08);
   }
   .pub-mobile-item {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.7rem 1.25rem;
-    font-size: 0.875rem;
+    padding: 0.75rem 1.4rem;
+    font-size: 0.82rem;
     font-weight: 500;
-    color: rgba(215,228,255,0.85);
+    color: rgba(220,232,255,0.8);
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.055);
     cursor: pointer;
-    transition: background-color 0.05s;
+    letter-spacing: 0.01em;
+    transition: background-color 0.06s, color 0.06s, border-left-color 0.06s;
+    border-left: 3px solid transparent;
     outline: none !important;
   }
   .pub-mobile-item:last-child { border-bottom: none; }
-  .pub-mobile-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.15); }
-  .pub-mobile-algo   { color: #e8c86a; font-weight: 600; letter-spacing: 0.02em; }
+  .pub-mobile-item:hover { background: rgba(200,168,75,0.09); color: #f0d898; border-left-color: rgba(200,168,75,0.4); }
+  .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.14); border-left-color: #c8a84b; font-weight: 600; }
+  .pub-mobile-algo   { color: #d4b86a; font-weight: 600; letter-spacing: 0.02em; border-top: 1px solid rgba(200,168,75,0.15); margin-top: 0.1rem; }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
   .pub-content {

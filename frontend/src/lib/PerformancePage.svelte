@@ -37,6 +37,13 @@
   let loading     = $state(false);
   let error       = $state('');
 
+  let selectedAccount = $state('all');
+  let accounts        = $state([]);
+  let rawHoldings     = $state([]);
+  let rawPositions    = $state([]);
+  let rawHoldingsSummary  = $state([]);
+  let rawPositionsSummary = $state([]);
+
   // Static grid refs
   let fundsEl            = null;
   let holdingsSummaryEl  = null;
@@ -49,12 +56,6 @@
   let holdingsAllGrid      = null;
   let positionsSummaryGrid = null;
   let positionsAllGrid     = null;
-
-  let holdingsAccountsContainer = null;
-  let positionsAccountsContainer = null;
-
-  let holdingsAccountGrids  = [];
-  let positionsAccountGrids = [];
 
   const numFmt  = ({ value }) =>
     value == null ? '' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -105,8 +106,6 @@
     { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
   ];
 
-  const holdingsAcctCols = holdingsCols.filter(c => c.field !== 'account');
-
   const positionsSummaryCols = [
     { field: 'account', headerName: 'Account', width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
@@ -122,8 +121,6 @@
     { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
     { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
   ];
-
-  const positionsAcctCols = positionsCols.filter(c => c.field !== 'account');
 
   const fundsCols = [
     { field: 'account',      headerName: 'Account',      width: 120, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
@@ -170,51 +167,6 @@
     grid.applyTransaction({ update, add, remove });
   }
 
-  function buildAccountGrids(container, rows, colDefs, source = 'holdings') {
-    const old = container === holdingsAccountsContainer ? holdingsAccountGrids : positionsAccountGrids;
-    old.forEach(g => g?.destroy());
-
-    container.innerHTML = '';
-    const grids = [];
-
-    const accounts = [...new Set(rows.map(r => r.account))];
-
-    for (const acct of accounts) {
-      const acctRows = rows.filter(r => r.account === acct);
-
-      const totalsRow = source === 'holdings'
-        ? makeHoldingsTotals(acctRows)
-        : makePositionsTotals(acctRows);
-
-      const section = document.createElement('div');
-      section.className = 'mb-4';
-
-      const heading = document.createElement('h3');
-      heading.className = 'section-heading';
-      heading.textContent = acct.replace(/\d/g, '#');
-      section.appendChild(heading);
-
-      const gridDiv = document.createElement('div');
-      gridDiv.className = `ag-theme-quartz ${theme} w-full`;
-      section.appendChild(gridDiv);
-
-      container.appendChild(section);
-
-      const grid = createGrid(gridDiv, {
-        columnDefs: colDefs,
-        rowData: [...acctRows, totalsRow],
-        defaultColDef: defaultCol,
-        domLayout: 'autoHeight',
-        getRowClass,
-        onRowClicked: (e) => openOrderPopup(e.data, source),
-      });
-      grids.push(grid);
-    }
-
-    if (container === holdingsAccountsContainer) holdingsAccountGrids = grids;
-    else positionsAccountGrids = grids;
-  }
-
   function makeHoldingsTotals(rows) {
     if (!rows?.length) return null;
     const sum = (f) => rows.reduce((s, r) => s + (Number(r[f]) || 0), 0);
@@ -252,24 +204,36 @@
     };
   }
 
-  function applyData(h, p, f) {
-    const holdingsTotals  = makeHoldingsTotals(h.rows);
-    const positionsTotals = makePositionsTotals(p.rows);
-
-    updateGrid(holdingsSummaryGrid,  h.summary ?? []);
-    updateGrid(holdingsAllGrid,      h.rows ? [...h.rows, holdingsTotals] : []);
-    updateGrid(positionsSummaryGrid, p.summary ?? []);
-    updateGrid(positionsAllGrid,     p.rows ? [...p.rows, positionsTotals] : []);
-    updateGrid(fundsGrid,             f.rows    ?? []);
-    lastRefresh = h.refreshed_at ?? '';
-
-    if (holdingsAccountsContainer && h.rows?.length) {
-      buildAccountGrids(holdingsAccountsContainer, h.rows, holdingsAcctCols, 'holdings');
-    }
-    if (positionsAccountsContainer && p.rows?.length) {
-      buildAccountGrids(positionsAccountsContainer, p.rows, positionsAcctCols, 'positions');
-    }
+  function applyAccountFilter() {
+    if (!holdingsAllGrid) return;
+    const hRows = selectedAccount === 'all' ? rawHoldings : rawHoldings.filter(r => r.account === selectedAccount);
+    const pRows = selectedAccount === 'all' ? rawPositions : rawPositions.filter(r => r.account === selectedAccount);
+    const hSum  = selectedAccount === 'all' ? rawHoldingsSummary : rawHoldingsSummary.filter(r => r.account === selectedAccount);
+    const pSum  = selectedAccount === 'all' ? rawPositionsSummary : rawPositionsSummary.filter(r => r.account === selectedAccount);
+    const hTotals = makeHoldingsTotals(hRows);
+    const pTotals = makePositionsTotals(pRows);
+    updateGrid(holdingsSummaryGrid, hSum);
+    updateGrid(positionsSummaryGrid, pSum);
+    updateGrid(holdingsAllGrid, hRows.length ? [...hRows, hTotals].filter(Boolean) : []);
+    updateGrid(positionsAllGrid, pRows.length ? [...pRows, pTotals].filter(Boolean) : []);
   }
+
+  function applyData(h, p, f) {
+    rawHoldings         = h.rows ?? [];
+    rawPositions        = p.rows ?? [];
+    rawHoldingsSummary  = h.summary ?? [];
+    rawPositionsSummary = p.summary ?? [];
+    const allAccts = [...new Set([...rawHoldings.map(r => r.account), ...rawPositions.map(r => r.account)])];
+    accounts = allAccts;
+    updateGrid(fundsGrid, f.rows ?? []);
+    lastRefresh = h.refreshed_at ?? '';
+    applyAccountFilter();
+  }
+
+  $effect(() => {
+    selectedAccount; // track
+    applyAccountFilter();
+  });
 
   async function loadAll() {
     loading = true; error = '';
@@ -308,8 +272,7 @@
   onDestroy(() => {
     unsub?.();
     [fundsGrid, holdingsSummaryGrid, holdingsAllGrid,
-     positionsSummaryGrid, positionsAllGrid,
-     ...holdingsAccountGrids, ...positionsAccountGrids]
+     positionsSummaryGrid, positionsAllGrid]
       .forEach(g => g?.destroy());
   });
 </script>
@@ -336,6 +299,17 @@
 <h2 class="section-heading">Fund Balances</h2>
 <div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
+{#if accounts.length > 0}
+<div class="acct-selector-row">
+  <select bind:value={selectedAccount} class="acct-select">
+    <option value="all">All Accounts</option>
+    {#each accounts as acct}
+      <option value={acct}>{acct.replace(/\d/g, '#')}</option>
+    {/each}
+  </select>
+</div>
+{/if}
+
 <div class="flex gap-0.5 mb-3">
   {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
     <button
@@ -350,9 +324,7 @@
   <h2 class="section-heading">Summary</h2>
   <div bind:this={positionsSummaryEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
-  <div bind:this={positionsAccountsContainer} class="mb-4"></div>
-
-  <h2 class="section-heading">All Positions</h2>
+  <h2 class="section-heading">Positions</h2>
   <div bind:this={positionsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
@@ -360,9 +332,7 @@
   <h2 class="section-heading">Summary</h2>
   <div bind:this={holdingsSummaryEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
-  <div bind:this={holdingsAccountsContainer} class="mb-4"></div>
-
-  <h2 class="section-heading">All Holdings</h2>
+  <h2 class="section-heading">Holdings</h2>
   <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
@@ -379,8 +349,32 @@
 
 <style>
   .hidden { display: none; }
+
+  .acct-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .acct-select {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid #c0ccdc;
+    border-radius: 0.25rem;
+    background: white;
+    color: #1e3050;
+    outline: none;
+    cursor: pointer;
+  }
+
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #d97706; }
+
+  .perf-dark .acct-select {
+    background: #0d1829;
+    border-color: #2a4060;
+    color: #c8d8f0;
+  }
 
   /* Tabs */
   .perf-dark :global(button[class*="border-primary"])    { border-color: #d97706 !important; color: #fbbf24 !important; }
