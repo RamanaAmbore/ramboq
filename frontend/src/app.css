@@ -32,8 +32,8 @@
 /* ── AG Grid — RamboQuant theme ──────────────────────────────────────────── */
 /* Outside @layer so these override AG Grid's imported quartz styles            */
 .ag-theme-ramboq {
-  --ag-header-background-color: #c8d4d2;
-  --ag-header-foreground-color: #163535;
+  --ag-header-background-color: #163535;
+  --ag-header-foreground-color: #d8f0ec;
   --ag-header-font-weight: 600;
   --ag-header-font-size: 0.6875rem;
   --ag-foreground-color: #1e3838;
@@ -59,12 +59,12 @@
 .ag-theme-ramboq .ag-root-wrapper {
   border-radius: 4px;
   overflow: hidden;
-  background-color: #c8d4d2 !important;
+  background-color: #163535 !important;
   box-shadow: none !important;
 }
 .ag-theme-ramboq .ag-header {
-  background-color: #c8d4d2 !important;
-  color: #163535 !important;
+  background-color: #163535 !important;
+  color: #d8f0ec !important;
 }
 .ag-theme-ramboq .ag-body {
   background-color: #ffffff !important;
@@ -74,11 +74,11 @@
   text-transform: uppercase;
   font-size: 0.5625rem !important;
   font-weight: 600;
-  color: #163535 !important;
+  color: #d8f0ec !important;
   background-color: transparent !important;
   padding-left: 4px !important;
   padding-right: 4px !important;
-  border-right: 1px solid #a8bcba !important;
+  border-right: 1px solid rgba(255,255,255,0.15) !important;
 }
 /* Hide header menu/filter icons */
 .ag-theme-ramboq .ag-header-cell-menu-button,
