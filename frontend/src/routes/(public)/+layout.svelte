@@ -266,7 +266,6 @@
     flex-direction: column;
     gap: 0;
     padding: 0.1rem 0 0.1rem 0.6rem;
-    border-left: 2px solid #c8a84b;
   }
   .pub-brand-name {
     font-size: 0.9rem;
@@ -276,6 +275,7 @@
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     text-shadow: 0 1px 10px rgba(200,168,75,0.55), 0 0 2px rgba(0,0,0,0.4);
     line-height: 1.15;
+    -webkit-text-stroke: 0.4px rgba(200,168,75,0.8);
   }
   .pub-brand-sub {
     font-size: 0.72rem;
@@ -285,7 +285,8 @@
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.2;
-    margin-bottom: 0.28rem;
+    margin-bottom: 0.15rem;
+    -webkit-text-stroke: 0.4px rgba(160,120,30,0.7);
   }
   .pub-brand-tagline {
     font-size: 0.43rem;
