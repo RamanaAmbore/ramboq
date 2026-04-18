@@ -62,7 +62,7 @@
           </div>
         </a>
 
-        <nav class="flex items-center gap-0.5 flex-1">
+        <nav class="flex items-center gap-0.5 flex-1 justify-center">
           {#each navLinks($authStore.user) as link}
             <button
               onclick={() => goto(link.href)}
@@ -256,7 +256,7 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.25rem;
     text-decoration: none;
     line-height: 1;
     margin-right: 1rem;
@@ -273,20 +273,20 @@
     color: #ffffff;
     letter-spacing: 0.06em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
-    text-shadow: 0 1px 10px rgba(200,168,75,0.55), 0 0 2px rgba(0,0,0,0.4);
+    text-shadow: 0 0 8px rgba(255,210,60,0.9), 0 1px 12px rgba(200,168,75,0.7), 0 0 2px rgba(0,0,0,0.5);
     line-height: 1.15;
-    -webkit-text-stroke: 0.4px rgba(200,168,75,0.8);
+    -webkit-text-stroke: 0.5px rgba(255,210,60,1);
   }
   .pub-brand-sub {
     font-size: 0.72rem;
-    font-weight: 600;
-    color: #c8a84b;
+    font-weight: 700;
+    color: #f0c84e;
     letter-spacing: 0.18em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.2;
     margin-bottom: 0.15rem;
-    -webkit-text-stroke: 0.4px rgba(160,120,30,0.7);
+    -webkit-text-stroke: 0.5px rgba(200,140,20,0.9);
   }
   .pub-brand-tagline {
     font-size: 0.43rem;
