@@ -326,6 +326,18 @@
     font-family: ui-monospace, monospace;
   }
 
+  /* Algo dark-theme overrides for classes shared with public pages */
+  :global(.algo-content .text-muted) { color: #7e97b8; }
+  :global(.algo-content .field-label) { color: #7e97b8; }
+  :global(.algo-content .field-input) {
+    background: #152033;
+    border-color: rgba(255,255,255,0.12);
+    color: #e2e8f0;
+  }
+  :global(.algo-content .field-input:focus) { border-color: #fbbf24 !important; }
+  :global(.algo-content .section-heading) { color: #fbbf24; }
+  :global(.algo-content .page-title-chip) { color: #fbbf24; border-color: rgba(251,191,36,0.25); }
+
   /* ── Status-driven surface card — used across algo pages ─────────────────── */
   :global(.algo-status-card) {
     background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);

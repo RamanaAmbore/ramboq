@@ -63,9 +63,9 @@
     value == null ? '' : `${Number(value).toFixed(2)}%`;
   const maskAcct = ({ value }) =>
     maskAccounts && value ? String(value).replace(/\d/g, '#') : value;
-  const loss  = () => ({ color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)'  });
-  const gain  = () => ({ color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)'  });
-  const zero  = () => ({ color: '#999' });
+  const loss  = () => ({ color: '#f87171', backgroundColor: 'rgba(248,113,113,0.08)' });
+  const gain  = () => ({ color: '#4ade80', backgroundColor: 'rgba(74,222,128,0.08)'  });
+  const zero  = () => ({ color: '#94a3b8' });
 
   const pnlStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
   const qtyStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
@@ -285,7 +285,7 @@
 {/if}
 
 <div class="flex items-center justify-between mb-2">
-  <div class="text-[0.65rem] text-muted">
+  <div class="text-[0.65rem] text-muted perf-ts">
     {#if loading && !lastRefresh}
       <span class="animate-pulse">Loading…</span>
     {:else if lastRefresh}
@@ -392,6 +392,6 @@
   }
   .perf-dark :global(.btn-secondary:hover:not(:disabled)) { background: rgba(255,255,255,0.06); }
 
-  /* Timestamp */
-  .perf-dark :global(.text-muted) { color: #7dd3fc !important; }
+  /* Dashboard timestamp — cyan to match other algo timestamps */
+  .perf-dark :global(.perf-ts) { color: #7dd3fc !important; }
 </style>

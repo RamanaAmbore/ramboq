@@ -95,25 +95,26 @@
 
 <div class="algo-ts mb-2">{clientTimestamp()}</div>
 
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
+<div class="algo-status-card p-5 pt-4" data-status="inactive">
   <div class="flex items-center justify-between mb-1">
-    <h1 class="page-heading mb-0 border-0">User Management</h1>
-    <button onclick={() => showCreate = !showCreate} class="btn-primary text-[0.65rem] py-1 px-3">
+    <h1 class="text-sm font-bold uppercase tracking-wider text-[#fbbf24] mb-0">User Management</h1>
+    <button onclick={() => showCreate = !showCreate}
+      class="text-[0.65rem] py-1 px-3 rounded border border-[#fbbf24]/50 bg-[#fbbf24]/15 text-[#fbbf24] hover:bg-[#fbbf24]/25 font-semibold">
       {showCreate ? 'Cancel' : 'Create User'}
     </button>
   </div>
-  <div class="border-b border-[#2f4f4f] mb-4"></div>
+  <div class="border-b border-[rgba(251,191,36,0.25)] mb-4"></div>
 
   {#if success}
-    <div class="mb-3 p-2 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>
+    <div class="mb-3 p-2 rounded bg-green-500/15 text-green-300 text-xs border border-green-500/40">{success}</div>
   {/if}
   {#if error}
-    <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
+    <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-xs border border-red-500/40">{error}</div>
   {/if}
 
   <!-- Create User Form -->
   {#if showCreate}
-    <div class="rounded-lg border border-gray-200 p-4 mb-4 bg-gray-50">
+    <div class="algo-status-card p-4 mb-4" data-status="running">
       <h3 class="section-heading mb-3">New User</h3>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div><label class="field-label">Username</label><input bind:value={createForm.username} class="field-input" placeholder="login username" /></div>
@@ -140,31 +141,31 @@
   {/if}
 
   {#if loading}
-    <div class="text-center text-text/40 text-xs animate-pulse py-8">Loading users…</div>
+    <div class="text-center text-[#7e97b8] text-xs animate-pulse py-8">Loading users…</div>
   {:else if !users.length}
-    <p class="text-xs text-text/50">No users registered.</p>
+    <p class="text-xs text-[#7e97b8]">No users registered.</p>
   {:else}
     <div class="space-y-3">
       {#each users as user}
-        <div class="rounded-lg border border-gray-200 p-3">
+        <div class="algo-status-card p-3" data-status={user.is_active ? (user.is_approved ? 'active' : 'running') : 'error'}>
           <!-- Header row -->
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center flex-wrap gap-1.5">
-              <span class="font-semibold text-xs text-primary">{user.display_name}</span>
-              <span class="text-xs text-muted">@{user.username}</span>
-              <span class="text-[0.6rem] text-muted font-mono">{user.account_id}</span>
-              <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-semibold uppercase
-                {user.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-teal-50 text-teal-700'}">
+              <span class="font-semibold text-xs text-[#fbbf24]">{user.display_name}</span>
+              <span class="text-xs text-[#c8d8f0]/70">@{user.username}</span>
+              <span class="text-[0.6rem] text-[#7e97b8] font-mono">{user.account_id}</span>
+              <span class="px-1.5 py-0.5 rounded text-[0.6rem] font-semibold uppercase border
+                {user.role === 'admin' ? 'bg-amber-500/15 text-amber-300 border-amber-500/40' : 'bg-teal-500/15 text-teal-300 border-teal-500/40'}">
                 {user.role}
               </span>
               {#if !user.is_approved}
-                <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[0.6rem] font-semibold uppercase">Pending</span>
+                <span class="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[0.6rem] font-semibold uppercase border border-amber-500/40">Pending</span>
               {/if}
               {#if !user.is_active}
-                <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[0.6rem] font-semibold uppercase">Inactive</span>
+                <span class="px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 text-[0.6rem] font-semibold uppercase border border-red-500/40">Inactive</span>
               {/if}
               {#if user.kyc_verified}
-                <span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 text-[0.6rem] font-semibold uppercase">KYC</span>
+                <span class="px-1.5 py-0.5 rounded bg-green-500/15 text-green-300 text-[0.6rem] font-semibold uppercase border border-green-500/40">KYC</span>
               {/if}
             </div>
             <div class="flex gap-1.5">
@@ -180,7 +181,7 @@
 
           {#if editing !== user.username}
             <!-- Read-only summary -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs text-text/70">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs text-[#c8d8f0]/80">
               <div><span class="text-muted">Email:</span> {user.email || '—'}</div>
               <div><span class="text-muted">Phone:</span> {user.phone || '—'}</div>
               <div><span class="text-muted">PAN:</span> {user.pan || '—'}</div>
