@@ -52,7 +52,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-5" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none pub-logo" />
         </a>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -83,7 +83,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none" />
+          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none pub-logo" />
         </a>
         <div class="flex items-center gap-2">
           {#if $authStore.user}
@@ -212,12 +212,17 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background-color: #1e5f5f;
+    background-color: #163535;
     background-image:
       repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(45deg,  transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px);
+      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
+      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      url('/nav_image.png');
+    background-size: auto, auto, auto, auto, cover, cover;
+    background-position: center;
+    background-repeat: repeat, repeat, repeat, repeat, no-repeat, no-repeat;
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -226,6 +231,14 @@
     max-width: 960px;
     margin: 0 auto;
     padding: 0 1rem;
+  }
+
+  /* Logo white edge outline */
+  .pub-logo {
+    filter:
+      drop-shadow(0 0 1px rgba(255,255,255,0.95))
+      drop-shadow(0 0 2px rgba(255,255,255,0.7))
+      drop-shadow(0 0 4px rgba(255,255,255,0.3));
   }
 
 
@@ -322,12 +335,17 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #1e5f5f;
+    background-color: #163535;
     background-image:
       repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
       repeating-linear-gradient(45deg,  transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px);
+      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
+      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      url('/nav_image.png');
+    background-size: auto, auto, auto, auto, cover, cover;
+    background-position: center;
+    background-repeat: repeat, repeat, repeat, repeat, no-repeat, no-repeat;
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
@@ -361,7 +379,13 @@
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background: #1e5f5f;
+    background-color: #163535;
+    background-image:
+      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     border-top: 1px solid rgba(212,146,12,0.3);
     height: 1.4rem;
     display: flex;
