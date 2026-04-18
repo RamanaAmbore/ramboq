@@ -132,9 +132,9 @@
 .ag-theme-ramboq .pnl-loss { color: #c0392b; background-color: rgba(192,57,43,0.06); }
 .ag-theme-ramboq .pnl-gain { color: #27ae60; background-color: rgba(39,174,96,0.06); }
 .ag-theme-ramboq .pnl-zero { color: #3c4660; }
-.ag-theme-algo .pnl-loss { color: #f87171 !important; background-color: rgba(248,113,113,0.1); }
-.ag-theme-algo .pnl-gain { color: #4ade80 !important; background-color: rgba(74,222,128,0.1); }
-.ag-theme-algo .pnl-zero { color: #cbd5e1 !important; }
+.ag-theme-algo .pnl-loss { color: #b91c1c !important; background-color: rgba(192,57,43,0.08); }
+.ag-theme-algo .pnl-gain { color: #15803d !important; background-color: rgba(21,128,61,0.08); }
+.ag-theme-algo .pnl-zero { color: #3c4660 !important; }
 /* Totals row keeps amber accent color regardless of +/-/0 */
 .ag-row.totals-row.pnl-loss, .ag-row.totals-row .pnl-loss,
 .ag-row.totals-row.pnl-gain, .ag-row.totals-row .pnl-gain,
@@ -155,12 +155,12 @@
   --ag-header-foreground-color: #fbbf24;
   --ag-header-font-weight: 700;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #e2e8f0;
-  --ag-background-color: #1d2a44;
-  --ag-odd-row-background-color: #233152;
-  --ag-row-hover-color: rgba(251,191,36,0.12);
-  --ag-selected-row-background-color: rgba(251,191,36,0.22);
-  --ag-border-color: rgba(255,255,255,0.18);
+  --ag-foreground-color: #0c1830;
+  --ag-background-color: #f0f4f8;
+  --ag-odd-row-background-color: #e6ecf3;
+  --ag-row-hover-color: rgba(251,191,36,0.18);
+  --ag-selected-row-background-color: rgba(251,191,36,0.3);
+  --ag-border-color: #c0ccdc;
   --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   --ag-font-size: 0.72rem;
   --ag-row-height: 24px;
@@ -168,7 +168,7 @@
   --ag-wrapper-border-radius: 3px;
   border-radius: 3px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.22);
+  border: 1px solid rgba(251,191,36,0.3);
   box-shadow: none !important;
 }
 /* autoHeight: only remove min-height that pads small tables */
@@ -179,7 +179,7 @@
 .ag-theme-algo .ag-root-wrapper {
   border-radius: 3px;
   overflow: hidden;
-  background-color: #1d2a44 !important;
+  background-color: #f0f4f8 !important;
   box-shadow: none !important;
 }
 .ag-theme-algo .ag-header {
@@ -188,7 +188,7 @@
   border-bottom: 1px solid rgba(217,119,6,0.4) !important;
 }
 .ag-theme-algo .ag-body {
-  background-color: #1d2a44 !important;
+  background-color: #f0f4f8 !important;
 }
 .ag-theme-algo .ag-header-cell {
   letter-spacing: 0.05em;
@@ -209,15 +209,15 @@
 .ag-theme-algo .ag-cell {
   padding-left: 4px !important;
   padding-right: 4px !important;
-  color: #e2e8f0 !important;
-  border-right: 1px solid rgba(255,255,255,0.12) !important;
+  color: #0c1830 !important;
+  border-right: 1px solid #c0ccdc !important;
 }
 .ag-theme-algo .ag-row {
   font-size: 0.72rem !important;
-  font-weight: 400;
-  color: #e2e8f0 !important;
+  font-weight: 500;
+  color: #0c1830 !important;
   letter-spacing: 0.01em;
-  border-bottom: 1px solid rgba(255,255,255,0.12) !important;
+  border-bottom: 1px solid #c0ccdc !important;
 }
 .ag-theme-algo .ag-cell.ag-col-fill {
   background-color: rgba(251,191,36,0.08) !important;
