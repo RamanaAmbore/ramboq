@@ -239,25 +239,28 @@
   }
 
   .section-heading {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
-    color: #5a7090;
+    color: #d4920c;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.35rem;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.5rem;
   }
 }
 
 /* ── Dark-underline heading — full width, same color as text ─────────────── */
 @layer components {
   .page-heading {
-    font-size: 0.95rem;
-    font-weight: 700;
+    font-size: 1.15rem;
+    font-weight: 800;
     color: #1a2744;
-    padding-bottom: 0.15rem;
-    border-bottom: 1px solid #1a2744;
+    padding-bottom: 0;
+    border-bottom: none;
+    border-left: 3px solid #d4920c;
+    padding-left: 0.65rem;
     display: block;
     width: 100%;
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.01em;
   }
 }

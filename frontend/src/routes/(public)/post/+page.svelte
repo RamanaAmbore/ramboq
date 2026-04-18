@@ -70,33 +70,32 @@
   </div>
 {/if}
 
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  {#if loading && !content}
-    <div class="text-center text-text/40 animate-pulse text-sm py-8">
-      Loading…
-    </div>
-  {:else if error && !content}
-    <div class="p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
-  {:else if content}
-    <div class="md-body">
-      {@html renderMarkdown(content)}
-    </div>
-  {/if}
-</div>
+{#if loading && !content}
+  <div class="text-center text-text/40 animate-pulse text-sm py-8">
+    Loading…
+  </div>
+{:else if error && !content}
+  <div class="p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
+{:else if content}
+  <div class="md-body">
+    {@html renderMarkdown(content)}
+  </div>
+{/if}
 
 <style>
   :global(.md-body .md-h3) {
     font-size: 1rem;
     font-weight: 700;
-    color: #2f4f4f;
+    color: #1a2744;
     margin: 1.4rem 0 0.4rem;
-    padding-bottom: 0.15rem;
-    border-bottom: 1px solid #2f4f4f;
+    border-left: 3px solid #d4920c;
+    border-bottom: none;
+    padding-left: 0.5rem;
   }
-  :global(.md-body .md-h4) { font-size: 0.875rem; font-weight: 600; color: #315062; margin: 1rem 0 0.3rem; }
-  :global(.md-body .md-p)  { font-size: 0.875rem; color: #315062; line-height: 1.65; margin: 0.25rem 0; }
+  :global(.md-body .md-h4) { font-size: 0.875rem; font-weight: 600; color: #1a2744; margin: 1rem 0 0.3rem; }
+  :global(.md-body .md-p)  { font-size: 0.875rem; color: #1e3050; line-height: 1.65; margin: 0.25rem 0; }
   :global(.md-body .md-ul) { margin: 0.4rem 0 0.4rem 1.2rem; }
-  :global(.md-body .md-li) { font-size: 0.875rem; color: #315062; line-height: 1.6; list-style: disc; }
-  :global(.md-body .md-hr) { border: none; border-top: 1px solid #e2e8e8; margin: 1.2rem 0; }
+  :global(.md-body .md-li) { font-size: 0.875rem; color: #1e3050; line-height: 1.6; list-style: disc; }
+  :global(.md-body .md-hr) { border: none; border-top: 1px solid #dde4f0; margin: 1.2rem 0; }
   :global(.md-body .md-gap){ height: 0.5rem; }
 </style>

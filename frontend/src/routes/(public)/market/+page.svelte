@@ -86,44 +86,43 @@
   {/if}
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  {#if error}
-    <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
-  {/if}
+{#if error}
+  <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
+{/if}
 
-  {#if !content && loading}
-    <div class="text-center text-text/40 text-sm animate-pulse py-8">
-      Loading market report…
-    </div>
-  {:else if content}
-    <div class="market-report w-full">
-      {@html renderMarkdown(content)}
-    </div>
-  {:else if !loading}
-    <p class="text-text/40 text-sm">No market update available.</p>
-  {/if}
-</div>
+{#if !content && loading}
+  <div class="text-center text-text/40 text-sm animate-pulse py-8">
+    Loading market report…
+  </div>
+{:else if content}
+  <div class="market-report w-full">
+    {@html renderMarkdown(content)}
+  </div>
+{:else if !loading}
+  <p class="text-text/40 text-sm">No market update available.</p>
+{/if}
 
 <style>
   :global(.market-report .md-h3) {
     font-size: 1.05rem;
     font-weight: 700;
-    color: #2f4f4f;
+    color: #1a2744;
     margin: 1.25rem 0 0.5rem;
-    padding-bottom: 0.15rem;
-    border-bottom: 1px solid #2f4f4f;
+    border-left: 3px solid #d4920c;
+    border-bottom: none;
+    padding-left: 0.5rem;
   }
   :global(.market-report .md-h4) {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #315062;
+    color: #1a2744;
     margin: 1rem 0 0.35rem;
   }
-  :global(.market-report .md-p)  { font-size: 0.875rem; color: #315062; line-height: 1.65; margin: 0.25rem 0; }
+  :global(.market-report .md-p)  { font-size: 0.875rem; color: #1e3050; line-height: 1.65; margin: 0.25rem 0; }
   :global(.market-report .md-ul) { margin: 0.25rem 0 0.5rem 1.25rem; list-style: disc; }
-  :global(.market-report .md-li) { font-size: 0.875rem; color: #315062; line-height: 1.6; margin: 0.15rem 0; }
-  :global(.market-report .md-hr) { border: none; border-top: 1px solid #e5e7eb; margin: 0.75rem 0; }
+  :global(.market-report .md-li) { font-size: 0.875rem; color: #1e3050; line-height: 1.6; margin: 0.15rem 0; }
+  :global(.market-report .md-hr) { border: none; border-top: 1px solid #dde4f0; margin: 0.75rem 0; }
   :global(.market-report .md-gap){ height: 0.4rem; }
-  :global(.market-report strong) { font-weight: 700; color: #2f4f4f; }
-  :global(.market-report em)     { font-style: italic; color: #315062; }
+  :global(.market-report strong) { font-weight: 700; color: #1a2744; }
+  :global(.market-report em)     { font-style: italic; color: #1e3050; }
 </style>

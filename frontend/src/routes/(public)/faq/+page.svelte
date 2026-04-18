@@ -130,70 +130,107 @@
   <meta name="description" content="Frequently asked questions about RamboQuant Analytics partnership and investment process." />
 </svelte:head>
 
-<div class="text-[0.65rem] text-muted mb-2">{clientTimestamp()}</div>
+<div class="text-[0.65rem] text-muted mb-4">{clientTimestamp()}</div>
 
+<h1 class="page-heading">Frequently Asked Questions</h1>
 
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  <h1 class="page-heading">Frequently Asked Questions</h1>
-
-  <!-- ── FAQ accordion ─────────────────────────────────────────────────────── -->
-  <div class="space-y-2 mb-10">
-    {#each faqs as faq, i}
-      <div class="rounded-lg border border-gray-200 overflow-hidden">
-        <button
-          class="w-full text-left px-5 py-3.5 flex items-center justify-between
-                 text-sm font-semibold text-text hover:bg-gray-50 transition-colors"
-          onclick={() => open = open === i ? -1 : i}
+<!-- FAQ accordion — clean, no outer card -->
+<div class="faq-list mb-10">
+  {#each faqs as faq, i}
+    <div class="faq-item {open === i ? 'faq-open' : ''}">
+      <button
+        class="faq-question"
+        onclick={() => open = open === i ? -1 : i}
+      >
+        <span>{faq.q}</span>
+        <svg
+          class="faq-chevron {open === i ? 'rotate-180' : ''}"
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
-          <span>{faq.q}</span>
-          <svg
-            class="w-4 h-4 shrink-0 ml-4 text-primary transition-transform duration-200
-                   {open === i ? 'rotate-180' : ''}"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
-        {#if open === i}
-          <div class="px-5 pb-4 text-sm text-text/80 leading-relaxed border-t border-gray-100 pt-3">
-            {faq.a}
-          </div>
-        {/if}
-      </div>
-    {/each}
-  </div>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      {#if open === i}
+        <div class="faq-answer">
+          {faq.a}
+        </div>
+      {/if}
+    </div>
+  {/each}
+</div>
 
-  <!-- ── Mermaid flow diagrams ──────────────────────────────────────────────── -->
-  <h2 class="page-heading mt-4">Process Flows</h2>
-  <div class="space-y-6">
-    {#each diagrams as d}
-      <div class="rounded-lg border border-gray-200 overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <h3 class="text-sm font-semibold text-primary">{d.title}</h3>
-        </div>
-        <div class="p-4 overflow-x-auto">
-          <div id="mermaid-{d.id}" class="mermaid-container flex justify-center">
-            <!-- skeleton while mermaid loads -->
-            <div class="text-xs text-text/30 animate-pulse py-8">Loading diagram…</div>
-          </div>
+<h2 class="page-heading">Process Flows</h2>
+<div class="space-y-6">
+  {#each diagrams as d}
+    <div class="flow-card">
+      <div class="flow-card-header">
+        <h3 class="flow-card-title">{d.title}</h3>
+      </div>
+      <div class="p-4 overflow-x-auto">
+        <div id="mermaid-{d.id}" class="mermaid-container flex justify-center">
+          <div class="text-xs text-muted animate-pulse py-8">Loading diagram…</div>
         </div>
       </div>
-    {/each}
-  </div>
+    </div>
+  {/each}
 </div>
 
 <style>
-  :global(.mermaid-container svg) {
-    max-width: 100%;
-    height: auto;
+  /* FAQ list */
+  .faq-list { border-top: 1px solid #dde4f0; }
+  .faq-item { border-bottom: 1px solid #dde4f0; }
+  .faq-question {
+    width: 100%;
+    text-align: left;
+    padding: 1rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1a2744;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    gap: 1rem;
+    outline: none !important;
   }
-  /* Rounded corners on flowchart boxes (SVG geometry properties need px units) */
-  :global(.mermaid-container svg .node rect) {
-    rx: 8px;
-    ry: 8px;
+  .faq-question:hover { color: #d4920c; }
+  .faq-open .faq-question { color: #d4920c; }
+  .faq-chevron {
+    width: 1rem;
+    height: 1rem;
+    color: #5a7090;
+    transition: transform 0.2s;
+    flex-shrink: 0;
   }
-  :global(.mermaid-container svg .node polygon) {
-    rx: 6px;
-    ry: 6px;
+  .faq-open .faq-chevron { color: #d4920c; }
+  .faq-answer {
+    padding: 0 0 1rem;
+    font-size: 0.83rem;
+    color: #1e3050;
+    line-height: 1.7;
   }
+
+  /* Flow diagrams */
+  .flow-card {
+    border: 1px solid #dde4f0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .flow-card-header {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #dde4f0;
+    background: #f0f3f8;
+  }
+  .flow-card-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1a2744;
+    letter-spacing: 0.01em;
+  }
+
+  :global(.mermaid-container svg) { max-width: 100%; height: auto; }
+  :global(.mermaid-container svg .node rect) { rx: 8px; ry: 8px; }
+  :global(.mermaid-container svg .node polygon) { rx: 6px; ry: 6px; }
 </style>
