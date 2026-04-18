@@ -397,7 +397,7 @@
   .cmd-chips-area {
     background: #152033;
     border: 1px solid #334155;
-    border-left: 3px solid #fbbf24;
+    border-left: 2px solid #fbbf24;
     border-bottom: 1px solid #1e2d42;
     border-radius: 0.375rem 0.375rem 0 0;
     height: 4.5rem;
@@ -407,7 +407,7 @@
   }
   .cmd-container {
     border: 1px solid #334155;
-    border-left: 3px solid #fbbf24;
+    border-left: 2px solid #fbbf24;
     border-radius: 0 0 0.375rem 0.375rem;
     background: #152033;
     color: #f1f5f9;
@@ -417,7 +417,7 @@
   }
   .cmd-container:focus-within {
     border-color: #fbbf2466;
-    border-left: 3px solid #fbbf24;
+    border-left: 2px solid #fbbf24;
   }
   .cmd-pairs {
     display: flex;

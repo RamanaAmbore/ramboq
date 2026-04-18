@@ -187,21 +187,25 @@
     background: transparent;
     color: rgba(180, 200, 230, 0.75);
     border: none;
+    border-bottom: 1px solid transparent;
     cursor: pointer;
     letter-spacing: 0.03em;
     font-family: ui-monospace, monospace;
-    transition: background-color 0.06s, color 0.06s;
+    transition: background-color 0.06s, color 0.06s, border-bottom-color 0.06s;
     white-space: nowrap;
     outline: none !important;
     -webkit-tap-highlight-color: transparent;
   }
-  :global(.algo-nav-btn:hover) { background: rgba(217,119,6,0.1); color: #fbbf24; }
+  :global(.algo-nav-btn:hover) {
+    background: rgba(251,191,36,0.1);
+    color: #fbbf24;
+    border-bottom-color: #fbbf24;
+  }
   :global(.algo-nav-btn-active) {
-    background: rgba(217,119,6,0.15);
+    background: rgba(251,191,36,0.15);
     color: #fbbf24;
     font-weight: 700;
-    border-left: 2px solid #d97706;
-    padding-left: calc(0.6rem - 2px);
+    border-bottom-color: #fbbf24;
   }
 
   /* Back-to-site link */
@@ -258,7 +262,7 @@
     transition: background-color 0.06s;
     outline: none !important;
   }
-  .algo-hamburger:hover { background: rgba(217,119,6,0.12); }
+  .algo-hamburger:hover { background: rgba(251,191,36,0.12); }
 
   /* Mobile dropdown */
   .algo-mobile-dropdown {
@@ -268,8 +272,8 @@
     right: 0;
     z-index: 49;
     background: #0a1020;
-    border-top: 1px solid rgba(217,119,6,0.2);
-    border-bottom: 1px solid rgba(217,119,6,0.2);
+    border-top: 1px solid rgba(251,191,36,0.2);
+    border-bottom: 1px solid rgba(251,191,36,0.2);
     box-shadow: 0 8px 20px rgba(0,0,0,0.5);
   }
   .algo-mobile-item {
@@ -289,8 +293,8 @@
     outline: none !important;
   }
   .algo-mobile-item:last-child { border-bottom: none; }
-  .algo-mobile-item:hover { background: rgba(217,119,6,0.1); color: #fbbf24; }
-  .algo-mobile-active { color: #fbbf24; background: rgba(217,119,6,0.1); }
+  .algo-mobile-item:hover { background: rgba(251,191,36,0.1); color: #fbbf24; }
+  .algo-mobile-active { color: #fbbf24; background: rgba(251,191,36,0.1); }
   .algo-mobile-site { color: rgba(150,170,200,0.5); font-size: 0.75rem; }
 
   /* ── Content ─────────────────────────────────────────────────────────────── */
@@ -303,7 +307,7 @@
   /* ── Footer ─────────────────────────────────────────────────────────────── */
   .algo-footer {
     background: #0a1020;
-    border-top: 1px solid rgba(217,119,6,0.2);
+    border-top: 1px solid rgba(251,191,36,0.2);
     height: 1.6rem;
     display: flex;
     align-items: center;
@@ -312,5 +316,5 @@
     padding: 0 1rem;
   }
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
-  .algo-footer-sep  { font-size: 0.6rem; color: rgba(217,119,6,0.6); margin: 0 0.4rem; }
+  .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
 </style>

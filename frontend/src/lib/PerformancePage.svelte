@@ -393,5 +393,5 @@
   .perf-dark :global(.btn-secondary:hover:not(:disabled)) { background: rgba(255,255,255,0.06); }
 
   /* Timestamp */
-  .perf-dark :global(.text-muted) { color: rgba(180,200,230,0.55) !important; }
+  .perf-dark :global(.text-muted) { color: #7dd3fc !important; }
 </style>
