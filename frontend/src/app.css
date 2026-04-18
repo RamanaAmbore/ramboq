@@ -123,10 +123,10 @@
 /* P&L cell colors — theme-aware, applied via cellClass in PerformancePage */
 .ag-theme-ramboq .pnl-loss { color: #c0392b; background-color: rgba(192,57,43,0.06); }
 .ag-theme-ramboq .pnl-gain { color: #27ae60; background-color: rgba(39,174,96,0.06); }
-.ag-theme-ramboq .pnl-zero { color: #7a8296; }
+.ag-theme-ramboq .pnl-zero { color: #3c4660; }
 .ag-theme-algo .pnl-loss { color: #f87171 !important; background-color: rgba(248,113,113,0.1); }
 .ag-theme-algo .pnl-gain { color: #4ade80 !important; background-color: rgba(74,222,128,0.1); }
-.ag-theme-algo .pnl-zero { color: #94a3b8 !important; }
+.ag-theme-algo .pnl-zero { color: #cbd5e1 !important; }
 /* Totals row keeps amber accent color regardless of +/-/0 */
 .ag-row.totals-row.pnl-loss, .ag-row.totals-row .pnl-loss,
 .ag-row.totals-row.pnl-gain, .ag-row.totals-row .pnl-gain,
