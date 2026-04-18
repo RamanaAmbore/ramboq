@@ -63,14 +63,17 @@
     value == null ? '' : `${Number(value).toFixed(2)}%`;
   const maskAcct = ({ value }) =>
     maskAccounts && value ? String(value).replace(/\d/g, '#') : value;
-  // Theme-aware P&L colors — actual colors live in app.css keyed to the grid theme
-  const pnlCls = ({ value }) => value < 0 ? 'pnl-loss' : value > 0 ? 'pnl-gain' : 'pnl-zero';
+  // Theme-aware P&L colors — actual colors live in app.css keyed to the grid theme.
+  // Include 'ag-right-aligned-cell' because user-provided cellClass overrides the
+  // class AG Grid adds via type: 'numericColumn'.
+  const pnlCls = ({ value }) =>
+    ['ag-right-aligned-cell', value < 0 ? 'pnl-loss' : value > 0 ? 'pnl-gain' : 'pnl-zero'];
   const qtyCls = pnlCls;
   const avgVsLtpCls = (params) => {
     const avg = params.data?.average_price;
     const ltp = params.data?.close_price;
-    if (avg == null || ltp == null) return '';
-    return avg > ltp ? 'pnl-loss' : avg < ltp ? 'pnl-gain' : 'pnl-zero';
+    if (avg == null || ltp == null) return 'ag-right-aligned-cell';
+    return ['ag-right-aligned-cell', avg > ltp ? 'pnl-loss' : avg < ltp ? 'pnl-gain' : 'pnl-zero'];
   };
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
@@ -133,6 +136,12 @@
       columnDefs: colDefs,
       rowData,
       defaultColDef: defaultCol,
+      columnTypes: {
+        numericColumn: {
+          cellClass: 'ag-right-aligned-cell',
+          headerClass: 'ag-right-aligned-header',
+        },
+      },
       overlayNoRowsTemplate: '<span style="font-size:0.65rem;color:#999">—</span>',
       domLayout: 'autoHeight',
       getRowClass,
