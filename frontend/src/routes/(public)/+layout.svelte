@@ -164,16 +164,26 @@
 </div>
 
 <style>
+  /*
+   * ── Investor palette: Deep Navy + Champagne Gold ───────────────────────────
+   *   Navy primary:    #0c1830   navbar, footer, grid headers
+   *   Champagne gold:  #c8a84b   accents, borders, active states
+   *   Gold bright:     #e8c86a   text on dark, brand name
+   *   Page bg:         #f0ece3   warm cream — premium feel
+   *   Card bg:         #faf7f0   warm white
+   *   Body text:       #1a1e35   near-black navy
+   */
+
   /* ── Viewport / card shell ─────────────────────────────────────────────── */
   .pub-viewport {
     min-height: 100vh;
-    background-color: #c2ccca;
+    background-color: #b8bcc8;
     background-image: repeating-linear-gradient(
       135deg,
       transparent,
       transparent 40px,
-      rgba(255,255,255,0.04) 40px,
-      rgba(255,255,255,0.04) 41px
+      rgba(255,255,255,0.05) 40px,
+      rgba(255,255,255,0.05) 41px
     );
     display: flex;
     flex-direction: column;
@@ -188,7 +198,7 @@
     width: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, #163535 0%, #e8a820 35%, #f5c030 50%, #e8a820 65%, #163535 100%);
+    background: linear-gradient(90deg, #0c1830 0%, #c8a84b 30%, #f0d878 50%, #c8a84b 70%, #0c1830 100%);
   }
   .pub-accent-top    { top: 0; }
   .pub-accent-bottom { bottom: 0; }
@@ -202,10 +212,10 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: #f4f5f8;
+    background-color: #faf7f0;
     border-left:  none;
     border-right: none;
-    box-shadow: -3px 0 10px rgba(0,0,0,0.18), 3px 0 10px rgba(0,0,0,0.18);
+    box-shadow: -4px 0 14px rgba(0,0,0,0.22), 4px 0 14px rgba(0,0,0,0.22);
     margin-top: 4px;
     margin-bottom: 4px;
     position: relative;
@@ -216,14 +226,14 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background-color: #163535;
+    background-color: #0c1830;
     background-image:
-      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      linear-gradient(rgba(8,14,30,0.78), rgba(8,14,30,0.78)),
       url('/nav_image.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-bottom: 2px solid #e8a820;
+    border-bottom: 2px solid #c8a84b;
     overflow: visible;
   }
 
@@ -237,48 +247,51 @@
   .pub-brand {
     display: flex;
     flex-direction: column;
-    gap: 0.08rem;
+    gap: 0.1rem;
     text-decoration: none;
     line-height: 1;
-    padding: 0.1rem 0;
-    border-left: 2px solid rgba(232,168,32,0.55);
-    padding-left: 0.6rem;
+    padding: 0.1rem 0 0.1rem 0.65rem;
+    border-left: 2px solid rgba(200,168,75,0.6);
+    margin-right: 1rem;
   }
   .pub-brand-name {
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 900;
-    color: #ffd060;
-    letter-spacing: 0.07em;
+    color: #e8c86a;
+    letter-spacing: 0.06em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     text-shadow:
-      -1px -1px 0 rgba(255,255,255,0.45),
-       1px -1px 0 rgba(255,255,255,0.45),
-      -1px  1px 0 rgba(255,255,255,0.45),
-       1px  1px 0 rgba(255,255,255,0.45),
-       0 0 8px rgba(232,168,32,0.4);
+      -1px -1px 0 rgba(255,255,255,0.75),
+       1px -1px 0 rgba(255,255,255,0.75),
+      -1px  1px 0 rgba(255,255,255,0.75),
+       1px  1px 0 rgba(255,255,255,0.75),
+      -2px  0   0 rgba(255,255,255,0.35),
+       2px  0   0 rgba(255,255,255,0.35),
+       0 0 10px rgba(200,168,75,0.45);
   }
   .pub-brand-sub {
-    font-size: 0.47rem;
+    font-size: 0.58rem;
     font-weight: 700;
-    color: rgba(255,208,96,0.65);
-    letter-spacing: 0.18em;
+    color: rgba(232,200,106,0.75);
+    letter-spacing: 0.2em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
   }
   .pub-brand-tagline {
     font-size: 0.44rem;
     font-weight: 600;
-    color: rgba(255,255,255,0.88);
-    letter-spacing: 0.13em;
-    background: rgba(0,0,0,0.32);
-    padding: 0.1rem 0.28rem;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.14em;
+    background: rgba(0,0,0,0.38);
+    padding: 0.1rem 0.3rem;
     border-radius: 2px;
     display: inline-block;
-    margin-top: 0.04rem;
+    margin-top: 0.05rem;
+    border-left: 1px solid rgba(200,168,75,0.5);
   }
-  .pub-brand-mobile .pub-brand-name { font-size: 0.88rem; }
-  .pub-brand-mobile .pub-brand-sub  { font-size: 0.42rem; }
-  .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
+  .pub-brand-mobile .pub-brand-name    { font-size: 0.92rem; }
+  .pub-brand-mobile .pub-brand-sub     { font-size: 0.52rem; }
+  .pub-brand-mobile .pub-brand-tagline { font-size: 0.41rem; }
 
   /* Nav buttons */
   :global(.pub-nav-btn) {
@@ -287,7 +300,7 @@
     font-weight: 500;
     border-radius: 0.25rem;
     background: transparent;
-    color: rgba(210, 235, 228, 0.88);
+    color: rgba(215, 228, 255, 0.82);
     border: none;
     cursor: pointer;
     letter-spacing: 0.02em;
@@ -295,20 +308,20 @@
     white-space: nowrap;
     outline: none !important;
     -webkit-tap-highlight-color: transparent;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.55);
   }
-  :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.10); color: #fff; }
-  :global(.pub-nav-btn-active) { background: rgba(232,168,32,0.28); color: #ffd060; font-weight: 600; }
+  :global(.pub-nav-btn:hover) { background: rgba(255,255,255,0.09); color: #fff; }
+  :global(.pub-nav-btn-active) { background: rgba(200,168,75,0.25); color: #f0d070; font-weight: 600; }
 
-  /* Algo link — stands apart with gold border */
+  /* Algo link */
   .pub-nav-algo-btn {
     padding: 0.2rem 0.6rem;
     font-size: 0.65rem;
     font-weight: 600;
     border-radius: 0.25rem;
-    background: rgba(232,168,32,0.2);
-    color: #ffd060;
-    border: 1px solid rgba(232,168,32,0.5);
+    background: rgba(200,168,75,0.18);
+    color: #e8c86a;
+    border: 1px solid rgba(200,168,75,0.5);
     cursor: pointer;
     letter-spacing: 0.03em;
     transition: background-color 0.08s;
@@ -316,7 +329,7 @@
     white-space: nowrap;
     margin-right: 0.25rem;
   }
-  .pub-nav-algo-btn:hover { background: rgba(232,168,32,0.35); }
+  .pub-nav-algo-btn:hover { background: rgba(200,168,75,0.32); }
 
   /* Sign-in button */
   .pub-nav-signin {
@@ -324,9 +337,9 @@
     font-size: 0.7rem;
     font-weight: 700;
     border-radius: 0.25rem;
-    background: rgba(232,168,32,0.25);
-    color: #ffd060;
-    border: 1px solid rgba(232,168,32,0.55);
+    background: rgba(200,168,75,0.22);
+    color: #e8c86a;
+    border: 1px solid rgba(200,168,75,0.55);
     cursor: pointer;
     transition: background-color 0.08s;
     outline: none !important;
@@ -334,16 +347,16 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.4);
     letter-spacing: 0.03em;
   }
-  .pub-nav-signin:hover { background: rgba(232,168,32,0.4); color: #fff; }
+  .pub-nav-signin:hover { background: rgba(200,168,75,0.4); color: #fff; }
 
   /* User pill */
   .pub-user-pill {
     font-size: 0.72rem;
     font-weight: 500;
-    color: rgba(200, 230, 222, 0.75);
+    color: rgba(210, 225, 255, 0.72);
     padding: 0.18rem 0.55rem;
     border-radius: 999px;
-    background: rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.12);
     margin-right: 0.2rem;
     white-space: nowrap;
@@ -354,7 +367,7 @@
     padding: 0.35rem;
     border-radius: 0.25rem;
     background: transparent;
-    color: rgba(210,235,228,0.9);
+    color: rgba(215,228,255,0.88);
     border: none;
     cursor: pointer;
     display: flex;
@@ -363,7 +376,7 @@
     transition: background-color 0.08s;
     outline: none !important;
   }
-  .pub-hamburger:hover { background: rgba(255,255,255,0.12); }
+  .pub-hamburger:hover { background: rgba(255,255,255,0.10); }
 
   /* Mobile dropdown */
   .pub-mobile-dropdown {
@@ -372,15 +385,15 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background-color: #163535;
+    background-color: #0c1830;
     background-image:
-      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      linear-gradient(rgba(8,14,30,0.82), rgba(8,14,30,0.82)),
       url('/nav_image.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-top: 1px solid rgba(232,168,32,0.35);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(200,168,75,0.35);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
   .pub-mobile-item {
     display: block;
@@ -389,18 +402,18 @@
     padding: 0.7rem 1.25rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: rgba(210,232,225,0.88);
+    color: rgba(215,228,255,0.85);
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     cursor: pointer;
     transition: background-color 0.05s;
     outline: none !important;
   }
   .pub-mobile-item:last-child { border-bottom: none; }
-  .pub-mobile-item:hover { background: rgba(255,255,255,0.09); color: #fff; }
-  .pub-mobile-active { color: #ffd060; background: rgba(232,168,32,0.15); }
-  .pub-mobile-algo { color: #ffd060; font-weight: 600; letter-spacing: 0.02em; }
+  .pub-mobile-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.15); }
+  .pub-mobile-algo   { color: #e8c86a; font-weight: 600; letter-spacing: 0.02em; }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
   .pub-content {
@@ -412,14 +425,14 @@
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background-color: #163535;
+    background-color: #0c1830;
     background-image:
-      linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
+      linear-gradient(rgba(8,14,30,0.78), rgba(8,14,30,0.78)),
       url('/nav_image.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border-top: 1px solid rgba(232,168,32,0.45);
+    border-top: 1px solid rgba(200,168,75,0.45);
     height: 1.4rem;
     display: flex;
     align-items: center;
@@ -427,6 +440,6 @@
     padding: 0 0.75rem;
   }
   .pub-footer p { width: 100%; }
-  .pub-footer-text { color: rgba(200,225,218,0.82); font-size: 0.65rem; line-height: 1; }
-  .pub-sep { color: #e8a820; font-weight: bold; margin: 0 0.35rem; }
+  .pub-footer-text { color: rgba(210,225,255,0.75); font-size: 0.65rem; line-height: 1; }
+  .pub-sep { color: #c8a84b; font-weight: bold; margin: 0 0.35rem; }
 </style>

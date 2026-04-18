@@ -144,9 +144,9 @@
     box-shadow: 0 4px 20px rgba(22,53,53,0.12);
   }
   .signin-header {
-    background: #163535;
+    background: #0c1830;
     padding: 1.5rem 1.5rem 1.25rem;
-    border-bottom: 2px solid #e8a820;
+    border-bottom: 2px solid #c8a84b;
   }
   .signin-header-title {
     font-size: 1rem;
