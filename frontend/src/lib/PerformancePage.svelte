@@ -63,17 +63,14 @@
     value == null ? '' : `${Number(value).toFixed(2)}%`;
   const maskAcct = ({ value }) =>
     maskAccounts && value ? String(value).replace(/\d/g, '#') : value;
-  const loss  = () => ({ color: '#f87171', backgroundColor: 'rgba(248,113,113,0.08)' });
-  const gain  = () => ({ color: '#4ade80', backgroundColor: 'rgba(74,222,128,0.08)'  });
-  const zero  = () => ({ color: '#94a3b8' });
-
-  const pnlStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
-  const qtyStyle     = ({ value }) => value < 0 ? loss() : value > 0 ? gain() : zero();
-  const avgVsLtpStyle = (params) => {
+  // Theme-aware P&L colors — actual colors live in app.css keyed to the grid theme
+  const pnlCls = ({ value }) => value < 0 ? 'pnl-loss' : value > 0 ? 'pnl-gain' : 'pnl-zero';
+  const qtyCls = pnlCls;
+  const avgVsLtpCls = (params) => {
     const avg = params.data?.average_price;
     const ltp = params.data?.close_price;
-    if (avg == null || ltp == null) return {};
-    return avg > ltp ? loss() : avg < ltp ? gain() : zero();
+    if (avg == null || ltp == null) return '';
+    return avg > ltp ? 'pnl-loss' : avg < ltp ? 'pnl-gain' : 'pnl-zero';
   };
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
@@ -87,44 +84,44 @@
     { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'cur_val',               headerName: 'Cur Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'inv_val',               headerName: 'Inv Val',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
-    { field: 'pnl',                   headerName: 'P&L',      flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_val',        headerName: 'Day P&L',  flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_percentage', headerName: 'Day %',    width: 70, valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'pnl',                   headerName: 'P&L',      flex: 1, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70, valueFormatter: pctFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'day_change_val',        headerName: 'Day P&L',  flex: 1, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'day_change_percentage', headerName: 'Day %',    width: 70, valueFormatter: pctFmt, cellClass: pnlCls, type: 'numericColumn' },
   ];
 
   const holdingsCols = [
     { field: 'account',               headerName: 'Account',  width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'tradingsymbol',         headerName: 'Symbol',   width: 120, pinned: 'left', cellClass: symFill, headerClass: symFill },
-    { field: 'pnl',                   headerName: 'P&L',      width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_val',        headerName: 'Day P&L',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'day_change_percentage', headerName: 'Day %',    width: 70,  valueFormatter: pctFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'pnl',                   headerName: 'P&L',      width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'pnl_percentage',        headerName: 'P&L %',    width: 70,  valueFormatter: pctFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'day_change_val',        headerName: 'Day P&L',  width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'day_change_percentage', headerName: 'Day %',    width: 70,  valueFormatter: pctFmt, cellClass: pnlCls, type: 'numericColumn' },
     { field: 'quantity',              headerName: 'Qty',      width: 60,  type: 'numericColumn' },
-    { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
-    { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
+    { field: 'average_price',         headerName: 'Avg Price', width: 90, valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
+    { field: 'close_price',           headerName: 'LTP',      width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
     { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
   ];
 
   const positionsSummaryCols = [
     { field: 'account', headerName: 'Account', width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
-    { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'pnl',     headerName: 'P&L',     flex: 1, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
   ];
 
   const positionsCols = [
     { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
-    { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
-    { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn', cellStyle: qtyStyle },
-    { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
-    { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellStyle: avgVsLtpStyle },
+    { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
+    { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn', cellClass: qtyCls },
+    { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
+    { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
   ];
 
   const fundsCols = [
     { field: 'account',      headerName: 'Account',      width: 120, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
-    { field: 'cash',         headerName: 'Cash',         flex: 1, valueFormatter: numFmt, cellStyle: pnlStyle, type: 'numericColumn' },
+    { field: 'cash',         headerName: 'Cash',         flex: 1, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
     { field: 'avail_margin', headerName: 'Avail Margin', flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'used_margin',  headerName: 'Used Margin',  flex: 1, valueFormatter: numFmt, type: 'numericColumn' },
     { field: 'collateral',   headerName: 'Collateral',   flex: 1, valueFormatter: numFmt, type: 'numericColumn' },

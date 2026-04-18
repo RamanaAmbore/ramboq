@@ -108,17 +108,29 @@
 
 /* AG Grid: totals row — bold + champagne tint, shared across all themes */
 .ag-row.totals-row {
-  font-weight: 700 !important;
-  background-color: rgba(200,168,75,0.13) !important;
-  border-top: 1px solid rgba(150,120,50,0.28) !important;
-  border-bottom: 1px solid rgba(150,120,50,0.28) !important;
+  font-weight: 800 !important;
+  background-color: rgba(200,168,75,0.22) !important;
+  border-top: 2px solid rgba(150,120,50,0.55) !important;
+  border-bottom: 2px solid rgba(150,120,50,0.55) !important;
 }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: rgba(251,191,36,0.14) !important;
+  background-color: rgba(251,191,36,0.22) !important;
   color: #fde68a !important;
-  border-top: 1px solid rgba(251,191,36,0.35) !important;
-  border-bottom: 1px solid rgba(251,191,36,0.35) !important;
+  border-top: 2px solid rgba(251,191,36,0.6) !important;
+  border-bottom: 2px solid rgba(251,191,36,0.6) !important;
 }
+
+/* P&L cell colors — theme-aware, applied via cellClass in PerformancePage */
+.ag-theme-ramboq .pnl-loss { color: #c0392b; background-color: rgba(192,57,43,0.06); }
+.ag-theme-ramboq .pnl-gain { color: #27ae60; background-color: rgba(39,174,96,0.06); }
+.ag-theme-ramboq .pnl-zero { color: #7a8296; }
+.ag-theme-algo .pnl-loss { color: #f87171 !important; background-color: rgba(248,113,113,0.1); }
+.ag-theme-algo .pnl-gain { color: #4ade80 !important; background-color: rgba(74,222,128,0.1); }
+.ag-theme-algo .pnl-zero { color: #94a3b8 !important; }
+/* Totals row keeps amber accent color regardless of +/-/0 */
+.ag-row.totals-row.pnl-loss, .ag-row.totals-row .pnl-loss,
+.ag-row.totals-row.pnl-gain, .ag-row.totals-row .pnl-gain,
+.ag-row.totals-row.pnl-zero, .ag-row.totals-row .pnl-zero { background-color: transparent !important; }
 
 /* AG Grid: show blank row when no data */
 .ag-theme-ramboq .ag-overlay-no-rows-wrapper {
