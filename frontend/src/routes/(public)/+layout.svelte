@@ -229,7 +229,7 @@
 
   /* Logo glow — follows transparent PNG shape */
   :global(.logo-glow) {
-    filter: drop-shadow(0 0 5px rgba(255,255,255,0.75)) drop-shadow(0 0 2px rgba(255,255,255,0.5));
+    filter: drop-shadow(0 0 2px rgba(255,255,255,0.55)) drop-shadow(0 0 1px rgba(255,255,255,0.4));
   }
 
   /* Nav buttons */
