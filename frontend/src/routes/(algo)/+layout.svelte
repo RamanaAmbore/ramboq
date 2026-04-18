@@ -43,7 +43,7 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:1.7rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(255,210,60,0.75)) drop-shadow(0 0 1px rgba(255,210,60,0.5));" />
+          <img src={bullSrc} alt="" style="height:1.7rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:none;" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
 
@@ -67,7 +67,7 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:1.5rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(255,210,60,0.75)) drop-shadow(0 0 1px rgba(255,210,60,0.5));" />
+          <img src={bullSrc} alt="" style="height:1.5rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:none;" />
           <span class="algo-brand-name">RAMBO QUANT</span>
         </button>
         <button

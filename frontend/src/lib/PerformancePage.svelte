@@ -208,12 +208,10 @@
     if (!holdingsAllGrid) return;
     const hRows = selectedAccount === 'all' ? rawHoldings : rawHoldings.filter(r => r.account === selectedAccount);
     const pRows = selectedAccount === 'all' ? rawPositions : rawPositions.filter(r => r.account === selectedAccount);
-    const hSum  = selectedAccount === 'all' ? rawHoldingsSummary : rawHoldingsSummary.filter(r => r.account === selectedAccount);
-    const pSum  = selectedAccount === 'all' ? rawPositionsSummary : rawPositionsSummary.filter(r => r.account === selectedAccount);
     const hTotals = makeHoldingsTotals(hRows);
     const pTotals = makePositionsTotals(pRows);
-    updateGrid(holdingsSummaryGrid, hSum);
-    updateGrid(positionsSummaryGrid, pSum);
+    updateGrid(holdingsSummaryGrid, rawHoldingsSummary);
+    updateGrid(positionsSummaryGrid, rawPositionsSummary);
     updateGrid(holdingsAllGrid, hRows.length ? [...hRows, hTotals].filter(Boolean) : []);
     updateGrid(positionsAllGrid, pRows.length ? [...pRows, pTotals].filter(Boolean) : []);
   }

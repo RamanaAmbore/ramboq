@@ -159,4 +159,13 @@
     background: #fff;
     padding: 1.25rem 1.5rem 1.5rem;
   }
+  /* Override browser autofill yellow background */
+  .signin-body :global(input:-webkit-autofill),
+  .signin-body :global(input:-webkit-autofill:hover),
+  .signin-body :global(input:-webkit-autofill:focus) {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+    box-shadow: 0 0 0 1000px #fff inset !important;
+    -webkit-text-fill-color: #1e3050 !important;
+    border-color: #c0ccdc !important;
+  }
 </style>
