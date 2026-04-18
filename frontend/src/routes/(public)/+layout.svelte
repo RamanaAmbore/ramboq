@@ -214,15 +214,11 @@
     z-index: 50;
     background-color: #163535;
     background-image:
-      repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
-      repeating-linear-gradient(45deg,  transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
       linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
       url('/nav_image.png');
-    background-size: auto, auto, auto, auto, cover, cover;
+    background-size: cover;
     background-position: center;
-    background-repeat: repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+    background-repeat: no-repeat;
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -233,12 +229,10 @@
     padding: 0 1rem;
   }
 
-  /* Logo white edge outline */
+  /* Logo 1px white border */
   .pub-logo {
-    filter:
-      drop-shadow(0 0 1px rgba(255,255,255,0.95))
-      drop-shadow(0 0 2px rgba(255,255,255,0.7))
-      drop-shadow(0 0 4px rgba(255,255,255,0.3));
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 3px;
   }
 
 
@@ -337,15 +331,11 @@
     z-index: 49;
     background-color: #163535;
     background-image:
-      repeating-linear-gradient(45deg,  transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 9px, rgba(255,255,255,0.03) 9px, rgba(255,255,255,0.03) 10px),
-      repeating-linear-gradient(45deg,  transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
-      repeating-linear-gradient(-45deg, transparent 0, transparent 29px, rgba(255,255,255,0.02) 29px, rgba(255,255,255,0.02) 30px),
       linear-gradient(rgba(16,40,40,0.72), rgba(16,40,40,0.72)),
       url('/nav_image.png');
-    background-size: auto, auto, auto, auto, cover, cover;
+    background-size: cover;
     background-position: center;
-    background-repeat: repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+    background-repeat: no-repeat;
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
