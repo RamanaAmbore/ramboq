@@ -10,7 +10,7 @@
 
   ModuleRegistry.registerModules([AllCommunityModule]);
 
-  // Read tab from URL ?tab= param; default to 'holdings'
+  // Read tab from URL ?tab= param; default to 'funds'
   const validTabs = ['funds', 'positions', 'holdings'];
   let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'funds');
 
@@ -29,11 +29,12 @@
     url.searchParams.set('tab', id);
     goto(url.pathname + url.search, { replaceState: true, noScroll: true });
   }
+
   let lastRefresh = $state('');
   let loading     = $state(false);
   let error       = $state('');
 
-  // Static grid refs (summary + all + funds)
+  // Static grid refs
   let holdingsSummaryEl  = null;
   let holdingsAllEl      = null;
   let positionsSummaryEl = null;
@@ -46,11 +47,9 @@
   let positionsAllGrid     = null;
   let fundsGrid            = null;
 
-  // Container divs for per-account grids (populated imperatively)
   let holdingsAccountsContainer = null;
   let positionsAccountsContainer = null;
 
-  // Track per-account grid instances for cleanup
   let holdingsAccountGrids  = [];
   let positionsAccountGrids = [];
 
@@ -64,7 +63,6 @@
       : value > 0
         ? { color: '#27ae60', backgroundColor: 'rgba(39,174,96,0.06)' }
         : { color: '#999' };
-  const totalsRowStyle = () => ({ fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.04)' });
   const qtyStyle = ({ value }) =>
     value < 0
       ? { color: '#c0392b', backgroundColor: 'rgba(192,57,43,0.06)' }
@@ -112,7 +110,6 @@
     { field: 'cur_val',               headerName: 'Cur Val',  width: 100, valueFormatter: numFmt, type: 'numericColumn' },
   ];
 
-  // Per-account holdings cols — without the account column
   const holdingsAcctCols = holdingsCols.filter(c => c.field !== 'account');
 
   const positionsSummaryCols = [
@@ -152,7 +149,6 @@
     });
   }
 
-  /** Smoothly update grid — reuse existing rows, flash changed cells */
   function updateGrid(grid, newRows) {
     if (!grid) return;
     const existing = [];
@@ -161,7 +157,6 @@
       grid.setGridOption('rowData', newRows);
       return;
     }
-    // Build lookup by account (+ tradingsymbol if present) for delta
     const key = (r) => r.tradingsymbol ? `${r.account}|${r.tradingsymbol}` : r.account;
     const oldMap = new Map(existing.map(r => [key(r), r]));
     const update = [], add = [];
@@ -179,9 +174,7 @@
     grid.applyTransaction({ update, add, remove });
   }
 
-  /** Build per-account AG Grids inside a container div. */
   function buildAccountGrids(container, rows, colDefs, source = 'holdings') {
-    // Destroy existing per-account grids
     const old = container === holdingsAccountsContainer ? holdingsAccountGrids : positionsAccountGrids;
     old.forEach(g => g?.destroy());
 
@@ -229,11 +222,11 @@
   function makeHoldingsTotals(rows) {
     if (!rows?.length) return null;
     const sum = (f) => rows.reduce((s, r) => s + (Number(r[f]) || 0), 0);
-    const total_pnl         = sum('pnl');
-    const total_cur_val     = sum('cur_val');
-    const total_day_change  = sum('day_change_val');
-    const total_inv_val     = total_cur_val - total_pnl;
-    const total_prev_val    = total_cur_val - total_day_change;
+    const total_pnl        = sum('pnl');
+    const total_cur_val    = sum('cur_val');
+    const total_day_change = sum('day_change_val');
+    const total_inv_val    = total_cur_val - total_pnl;
+    const total_prev_val   = total_cur_val - total_day_change;
     return {
       account: '',
       tradingsymbol: 'TOTAL',
@@ -274,7 +267,6 @@
     updateGrid(fundsGrid,            f.rows    ?? []);
     lastRefresh = h.refreshed_at ?? '';
 
-    // Build per-account grids
     if (holdingsAccountsContainer && h.rows?.length) {
       buildAccountGrids(holdingsAccountsContainer, h.rows, holdingsAcctCols, 'holdings');
     }
@@ -326,11 +318,6 @@
       .forEach(g => g?.destroy());
   });
 </script>
-<svelte:head>
-  <title>Performance | RamboQuant Analytics</title>
-  <meta name="description" content="Real-time portfolio performance — holdings, positions, and fund balances." />
-</svelte:head>
-
 
 {#if error}
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
