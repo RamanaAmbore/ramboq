@@ -5,6 +5,22 @@
 
   const { children } = $props();
 
+  // Action: stretch pub-brand-sub letter-spacing to match pub-brand-name width
+  function matchNameWidth(node) {
+    function update() {
+      const nameEl = node.previousElementSibling;
+      if (!nameEl) return;
+      node.style.letterSpacing = '0';
+      const targetWidth = nameEl.getBoundingClientRect().width;
+      const naturalWidth = node.getBoundingClientRect().width;
+      const extra = targetWidth - naturalWidth;
+      node.style.letterSpacing = (extra / (node.textContent?.length || 1)) + 'px';
+    }
+    update();
+    window.addEventListener('resize', update);
+    return { destroy() { window.removeEventListener('resize', update); } };
+  }
+
   // Portfolio page requires sign-in (any role)
   $effect(() => {
     const path = page.url.pathname;
@@ -57,7 +73,8 @@
           <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
-            <span class="pub-brand-sub">ANALYTICS LLP</span>
+            <span class="pub-brand-sub" use:matchNameWidth>ANALYTICS LLP</span>
+            <div class="pub-brand-sep"></div>
             <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
           </div>
         </a>
@@ -93,7 +110,8 @@
           <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
-            <span class="pub-brand-sub">ANALYTICS LLP</span>
+            <span class="pub-brand-sub" use:matchNameWidth>ANALYTICS LLP</span>
+            <div class="pub-brand-sep"></div>
             <span class="pub-brand-tagline">INVEST · GROW · COMPOUND</span>
           </div>
         </a>
@@ -284,13 +302,18 @@
     font-size: 0.58rem;
     font-weight: 700;
     color: #f0c84e;
-    letter-spacing: 0.25em;
+    /* letter-spacing set dynamically by matchNameWidth action */
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.1;
     margin-bottom: 0;
     padding-bottom: 0;
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
+  }
+  .pub-brand-sep {
+    width: 100%;
+    border-top: 1px solid rgba(200,168,75,0.55);
+    margin: 0.12rem 0 0.08rem;
   }
   .pub-brand-tagline {
     font-size: 0.4rem;

@@ -138,6 +138,7 @@
       overlayNoRowsTemplate: '<span style="font-size:0.65rem;color:#999">—</span>',
       domLayout: 'autoHeight',
       getRowClass,
+      pinnedBottomRowData: [],
       ...(onRowClick ? { onRowClicked: (e) => onRowClick(e.data) } : {}),
     });
   }
@@ -212,8 +213,10 @@
     const pTotals = makePositionsTotals(pRows);
     updateGrid(holdingsSummaryGrid, rawHoldingsSummary);
     updateGrid(positionsSummaryGrid, rawPositionsSummary);
-    updateGrid(holdingsAllGrid, hRows.length ? [...hRows, hTotals].filter(Boolean) : []);
-    updateGrid(positionsAllGrid, pRows.length ? [...pRows, pTotals].filter(Boolean) : []);
+    updateGrid(holdingsAllGrid, hRows);
+    holdingsAllGrid.setGridOption('pinnedBottomRowData', hTotals ? [hTotals] : []);
+    updateGrid(positionsAllGrid, pRows);
+    positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
   }
 
   function applyData(h, p, f) {
@@ -302,7 +305,7 @@
   <select bind:value={selectedAccount} class="acct-select">
     <option value="all">All Accounts</option>
     {#each accounts as acct}
-      <option value={acct}>{acct.replace(/\d/g, '#')}</option>
+      <option value={acct}>{maskAccounts ? acct.replace(/\d/g, '#') : acct}</option>
     {/each}
   </select>
 </div>
