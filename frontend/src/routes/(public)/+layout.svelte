@@ -280,7 +280,7 @@
     letter-spacing: 0.12em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     line-height: 1.1;
-    -webkit-text-stroke: 1.5px rgba(200,140,20,0.9);
+    -webkit-text-stroke: 1px rgba(200,140,20,0.9);
     margin-bottom: 0.1rem;
   }
   .pub-brand-sub {
