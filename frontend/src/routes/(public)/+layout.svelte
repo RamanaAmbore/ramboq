@@ -240,9 +240,7 @@
 
   /* Logo — white halo to lift dark elements off dark navbar, gold accent edge */
   :global(.logo-glow) {
-    filter:
-      drop-shadow(0 0 2px rgba(255,255,255,0.2))
-      drop-shadow(0 0 1px rgba(212,146,12,0.15));
+    filter: drop-shadow(0 0 0.5px rgba(255,255,255,0.5));
   }
 
 
