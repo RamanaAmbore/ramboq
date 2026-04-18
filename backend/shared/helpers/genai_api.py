@@ -1,3 +1,5 @@
+import socket as _socket
+
 from google import genai
 from google.genai import types
 
@@ -6,6 +8,19 @@ from backend.shared.helpers.ramboq_logger import get_logger
 from backend.shared.helpers.utils import secrets, ramboq_config, ramboq_deploy, is_prod_capable
 
 logger = get_logger(__name__)
+
+# Force IPv4 for Google API hosts. The server binds per-account IPv6 addresses
+# for Kite routing; those addresses don't have public egress to Google, so the
+# SDK's default IPv6 preference makes generate_content hang. Scoping the
+# override to *googleapis.com keeps Kite's IPv6 binding untouched.
+_orig_getaddrinfo = _socket.getaddrinfo
+
+def _getaddrinfo_v4_for_google(host, port, family=0, type=0, proto=0, flags=0):
+    if host and 'googleapis.com' in str(host):
+        family = _socket.AF_INET
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+
+_socket.getaddrinfo = _getaddrinfo_v4_for_google
 
 
 def _extract_underlying(tradingsymbol):
