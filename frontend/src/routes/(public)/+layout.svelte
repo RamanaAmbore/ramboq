@@ -232,10 +232,10 @@
   /* Logo 1px off-white shape outline */
   .pub-logo {
     filter:
-      drop-shadow(1px 0 0 rgba(220,235,235,0.85))
-      drop-shadow(-1px 0 0 rgba(220,235,235,0.85))
-      drop-shadow(0 1px 0 rgba(220,235,235,0.85))
-      drop-shadow(0 -1px 0 rgba(220,235,235,0.85));
+      drop-shadow(1px 0 0 rgba(220,235,235,0.35))
+      drop-shadow(-1px 0 0 rgba(220,235,235,0.35))
+      drop-shadow(0 1px 0 rgba(220,235,235,0.35))
+      drop-shadow(0 -1px 0 rgba(220,235,235,0.35));
   }
 
 
