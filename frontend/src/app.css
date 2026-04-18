@@ -32,14 +32,14 @@
 /* ── AG Grid — RamboQuant theme ──────────────────────────────────────────── */
 /* Outside @layer so these override AG Grid's imported quartz styles            */
 .ag-theme-ramboq {
-  --ag-header-background-color: #c2dedd;
+  --ag-header-background-color: #c8d4d2;
   --ag-header-foreground-color: #163535;
   --ag-header-font-weight: 600;
   --ag-header-font-size: 0.6875rem;
   --ag-foreground-color: #1e3838;
   --ag-odd-row-background-color: #f8f9fb;
-  --ag-row-hover-color: #d8efed;
-  --ag-selected-row-background-color: #b0d8d4;
+  --ag-row-hover-color: #e4eceb;
+  --ag-selected-row-background-color: #b8cac8;
   --ag-border-color: #e0eceb;
   --ag-font-family: 'Inter', 'SF Pro Text', -apple-system, system-ui, sans-serif;
   --ag-font-size: 0.625rem;
@@ -59,11 +59,11 @@
 .ag-theme-ramboq .ag-root-wrapper {
   border-radius: 4px;
   overflow: hidden;
-  background-color: #c2dedd !important;
+  background-color: #c8d4d2 !important;
   box-shadow: none !important;
 }
 .ag-theme-ramboq .ag-header {
-  background-color: #c2dedd !important;
+  background-color: #c8d4d2 !important;
   color: #163535 !important;
 }
 .ag-theme-ramboq .ag-body {
@@ -78,7 +78,7 @@
   background-color: transparent !important;
   padding-left: 4px !important;
   padding-right: 4px !important;
-  border-right: 1px solid #8ec4c0 !important;
+  border-right: 1px solid #a8bcba !important;
 }
 /* Hide header menu/filter icons */
 .ag-theme-ramboq .ag-header-cell-menu-button,
@@ -100,7 +100,7 @@
 }
 /* Background fill for Account and Symbol columns */
 .ag-theme-ramboq .ag-cell.ag-col-fill {
-  background-color: #c8e8e4 !important;
+  background-color: #d0dedd !important;
 }
 .ag-theme-ramboq .ag-header-cell.ag-col-fill {
   background-color: rgba(0,0,0,0.05) !important;
@@ -147,9 +147,9 @@
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: 0.375rem;
-    background-color: #c2dedd;
+    background-color: #c8d4d2;
     color: #163535;
-    border: 1px solid #8ec4c0;
+    border: 1px solid #a8bcba;
     cursor: pointer;
     transition: background-color 0.05s;
     outline: none !important;
@@ -169,7 +169,7 @@
     transition: background-color 0.05s;
     outline: none !important;
   }
-  .btn-secondary:hover:not(:disabled) { background-color: #d8efed; }
+  .btn-secondary:hover:not(:disabled) { background-color: #e4eceb; }
   .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-tertiary {
