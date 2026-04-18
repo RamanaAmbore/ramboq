@@ -212,7 +212,22 @@
     position: sticky;
     top: 4px;
     z-index: 50;
-    background: #1a2744;
+    background-color: #1a2744;
+    background-image:
+      repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 18px,
+        rgba(255,255,255,0.018) 18px,
+        rgba(255,255,255,0.018) 19px
+      ),
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 18px,
+        rgba(255,255,255,0.018) 18px,
+        rgba(255,255,255,0.018) 19px
+      );
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -221,6 +236,11 @@
     max-width: 960px;
     margin: 0 auto;
     padding: 0 1rem;
+  }
+
+  /* Logo — subtle orange glow following PNG shape */
+  :global(.logo-glow) {
+    filter: drop-shadow(0 0 1px rgba(212,146,12,0.5));
   }
 
 
@@ -316,7 +336,22 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background: #1a2744;
+    background-color: #1a2744;
+    background-image:
+      repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 18px,
+        rgba(255,255,255,0.018) 18px,
+        rgba(255,255,255,0.018) 19px
+      ),
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 18px,
+        rgba(255,255,255,0.018) 18px,
+        rgba(255,255,255,0.018) 19px
+      );
     border-top: 1px solid rgba(212,146,12,0.35);
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
