@@ -229,8 +229,11 @@
     padding: 0 1rem;
   }
 
-  /* Logo 1px off-white shape outline */
+  /* Logo off-white background + shape outline */
   .pub-logo {
+    background: rgba(255,250,240,0.13);
+    border-radius: 3px;
+    padding: 2px 4px;
     filter:
       drop-shadow(1px 0 0 rgba(220,235,235,0.35))
       drop-shadow(-1px 0 0 rgba(220,235,235,0.35))
