@@ -55,7 +55,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="pub-brand shrink-0 mr-5" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
+          <img src={bullSrc} alt="" style="height:2.6rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(240,200,78,0.75)) drop-shadow(0 0 6px rgba(200,168,75,0.45));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -92,7 +92,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="pub-brand pub-brand-mobile" tabindex="-1">
-          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 1px rgba(200,168,75,0.55));" />
+          <img src={bullSrc} alt="" style="height:2.2rem;width:auto;display:block;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 0 3px rgba(240,200,78,0.75)) drop-shadow(0 0 6px rgba(200,168,75,0.45));" />
           <div class="pub-brand-text">
             <span class="pub-brand-name">RAMBO QUANT</span>
             <span class="pub-brand-sub">ANALYTICS LLP</span>
@@ -281,6 +281,7 @@
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
     line-height: 1.1;
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
+    text-shadow: 0 0 8px rgba(240,200,78,0.7), 0 0 2px rgba(200,140,20,0.9);
     margin-bottom: 0.1rem;
   }
   .pub-brand-sub {
