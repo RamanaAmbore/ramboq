@@ -75,7 +75,8 @@
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
 
-  const getRowClass = (params) => params.data?.tradingsymbol === 'TOTAL' ? 'totals-row' : '';
+  const getRowClass = (params) =>
+    (params.data?.tradingsymbol === 'TOTAL' || params.data?.account === 'TOTAL') ? 'totals-row' : '';
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';

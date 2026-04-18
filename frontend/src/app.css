@@ -135,10 +135,26 @@
 .ag-theme-algo .pnl-loss { color: #b91c1c !important; background-color: rgba(192,57,43,0.08); }
 .ag-theme-algo .pnl-gain { color: #15803d !important; background-color: rgba(21,128,61,0.08); }
 .ag-theme-algo .pnl-zero { color: #3c4660 !important; }
-/* Totals row keeps amber accent color regardless of +/-/0 */
-.ag-row.totals-row.pnl-loss, .ag-row.totals-row .pnl-loss,
-.ag-row.totals-row.pnl-gain, .ag-row.totals-row .pnl-gain,
-.ag-row.totals-row.pnl-zero, .ag-row.totals-row .pnl-zero { background-color: transparent !important; }
+/* Totals row cells inherit the header color regardless of +/-/0 */
+.ag-theme-ramboq .ag-row.totals-row .pnl-loss,
+.ag-theme-ramboq .ag-row.totals-row .pnl-gain,
+.ag-theme-ramboq .ag-row.totals-row .pnl-zero,
+.ag-theme-ramboq .ag-row.totals-row .ag-cell { color: #e8d9a8 !important; background-color: transparent !important; }
+.ag-theme-algo .ag-row.totals-row .pnl-loss,
+.ag-theme-algo .ag-row.totals-row .pnl-gain,
+.ag-theme-algo .ag-row.totals-row .pnl-zero,
+.ag-theme-algo .ag-row.totals-row .ag-cell { color: #fbbf24 !important; background-color: transparent !important; }
+
+/* Right-align all numeric cells and their headers across every grid */
+.ag-theme-ramboq .ag-right-aligned-cell,
+.ag-theme-algo .ag-right-aligned-cell {
+  text-align: right !important;
+  justify-content: flex-end !important;
+}
+.ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-label,
+.ag-theme-algo .ag-right-aligned-header .ag-header-cell-label {
+  justify-content: flex-end !important;
+}
 
 /* AG Grid: show blank row when no data */
 .ag-theme-ramboq .ag-overlay-no-rows-wrapper {
