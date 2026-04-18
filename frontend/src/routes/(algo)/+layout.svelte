@@ -161,7 +161,7 @@
   .algo-brand {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.65rem;
     background: none;
     border: none;
     cursor: pointer;

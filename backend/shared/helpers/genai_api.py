@@ -140,12 +140,12 @@ def get_market_update(strict: bool = False):
             logger.warning("Gemini returned empty response — using fallback")
             return fallback
 
-        # Post-process: fix stray ** (double asterisks) that Gemini sometimes adds
+        # Strip markdown emphasis markers so the raw report renders cleanly.
         import re
-        # Replace **text** with *text* (bold → italic/emphasis)
-        resp = re.sub(r'\*\*([^*]+)\*\*', r'*\1*', resp)
-        # Remove orphan ** not wrapping anything
-        resp = resp.replace('**', '')
+        resp = re.sub(r'\*\*([^*]+)\*\*', r'\1', resp)           # **bold** → bold
+        resp = resp.replace('**', '')                             # drop stray **
+        resp = re.sub(r'\*(\S(?:[^*\n]*?\S)?)\*', r'\1', resp)   # *text* → text
+        resp = re.sub(r'(?<!\w)_(\S(?:[^_\n]*?\S)?)_(?!\w)', r'\1', resp)  # _text_ → text
 
         logger.info(resp)
         return resp
