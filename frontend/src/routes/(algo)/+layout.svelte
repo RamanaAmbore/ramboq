@@ -180,18 +180,18 @@
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
-    padding: 0.22rem 0.6rem;
+    padding: 0.22rem 0.6rem 0.22rem calc(0.6rem - 2px);
     font-size: 0.68rem;
     font-weight: 500;
     border-radius: 0.2rem;
     background: transparent;
     color: rgba(180, 200, 230, 0.75);
     border: none;
-    border-bottom: 1px solid transparent;
+    border-left: 2px solid transparent;
     cursor: pointer;
     letter-spacing: 0.03em;
     font-family: ui-monospace, monospace;
-    transition: background-color 0.06s, color 0.06s, border-bottom-color 0.06s;
+    transition: background-color 0.06s, color 0.06s, border-left-color 0.06s;
     white-space: nowrap;
     outline: none !important;
     -webkit-tap-highlight-color: transparent;
@@ -199,13 +199,13 @@
   :global(.algo-nav-btn:hover) {
     background: rgba(251,191,36,0.1);
     color: #fbbf24;
-    border-bottom-color: #fbbf24;
+    border-left-color: #fbbf24;
   }
   :global(.algo-nav-btn-active) {
     background: rgba(251,191,36,0.15);
     color: #fbbf24;
     font-weight: 700;
-    border-bottom-color: #fbbf24;
+    border-left-color: #fbbf24;
   }
 
   /* Back-to-site link */
@@ -318,13 +318,21 @@
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
   .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
 
+  /* Page-level timestamp line (cyan, matches log timestamps) */
+  :global(.algo-ts) {
+    font-size: 0.65rem;
+    color: #7dd3fc;
+    margin-bottom: 0.25rem;
+    font-family: ui-monospace, monospace;
+  }
+
   /* ── Status-driven surface card — used across algo pages ─────────────────── */
   :global(.algo-status-card) {
-    background: #0d1829;
+    background: #11203a;
     border: 1.5px solid rgba(255,255,255,0.08);
     border-radius: 6px;
     padding: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
     color: #c8d8f0;
     transition: border-color 0.15s, box-shadow 0.15s;
   }

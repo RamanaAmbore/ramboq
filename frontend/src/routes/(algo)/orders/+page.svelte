@@ -121,16 +121,16 @@
     cmdVerb = (ctx?._verb || '').toUpperCase();
     return enrichOrderPairs(pairs, ctx);
   }
-  const statusColor = (/** @type {string} */ s) => {
+  const statusDataAttr = (/** @type {string} */ s) => {
     const c = s?.toUpperCase();
-    if (c === 'COMPLETE') return 'border-green-500 bg-green-50';
-    if (c === 'REJECTED' || c === 'CANCELLED') return 'border-red-400 bg-red-50';
-    if (c === 'OPEN' || c === 'TRIGGER PENDING') return 'border-amber-400 bg-amber-50';
-    return 'border-gray-300 bg-white';
+    if (c === 'COMPLETE') return 'active';
+    if (c === 'REJECTED' || c === 'CANCELLED') return 'error';
+    if (c === 'OPEN' || c === 'TRIGGER PENDING') return 'running';
+    return 'inactive';
   };
-  const txnColor = (/** @type {string} */ t) => t === 'BUY' ? 'text-green-700' : 'text-red-600';
-  // Industry standard: distinct hues per account, readable on white bg
-  const ACCT_COLORS = ['text-blue-700', 'text-orange-600', 'text-purple-700', 'text-teal-700'];
+  const txnColor = (/** @type {string} */ t) => t === 'BUY' ? 'text-green-400' : 'text-red-400';
+  // Industry standard: distinct hues per account, readable on dark bg
+  const ACCT_COLORS = ['text-sky-300', 'text-amber-300', 'text-fuchsia-300', 'text-teal-300'];
   const _acctList = /** @type {string[]} */ ([]);
   const acctColor = (/** @type {string} */ a) => {
     let idx = _acctList.indexOf(a);
@@ -170,7 +170,7 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
+<div class="algo-ts">{clientTimestamp()}</div>
 <h1 class="page-title-chip mb-1">Orders</h1>
 
 {#if error}<div class="mb-1 p-1.5 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
@@ -205,29 +205,29 @@
 <!-- Status Dashboard -->
 <div class="grid grid-cols-5 gap-2 mt-1 mb-2">
   <button onclick={() => filterStatus = 'all'}
-    class="rounded-lg border-2 bg-white border-gray-300 p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-primary/30' : ''}">
-    <div class="text-xs font-bold text-primary">{orders.length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">All</div>
+    class="algo-status-card p-2 text-center {filterStatus === 'all' ? 'ring-2 ring-[#fbbf24]/40' : ''}" data-status="inactive">
+    <div class="text-xs font-bold text-[#c8d8f0]">{orders.length}</div>
+    <div class="text-[0.55rem] text-[#7e97b8] uppercase">All</div>
   </button>
   <button onclick={() => filterStatus = 'open'}
-    class="rounded-lg border-2 bg-amber-50 border-amber-400 p-2 text-center {filterStatus === 'open' ? 'ring-2 ring-primary/30' : ''}">
-    <div class="text-xs font-bold text-amber-600">{orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Open</div>
+    class="algo-status-card p-2 text-center {filterStatus === 'open' ? 'ring-2 ring-[#fbbf24]/40' : ''}" data-status="running">
+    <div class="text-xs font-bold text-amber-400">{orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING').length}</div>
+    <div class="text-[0.55rem] text-[#7e97b8] uppercase">Open</div>
   </button>
   <button onclick={() => filterStatus = 'complete'}
-    class="rounded-lg border-2 bg-green-50 border-green-500 p-2 text-center {filterStatus === 'complete' ? 'ring-2 ring-primary/30' : ''}">
-    <div class="text-xs font-bold text-green-600">{orders.filter(o => o.status === 'COMPLETE').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Filled</div>
+    class="algo-status-card p-2 text-center {filterStatus === 'complete' ? 'ring-2 ring-[#fbbf24]/40' : ''}" data-status="active">
+    <div class="text-xs font-bold text-green-400">{orders.filter(o => o.status === 'COMPLETE').length}</div>
+    <div class="text-[0.55rem] text-[#7e97b8] uppercase">Filled</div>
   </button>
   <button onclick={() => filterStatus = 'rejected'}
-    class="rounded-lg border-2 bg-red-50 border-red-400 p-2 text-center {filterStatus === 'rejected' ? 'ring-2 ring-primary/30' : ''}">
-    <div class="text-xs font-bold text-red-600">{orders.filter(o => o.status === 'REJECTED').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Rejected</div>
+    class="algo-status-card p-2 text-center {filterStatus === 'rejected' ? 'ring-2 ring-[#fbbf24]/40' : ''}" data-status="error">
+    <div class="text-xs font-bold text-red-400">{orders.filter(o => o.status === 'REJECTED').length}</div>
+    <div class="text-[0.55rem] text-[#7e97b8] uppercase">Rejected</div>
   </button>
   <button onclick={() => filterStatus = 'cancelled'}
-    class="rounded-lg border-2 bg-gray-50 border-gray-400 p-2 text-center {filterStatus === 'cancelled' ? 'ring-2 ring-primary/30' : ''}">
-    <div class="text-xs font-bold text-gray-600">{orders.filter(o => o.status === 'CANCELLED').length}</div>
-    <div class="text-[0.55rem] text-muted uppercase">Cancelled</div>
+    class="algo-status-card p-2 text-center {filterStatus === 'cancelled' ? 'ring-2 ring-[#fbbf24]/40' : ''}" data-status="error">
+    <div class="text-xs font-bold text-red-300">{orders.filter(o => o.status === 'CANCELLED').length}</div>
+    <div class="text-[0.55rem] text-[#7e97b8] uppercase">Cancelled</div>
   </button>
 </div>
 
@@ -238,13 +238,15 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-1 max-h-[8rem] overflow-y-auto">
     {#each orders.filter(o => filterStatus === 'all' ? true : filterStatus === 'open' ? (o.status === 'OPEN' || o.status === 'TRIGGER PENDING') : o.status === filterStatus.toUpperCase()) as o}
       <button type="button" onclick={() => selectedOrder = (selectedOrder?.order_id === o.order_id ? null : o)}
-        class="text-left rounded-lg border-2 {statusColor(o.status)} p-2.5 hover:brightness-95 transition">
+        class="algo-status-card text-left p-2.5 transition" data-status={statusDataAttr(o.status)}>
         <div class="flex items-center justify-between mb-0.5">
-          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-slate-700">{o.tradingsymbol}</span></span>
-          <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase
-            {o.status === 'COMPLETE' ? 'bg-green-100 text-green-700' : o.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">{o.status}</span>
+          <span class="font-semibold text-xs"><span class="{txnColor(o.transaction_type)}">{o.transaction_type}</span> <span class="{acctColor(o.account)}">{o.account}</span> <span class="text-[#c8d8f0]">{o.tradingsymbol}</span></span>
+          <span class="text-[0.55rem] px-1.5 py-0.5 rounded font-medium uppercase border
+            {o.status === 'COMPLETE' ? 'bg-green-500/15 text-green-400 border-green-500/40'
+            : o.status === 'REJECTED' ? 'bg-red-500/15 text-red-400 border-red-500/40'
+            : 'bg-amber-500/15 text-amber-400 border-amber-500/40'}">{o.status}</span>
         </div>
-        <div class="text-[0.55rem] text-gray-700 flex flex-wrap gap-x-2 uppercase">
+        <div class="text-[0.55rem] text-[#c8d8f0]/70 flex flex-wrap gap-x-2 uppercase">
           <span>QTY:<b>{o.filled_quantity}/{o.quantity}</b></span>
           <span>ORDER:<b>{o.order_type}</b></span>
           <span>PRICE:<b>{o.average_price || o.price || '—'}</b></span>

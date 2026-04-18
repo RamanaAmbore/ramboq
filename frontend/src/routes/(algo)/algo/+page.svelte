@@ -176,7 +176,7 @@
   <title>AI Agents | RamboQuant Analytics</title>
 </svelte:head>
 
-<div class="text-[0.65rem] text-muted mb-1">{clientTimestamp()}</div>
+<div class="algo-ts">{clientTimestamp()}</div>
 <h1 class="page-title-chip mb-2">AI Agents</h1>
 
 {#if error}
