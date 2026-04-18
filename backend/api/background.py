@@ -187,9 +187,12 @@ async def _task_market(state: dict) -> None:
     else:
         try:
             result = await _run(fetch_fresh)
-            _hydrate(result)
-            await _save_market_to_db(result)
-            logger.info(f"Background: market generated at startup (cycle {get_cycle_date()})")
+            if result is None:
+                logger.warning("Background: Gemini empty at startup — leaving cache/DB untouched")
+            else:
+                _hydrate(result)
+                await _save_market_to_db(result)
+                logger.info(f"Background: market generated at startup (cycle {get_cycle_date()})")
         except Exception as e:
             logger.error(f"Background: market startup warm failed: {e}")
 
@@ -204,6 +207,9 @@ async def _task_market(state: dict) -> None:
 
         try:
             result = await _run(fetch_fresh)
+            if result is None:
+                logger.warning("Background: Gemini empty on daily refresh — keeping previous report")
+                continue
             _hydrate(result)
             await _save_market_to_db(result)
             logger.info(f"Background: market cache warmed for cycle {get_cycle_date()}")

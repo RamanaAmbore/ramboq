@@ -70,7 +70,15 @@ def _get_portfolio_details():
         return "    • (no current holdings/positions)", []
 
 
-def get_market_update():
+def get_market_update(strict: bool = False):
+    """
+    Return the AI-generated market report.
+
+    Default (strict=False): on any failure (genai disabled, not prod-capable,
+    empty response, exception) returns the YAML static fallback.
+    strict=True: return None in those failure cases so callers can decide
+    what to show rather than serving stale static content.
+    """
     now = timestamp_indian()
     now_est = timestamp_est()
     formatted_ist = now.strftime('%a, %B %d, %Y, %I:%M %p IST')
@@ -78,7 +86,7 @@ def get_market_update():
     logger.info(f'GenAI for market update invoked at {formatted_ist}')
 
     message = f"Market Report — {formatted_ist} | {formatted_est}"
-    fallback = ramboq_config['market'].replace("Market Report", message)
+    fallback = None if strict else ramboq_config['market'].replace("Market Report", message)
 
     if not ramboq_deploy['genai']:
         return fallback

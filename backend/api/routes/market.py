@@ -18,9 +18,14 @@ logger = get_logger(__name__)
 _TTL = 86400  # 24 hours
 
 
-def fetch_fresh() -> MarketResponse:
-    """Call Gemini for a fresh market update — blocks for a few seconds."""
-    content = genai_api.get_market_update()
+_UNAVAILABLE = "Market report is temporarily unavailable. Please try again shortly."
+
+
+def fetch_fresh() -> MarketResponse | None:
+    """Call Gemini for a fresh market update. None if Gemini returned empty/failed."""
+    content = genai_api.get_market_update(strict=True)
+    if content is None:
+        return None
     return MarketResponse(
         content=content,
         cycle_date=str(get_cycle_date()),
@@ -29,7 +34,7 @@ def fetch_fresh() -> MarketResponse:
 
 
 async def _db_or_gemini() -> MarketResponse:
-    """Try DB row (<24h old). Else call Gemini inline and persist."""
+    """Try DB row (<24h old). Else call Gemini inline and persist on success."""
     from backend.api.background import _load_market_from_db, _save_market_to_db
 
     cached = await _load_market_from_db()
@@ -38,6 +43,12 @@ async def _db_or_gemini() -> MarketResponse:
 
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, fetch_fresh)
+    if result is None:
+        return MarketResponse(
+            content=_UNAVAILABLE,
+            cycle_date=str(get_cycle_date()),
+            refreshed_at=timestamp_display(),
+        )
     await _save_market_to_db(result)
     return result
 
