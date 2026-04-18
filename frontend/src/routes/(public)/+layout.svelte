@@ -205,7 +205,7 @@
     position: fixed;
     height: 4px;
     z-index: 200;
-    max-width: 958px;
+    max-width: 1280px;
     width: 100%;
     left: 50%;
     transform: translateX(-50%);
@@ -276,12 +276,12 @@
   .pub-brand-name {
     font-size: 0.78rem;
     font-weight: 900;
-    color: #ffffff;
+    color: #f0c84e;
     letter-spacing: 0.12em;
     font-family: 'Trebuchet MS', 'Arial Narrow', Arial, sans-serif;
-    text-shadow: 0 0 4px rgba(255,210,60,0.35), 0 0 1px rgba(0,0,0,0.4);
     line-height: 1.1;
-    -webkit-text-stroke: 0.7px rgba(255,210,60,1);
+    -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
+    margin-bottom: 0.1rem;
   }
   .pub-brand-sub {
     font-size: 0.58rem;
