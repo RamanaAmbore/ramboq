@@ -52,7 +52,7 @@
     <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-5" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none pub-logo" />
+          <img src="/logo5.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none pub-logo" />
         </a>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -83,7 +83,7 @@
       <!-- Mobile bar -->
       <div class="pub-nav-inner md:hidden flex items-center justify-between h-16 py-2">
         <a href="/about" class="shrink-0" tabindex="-1">
-          <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none pub-logo" />
+          <img src="/logo5.png" alt="RamboQuant Analytics LLP" class="h-12 w-auto pointer-events-none pub-logo" />
         </a>
         <div class="flex items-center gap-2">
           {#if $authStore.user}
@@ -229,16 +229,11 @@
     padding: 0 1rem;
   }
 
-  /* Logo gold wash + white glow */
+  /* Logo gold wash */
   .pub-logo {
     background: rgba(232,168,32,0.07);
     border-radius: 3px;
     padding: 2px 4px;
-    filter:
-      drop-shadow(1px 0 0 rgba(255,255,255,0.38))
-      drop-shadow(-1px 0 0 rgba(255,255,255,0.38))
-      drop-shadow(0 1px 0 rgba(255,255,255,0.38))
-      drop-shadow(0 -1px 0 rgba(255,255,255,0.38));
   }
 
 
