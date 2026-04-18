@@ -352,17 +352,19 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.6rem;
+    padding: 0;
   }
   .acct-select {
     font-size: 0.65rem;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 0.4rem;
     border: 1px solid #c0ccdc;
     border-radius: 0.25rem;
     background: white;
     color: #1e3050;
     outline: none;
     cursor: pointer;
+    margin-left: 0;
   }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
