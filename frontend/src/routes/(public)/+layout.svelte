@@ -264,9 +264,11 @@
   .pub-brand-text {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 0;
     padding: 0 0 0 0.6rem;
     justify-content: center;
+    margin-top: 0.3rem;
   }
   .pub-brand-name {
     font-size: 0.78rem;
@@ -279,16 +281,15 @@
     -webkit-text-stroke: 0.7px rgba(255,210,60,1);
   }
   .pub-brand-sub {
-    font-size: 0.72rem;
+    font-size: 0.58rem;
     font-weight: 700;
     color: #f0c84e;
-    letter-spacing: 0.24em;
+    letter-spacing: 0.1em;
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.1;
     margin-bottom: 0;
-    padding-bottom: 0.1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.52);
+    padding-bottom: 0;
     -webkit-text-stroke: 0.7px rgba(200,140,20,0.9);
   }
   .pub-brand-tagline {
@@ -298,9 +299,11 @@
     letter-spacing: 0.06em;
     display: block;
     padding-top: 0.1rem;
+    border-top: 1px solid rgba(255,255,255,0.52);
+    margin-top: 0.08rem;
   }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.66rem; }
-  .pub-brand-mobile .pub-brand-sub     { font-size: 0.62rem; }
+  .pub-brand-mobile .pub-brand-sub     { font-size: 0.5rem; }
   .pub-brand-mobile .pub-brand-tagline { font-size: 0.4rem; }
 
   /* Nav buttons */
