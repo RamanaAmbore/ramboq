@@ -49,7 +49,7 @@
 
   <div class="pub-card">
     <!-- Desktop navbar -->
-    <header class="pub-navbar bg-gradient-to-r from-[#0f1b30] via-[#1e2f50] to-[#0f1b30]">
+    <header class="pub-navbar">
       <div class="pub-nav-inner hidden md:flex items-center gap-1 h-14">
         <a href="/about" class="shrink-0 mr-5" tabindex="-1">
           <img src="/logo.png" alt="RamboQuant Analytics LLP" class="h-9 w-auto pointer-events-none logo-glow" />
@@ -212,6 +212,7 @@
     position: sticky;
     top: 4px;
     z-index: 50;
+    background-color: #1a2744;
     background-image:
       repeating-linear-gradient(
         135deg,
@@ -226,7 +227,8 @@
         transparent 18px,
         rgba(255,255,255,0.018) 18px,
         rgba(255,255,255,0.018) 19px
-      );
+      ),
+      linear-gradient(to right, #0f1b30, #1e2f50, #0f1b30);
     border-bottom: 2px solid #d4920c;
     overflow: visible;
   }
@@ -335,7 +337,7 @@
     left: 0;
     right: 0;
     z-index: 49;
-    background: linear-gradient(to right, #0f1b30, #1e2f50, #0f1b30);
+    background-color: #1a2744;
     background-image:
       repeating-linear-gradient(
         135deg,
