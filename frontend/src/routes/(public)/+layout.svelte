@@ -256,7 +256,7 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.08rem;
     text-decoration: none;
     line-height: 1;
     margin-right: 1rem;
@@ -285,7 +285,9 @@
     font-family: 'Trebuchet MS', Arial, sans-serif;
     text-transform: uppercase;
     line-height: 1.2;
-    margin-bottom: 0.15rem;
+    margin-bottom: 0;
+    padding-bottom: 0.18rem;
+    border-bottom: 1px solid rgba(200,168,75,0.35);
     -webkit-text-stroke: 0.5px rgba(200,140,20,0.9);
   }
   .pub-brand-tagline {
@@ -294,6 +296,7 @@
     color: rgba(255,255,255,0.52);
     letter-spacing: 0.06em;
     display: block;
+    padding-top: 0.15rem;
   }
   .pub-brand-mobile .pub-brand-name    { font-size: 0.78rem; }
   .pub-brand-mobile .pub-brand-sub     { font-size: 0.62rem; }
