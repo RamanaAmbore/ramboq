@@ -231,7 +231,7 @@
 
   /* Logo teal wash + white glow */
   .pub-logo {
-    background: rgba(22,53,53,0.5);
+    background: rgba(22,53,53,1);
     border-radius: 3px;
     padding: 2px 4px;
     filter:
