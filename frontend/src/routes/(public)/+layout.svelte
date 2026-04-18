@@ -229,11 +229,16 @@
     padding: 0 1rem;
   }
 
-  /* Logo off-white background wash */
+  /* Logo off-white wash + faint white glow */
   .pub-logo {
     background: rgba(255,250,240,0.13);
     border-radius: 3px;
     padding: 2px 4px;
+    filter:
+      drop-shadow(1px 0 0 rgba(255,255,255,0.18))
+      drop-shadow(-1px 0 0 rgba(255,255,255,0.18))
+      drop-shadow(0 1px 0 rgba(255,255,255,0.18))
+      drop-shadow(0 -1px 0 rgba(255,255,255,0.18));
   }
 
 
