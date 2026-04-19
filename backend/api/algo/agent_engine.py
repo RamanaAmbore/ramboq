@@ -274,71 +274,75 @@ def _v2_cfg():
 
 # Built-in agents seeded on first startup
 BUILTIN_AGENTS = [
+    # The four legacy risk rules below were authored in v1 grammar
+    # (field/operator/rules). They are now expressed as v2 metric/scope/op/value
+    # trees so the codebase has a single evaluator path. Left seeded as
+    # `inactive` because the explicit loss-* v2 agents further down supersede
+    # them — keeping the slugs prevents orphaning existing DB rows and preserves
+    # event-log history for anyone who previously enabled them.
     {
         "slug": "position_loss",
-        "name": "Position Loss (Absolute)",
-        "description": "Alert when day loss exceeds absolute threshold",
-        "conditions": {"operator": "or", "rules": [
-            {"field": "day_change_val", "op": "<", "value": -50000},
-        ]},
+        "name": "Position Loss (Absolute) — superseded",
+        "description": "Superseded by loss-hold-acct-* and loss-pos-acct-static-abs; kept inactive.",
+        "conditions": {"metric": "day_val", "scope": "holdings.any_acct", "op": "<", "value": -50000},
         "events": [
             {"channel": "telegram", "enabled": True},
             {"channel": "email", "enabled": True},
             {"channel": "log", "enabled": True},
         ],
         "actions": [],
-        "scope": "per_account",
+        "scope": "total",
         "schedule": "market_hours",
         "cooldown_minutes": 30,
-        "status": "active",
+        "status": "inactive",
     },
     {
         "slug": "position_loss_pct",
-        "name": "Position Loss (Percentage)",
-        "description": "Alert when day loss exceeds percentage threshold",
-        "conditions": {"field": "day_change_percentage", "op": "<", "value": -2.0},
+        "name": "Position Loss (Percentage) — superseded",
+        "description": "Superseded by loss-hold-acct-static-pct; kept inactive.",
+        "conditions": {"metric": "day_pct", "scope": "holdings.any_acct", "op": "<", "value": -2.0},
         "events": [
             {"channel": "telegram", "enabled": True},
             {"channel": "email", "enabled": True},
             {"channel": "log", "enabled": True},
         ],
         "actions": [],
-        "scope": "per_account",
+        "scope": "total",
         "schedule": "market_hours",
         "cooldown_minutes": 30,
-        "status": "active",
+        "status": "inactive",
     },
     {
         "slug": "negative_cash",
-        "name": "Negative Cash Balance",
-        "description": "Alert when cash balance goes below zero",
-        "conditions": {"field": "cash", "op": "<", "value": 0},
+        "name": "Negative Cash Balance — superseded",
+        "description": "Superseded by loss-funds-cash-negative; kept inactive.",
+        "conditions": {"metric": "cash", "scope": "funds.any_acct", "op": "<", "value": 0},
         "events": [
             {"channel": "telegram", "enabled": True},
             {"channel": "email", "enabled": True},
             {"channel": "log", "enabled": True},
         ],
         "actions": [],
-        "scope": "per_account",
+        "scope": "total",
         "schedule": "market_hours",
         "cooldown_minutes": 30,
-        "status": "active",
+        "status": "inactive",
     },
     {
         "slug": "negative_margin",
-        "name": "Negative Available Margin",
-        "description": "Alert when available margin goes below zero",
-        "conditions": {"field": "avail_margin", "op": "<", "value": 0},
+        "name": "Negative Available Margin — superseded",
+        "description": "Superseded by loss-funds-margin-negative; kept inactive.",
+        "conditions": {"metric": "avail_margin", "scope": "funds.any_acct", "op": "<", "value": 0},
         "events": [
             {"channel": "telegram", "enabled": True},
             {"channel": "email", "enabled": True},
             {"channel": "log", "enabled": True},
         ],
         "actions": [],
-        "scope": "per_account",
+        "scope": "total",
         "schedule": "market_hours",
         "cooldown_minutes": 30,
-        "status": "active",
+        "status": "inactive",
     },
     {
         "slug": "nse_open_summary",
@@ -570,7 +574,7 @@ _LOSS_AGENT_DEFAULTS = dict(
     actions=[],                 # notify-only. Attach actions via admin UI later.
     schedule="market_hours",
     cooldown_minutes=30,
-    status="inactive",          # activated manually per rule during migration
+    status="active",            # v2 grammar is now the sole loss-alert engine
 )
 
 for _a in _LOSS_AGENTS:
@@ -595,10 +599,23 @@ async def seed_agents():
                 # Always sync schedule (new field enforcement)
                 if existing.schedule != agent_def.get("schedule", "market_hours"):
                     existing.schedule = agent_def.get("schedule", "market_hours")
-                # Force status to "inactive" only when the built-in definition
-                # says inactive (keeps user-disabled agents disabled too).
-                if agent_def.get("status") == "inactive" and existing.status == "active":
+                desired_status = agent_def.get("status")
+                # Force status to "inactive" when the def says inactive — this
+                # stops superseded built-ins (summary agents, legacy risk
+                # agents) from duplicating alerts even if an old DB row has
+                # them active.
+                if desired_status == "inactive" and existing.status == "active":
                     existing.status = "inactive"
+                # Force-activate the v2 loss-* agents during the one-shot
+                # migration from alert_utils.check_and_alert → agent engine.
+                # Scoped to the loss-* slug prefix so this doesn't fight user
+                # intent on non-loss agents.
+                elif (
+                    desired_status == "active"
+                    and existing.status == "inactive"
+                    and existing.slug.startswith("loss-")
+                ):
+                    existing.status = "active"
                 continue
             agent = Agent(
                 slug=agent_def["slug"],

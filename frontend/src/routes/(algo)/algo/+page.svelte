@@ -72,6 +72,8 @@
 
   function startEdit(/** @type {any} */ agent) {
     editing = agent.slug;
+    validationErrors = [];
+    validationGrammar = '';
     editForm = {
       name: agent.name,
       description: agent.description || '',
@@ -82,6 +84,13 @@
       scope: agent.scope,
       schedule: agent.schedule || 'market_hours',
     };
+    // Give Svelte a tick to render, then jump the browser to the editor so the
+    // operator actually sees which agent opened (it was previously hidden
+    // below a long list).
+    setTimeout(() => {
+      document.getElementById('agent-editor')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
   }
 
   let validationErrors = $state(/** @type {string[]} */([]));
@@ -389,16 +398,92 @@
 
 <!-- Agent Editor (inline) -->
 {#if editing}
-  <div class="algo-status-card p-4 mb-4" data-status="inactive">
+  <div id="agent-editor" class="algo-status-card p-4 mb-4" data-status="inactive">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="section-heading">Edit: {editing}</h3>
+      <div class="flex items-baseline gap-2">
+        <h3 class="section-heading">Editing agent</h3>
+        <span class="text-[0.65rem] font-mono px-2 py-0.5 rounded bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/40">{editing}</span>
+      </div>
       <button onclick={() => editing = null} class="text-xs text-muted hover:text-text">Cancel</button>
     </div>
 
-    <!-- Two columns on md+: form on the left, live graphical view on the right -->
-    <div class="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4">
-      <!-- LEFT: the existing form fields -->
-      <div>
+    <!-- Live preview lives at the TOP of the editor so it is always visible,
+         even on narrow screens where the textareas would otherwise push it
+         below the fold. Driven by $derived parsed state — every keystroke
+         in the form flows through to this tree. -->
+    <div class="agent-preview agent-preview-top mb-4">
+      <div class="preview-heading">Live preview</div>
+
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3">
+        <!-- Left of preview: header + condition tree -->
+        <div>
+          <div class="preview-header">
+            <div class="preview-title">{editForm.name || '(unnamed agent)'}</div>
+            {#if editForm.description}
+              <div class="preview-desc">{editForm.description}</div>
+            {/if}
+            <div class="preview-meta">
+              Scope: <b>{editForm.scope}</b>
+              <span class="preview-sep">|</span>
+              Schedule: <b>{editForm.schedule}</b>
+              <span class="preview-sep">|</span>
+              Cooldown: <b>{editForm.cooldown_minutes}m</b>
+            </div>
+          </div>
+          <div class="preview-section-label">Condition tree</div>
+          {#if parsedConditions.ok}
+            <div class="preview-tree">
+              {@render renderCondNode(parsedConditions.value)}
+            </div>
+          {:else}
+            <div class="preview-error">Invalid JSON: {parsedConditions.error}</div>
+          {/if}
+        </div>
+
+        <!-- Right of preview: notify + actions -->
+        <div>
+          <div class="preview-section-label">Notify</div>
+          {#if parsedEvents.ok}
+            {#if parsedEvents.value.length}
+              <div class="flex flex-wrap gap-1">
+                {#each parsedEvents.value as ev}
+                  {@const on = ev.enabled !== false}
+                  <span class="preview-chip {on ? 'chip-on' : 'chip-off'}">
+                    {ev.channel || '?'}{on ? '' : ' (off)'}
+                  </span>
+                {/each}
+              </div>
+            {:else}
+              <div class="preview-muted">no channels configured</div>
+            {/if}
+          {:else}
+            <div class="preview-error">Invalid JSON: {parsedEvents.error}</div>
+          {/if}
+
+          <div class="preview-section-label">Actions</div>
+          {#if parsedActions.ok}
+            {#if parsedActions.value.length}
+              <div class="space-y-1">
+                {#each parsedActions.value as a}
+                  <div class="preview-action">
+                    <span class="preview-action-type">{a.type || '?'}</span>
+                    {#if a.params && Object.keys(a.params).length}
+                      <pre class="preview-action-params">{JSON.stringify(a.params, null, 2)}</pre>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="preview-muted">alert-only (no actions)</div>
+            {/if}
+          {:else}
+            <div class="preview-error">Invalid JSON: {parsedActions.error}</div>
+          {/if}
+        </div>
+      </div>
+    </div>
+
+    <!-- Form fields below the preview -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div>
         <label class="field-label">Name</label>
@@ -465,78 +550,6 @@
       <button onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
         class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
     </div>
-      </div><!-- /LEFT column -->
-
-      <!-- RIGHT: live graphical view of the agent, driven by $derived parsed state -->
-      <div class="agent-preview">
-        <div class="preview-heading">Live preview</div>
-
-        <!-- Header: name + scope + schedule + cooldown -->
-        <div class="preview-header">
-          <div class="preview-title">{editForm.name || '(unnamed agent)'}</div>
-          {#if editForm.description}
-            <div class="preview-desc">{editForm.description}</div>
-          {/if}
-          <div class="preview-meta">
-            Scope: <b>{editForm.scope}</b>
-            <span class="preview-sep">|</span>
-            Schedule: <b>{editForm.schedule}</b>
-            <span class="preview-sep">|</span>
-            Cooldown: <b>{editForm.cooldown_minutes}m</b>
-          </div>
-        </div>
-
-        <!-- Conditions tree -->
-        <div class="preview-section-label">Condition tree</div>
-        {#if parsedConditions.ok}
-          <div class="preview-tree">
-            {@render renderCondNode(parsedConditions.value)}
-          </div>
-        {:else}
-          <div class="preview-error">Invalid JSON: {parsedConditions.error}</div>
-        {/if}
-
-        <!-- Notify channels -->
-        <div class="preview-section-label">Notify</div>
-        {#if parsedEvents.ok}
-          {#if parsedEvents.value.length}
-            <div class="flex flex-wrap gap-1">
-              {#each parsedEvents.value as ev}
-                {@const on = ev.enabled !== false}
-                <span class="preview-chip {on ? 'chip-on' : 'chip-off'}">
-                  {ev.channel || '?'}{on ? '' : ' (off)'}
-                </span>
-              {/each}
-            </div>
-          {:else}
-            <div class="preview-muted">no channels configured</div>
-          {/if}
-        {:else}
-          <div class="preview-error">Invalid JSON: {parsedEvents.error}</div>
-        {/if}
-
-        <!-- Actions -->
-        <div class="preview-section-label">Actions</div>
-        {#if parsedActions.ok}
-          {#if parsedActions.value.length}
-            <div class="space-y-1">
-              {#each parsedActions.value as a}
-                <div class="preview-action">
-                  <span class="preview-action-type">{a.type || '?'}</span>
-                  {#if a.params && Object.keys(a.params).length}
-                    <pre class="preview-action-params">{JSON.stringify(a.params, null, 2)}</pre>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div class="preview-muted">alert-only (no actions)</div>
-          {/if}
-        {:else}
-          <div class="preview-error">Invalid JSON: {parsedActions.error}</div>
-        {/if}
-      </div><!-- /RIGHT column -->
-    </div><!-- /grid -->
   </div>
 {/if}
 
