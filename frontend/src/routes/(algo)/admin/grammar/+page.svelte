@@ -271,7 +271,7 @@
       <div class="col-span-2">
         <label class="field-label">params_schema (JSON)</label>
         <textarea bind:value={form.params_schema_json} class="field-input font-mono text-[0.6rem]" rows="5"
-                  placeholder='{"account": {"type": "string", "required": true}}'></textarea>
+                  placeholder={'{"account": {"type": "string", "required": true}}'}></textarea>
       </div>
       <div class="col-span-2">
         <label class="field-label">enum_values (JSON array)</label>
