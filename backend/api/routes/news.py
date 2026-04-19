@@ -258,21 +258,41 @@ async def _fetch_and_accumulate() -> NewsResponse:
 
     try:
         async with async_session() as s:
-            # Purge any previously-stored rows whose titles contain '?'
-            # (speculative/clickbait) so the feed stays clean.
+            # ── Purge stale rows on every fetch ────────────────────────────
+            # 1. '?' titles (clickbait / speculative).
             await s.execute(delete(NewsHeadline).where(NewsHeadline.title.like('%?%')))
+            # 2. Re-apply current filters + cross-publisher dedupe to whatever
+            #    is already stored, so legacy rows from earlier code versions
+            #    don't linger on the feed.
+            all_rows = await s.execute(
+                select(NewsHeadline.link, NewsHeadline.title)
+                .order_by(NewsHeadline.published_at.desc())
+            )
+            seen_fps: set[str] = set()
+            stale_links: list[str] = []
+            for link, title in all_rows.all():
+                if _NOISE_RE.search(title) or _is_low_info(title):
+                    stale_links.append(link)
+                    continue
+                fp = _title_fingerprint(title)
+                if not fp or fp in seen_fps:
+                    stale_links.append(link)
+                    continue
+                seen_fps.add(fp)
+            if stale_links:
+                await s.execute(
+                    delete(NewsHeadline).where(NewsHeadline.link.in_(stale_links))
+                )
+                logger.info(f"News: purged {len(stale_links)} stale/duplicate rows")
+
             if fresh:
-                # Exact-link dedupe against what's already stored.
+                # Exact-link dedupe against what remains after the purge.
                 existing_links = await s.execute(
                     select(NewsHeadline.link).where(
                         NewsHeadline.link.in_([row["link"] for _, row in fresh])
                     )
                 )
-                have_links = {r[0] for r in existing_links}
-                # Fingerprint-based dedupe catches the same story republished by
-                # multiple outlets with different URLs.
-                existing_titles = await s.execute(select(NewsHeadline.title))
-                seen_fps = {_title_fingerprint(t[0]) for t in existing_titles}
+                have_links = {r[0] for r in existing_links} - set(stale_links)
 
                 added = 0
                 for _dt, row in fresh:
@@ -284,8 +304,9 @@ async def _fetch_and_accumulate() -> NewsResponse:
                     seen_fps.add(fp)
                     s.add(NewsHeadline(**row))
                     added += 1
-                if added:
+                if added or stale_links:
                     await s.commit()
+                if added:
                     logger.info(f"News: +{added} new headlines")
 
             rows = await s.execute(
