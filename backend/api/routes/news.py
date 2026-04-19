@@ -96,6 +96,29 @@ _IN_RE = re.compile(
 )
 
 
+# Short words that don't distinguish stories — excluded from the dedupe fingerprint.
+_STOP_TOKENS = frozenset({
+    'the', 'and', 'for', 'from', 'with', 'this', 'that', 'over', 'into', 'amid',
+    'after', 'before', 'says', 'said', 'today', 'news', 'market', 'markets',
+    'stock', 'stocks', 'shares', 'report', 'live', 'update', 'breaking',
+    'week', 'day', 'morning', 'evening', 'session', 'amp',
+})
+
+
+def _title_fingerprint(title: str) -> str:
+    """
+    Order-independent fingerprint of the informative tokens in a headline.
+    Two headlines covering the same story tend to share the same fingerprint
+    even when wording differs. Strips " - Source" suffix, lowercases, keeps
+    alnum tokens ≥3 chars, drops stop-words, uses the top-10 sorted unique.
+    """
+    t = (title or "").lower()
+    t = re.sub(r'\s+[-—|]\s+[^-—|]{1,40}$', '', t)
+    tokens = re.findall(r'\b[a-z0-9]{3,}\b', t)
+    keyed = [tok for tok in tokens if tok not in _STOP_TOKENS]
+    return ' '.join(sorted(set(keyed))[:10])
+
+
 def _is_low_info(title: str) -> bool:
     """Drop headlines that carry no substantive information."""
     t = (title or "").strip()
@@ -236,16 +259,26 @@ async def _fetch_and_accumulate() -> NewsResponse:
     try:
         async with async_session() as s:
             if fresh:
-                existing = await s.execute(
+                # Exact-link dedupe against what's already stored.
+                existing_links = await s.execute(
                     select(NewsHeadline.link).where(
                         NewsHeadline.link.in_([row["link"] for _, row in fresh])
                     )
                 )
-                have = {r[0] for r in existing}
+                have_links = {r[0] for r in existing_links}
+                # Fingerprint-based dedupe catches the same story republished by
+                # multiple outlets with different URLs.
+                existing_titles = await s.execute(select(NewsHeadline.title))
+                seen_fps = {_title_fingerprint(t[0]) for t in existing_titles}
+
                 added = 0
                 for _dt, row in fresh:
-                    if row["link"] in have:
+                    if row["link"] in have_links:
                         continue
+                    fp = _title_fingerprint(row["title"])
+                    if not fp or fp in seen_fps:
+                        continue
+                    seen_fps.add(fp)
                     s.add(NewsHeadline(**row))
                     added += 1
                 if added:
