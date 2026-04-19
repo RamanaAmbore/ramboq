@@ -30,6 +30,7 @@ from backend.api.routes.funds import FundsController
 from backend.api.routes.holdings import HoldingsController
 from backend.api.routes.market import MarketController
 from backend.api.routes.news import NewsController
+from backend.api.routes.grammar import GrammarTokenController
 from backend.api.routes.instruments import InstrumentsController
 from backend.api.routes.orders import AccountsController, OrdersController
 from backend.api.routes.quote import QuoteController
@@ -114,6 +115,7 @@ _route_handlers = [
     FundsController,
     MarketController,
     NewsController,
+    GrammarTokenController,
     OrdersController,
     AccountsController,
     InstrumentsController,

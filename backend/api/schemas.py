@@ -118,6 +118,52 @@ class NewsResponse(msgspec.Struct):
 
 
 # ---------------------------------------------------------------------------
+# Agent grammar token CRUD
+# ---------------------------------------------------------------------------
+
+class GrammarTokenOut(msgspec.Struct):
+    id:            int
+    grammar_kind:  str                         # condition | notify | action
+    token_kind:    str                         # metric | scope | operator | channel | format | template | action_type
+    token:         str
+    value_type:    str | None = None
+    units:         str | None = None
+    description:   str = ""
+    resolver:      str | None = None
+    params_schema: dict | None = None
+    enum_values:   list | None = None
+    template_body: str | None = None
+    is_system:     bool = False
+    is_active:     bool = True
+
+
+class GrammarTokenCreate(msgspec.Struct):
+    grammar_kind:  str
+    token_kind:    str
+    token:         str
+    value_type:    str | None = None
+    units:         str | None = None
+    description:   str = ""
+    resolver:      str | None = None
+    params_schema: dict | None = None
+    enum_values:   list | None = None
+    template_body: str | None = None
+    is_active:     bool = True
+
+
+class GrammarTokenPatch(msgspec.Struct):
+    # All optional — only fields the caller sets are mutated.
+    value_type:    str | None = None
+    units:         str | None = None
+    description:   str | None = None
+    resolver:      str | None = None
+    params_schema: dict | None = None
+    enum_values:   list | None = None
+    template_body: str | None = None
+    is_active:     bool | None = None
+
+
+# ---------------------------------------------------------------------------
 # Post / Insights
 # ---------------------------------------------------------------------------
 

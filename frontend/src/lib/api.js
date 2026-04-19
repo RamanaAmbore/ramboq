@@ -95,6 +95,24 @@ export const fetchAbout  = () => _get('/config/about');
 
 // ── Agent endpoints (admin) ───────────────────────────────────────────────────
 export const fetchAgents      = () => _get('/agents/', { auth: true });
+
+// ── Grammar tokens (admin) ────────────────────────────────────────────────────
+// The Agent-grammar catalog — condition / notify / action tokens backing every
+// agent. System tokens are toggle-only; custom tokens support full CRUD.
+export const fetchGrammarTokens = (grammar) =>
+  _get(`/admin/grammar/tokens${grammar ? `?grammar=${encodeURIComponent(grammar)}` : ''}`,
+       { auth: true });
+export const patchGrammarToken = async (id, payload) => {
+  const res = await fetch(`${BASE}/admin/grammar/tokens/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+};
+export const reloadGrammarRegistry = () => _post('/admin/grammar/reload', {}, { auth: true });
 export const fetchAgentTypes  = () => _get('/agents/types', { auth: true });
 export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
 export const fetchRecentAgentEvents = (n = 100) => _get(`/agents/events/recent?n=${n}`, { auth: true });
