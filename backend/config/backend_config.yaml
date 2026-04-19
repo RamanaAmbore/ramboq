@@ -21,11 +21,11 @@ enforce_password_standard: False
 # Check gate with is_enabled('<cap>'). To add a new capability, append its key below
 # and call is_enabled('<cap>') at the usage site — no other code changes needed.
 cap_in_dev:
-  genai: True              # GenAI market update (Gemini)
-  telegram: True           # Telegram alert notifications
-  mail: True               # Email notifications (SMTP)
+  genai: False             # GenAI market update (Gemini)
+  telegram: False          # Telegram alert notifications
+  mail: False              # Email notifications (SMTP)
   notify_on_startup: True  # Send test Telegram+email on each deploy
-  market_feed: True        # Market news feed (Google News RSS)
+  market_feed: False       # Market news feed (Google News RSS)
 
 # Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
 # it here so the actual market-report response has room (avoids mid-sentence truncation).
