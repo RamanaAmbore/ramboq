@@ -72,6 +72,9 @@
 
   function startEdit(/** @type {any} */ agent) {
     editing = agent.slug;
+    // Keep the agent's row expanded so the inline editor actually renders
+    // where the operator clicked.
+    expandedSlug = agent.slug;
     validationErrors = [];
     validationGrammar = '';
     editForm = {
@@ -84,13 +87,6 @@
       scope: agent.scope,
       schedule: agent.schedule || 'market_hours',
     };
-    // Give Svelte a tick to render, then jump the browser to the editor so the
-    // operator actually sees which agent opened (it was previously hidden
-    // below a long list).
-    setTimeout(() => {
-      document.getElementById('agent-editor')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 40);
   }
 
   let validationErrors = $state(/** @type {string[]} */([]));
@@ -184,14 +180,6 @@
     cooldown: 'bg-amber-300', error: 'bg-red-600',
   }[s] || 'bg-slate-500');
 
-  function conditionSummary(/** @type {any} */ cond) {
-    if (!cond) return '—';
-    if (Array.isArray(cond.all)) return cond.all.map(conditionSummary).join(' AND ');
-    if (Array.isArray(cond.any)) return cond.any.map(conditionSummary).join(' OR ');
-    if (cond.not !== undefined) return `NOT (${conditionSummary(cond.not)})`;
-    return leafLabel(cond);
-  }
-
   function actionSummary(/** @type {any[]} */ actions) {
     if (!actions || !actions.length) return 'Alert only';
     return actions.map(a => a.type).join(', ');
@@ -256,6 +244,36 @@
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
 {/if}
 
+<!-- Recursive tree renderer used by both the normal expanded view and the
+     inline editor. Grammar nodes are:
+       { all: [...] } | { any: [...] } | { not: node } | { metric, scope, op, value } -->
+{#snippet renderCondNode(/** @type {any} */ node)}
+  {#if !node || typeof node !== 'object'}
+    <div class="tree-leaf">{JSON.stringify(node)}</div>
+  {:else if Array.isArray(node.all)}
+    <div class="tree-node tree-node-all">
+      <div class="tree-op">ALL</div>
+      <div class="tree-children">
+        {#each node.all as child}{@render renderCondNode(child)}{/each}
+      </div>
+    </div>
+  {:else if Array.isArray(node.any)}
+    <div class="tree-node tree-node-any">
+      <div class="tree-op">ANY</div>
+      <div class="tree-children">
+        {#each node.any as child}{@render renderCondNode(child)}{/each}
+      </div>
+    </div>
+  {:else if node.not !== undefined}
+    <div class="tree-node tree-node-not">
+      <div class="tree-op">NOT</div>
+      <div class="tree-children">{@render renderCondNode(node.not)}</div>
+    </div>
+  {:else}
+    <div class="tree-leaf">{leafLabel(node)}</div>
+  {/if}
+{/snippet}
+
 <!-- Grouped agent list — compact rows, click to expand -->
 {#each groupedAgents() as group}
   <h2 class="text-[0.6rem] font-bold uppercase tracking-wider text-[#fbbf24] mt-3 mb-1.5 border-b border-[#fbbf24]/25 pb-0.5">
@@ -288,225 +306,179 @@
         </div>
 
         {#if isOpen}
-          <!-- Expanded details -->
-          <div class="px-2 pb-2 border-t border-white/5">
-            {#if agent.description}
-              <div class="text-[0.6rem] text-[#c8d8f0]/60 italic mt-1.5 mb-1">{agent.description}</div>
-            {/if}
-            <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
-              <span class="text-[#7e97b8]">If:</span>
-              <span class="font-mono">{conditionSummary(agent.conditions)}</span>
+          {#if editing === agent.slug}
+            <!-- ──────── Inline editor + live tree preview ──────── -->
+            <div class="px-3 pb-3 pt-2 border-t border-white/5">
+              <!-- Preview at top — condition tree left, notify + actions right -->
+              <div class="agent-preview mb-3">
+                <div class="preview-heading">Live preview</div>
+                <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3">
+                  <div>
+                    <div class="preview-header">
+                      <div class="preview-title">{editForm.name || '(unnamed agent)'}</div>
+                      {#if editForm.description}
+                        <div class="preview-desc">{editForm.description}</div>
+                      {/if}
+                      <div class="preview-meta">
+                        Scope: <b>{editForm.scope}</b>
+                        <span class="preview-sep">|</span>
+                        Schedule: <b>{editForm.schedule}</b>
+                        <span class="preview-sep">|</span>
+                        Cooldown: <b>{editForm.cooldown_minutes}m</b>
+                      </div>
+                    </div>
+                    <div class="preview-section-label">Condition tree</div>
+                    {#if parsedConditions.ok}
+                      <div class="preview-tree">{@render renderCondNode(parsedConditions.value)}</div>
+                    {:else}
+                      <div class="preview-error">Invalid JSON: {parsedConditions.error}</div>
+                    {/if}
+                  </div>
+                  <div>
+                    <div class="preview-section-label">Notify</div>
+                    {#if parsedEvents.ok}
+                      {#if parsedEvents.value.length}
+                        <div class="flex flex-wrap gap-1">
+                          {#each parsedEvents.value as ev}
+                            {@const on = ev.enabled !== false}
+                            <span class="preview-chip {on ? 'chip-on' : 'chip-off'}">{ev.channel || '?'}{on ? '' : ' (off)'}</span>
+                          {/each}
+                        </div>
+                      {:else}
+                        <div class="preview-muted">no channels configured</div>
+                      {/if}
+                    {:else}
+                      <div class="preview-error">Invalid JSON: {parsedEvents.error}</div>
+                    {/if}
+
+                    <div class="preview-section-label">Actions</div>
+                    {#if parsedActions.ok}
+                      {#if parsedActions.value.length}
+                        <div class="space-y-1">
+                          {#each parsedActions.value as a}
+                            <div class="preview-action">
+                              <span class="preview-action-type">{a.type || '?'}</span>
+                              {#if a.params && Object.keys(a.params).length}
+                                <pre class="preview-action-params">{JSON.stringify(a.params, null, 2)}</pre>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      {:else}
+                        <div class="preview-muted">alert-only (no actions)</div>
+                      {/if}
+                    {:else}
+                      <div class="preview-error">Invalid JSON: {parsedActions.error}</div>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Form fields -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="field-label">Name</label>
+                  <input bind:value={editForm.name} class="field-input" />
+                </div>
+                <div>
+                  <label class="field-label">Description</label>
+                  <input bind:value={editForm.description} class="field-input" />
+                </div>
+                <div>
+                  <label class="field-label">Scope</label>
+                  <select bind:value={editForm.scope} class="field-input">
+                    <option value="per_account">Per Account</option>
+                    <option value="total">Total Only</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Schedule</label>
+                  <select bind:value={editForm.schedule} class="field-input">
+                    <option value="market_hours">Market Hours</option>
+                    <option value="always">Always</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Cooldown (minutes)</label>
+                  <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div>
+                  <label class="field-label">Conditions (JSON)</label>
+                  <textarea bind:value={editForm.conditions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">Events (JSON)</label>
+                  <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">Actions (JSON)</label>
+                  <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+              </div>
+
+              {#if validationErrors.length}
+                <div class="mt-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.6rem] border border-red-500/40">
+                  <div class="font-semibold mb-1">Condition validation failed:</div>
+                  <ul class="list-disc ml-4">{#each validationErrors as err}<li>{err}</li>{/each}</ul>
+                </div>
+              {:else if validationGrammar}
+                <div class="mt-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.6rem] border border-emerald-500/30">
+                  Validated — ready to save.
+                </div>
+              {/if}
+
+              <div class="flex gap-2 mt-3">
+                <button onclick={async () => { await runValidation(); }}
+                  class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
+                  Validate
+                </button>
+                <button onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
+                <button onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
+                  class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
+              </div>
             </div>
-            <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
-              <span class="text-[#7e97b8]">Alert via:</span> {channelSummary(agent.events)}
-              <span class="mx-1 text-[#7e97b8]">|</span>
-              <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
+          {:else}
+            <!-- ──────── Normal expanded view ──────── -->
+            <div class="px-2 pb-2 border-t border-white/5">
+              {#if agent.description}
+                <div class="text-[0.6rem] text-[#c8d8f0]/60 italic mt-1.5 mb-1">{agent.description}</div>
+              {/if}
+
+              <!-- Condition tree (always shown; falls back to text summary when parse fails) -->
+              <div class="preview-section-label mt-1">Condition</div>
+              {#if agent.conditions && Object.keys(agent.conditions).length}
+                <div class="preview-tree">{@render renderCondNode(agent.conditions)}</div>
+              {:else}
+                <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">no conditions</div>
+              {/if}
+
+              <div class="text-[0.6rem] text-[#c8d8f0]/75 mt-2 mb-1">
+                <span class="text-[#7e97b8]">Alert via:</span> {channelSummary(agent.events)}
+                <span class="mx-1 text-[#7e97b8]">|</span>
+                <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
+              </div>
+              <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
+                <span>
+                  Last fire: {agent.last_triggered_at?.slice(0, 16) || '—'}
+                  <span class="mx-1">|</span>
+                  Count: {agent.trigger_count}
+                  <span class="mx-1">|</span>
+                  Cooldown: {agent.cooldown_minutes}m
+                  <span class="mx-1">|</span>
+                  Scope: {agent.scope}
+                </span>
+                <button onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
+                  class="text-[#fbbf24] hover:underline">Edit</button>
+              </div>
             </div>
-            <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
-              <span>
-                Last fire: {agent.last_triggered_at?.slice(0, 16) || '—'}
-                <span class="mx-1">|</span>
-                Count: {agent.trigger_count}
-                <span class="mx-1">|</span>
-                Cooldown: {agent.cooldown_minutes}m
-                <span class="mx-1">|</span>
-                Scope: {agent.scope}
-              </span>
-              <button onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
-                class="text-[#fbbf24] hover:underline">Edit</button>
-            </div>
-          </div>
+          {/if}
         {/if}
       </div>
     {/each}
   </div>
 {/each}
-
-<!-- Recursive tree renderer for the live preview. Grammar nodes are:
-       { all: [...] } | { any: [...] } | { not: node } | { metric, scope, op, value } -->
-{#snippet renderCondNode(/** @type {any} */ node)}
-  {#if !node || typeof node !== 'object'}
-    <div class="tree-leaf">{JSON.stringify(node)}</div>
-  {:else if Array.isArray(node.all)}
-    <div class="tree-node tree-node-all">
-      <div class="tree-op">ALL</div>
-      <div class="tree-children">
-        {#each node.all as child}{@render renderCondNode(child)}{/each}
-      </div>
-    </div>
-  {:else if Array.isArray(node.any)}
-    <div class="tree-node tree-node-any">
-      <div class="tree-op">ANY</div>
-      <div class="tree-children">
-        {#each node.any as child}{@render renderCondNode(child)}{/each}
-      </div>
-    </div>
-  {:else if node.not !== undefined}
-    <div class="tree-node tree-node-not">
-      <div class="tree-op">NOT</div>
-      <div class="tree-children">{@render renderCondNode(node.not)}</div>
-    </div>
-  {:else}
-    <div class="tree-leaf">{leafLabel(node)}</div>
-  {/if}
-{/snippet}
-
-<!-- Agent Editor (inline) -->
-{#if editing}
-  <div id="agent-editor" class="algo-status-card p-4 mb-4" data-status="inactive">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-baseline gap-2">
-        <h3 class="section-heading">Editing agent</h3>
-        <span class="text-[0.65rem] font-mono px-2 py-0.5 rounded bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/40">{editing}</span>
-      </div>
-      <button onclick={() => editing = null} class="text-xs text-muted hover:text-text">Cancel</button>
-    </div>
-
-    <!-- Live preview lives at the TOP of the editor so it is always visible,
-         even on narrow screens where the textareas would otherwise push it
-         below the fold. Driven by $derived parsed state — every keystroke
-         in the form flows through to this tree. -->
-    <div class="agent-preview agent-preview-top mb-4">
-      <div class="preview-heading">Live preview</div>
-
-      <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3">
-        <!-- Left of preview: header + condition tree -->
-        <div>
-          <div class="preview-header">
-            <div class="preview-title">{editForm.name || '(unnamed agent)'}</div>
-            {#if editForm.description}
-              <div class="preview-desc">{editForm.description}</div>
-            {/if}
-            <div class="preview-meta">
-              Scope: <b>{editForm.scope}</b>
-              <span class="preview-sep">|</span>
-              Schedule: <b>{editForm.schedule}</b>
-              <span class="preview-sep">|</span>
-              Cooldown: <b>{editForm.cooldown_minutes}m</b>
-            </div>
-          </div>
-          <div class="preview-section-label">Condition tree</div>
-          {#if parsedConditions.ok}
-            <div class="preview-tree">
-              {@render renderCondNode(parsedConditions.value)}
-            </div>
-          {:else}
-            <div class="preview-error">Invalid JSON: {parsedConditions.error}</div>
-          {/if}
-        </div>
-
-        <!-- Right of preview: notify + actions -->
-        <div>
-          <div class="preview-section-label">Notify</div>
-          {#if parsedEvents.ok}
-            {#if parsedEvents.value.length}
-              <div class="flex flex-wrap gap-1">
-                {#each parsedEvents.value as ev}
-                  {@const on = ev.enabled !== false}
-                  <span class="preview-chip {on ? 'chip-on' : 'chip-off'}">
-                    {ev.channel || '?'}{on ? '' : ' (off)'}
-                  </span>
-                {/each}
-              </div>
-            {:else}
-              <div class="preview-muted">no channels configured</div>
-            {/if}
-          {:else}
-            <div class="preview-error">Invalid JSON: {parsedEvents.error}</div>
-          {/if}
-
-          <div class="preview-section-label">Actions</div>
-          {#if parsedActions.ok}
-            {#if parsedActions.value.length}
-              <div class="space-y-1">
-                {#each parsedActions.value as a}
-                  <div class="preview-action">
-                    <span class="preview-action-type">{a.type || '?'}</span>
-                    {#if a.params && Object.keys(a.params).length}
-                      <pre class="preview-action-params">{JSON.stringify(a.params, null, 2)}</pre>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="preview-muted">alert-only (no actions)</div>
-            {/if}
-          {:else}
-            <div class="preview-error">Invalid JSON: {parsedActions.error}</div>
-          {/if}
-        </div>
-      </div>
-    </div>
-
-    <!-- Form fields below the preview -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div>
-        <label class="field-label">Name</label>
-        <input bind:value={editForm.name} class="field-input" />
-      </div>
-      <div>
-        <label class="field-label">Description</label>
-        <input bind:value={editForm.description} class="field-input" />
-      </div>
-      <div>
-        <label class="field-label">Scope</label>
-        <select bind:value={editForm.scope} class="field-input">
-          <option value="per_account">Per Account</option>
-          <option value="total">Total Only</option>
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Schedule</label>
-        <select bind:value={editForm.schedule} class="field-input">
-          <option value="market_hours">Market Hours</option>
-          <option value="always">Always</option>
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Cooldown (minutes)</label>
-        <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
-      </div>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-      <div>
-        <label class="field-label">Conditions (JSON)</label>
-        <textarea bind:value={editForm.conditions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-      </div>
-      <div>
-        <label class="field-label">Events (JSON)</label>
-        <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-      </div>
-      <div>
-        <label class="field-label">Actions (JSON)</label>
-        <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-      </div>
-    </div>
-    <!-- Validation feedback — v2 trees run through the grammar registry;
-         v1 trees are accepted as-is and flow through the legacy evaluator. -->
-    {#if validationErrors.length}
-      <div class="mt-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.6rem] border border-red-500/40">
-        <div class="font-semibold mb-1">Condition validation failed ({validationGrammar || '?'}):</div>
-        <ul class="list-disc ml-4">
-          {#each validationErrors as err}<li>{err}</li>{/each}
-        </ul>
-      </div>
-    {:else if validationGrammar}
-      <div class="mt-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.6rem] border border-emerald-500/30">
-        Validated as {validationGrammar} — ready to save.
-      </div>
-    {/if}
-
-    <div class="flex gap-2 mt-3">
-      <button onclick={async () => { await runValidation(); }}
-        class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
-        Validate
-      </button>
-      <button onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
-      <button onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
-        class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
-    </div>
-  </div>
-{/if}
 
 <style>
   /* Live-preview styling — compact, dense, matches algo dark palette. */
