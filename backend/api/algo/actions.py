@@ -97,3 +97,61 @@ async def _action_place_order(context: dict, params: dict):
         quantity=params.get("quantity", 0),
         cfg=cfg,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  NEW-GRAMMAR ACTION HANDLERS
+#
+#  Referenced by dotted path from the grammar_tokens seed (see grammar.py).
+#  Each handler has the signature (ctx, params) → result dict.
+#  Stubs at this phase — they log the invocation so the pipeline can be
+#  exercised end-to-end before real broker calls land.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _log_invoke(action: str, params: dict) -> dict:
+    logger.info(f"Agent action invoked: {action} params={params}")
+    return {"action": action, "status": "logged", "params": params}
+
+
+async def place_order(ctx, params: dict) -> dict:
+    """Place a new broker order — wiring pending full action-runner landing."""
+    return _log_invoke("place_order", params)
+
+
+async def modify_order(ctx, params: dict) -> dict:
+    return _log_invoke("modify_order", params)
+
+
+async def cancel_order(ctx, params: dict) -> dict:
+    return _log_invoke("cancel_order", params)
+
+
+async def cancel_all_orders(ctx, params: dict) -> dict:
+    return _log_invoke("cancel_all_orders", params)
+
+
+async def chase_close_positions(ctx, params: dict) -> dict:
+    """
+    Close every open position in scope via the adaptive chase engine.
+    Delegates to ExpiryEngine primitives once the action runner lands.
+    """
+    return _log_invoke("chase_close_positions", params)
+
+
+async def monitor_order(ctx, params: dict) -> dict:
+    return _log_invoke("monitor_order", params)
+
+
+async def deactivate_agent(ctx, params: dict) -> dict:
+    return _log_invoke("deactivate_agent", params)
+
+
+async def set_flag(ctx, params: dict) -> dict:
+    return _log_invoke("set_flag", params)
+
+
+async def emit_log(ctx, params: dict) -> dict:
+    level   = (params.get("level") or "info").lower()
+    message = params.get("message", "")
+    getattr(logger, level, logger.info)(f"Agent emit_log: {message}")
+    return {"action": "emit_log", "status": "logged", "level": level, "message": message}

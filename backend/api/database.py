@@ -55,6 +55,12 @@ async def init_db() -> None:
     from backend.api.algo.grammar import seed_grammar_tokens
     await seed_grammar_tokens()
 
+    # Load the grammar dispatch table — resolves every is_active token's
+    # resolver path into an importable callable. Called again whenever the
+    # admin edits a token (future UI endpoint).
+    from backend.api.algo.grammar_registry import REGISTRY
+    await REGISTRY.reload()
+
     # Seed built-in agents
     from backend.api.algo.agent_engine import seed_agents
     await seed_agents()
