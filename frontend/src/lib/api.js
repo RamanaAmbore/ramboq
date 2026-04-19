@@ -137,6 +137,12 @@ export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n
 export const fetchRecentAgentEvents = (n = 100) => _get(`/agents/events/recent?n=${n}`, { auth: true });
 export const createAgent      = (payload) => _post('/agents/', payload, { auth: true });
 
+// Dry-validate a condition tree against the grammar registry. Returns
+// { ok: bool, errors: string[], grammar: 'v1'|'v2' }. v1 trees skip deep
+// checks since they flow through the legacy evaluator.
+export const validateAgentCondition = (condTree) =>
+  _post('/agents/validate-condition', condTree, { auth: true });
+
 export async function updateAgent(slug, payload) {
   const res = await fetch(`${BASE}/agents/${slug}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json', ..._authHeaders() },

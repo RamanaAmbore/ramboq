@@ -84,7 +84,31 @@
     };
   }
 
+  let validationErrors = $state(/** @type {string[]} */([]));
+  let validationGrammar = $state('');
+
+  async function runValidation() {
+    validationErrors = []; validationGrammar = '';
+    let parsed;
+    try { parsed = JSON.parse(editForm.conditions); }
+    catch (e) { validationErrors = [`conditions JSON invalid: ${e.message}`]; return false; }
+    try {
+      const { validateAgentCondition } = await import('$lib/api');
+      const res = await validateAgentCondition(parsed);
+      validationGrammar = res.grammar || '';
+      validationErrors = res.errors || [];
+      return res.ok;
+    } catch (e) {
+      validationErrors = [e.message || 'Validation failed'];
+      return false;
+    }
+  }
+
   async function saveEdit() {
+    // Server-side validation must pass for v2 trees before we touch the
+    // agent row — v1 trees are accepted as-is.
+    const ok = await runValidation();
+    if (!ok) return;
     try {
       await updateAgent(editing, {
         name: editForm.name,
@@ -97,6 +121,7 @@
         schedule: editForm.schedule,
       });
       editing = null;
+      validationErrors = []; validationGrammar = '';
       await loadAgents();
     } catch (e) { error = e.message; }
   }
@@ -339,9 +364,29 @@
         <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
       </div>
     </div>
+    <!-- Validation feedback — v2 trees run through the grammar registry;
+         v1 trees are accepted as-is and flow through the legacy evaluator. -->
+    {#if validationErrors.length}
+      <div class="mt-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.6rem] border border-red-500/40">
+        <div class="font-semibold mb-1">Condition validation failed ({validationGrammar || '?'}):</div>
+        <ul class="list-disc ml-4">
+          {#each validationErrors as err}<li>{err}</li>{/each}
+        </ul>
+      </div>
+    {:else if validationGrammar}
+      <div class="mt-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.6rem] border border-emerald-500/30">
+        Validated as {validationGrammar} — ready to save.
+      </div>
+    {/if}
+
     <div class="flex gap-2 mt-3">
+      <button onclick={async () => { await runValidation(); }}
+        class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
+        Validate
+      </button>
       <button onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
-      <button onclick={() => editing = null} class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
+      <button onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
+        class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
     </div>
   </div>
 {/if}

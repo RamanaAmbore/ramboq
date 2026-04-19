@@ -156,6 +156,29 @@ class AgentController(Controller):
             "event_channels": EVENT_CHANNELS,
         }
 
+    @post("/validate-condition")
+    async def validate_condition(self, data: dict) -> dict:
+        """
+        Dry-check a v2 condition tree against the live Grammar Registry.
+
+        Request body shape: the condition tree itself (the same JSON that
+        will be saved into Agent.conditions).
+
+        Response:
+          { "ok": bool, "errors": [str, ...], "grammar": "v1"|"v2" }
+
+        v1 trees (legacy `field`/`operator`+`rules` shape) are accepted
+        without deep validation — they flow through the old evaluator.
+        """
+        from backend.api.algo.agent_evaluator import validate as v2_validate
+        from backend.api.algo.agent_engine import _is_v2_conditions
+
+        cond = data or {}
+        if _is_v2_conditions(cond):
+            errors = v2_validate(cond)
+            return {"ok": not errors, "errors": errors, "grammar": "v2"}
+        return {"ok": True, "errors": [], "grammar": "v1"}
+
     @get("/{slug:str}")
     async def get_agent(self, slug: str) -> AgentInfo:
         async with async_session() as session:
