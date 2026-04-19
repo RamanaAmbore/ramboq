@@ -74,29 +74,33 @@ def main():
             services_status.append(f"{svc}: unknown")
     svc_text = " | ".join(services_status)
 
+    # notify_on_startup is the single gate for the deploy message — by the time
+    # we reach here we've already confirmed it's on (or we're on prod). Telegram
+    # and email both fire if their credentials are configured; cap_in_dev.telegram
+    # / cap_in_dev.mail gate runtime alerts, not this deploy ping.
+
     # --- Telegram ---
-    if _cap("telegram"):
-        token   = sec.get("telegram_bot_token", "")
-        chat_id = sec.get("telegram_chat_id", "")
-        if token and chat_id:
-            branch_line = f"\n⚠ <b>Branch: {branch}</b>" if is_non_main else ""
-            try:
-                resp = requests.post(
-                    f"https://api.telegram.org/bot{token}/sendMessage",
-                    json={"chat_id": chat_id,
-                          "text": f"<b>Deploy OK{branch_tag}</b>{branch_line}\n{ts}\n<code>{svc_text}</code>",
-                          "parse_mode": "HTML"},
-                    timeout=10,
-                )
-                if resp.ok:
-                    print("notify_deploy: Telegram sent")
-                else:
-                    errors.append(f"Telegram failed {resp.status_code}: {resp.text[:100]}")
-            except Exception as e:
-                errors.append(f"Telegram error: {e}")
+    token   = sec.get("telegram_bot_token", "")
+    chat_id = sec.get("telegram_chat_id", "")
+    if token and chat_id:
+        branch_line = f"\n⚠ <b>Branch: {branch}</b>" if is_non_main else ""
+        try:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id,
+                      "text": f"<b>Deploy OK{branch_tag}</b>{branch_line}\n{ts}\n<code>{svc_text}</code>",
+                      "parse_mode": "HTML"},
+                timeout=10,
+            )
+            if resp.ok:
+                print("notify_deploy: Telegram sent")
+            else:
+                errors.append(f"Telegram failed {resp.status_code}: {resp.text[:100]}")
+        except Exception as e:
+            errors.append(f"Telegram error: {e}")
 
     # --- Email ---
-    if _cap("mail"):
+    if True:
         smtp_server   = sec.get("smtp_server", "")
         smtp_port     = int(sec.get("smtp_port", 587))
         smtp_user     = sec.get("smtp_user", "")
