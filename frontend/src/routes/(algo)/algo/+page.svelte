@@ -159,6 +159,44 @@
     return events.filter(e => e.enabled).map(e => e.channel).join(', ');
   }
 
+  // ── Category grouping ────────────────────────────────────────────────────
+  // Derive category from slug prefix so new agents bucket automatically
+  // without needing a DB field. If the catalog grows unwieldy, promote
+  // this to an Agent column later.
+  function categoryFor(slug) {
+    if (!slug) return 'Other';
+    if (slug.startsWith('loss-') ||
+        slug === 'position_loss' || slug === 'position_loss_pct' ||
+        slug.startsWith('negative_')) return 'Loss & Risk';
+    if (slug.endsWith('_summary') || slug.includes('summary')) return 'Summaries';
+    if (slug.includes('expiry') || slug.includes('close') || slug.includes('order')) return 'Automation';
+    return 'Other';
+  }
+
+  const CATEGORY_ORDER = ['Loss & Risk', 'Summaries', 'Automation', 'Other'];
+
+  function groupedAgents() {
+    const out = {};
+    for (const a of agents) {
+      const cat = categoryFor(a.slug);
+      (out[cat] = out[cat] || []).push(a);
+    }
+    for (const cat of Object.keys(out)) {
+      out[cat].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return CATEGORY_ORDER
+      .filter(c => out[c]?.length)
+      .map(c => ({ name: c, agents: out[c] }));
+  }
+
+  let expandedSlug = $state(/** @type {string|null} */(null));
+
+  function isV2Conditions(cond) {
+    if (!cond || typeof cond !== 'object') return false;
+    if ('all' in cond || 'any' in cond || 'not' in cond) return true;
+    return 'metric' in cond && 'scope' in cond;
+  }
+
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadAll();
@@ -183,45 +221,74 @@
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
 {/if}
 
-<!-- Agent Cards Grid -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-  {#each agents as agent}
-    <div class="algo-status-card {agent.status === 'triggered' ? 'animate-pulse' : ''}" data-status={agent.status}>
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full {statusDot(agent.status)}"></span>
-          <span class="font-semibold text-xs text-[#fbbf24]">{agent.name}</span>
+<!-- Grouped agent list — compact rows, click to expand -->
+{#each groupedAgents() as group}
+  <h2 class="text-[0.6rem] font-bold uppercase tracking-wider text-[#fbbf24] mt-3 mb-1.5 border-b border-[#fbbf24]/25 pb-0.5">
+    {group.name}
+    <span class="opacity-60 font-normal ml-1">({group.agents.length})</span>
+  </h2>
+  <div class="space-y-1 mb-3">
+    {#each group.agents as agent}
+      {@const isOpen = expandedSlug === agent.slug}
+      <div class="algo-status-card {agent.status === 'triggered' ? 'animate-pulse' : ''}"
+           data-status={agent.status}
+           style="padding: 0">
+        <!-- Compact row (always visible). Div + role="button" so the inner
+             ON/OFF can stay a real <button> — nested buttons aren't valid. -->
+        <div role="button" tabindex="0"
+          onclick={() => expandedSlug = isOpen ? null : agent.slug}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); expandedSlug = isOpen ? null : agent.slug; } }}
+          class="w-full flex items-center gap-2 px-2 py-1 text-left cursor-pointer select-none">
+          <span class="w-2 h-2 rounded-full {statusDot(agent.status)} flex-shrink-0"></span>
+          <span class="text-xs text-[#fbbf24] flex-1 truncate">{agent.name}</span>
+          {#if isV2Conditions(agent.conditions)}
+            <span class="text-[0.5rem] px-1 py-0 rounded bg-[#7dd3fc]/15 text-[#7dd3fc] border border-[#7dd3fc]/30 uppercase tracking-wider flex-shrink-0">v2</span>
+          {/if}
+          <button type="button"
+            onclick={(e) => { e.stopPropagation(); toggle(agent); }}
+            class="text-[0.55rem] px-1.5 py-0 rounded font-medium border flex-shrink-0
+              {agent.status !== 'inactive'
+                ? 'bg-green-500/15 text-green-400 border-green-500/40'
+                : 'bg-slate-700/40 text-slate-400 border-slate-500/30'}">
+            {agent.status !== 'inactive' ? 'ON' : 'OFF'}
+          </button>
+          <span class="text-[#7e97b8] text-[0.65rem] flex-shrink-0">{isOpen ? '▾' : '▸'}</span>
         </div>
-        <button
-          onclick={() => toggle(agent)}
-          class="text-[0.6rem] px-2 py-0.5 rounded font-medium border
-            {agent.status !== 'inactive'
-              ? 'bg-green-500/15 text-green-400 border-green-500/40'
-              : 'bg-slate-700/40 text-slate-400 border-slate-500/30'}"
-        >{agent.status !== 'inactive' ? 'ON' : 'OFF'}</button>
-      </div>
 
-      <!-- Conditions -->
-      <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
-        <span class="text-[#7e97b8]">If:</span> {conditionSummary(agent.conditions)}
+        {#if isOpen}
+          <!-- Expanded details -->
+          <div class="px-2 pb-2 border-t border-white/5">
+            {#if agent.description}
+              <div class="text-[0.6rem] text-[#c8d8f0]/60 italic mt-1.5 mb-1">{agent.description}</div>
+            {/if}
+            <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
+              <span class="text-[#7e97b8]">If:</span>
+              <span class="font-mono">{conditionSummary(agent.conditions)}</span>
+            </div>
+            <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
+              <span class="text-[#7e97b8]">Alert via:</span> {channelSummary(agent.events)}
+              <span class="mx-1 text-[#7e97b8]">|</span>
+              <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
+            </div>
+            <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
+              <span>
+                Last fire: {agent.last_triggered_at?.slice(0, 16) || '—'}
+                <span class="mx-1">|</span>
+                Count: {agent.trigger_count}
+                <span class="mx-1">|</span>
+                Cooldown: {agent.cooldown_minutes}m
+                <span class="mx-1">|</span>
+                Scope: {agent.scope}
+              </span>
+              <button onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
+                class="text-[#fbbf24] hover:underline">Edit</button>
+            </div>
+          </div>
+        {/if}
       </div>
-
-      <!-- Channels + Actions -->
-      <div class="text-[0.6rem] text-[#c8d8f0]/75 mb-1">
-        <span class="text-[#7e97b8]">Alert:</span> {channelSummary(agent.events)}
-        <span class="mx-1 text-[#7e97b8]">|</span>
-        <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
-      </div>
-
-      <!-- Stats + Edit -->
-      <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
-        <span>Last: {agent.last_triggered_at?.slice(0, 16) || '—'} | #{agent.trigger_count}</span>
-        <button onclick={() => startEdit(agent)} class="text-[#fbbf24] hover:underline">Edit</button>
-      </div>
-    </div>
-  {/each}
-</div>
+    {/each}
+  </div>
+{/each}
 
 <!-- Agent Editor (inline) -->
 {#if editing}
