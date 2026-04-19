@@ -12,8 +12,9 @@
   import {
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
-    fetchSimOrders, fetchAgents,
+    fetchSimOrders, fetchSimTicks, fetchAgents,
   } from '$lib/api';
+  import LogPanel from '$lib/LogPanel.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
@@ -30,6 +31,40 @@
   let agentId   = $state('');
   let liveSnap  = $state(/** @type {any} */ (null));
   let refreshIv;
+
+  // ── Log panel feeds ──────────────────────────────────────────────────
+  // Mirror the feeds shown on /agents, but every list is SIMULATOR-scoped
+  // on this page: the Agent tab shows sim_mode=True agent events, the
+  // Order tab is derived from the same sim events, and the Simulator tab
+  // streams live tick price changes from the driver's rolling buffer.
+  let simLog    = $state(/** @type {any[]} */ ([]));
+  let systemLog = $state(/** @type {string[]} */ ([]));
+  let logTab    = $state('simulator');
+  // "order" log on this page is filtered sim agent-events — same pattern
+  // LogPanel uses on /agents where orderLog is agent events (filtered
+  // for order-related event types inside LogPanel itself).
+  const orderLog = $derived(events);
+
+  function authHeaders() {
+    const token = $authStore.token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function loadSimLog() {
+    try { simLog = await fetchSimTicks(100) || []; }
+    catch (_) { /* ignore — cap flag off */ }
+  }
+  async function loadSystemLog() {
+    try {
+      const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
+      if (res.ok) { const d = await res.json(); systemLog = d.lines || []; }
+    } catch (_) { /* ignore */ }
+  }
+  function loadCurrentLog() {
+    if (logTab === 'simulator') loadSimLog();
+    else if (logTab === 'system') loadSystemLog();
+    // agent / order tabs piggyback on `events` (refreshed by loadAll every 3s)
+  }
 
   async function loadAll() {
     try {
@@ -104,7 +139,9 @@
     const q = page.url.searchParams.get('agent_id');
     if (q) agentId = q;
     loadAll();
-    refreshIv = setInterval(loadAll, 3000);
+    loadSimLog();
+    loadSystemLog();
+    refreshIv = setInterval(() => { loadAll(); loadCurrentLog(); }, 3000);
   });
   onDestroy(() => { if (refreshIv) clearInterval(refreshIv); });
 </script>
@@ -314,3 +351,19 @@
     </div>
   {/if}
 </div>
+
+<!-- Shared log panel — same widget as /agents, defaulted to the Simulator
+     tab so the first thing an operator sees on this page is the live tick
+     price stream. Every tab's feed is SIMULATOR-scoped: agent = sim events,
+     order = sim events filtered client-side, simulator = tick diffs,
+     system = API log tail. -->
+<LogPanel
+  heightClass="h-[40vh]"
+  initialTab={logTab}
+  cmdHistory={[]}
+  {orderLog}
+  agentLog={events}
+  {systemLog}
+  {simLog}
+  onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
+/>
