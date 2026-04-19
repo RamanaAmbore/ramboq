@@ -304,11 +304,8 @@
   </button>
 </div>
 
-<h2 class="section-heading">Fund Balances</h2>
-<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
-
 {#if accounts.length > 0}
-<div class="acct-selector-row">
+<div class="acct-selector-row mb-3">
   <select bind:value={selectedAccount} class="acct-select">
     <option value="all">All Accounts</option>
     {#each accounts as acct}
@@ -317,6 +314,9 @@
   </select>
 </div>
 {/if}
+
+<h2 class="section-heading">Fund Balances</h2>
+<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
 <div class="flex gap-0.5 mb-3">
   {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
