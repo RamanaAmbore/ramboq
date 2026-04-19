@@ -10,11 +10,18 @@ aligned with the daily market-report refresh. Gated by is_enabled('market_feed')
 import asyncio
 import re
 import threading
-import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
+
+# Force IPv4 for outbound requests — the server's IPv6 /48 can reach Kite but
+# hangs on public internet hosts. Matches the override already applied in
+# alert_utils.py so anything using requests/urllib3 goes over IPv4.
+import urllib3.util.connection as _urllib3_conn
+_urllib3_conn.HAS_IPV6 = False
+
+import requests
 
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
@@ -187,13 +194,12 @@ _FEED_TIMEOUT = 4  # seconds per feed — slow publishers get dropped from this 
 
 
 def _fetch_one_feed(url: str) -> list[tuple[datetime, dict]]:
-    req = urllib.request.Request(url, headers={
+    r = requests.get(url, headers={
         "User-Agent": _UA,
         "Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.5",
-    })
-    with urllib.request.urlopen(req, timeout=_FEED_TIMEOUT) as r:
-        data = r.read()
-    root = ET.fromstring(data)
+    }, timeout=_FEED_TIMEOUT)
+    r.raise_for_status()
+    root = ET.fromstring(r.content)
     out: list[tuple[datetime, dict]] = []
     for item in list(root.iterfind(".//item"))[:40]:
         title = (item.findtext("title") or "").strip()
