@@ -73,6 +73,28 @@ _STUB_RE = re.compile(
 _MIN_TITLE_CHARS = 40  # headlines shorter than this are usually just labels
 _MIN_TITLE_WORDS = 5
 
+# US-centric markers — indicate the story is about US markets/companies.
+_US_RE = re.compile(
+    r'\b(wall\s+street|s&p\s*500|nasdaq|dow\s+jones|dow\s+industrial|'
+    r'us\s+(stocks?|market|tech|economy|gdp|inflation|jobs)|'
+    r'federal\s+reserve|fomc|jerome\s+powell|janet\s+yellen|'
+    r'tesla|apple|microsoft|nvidia|alphabet|google|meta|amazon|netflix|'
+    r'pentagon|white\s+house|washington\s+(dc|\.\s+c\.)|'
+    r'biden|trump|harris|secretary\s+of\s+(state|treasury))\b',
+    re.IGNORECASE,
+)
+
+# India-relevant markers — if any of these appear, keep the story even when
+# it also mentions the US (the US angle is then Indian-market-relevant).
+_IN_RE = re.compile(
+    r'\b(nifty|sensex|nse|bse|nfo|sebi|rbi|reserve\s+bank|indian|india|'
+    r'mumbai|delhi|bengaluru|chennai|hyderabad|kolkata|pune|'
+    r'\brupee\b|\binr\b|fii|dii|dalal\s+street|'
+    r'tata|reliance|adani|infosys|wipro|hdfc|icici|sbi|bajaj|mahindra|'
+    r'ambani|modi|sitharaman|ministry\s+of\s+finance)\b',
+    re.IGNORECASE,
+)
+
 
 def _is_low_info(title: str) -> bool:
     """Drop headlines that carry no substantive information."""
@@ -82,6 +104,9 @@ def _is_low_info(title: str) -> bool:
     # Question-mark headlines are almost always speculative/clickbait ("Will Nifty
     # hit 30,000?") — drop them.
     if '?' in t:
+        return True
+    # US-only stories with no Indian-market angle — skip.
+    if _US_RE.search(t) and not _IN_RE.search(t):
         return True
     # Strip trailing " - Source" suffix Google News appends, for length checks
     stripped = re.sub(r'\s+[-—|]\s+[^-—|]{1,40}$', '', t)
