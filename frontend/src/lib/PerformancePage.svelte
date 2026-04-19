@@ -304,26 +304,28 @@
   </button>
 </div>
 
-{#if accounts.length > 0}
-<div class="acct-selector-row mb-3">
-  <select bind:value={selectedAccount} class="acct-select">
-    <option value="all">All Accounts</option>
-    {#each accounts as acct}
-      <option value={acct}>{maskAccounts ? acct.replace(/\d/g, '#') : acct}</option>
+<div class="tabs-row mb-3">
+  <div class="flex gap-0.5">
+    {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
+      <button
+        class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+               {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
+        onclick={() => switchTab(id)}
+      >{label}</button>
     {/each}
-  </select>
+  </div>
+  {#if accounts.length > 0}
+    <select bind:value={selectedAccount} class="acct-select">
+      <option value="all">All Accounts</option>
+      {#each accounts as acct}
+        <option value={acct}>{maskAccounts ? acct.replace(/\d/g, '#') : acct}</option>
+      {/each}
+    </select>
+  {/if}
 </div>
-{/if}
 
-<div class="flex gap-0.5 mb-3">
-  {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
-    <button
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
-             {activeTab === id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-text'}"
-      onclick={() => switchTab(id)}
-    >{label}</button>
-  {/each}
-</div>
+<h2 class="section-heading">Fund Balances</h2>
+<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
 <section class:hidden={activeTab !== 'positions'}>
   <h2 class="section-heading">Summary</h2>
@@ -341,9 +343,6 @@
   <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
-<h2 class="section-heading mt-4">Fund Balances</h2>
-<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
-
 {#if orderRow}
   <OrderPopup
     row={orderRow}
@@ -358,12 +357,13 @@
 <style>
   .hidden { display: none; }
 
-  .acct-selector-row {
+  /* Tabs + account selector on the same row. Tabs left, dropdown right
+     after the Holdings tab with a small gap so they don't crowd. */
+  .tabs-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.6rem;
-    padding: 0;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
   .acct-select {
     font-size: 0.65rem;
