@@ -258,6 +258,9 @@ async def _fetch_and_accumulate() -> NewsResponse:
 
     try:
         async with async_session() as s:
+            # Purge any previously-stored rows whose titles contain '?'
+            # (speculative/clickbait) so the feed stays clean.
+            await s.execute(delete(NewsHeadline).where(NewsHeadline.title.like('%?%')))
             if fresh:
                 # Exact-link dedupe against what's already stored.
                 existing_links = await s.execute(
