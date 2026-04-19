@@ -153,6 +153,7 @@ export const runSimCycle          = () => _post('/test/run-cycle', {}, { auth: t
 export const clearSimArtefacts    = () => _post('/test/clear', {}, { auth: true });
 export const fetchSimEvents       = (n = 50) => _get(`/test/events/recent?limit=${n}`, { auth: true });
 export const fetchSimOrders       = (n = 50) => _get(`/test/orders/recent?limit=${n}`, { auth: true });
+export const fetchSimTicks        = (n = 100) => _get(`/test/ticks/recent?limit=${n}`, { auth: true });
 
 export async function updateAgent(slug, payload) {
   const res = await fetch(`${BASE}/agents/${slug}`, {

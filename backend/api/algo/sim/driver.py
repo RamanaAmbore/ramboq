@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
@@ -36,6 +37,7 @@ logger = get_logger(__name__)
 
 SCENARIOS_PATH = Path(__file__).parent / "scenarios.yaml"
 AUTO_STOP_AFTER = timedelta(minutes=30)
+TICK_LOG_LIMIT = 200
 
 
 class SimGuardError(RuntimeError):
@@ -127,6 +129,9 @@ class SimDriver:
         self._holdings_rows: list[dict] = []
         self._positions_rows: list[dict] = []
         self._margins_rows: list[dict] = []
+        # Rolling buffer of recent ticks, surfaced via /api/test/ticks/recent
+        # so the Simulator log tab can render a live timeline.
+        self._tick_log: deque[dict] = deque(maxlen=TICK_LOG_LIMIT)
 
     @classmethod
     def instance(cls) -> "SimDriver":
@@ -185,6 +190,13 @@ class SimDriver:
         self._holdings_rows  = copy.deepcopy(scen.get("initial", {}).get("holdings", []))
         self._positions_rows = copy.deepcopy(scen.get("initial", {}).get("positions", []))
         self._margins_rows   = copy.deepcopy(scen.get("initial", {}).get("margins", []))
+        self._tick_log.clear()
+        self._record_tick(
+            kind="started",
+            patch={},
+            changes=[],
+            note=f"Scenario loaded: {scenario_slug} @ {self.rate_ms}ms",
+        )
         self.active = True
         logger.warning(f"[TEST] Sim started: {scenario_slug} @ {rate_ms}ms")
         self._task = asyncio.create_task(self._run_loop(), name="sim-driver")
@@ -197,6 +209,12 @@ class SimDriver:
         if self._task and not self._task.done():
             self._task.cancel()
         self._task = None
+        self._record_tick(
+            kind="stopped",
+            patch={},
+            changes=[],
+            note=f"Stopped after {self.tick_index} ticks",
+        )
         logger.warning(f"[TEST] Sim stopped after {self.tick_index} ticks")
         return self.snapshot()
 
@@ -267,18 +285,22 @@ class SimDriver:
         if not ticks:
             return
         tick = ticks[self.tick_index % len(ticks)]
-        self._apply_patch(tick.get("patch") or {})
+        patch = tick.get("patch") or {}
+        changes = self._apply_patch(patch)
         self.tick_index += 1
+        self._record_tick(kind="tick", patch=patch, changes=changes)
 
-    def _apply_patch(self, patch: dict) -> None:
+    def _apply_patch(self, patch: dict) -> list[dict]:
         """
-        Apply a flat-dotted-key patch to the running state.
+        Apply a flat-dotted-key patch to the running state and return a list
+        of diff entries (one per key that actually changed) for the tick log.
 
         Keys look like:
           holdings.<account>.<col>
           positions.<account>.<col>
           margins.<account>.<col>
         """
+        changes: list[dict] = []
         for key, val in patch.items():
             parts = key.split(".", 2)
             if len(parts) != 3:
@@ -295,11 +317,38 @@ class SimDriver:
                 continue
             match = next((r for r in rows if r.get("account") == account), None)
             if match is None:
-                # Auto-create the row if the scenario omitted it. Pragmatic —
-                # lets operators bring in a new account mid-scenario.
+                # Auto-create the row if the scenario omitted it.
                 match = {"account": account}
                 rows.append(match)
+            prev = match.get(col)
             match[col] = val
+            changes.append({
+                "section": section,
+                "account": account,
+                "col":     col,
+                "prev":    prev,
+                "next":    val,
+                "delta":   (val - prev) if isinstance(prev, (int, float)) and isinstance(val, (int, float)) else None,
+            })
+        return changes
+
+    def _record_tick(self, *, kind: str, patch: dict, changes: list[dict],
+                     note: str = "") -> None:
+        """Append a row to the tick log. `kind` is tick / started / stopped."""
+        self._tick_log.append({
+            "ts":           datetime.now().isoformat(timespec="seconds"),
+            "tick_index":   self.tick_index,
+            "scenario":     self.scenario_slug,
+            "kind":         kind,
+            "patch":        patch,
+            "changes":      changes,
+            "note":         note,
+        })
+
+    def recent_ticks(self, limit: int = 100) -> list[dict]:
+        """Return the most recent `limit` ticks (oldest-first)."""
+        limit = max(1, min(int(limit), TICK_LOG_LIMIT))
+        return list(self._tick_log)[-limit:]
 
     # ── convenience ────────────────────────────────────────────────────────
 

@@ -186,6 +186,16 @@ class TestController(Controller):
             for r in rows
         ]
 
+    @get("/ticks/recent")
+    async def recent_ticks(self, limit: Optional[int] = 100) -> list[dict]:
+        """
+        Rolling buffer of recent simulator ticks (oldest-first). Returned
+        entries include the patch applied and a per-field diff so the UI
+        can render a compact timeline. Empty when no sim has run since
+        process start.
+        """
+        return get_driver().recent_ticks(int(limit or 100))
+
     @get("/orders/recent")
     async def recent_orders(self, limit: Optional[int] = 50) -> list[TestOrderInfo]:
         limit = max(1, min(int(limit or 50), 500))

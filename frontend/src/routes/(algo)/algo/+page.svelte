@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
-  import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents } from '$lib/api';
+  import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents, fetchSimTicks } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
   let agents      = $state([]);
@@ -12,6 +12,7 @@
   let logTab      = $state('agent');
   let systemLog   = $state([]);
   let orderLog    = $state([]);
+  let simLog      = $state(/** @type {any[]} */ ([]));
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
@@ -51,15 +52,26 @@
     } catch (e) { /* ignore */ }
   }
 
+  async function loadSimLog() {
+    // Polled every few seconds while the Simulator tab is visible so the
+    // sim's tick timeline stays roughly live. Silently ignores failures
+    // (sim endpoint 400s on prod / when sim_mode is off).
+    try {
+      const data = await fetchSimTicks(100);
+      simLog = Array.isArray(data) ? data : [];
+    } catch (e) { /* ignore */ }
+  }
+
   function loadCurrentLog() {
     if (logTab === 'agent') loadAgentLog();
     else if (logTab === 'system') loadSystemLog();
     else if (logTab === 'order') loadOrderLog();
+    else if (logTab === 'simulator') loadSimLog();
   }
 
   async function loadAll() {
     loading = true;
-    await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog()]);
+    await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog(), loadSimLog()]);
     loading = false;
   }
 
@@ -585,5 +597,6 @@
   {orderLog}
   agentLog={agentEvents}
   {systemLog}
+  {simLog}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />
