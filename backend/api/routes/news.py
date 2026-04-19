@@ -94,8 +94,17 @@ async def _maybe_reset() -> None:
             logger.error(f"News: reset failed: {e}")
 
 
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+)
+
+
 def _fetch_one_feed(url: str) -> list[tuple[datetime, dict]]:
-    req = urllib.request.Request(url, headers={"User-Agent": "RamboQuant/1.0"})
+    req = urllib.request.Request(url, headers={
+        "User-Agent": _UA,
+        "Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.5",
+    })
     with urllib.request.urlopen(req, timeout=8) as r:
         data = r.read()
     root = ET.fromstring(data)
