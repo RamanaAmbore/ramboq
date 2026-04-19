@@ -37,15 +37,22 @@ def main():
         sys.exit(1)
 
     branch = cfg.get("deploy_branch", "main")
-    caps = cfg.get("cap_in_dev") or {}
-    # Prod (main): always notify. Dev: gated by cap_in_dev.notify_on_startup.
-    if branch != "main":
-        enabled = bool(caps.get("notify_on_startup", False)) if isinstance(caps, dict) else bool(caps)
-        if not enabled:
-            print("notify_deploy: skipped — notify_on_startup disabled for this environment")
-            return
     is_non_main = branch != "main"
     branch_tag = f" [{branch}]" if is_non_main else ""
+    caps = cfg.get("cap_in_dev") or {}
+    if not isinstance(caps, dict):
+        caps = {}
+
+    # Per-channel enable logic — prod (main) always on, dev gated by cap_in_dev.
+    def _cap(name: str) -> bool:
+        if not is_non_main:
+            return True
+        return bool(caps.get(name, False))
+
+    # Skip entirely on dev when notify_on_startup is off.
+    if is_non_main and not _cap("notify_on_startup"):
+        print("notify_deploy: skipped — notify_on_startup disabled for this environment")
+        return
 
     ts = _timestamp()
     errors = []
@@ -68,7 +75,7 @@ def main():
     svc_text = " | ".join(services_status)
 
     # --- Telegram ---
-    if cfg.get("telegram", False):
+    if _cap("telegram"):
         token   = sec.get("telegram_bot_token", "")
         chat_id = sec.get("telegram_chat_id", "")
         if token and chat_id:
@@ -89,7 +96,7 @@ def main():
                 errors.append(f"Telegram error: {e}")
 
     # --- Email ---
-    if cfg.get("mail", False):
+    if _cap("mail"):
         smtp_server   = sec.get("smtp_server", "")
         smtp_port     = int(sec.get("smtp_port", 587))
         smtp_user     = sec.get("smtp_user", "")
