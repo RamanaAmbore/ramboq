@@ -1,9 +1,10 @@
 """
 Alert utilities — market open/close summaries and intra-day P&L alerts.
 
-Message type prefixes:
-  Telegram subject : Open | Alert | Close
-  Email subject    : RamboQuant Open: | RamboQuant Alert: | RamboQuant Close:
+Message type prefixes (we use "Agent" rather than "Alert" so the user-facing
+wording matches the framework vocabulary: an agent fires → one message):
+  Telegram subject : Open | Agent | Close
+  Email subject    : RamboQuant Open: | RamboQuant Agent: | RamboQuant Close:
 
 ───────────────────────────────────────────────────────────────────────────────
   INTRA-DAY ALERT SYSTEM
@@ -121,7 +122,7 @@ logger = get_logger(__name__)
 
 _MSG_TYPES = {
     'open':  ('Open Summary',  'RamboQuant Open Summary: '),
-    'alert': ('Alert',          'RamboQuant Alert: '),
+    'alert': ('Agent',          'RamboQuant Agent: '),
     'close': ('Close Summary',  'RamboQuant Close Summary: '),
 }
 

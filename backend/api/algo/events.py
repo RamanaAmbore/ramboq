@@ -45,7 +45,7 @@ async def dispatch(agent, eval_result, broadcast_fn=None):
         f"Condition: {condition_text}",
     ]
     telegram_body = "\n".join(body_lines)
-    email_subject = f"RamboQuant Alert{branch_tag}: {agent.name}"
+    email_subject = f"RamboQuant Agent{branch_tag}: {agent.name}"
     email_body = (
         f"<html><body style='font-family:sans-serif'>"
         + (f"<p style='padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px'>"
