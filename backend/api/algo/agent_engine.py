@@ -178,7 +178,7 @@ def _v2_match_to_alertrow(match: dict) -> dict:
     )
 
 
-async def _v2_send_rich_alert(agent, matches, now, test_mode: bool = False):
+async def _v2_send_rich_alert(agent, matches, now, sim_mode: bool = False):
     """
     Render the v2 alert as the same narrow-TG + HTML-table format the legacy
     engine uses, and send through Telegram + email via alert_utils's own
@@ -207,7 +207,7 @@ async def _v2_send_rich_alert(agent, matches, now, test_mode: bool = False):
     subject    = f"Agent {agent.slug}"
     try:
         _dispatch('alert', timestamp_display(), tg_body, email_html, subject,
-                  test_mode=test_mode)
+                  sim_mode=sim_mode)
     except Exception as e:
         logger.error(f"Agent [{agent.slug}] rich alert send failed: {e}")
         return False
@@ -526,23 +526,39 @@ def _build_context(now) -> dict:
     return ctx
 
 
-async def run_cycle(context: dict, broadcast_fn=None):
+async def run_cycle(context: dict, broadcast_fn=None,
+                    only_agent_ids: list[int] | None = None,
+                    bypass_schedule: bool = False):
     """
     Main agent evaluation cycle. Called from background.py every refresh.
 
     Args:
         context: dict with sum_holdings, sum_positions, df_margins, now, seg_state
         broadcast_fn: WebSocket broadcast function
+        only_agent_ids: when non-empty, restrict evaluation to these agent
+                        IDs and include them regardless of `status` — lets the
+                        simulator dry-run an inactive agent without flipping
+                        it on globally.
+        bypass_schedule: when True, ignore each agent's `schedule` field (so a
+                         `market_hours` agent still runs outside market
+                         hours). Used by the simulator.
     """
     now = context.get("now")
     if not now:
         return
 
-    # Load active agents
+    # Load agents. For isolated runs (simulator "Run in Simulator") we accept
+    # any status so an operator can dry-fire an inactive agent. For the
+    # normal cycle we stick to active/cooldown rows.
     async with async_session() as session:
-        result = await session.execute(
-            select(Agent).where(Agent.status.in_(["active", "cooldown"]))
-        )
+        if only_agent_ids:
+            result = await session.execute(
+                select(Agent).where(Agent.id.in_(only_agent_ids))
+            )
+        else:
+            result = await session.execute(
+                select(Agent).where(Agent.status.in_(["active", "cooldown"]))
+            )
         agents = result.scalars().all()
 
     if not agents:
@@ -558,11 +574,13 @@ async def run_cycle(context: dict, broadcast_fn=None):
     any_market_open = nse_open_flag or mcx_open_flag
 
     for agent in agents:
-        # Enforce schedule: "market_hours" agents only run while some market is open
-        if agent.schedule == "market_hours" and not any_market_open:
+        # Enforce schedule: "market_hours" agents only run while some market
+        # is open — unless the caller asked to bypass (isolated sim test).
+        if (not bypass_schedule
+                and agent.schedule == "market_hours" and not any_market_open):
             continue
-        # Check cooldown
-        if agent.status == "cooldown":
+        # Check cooldown (also skippable during isolated sim runs)
+        if agent.status == "cooldown" and not bypass_schedule:
             if agent.last_triggered_at:
                 elapsed = (datetime.now(timezone.utc) - agent.last_triggered_at).total_seconds() / 60
                 if elapsed < agent.cooldown_minutes:
@@ -573,19 +591,22 @@ async def run_cycle(context: dict, broadcast_fn=None):
         # suppression are applied here rather than inside the evaluator so
         # the evaluator stays a pure tree walker.
         alert_state = context.get("alert_state") or {}
-        # `test_mode` is set by the simulator; it flows through V2Context and
+        # `sim_mode` is set by the simulator; it flows through V2Context and
         # tags every downstream artefact (Telegram, email, agent_events,
-        # algo_orders) with a TEST marker so real and simulated fires can't
-        # be confused in the logs or the group chat.
-        test_mode = bool(alert_state.get("test_mode") or context.get("test_mode"))
+        # algo_orders) with a SIMULATOR marker so real and simulated fires
+        # can't be confused in the logs or the group chat.
+        sim_mode = bool(alert_state.get("sim_mode") or context.get("sim_mode"))
         _maybe_reset_v2_state(now.date() if hasattr(now, 'date') else None)
         cfg = _v2_cfg()
         triggered = False
 
         # Baseline gate: skip every rate-based agent for the first N min
-        # of the session to avoid the opening-gap firing rate alerts.
-        if _v2_has_rate_metric(agent.conditions) and not _v2_baseline_live(
-                alert_state, now, cfg['baseline_offset_min']):
+        # of the session to avoid the opening-gap firing rate alerts. The
+        # isolated-sim path bypasses this so operators can test rate rules
+        # without waiting 15 minutes of simulated time.
+        if (not bypass_schedule
+                and _v2_has_rate_metric(agent.conditions)
+                and not _v2_baseline_live(alert_state, now, cfg['baseline_offset_min'])):
             continue
 
         v2_ctx = V2Context(
@@ -605,7 +626,9 @@ async def run_cycle(context: dict, broadcast_fn=None):
             logger.error(f"Agent [{agent.slug}] v2 evaluate failed: {e}")
             matches = []
 
-        if matches and not _v2_should_suppress(agent, matches, now, cfg):
+        # Suppression gate is also bypassed for isolated sim runs so repeated
+        # "Run in Simulator" clicks always fire.
+        if matches and (bypass_schedule or not _v2_should_suppress(agent, matches, now, cfg)):
             triggered = True
             result = _v2_build_evalresult(matches, agent.name)
             _v2_record(agent, matches, now)
@@ -617,41 +640,44 @@ async def run_cycle(context: dict, broadcast_fn=None):
             # alert_utils._dispatch. Fall back to the generic dispatch()
             # path on any failure so the log / WebSocket channel still
             # carries a record of the fire.
-            rich_sent = await _v2_send_rich_alert(agent, matches, now, test_mode=test_mode)
+            rich_sent = await _v2_send_rich_alert(agent, matches, now, sim_mode=sim_mode)
             if not rich_sent:
-                await dispatch(agent, result, broadcast_fn, test_mode=test_mode)
+                await dispatch(agent, result, broadcast_fn, sim_mode=sim_mode)
             else:
-                await log_event(agent, 'triggered', result.condition_text, test_mode=test_mode)
+                await log_event(agent, 'triggered', result.condition_text, sim_mode=sim_mode)
                 if broadcast_fn:
                     broadcast_fn('agent_alert', {
                         'slug': agent.slug,
                         'message': result.condition_text,
                         'timestamp': now.isoformat(),
-                        'test_mode': test_mode,
+                        'sim_mode': sim_mode,
                     })
 
             if agent.actions:
                 action_ctx = dict(context)
                 action_ctx["account"] = "TOTAL"
-                action_ctx["test_mode"] = test_mode
+                action_ctx["sim_mode"] = sim_mode
                 await execute(agent, agent.actions, action_ctx)
 
-        # Update state
-        async with async_session() as session:
-            if triggered:
-                await session.execute(
-                    update(Agent).where(Agent.id == agent.id).values(
-                        status="cooldown",
-                        last_triggered_at=datetime.now(timezone.utc),
-                        trigger_count=Agent.trigger_count + 1,
+        # Update state. For isolated sim runs we never mutate the agent row —
+        # the whole point is to dry-fire without leaking cooldown / trigger
+        # count into the real-market state machine.
+        if not bypass_schedule:
+            async with async_session() as session:
+                if triggered:
+                    await session.execute(
+                        update(Agent).where(Agent.id == agent.id).values(
+                            status="cooldown",
+                            last_triggered_at=datetime.now(timezone.utc),
+                            trigger_count=Agent.trigger_count + 1,
+                        )
                     )
-                )
-            elif agent.status == "cooldown":
-                await session.execute(
-                    update(Agent).where(Agent.id == agent.id).values(status="active")
-                )
-            await session.commit()
+                elif agent.status == "cooldown":
+                    await session.execute(
+                        update(Agent).where(Agent.id == agent.id).values(status="active")
+                    )
+                await session.commit()
 
-        if broadcast_fn:
-            new_status = "cooldown" if triggered else "active"
-            broadcast_fn("agent_state", {"slug": agent.slug, "status": new_status})
+            if broadcast_fn:
+                new_status = "cooldown" if triggered else "active"
+                broadcast_fn("agent_state", {"slug": agent.slug, "status": new_status})

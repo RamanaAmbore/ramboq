@@ -19,21 +19,21 @@ async def execute(agent, actions: list, context: dict):
     Args:
         agent: Agent DB row
         actions: list of action dicts from agent.actions
-        context: market data context (contains `test_mode` when fired by the
-                 simulator — used to route to the test paper-trade writer
+        context: market data context (contains `sim_mode` when fired by the
+                 simulator — used to route to the sim paper-trade writer
                  instead of the real broker)
     """
-    test_mode = bool(context.get("test_mode"))
+    sim_mode = bool(context.get("sim_mode"))
     for action in actions:
         action_type = action.get("type", "")
         params = action.get("params", {})
 
         try:
-            if test_mode:
-                # Simulation: skip the real broker, write a mode='test' row
+            if sim_mode:
+                # Simulation: skip the real broker, write a mode='sim' row
                 # into algo_orders so the operator can see exactly what the
                 # real path would have done.
-                await _test_paper_trade(agent, action_type, params, context)
+                await _sim_paper_trade(agent, action_type, params, context)
             elif action_type == "chase_close":
                 await _action_chase_close(context, params)
             elif action_type == "send_summary":
@@ -44,32 +44,32 @@ async def execute(agent, actions: list, context: dict):
                 logger.warning(f"Agent [{agent.slug}]: unknown action type '{action_type}'")
                 continue
 
-            tag = "[TEST] " if test_mode else ""
+            tag = "[SIMULATOR] " if sim_mode else ""
             logger.info(f"{tag}Agent [{agent.slug}]: action '{action_type}' completed")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_success", f"{tag}Action: {action_type}",
-                            params, test_mode=test_mode)
+                            params, sim_mode=sim_mode)
 
         except Exception as e:
-            tag = "[TEST] " if test_mode else ""
+            tag = "[SIMULATOR] " if sim_mode else ""
             logger.error(f"{tag}Agent [{agent.slug}]: action '{action_type}' failed: {e}")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_failed",
                             f"{tag}Action: {action_type} — {e}",
-                            params, test_mode=test_mode)
+                            params, sim_mode=sim_mode)
 
 
-async def _test_paper_trade(agent, action_type: str, params: dict, context: dict):
+async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict):
     """
-    Record a paper-trade row in algo_orders with mode='test' for every
-    action fired by a simulator run. Leaves no side-effect at the broker
-    — visibility only.
+    Record a paper-trade row in algo_orders with mode='sim' for every action
+    fired by a simulator run. Leaves no side-effect at the broker — visibility
+    only.
     """
     from backend.api.database import async_session
     from backend.api.models import AlgoOrder
 
-    detail = f"[TEST] agent={agent.slug} action={action_type} params={params}"
-    logger.warning(f"[TEST] paper-trade: {detail}")
+    detail = f"[SIMULATOR] agent={agent.slug} action={action_type} params={params}"
+    logger.warning(f"[SIMULATOR] paper-trade: {detail}")
 
     if action_type not in {"place_order", "chase_close", "chase_close_positions"}:
         # Non-order actions (emit_log, set_flag, monitor_order, deactivate_agent,
@@ -79,20 +79,20 @@ async def _test_paper_trade(agent, action_type: str, params: dict, context: dict
     try:
         async with async_session() as s:
             row = AlgoOrder(
-                account=str(params.get("account") or "TEST"),
+                account=str(params.get("account") or "SIM"),
                 symbol=str(params.get("symbol") or f"{agent.slug}-{action_type}"),
                 exchange=str(params.get("exchange") or "NFO"),
                 transaction_type=str(params.get("transaction_type") or "SELL"),
                 quantity=int(params.get("quantity") or 0),
                 status="simulated",
-                engine="test",
-                mode="test",
+                engine="sim",
+                mode="sim",
                 detail=detail,
             )
             s.add(row)
             await s.commit()
     except Exception as e:
-        logger.error(f"[TEST] paper-trade write failed: {e}")
+        logger.error(f"[SIMULATOR] paper-trade write failed: {e}")
 
 
 async def _action_chase_close(context: dict, params: dict):

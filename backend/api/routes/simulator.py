@@ -1,23 +1,28 @@
 """
-Market-simulation control plane — `/api/test/*`.
+Market-simulator control plane — `/api/simulator/*`.
 
-Every endpoint is admin-guarded AND additionally refuses to run on the
-`main` branch (see `SimDriver.assert_dev`). Pairs with
-`backend/api/algo/sim/driver.py` and `frontend/src/routes/(algo)/admin/test`.
+Every endpoint is admin-guarded AND additionally refuses to run when the
+per-branch capability flag is off (see `SimDriver.assert_enabled`). Pairs
+with `backend/api/algo/sim/driver.py` and
+`frontend/src/routes/(algo)/admin/simulator`.
 
 Endpoints
-  GET  /api/test/scenarios         — list available scenarios
-  GET  /api/test/status            — driver snapshot (active / tick / etc)
-  POST /api/test/start             — begin a scenario at a given cadence
-  POST /api/test/stop              — halt the sim
-  POST /api/test/step              — apply a single tick (deterministic debug)
-  POST /api/test/run-cycle         — immediately run the agent engine against
-                                     the current sim state (no waiting for the
-                                     next background tick)
-  POST /api/test/clear             — wipe test_mode rows from agent_events
-                                     and algo_orders (handy between runs)
-  GET  /api/test/events/recent     — recent test_mode agent events
-  GET  /api/test/orders/recent     — recent test_mode algo orders
+  GET  /api/simulator/scenarios           — list available scenarios
+  GET  /api/simulator/status              — driver snapshot (active / tick / etc)
+  POST /api/simulator/start               — begin a scenario at a given cadence
+  POST /api/simulator/stop                — halt the sim
+  POST /api/simulator/step                — apply a single tick (deterministic debug)
+  POST /api/simulator/run-cycle           — immediately run the agent engine against
+                                            the current sim state
+  POST /api/simulator/seed-live           — snapshot live broker data as sim baseline
+  POST /api/simulator/clear               — wipe sim_mode rows from agent_events
+                                            and algo_orders (handy between runs)
+  GET  /api/simulator/events/recent       — recent sim_mode agent events
+  GET  /api/simulator/orders/recent       — recent sim_mode algo orders
+  GET  /api/simulator/ticks/recent        — rolling buffer of recent ticks
+
+The former `/api/test/*` routes are retired — the simulator owns the
+vocabulary end-to-end now.
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ from __future__ import annotations
 from typing import Optional
 
 import msgspec
-from litestar import Controller, delete, get, post
+from litestar import Controller, get, post
 from litestar.exceptions import HTTPException
 from sqlalchemy import delete as sql_delete, desc, select
 
@@ -49,16 +54,25 @@ logger = get_logger(__name__)
 class SimStartRequest(msgspec.Struct):
     scenario: str
     rate_ms: int = 2000
+    # 'scripted' (default, use scenario.initial),
+    # 'live' (use last seed-live snapshot, no scenario initial),
+    # 'live+scenario' (snapshot + scripted initial layered on top).
+    seed_mode: str = "scripted"
+    # When non-empty, restrict the run to these agent IDs and bypass the
+    # schedule / cooldown / baseline gates so the operator can dry-fire a
+    # single agent from the /algo page.
+    agent_ids: Optional[list[int]] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
     slug: str
     name: str
     description: str
+    mode: str
     ticks: int
 
 
-class TestEventInfo(msgspec.Struct):
+class SimEventInfo(msgspec.Struct):
     id: int
     agent_id: int
     event_type: str
@@ -67,7 +81,7 @@ class TestEventInfo(msgspec.Struct):
     timestamp: str
 
 
-class TestOrderInfo(msgspec.Struct):
+class SimOrderInfo(msgspec.Struct):
     id: int
     account: str
     symbol: str
@@ -84,21 +98,19 @@ class TestOrderInfo(msgspec.Struct):
 # Controller
 # ---------------------------------------------------------------------------
 
-class TestController(Controller):
-    """Simulation control plane. Prefix keeps every endpoint easy to spot."""
+class SimulatorController(Controller):
+    """Simulator control plane. Prefix keeps every endpoint easy to spot."""
 
-    path = "/api/test"
+    path = "/api/simulator"
     guards = [admin_guard]
 
     @get("/scenarios")
     async def list_scenarios(self) -> list[SimScenarioInfo]:
         out = []
-        for s in load_scenarios():
+        for s in get_driver().scenarios_manifest():
             out.append(SimScenarioInfo(
-                slug=s.get("slug"),
-                name=s.get("name") or s.get("slug"),
-                description=s.get("description", ""),
-                ticks=len(s.get("ticks", []) or []),
+                slug=s["slug"], name=s["name"],
+                description=s["description"], mode=s["mode"], ticks=s["ticks"],
             ))
         return out
 
@@ -109,7 +121,11 @@ class TestController(Controller):
     @post("/start")
     async def start(self, data: SimStartRequest) -> dict:
         try:
-            return get_driver().start(data.scenario, data.rate_ms)
+            return get_driver().start(
+                data.scenario, data.rate_ms,
+                seed_mode=data.seed_mode,
+                only_agent_ids=data.agent_ids,
+            )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -124,13 +140,25 @@ class TestController(Controller):
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    @post("/seed-live")
+    async def seed_live(self) -> dict:
+        """
+        Snapshot live holdings + positions + margins into the driver's
+        `_live_snapshot` field so the next `start(seed_mode=live|live+scenario)`
+        uses the real book as the starting state. Bypasses the in-process
+        cache so the snapshot is fresh at the moment of the call.
+        """
+        try:
+            return get_driver().seed_live()
+        except SimGuardError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     @post("/run-cycle")
     async def run_cycle_now(self) -> dict:
         """
-        Run the agent engine's `run_cycle` immediately against the current
-        sim state. Useful for step-mode debugging — lets the operator advance
-        one tick, then ask the engine to evaluate against the mutated state
-        without waiting for the next background refresh.
+        Run the agent engine against the current sim state immediately.
+        Useful for step-mode debugging — advance one tick, then ask the
+        engine to evaluate without waiting for the next background tick.
         """
         try:
             drv = get_driver()
@@ -150,35 +178,39 @@ class TestController(Controller):
                 "seg_state":      {},
                 "segments":       [],
                 # Propagated into V2Context → picked up by _dispatch and actions
-                "alert_state":    {"test_mode": True},
-                "test_mode":      True,
+                "alert_state":    {"sim_mode": True},
+                "sim_mode":       True,
             }
-            await run_cycle(ctx, _broadcast_event)
+            await run_cycle(
+                ctx, _broadcast_event,
+                only_agent_ids=drv.only_agent_ids,
+                bypass_schedule=True,
+            )
             return {"ok": True, "sim": drv.snapshot()}
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
     @post("/clear")
-    async def clear_test_rows(self) -> dict:
-        """Delete every test_mode row from agent_events and algo_orders."""
+    async def clear_sim_rows(self) -> dict:
+        """Delete every sim_mode row from agent_events and algo_orders."""
         async with async_session() as s:
-            ev = await s.execute(sql_delete(AgentEvent).where(AgentEvent.test_mode.is_(True)))
-            od = await s.execute(sql_delete(AlgoOrder).where(AlgoOrder.mode == "test"))
+            ev = await s.execute(sql_delete(AgentEvent).where(AgentEvent.sim_mode.is_(True)))
+            od = await s.execute(sql_delete(AlgoOrder).where(AlgoOrder.mode == "sim"))
             await s.commit()
         return {"events_deleted": ev.rowcount or 0, "orders_deleted": od.rowcount or 0}
 
     @get("/events/recent")
-    async def recent_events(self, limit: Optional[int] = 50) -> list[TestEventInfo]:
+    async def recent_events(self, limit: Optional[int] = 50) -> list[SimEventInfo]:
         limit = max(1, min(int(limit or 50), 500))
         async with async_session() as s:
             rows = (await s.execute(
                 select(AgentEvent)
-                .where(AgentEvent.test_mode.is_(True))
+                .where(AgentEvent.sim_mode.is_(True))
                 .order_by(desc(AgentEvent.timestamp))
                 .limit(limit)
             )).scalars().all()
         return [
-            TestEventInfo(
+            SimEventInfo(
                 id=r.id, agent_id=r.agent_id, event_type=r.event_type,
                 trigger_condition=r.trigger_condition, detail=r.detail,
                 timestamp=r.timestamp.isoformat() if r.timestamp else "",
@@ -190,24 +222,24 @@ class TestController(Controller):
     async def recent_ticks(self, limit: Optional[int] = 100) -> list[dict]:
         """
         Rolling buffer of recent simulator ticks (oldest-first). Returned
-        entries include the patch applied and a per-field diff so the UI
+        entries include the moves applied and a per-field diff so the UI
         can render a compact timeline. Empty when no sim has run since
         process start.
         """
         return get_driver().recent_ticks(int(limit or 100))
 
     @get("/orders/recent")
-    async def recent_orders(self, limit: Optional[int] = 50) -> list[TestOrderInfo]:
+    async def recent_orders(self, limit: Optional[int] = 50) -> list[SimOrderInfo]:
         limit = max(1, min(int(limit or 50), 500))
         async with async_session() as s:
             rows = (await s.execute(
                 select(AlgoOrder)
-                .where(AlgoOrder.mode == "test")
+                .where(AlgoOrder.mode == "sim")
                 .order_by(desc(AlgoOrder.created_at))
                 .limit(limit)
             )).scalars().all()
         return [
-            TestOrderInfo(
+            SimOrderInfo(
                 id=r.id, account=r.account, symbol=r.symbol, exchange=r.exchange,
                 transaction_type=r.transaction_type, quantity=r.quantity,
                 status=r.status, engine=r.engine,

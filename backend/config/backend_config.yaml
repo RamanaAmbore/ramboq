@@ -29,10 +29,10 @@ cap_in_dev:
   mail:             False  # Email notifications (SMTP)
   notify_on_deploy: True   # Send test Telegram+email on each deploy
   market_feed:      False  # Market news feed (Google News RSS)
-  simulator:        True   # /api/test simulator (dev default: on)
+  simulator:        True   # /api/simulator market simulator (dev default: on)
 
 cap_in_prod:
-  simulator:        False  # /api/test simulator (prod default: off — never run
+  simulator:        False  # /api/simulator market simulator (prod default: off — never run
                            # fabricated market data in production)
 
 # Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap

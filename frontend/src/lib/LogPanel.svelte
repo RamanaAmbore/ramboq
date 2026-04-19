@@ -54,9 +54,10 @@
   ];
 
   // ── Simulator-tab rendering ──────────────────────────────────────────
-  // A sim tick entry from /api/test/ticks/recent looks like:
+  // A sim tick entry from /api/simulator/ticks/recent looks like:
   //   { ts, tick_index, scenario, kind: 'tick'|'started'|'stopped',
-  //     patch, changes: [{section, account, col, prev, next, delta}], note }
+  //     moves, changes: [{section, account, symbol, col, prev, next, delta}],
+  //     note }
   // Rendered as one line per tick with a color based on the magnitude of
   // the worst change (red = steep rate, yellow = static crossing, neutral).
   function _fmtVal(v) {
@@ -91,7 +92,7 @@
       return `<span class="log-chip"><span class="log-chip-key">${field}:</span>${arrow}${delta}</span>`;
     }).join(' ');
     const head = `tick ${entry.tick_index} · ${scen}`;
-    return `<span class="${cls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">TEST</span> ${head} ${diffs || '(no changes)'}</span>`;
+    return `<span class="${cls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIMULATOR</span> ${head} ${diffs || '(no changes)'}</span>`;
   }
 
   const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);
@@ -161,7 +162,7 @@
 <pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/test to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{@html newsItems.map(n => {
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{@html newsItems.map(n => {
   const safeTitle = (n.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const safeLink  = (n.link || '').replace(/"/g,'&quot;');
   const safeSrc   = (n.source || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

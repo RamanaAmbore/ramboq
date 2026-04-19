@@ -268,14 +268,15 @@ async def _task_performance(state: dict) -> None:
         if not open_segments:
             continue
 
-        # If the market simulator is running, step out of the real refresh
-        # entirely — the sim driver owns its own tick loop and calls
-        # run_cycle against fabricated data. Mixing a live Kite fetch with
-        # sim state on the same alert_state dict would corrupt rate history.
+        # If the simulator is running we still want the performance cache
+        # (and the /performance page that reads from it) to stay fresh with
+        # real Kite data — only the live run_cycle is gated off, so the
+        # fabricated sim state doesn't race with real agent fires on the
+        # same alert_state dict.
+        sim_active = False
         try:
             from backend.api.algo.sim.driver import get_driver
-            if get_driver().active:
-                continue
+            sim_active = bool(get_driver().active)
         except Exception:
             pass
 
@@ -314,30 +315,36 @@ async def _task_performance(state: dict) -> None:
             # Loss alerts are now entirely owned by the v2 agent engine below
             # (loss-* BUILTIN_AGENTS). alert_utils.check_and_alert is retired.
 
-            # Run agent engine with market data context
-            try:
-                from backend.api.algo.agent_engine import run_cycle
-                from backend.api.routes.algo import _broadcast_event
-                agent_context = {
-                    "sum_holdings": sum_holdings,
-                    "sum_positions": sum_positions,
-                    "df_margins": df_margins,
-                    "df_holdings": df_holdings,
-                    "df_positions": df_positions,
-                    "ist_display": ist_display,
-                    "now": now,
-                    "seg_state": seg_state,
-                    # alert_state is the long-lived dict owned here (pnl_history,
-                    # session_start, last_alert buckets, funds_*). Passed so the
-                    # v2 grammar evaluator in run_cycle can read rate history
-                    # and write its own suppression entries without needing a
-                    # parallel state store.
-                    "alert_state": alert_state,
-                    "segments":    segments,
-                }
-                await run_cycle(agent_context, broadcast_fn=_broadcast_event)
-            except Exception as ae:
-                logger.error(f"Background: agent engine failed: {ae}")
+            # Run agent engine with market data context — but skip entirely
+            # while the simulator is active. The sim driver owns run_cycle
+            # while it's running; mixing a live fire with a fabricated one
+            # would corrupt rate history and spam the Telegram group.
+            if sim_active:
+                logger.info("Background: simulator active — skipping real run_cycle (performance cache still fresh)")
+            else:
+                try:
+                    from backend.api.algo.agent_engine import run_cycle
+                    from backend.api.routes.algo import _broadcast_event
+                    agent_context = {
+                        "sum_holdings": sum_holdings,
+                        "sum_positions": sum_positions,
+                        "df_margins": df_margins,
+                        "df_holdings": df_holdings,
+                        "df_positions": df_positions,
+                        "ist_display": ist_display,
+                        "now": now,
+                        "seg_state": seg_state,
+                        # alert_state is the long-lived dict owned here (pnl_history,
+                        # session_start, last_alert buckets, funds_*). Passed so the
+                        # v2 grammar evaluator in run_cycle can read rate history
+                        # and write its own suppression entries without needing a
+                        # parallel state store.
+                        "alert_state": alert_state,
+                        "segments":    segments,
+                    }
+                    await run_cycle(agent_context, broadcast_fn=_broadcast_event)
+                except Exception as ae:
+                    logger.error(f"Background: agent engine failed: {ae}")
 
             # Invalidate in-process cache and push to WebSocket clients
             invalidate_all()

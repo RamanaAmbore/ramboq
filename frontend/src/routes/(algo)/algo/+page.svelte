@@ -2,7 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
-  import { fetchAgents, activateAgent, deactivateAgent, updateAgent, fetchRecentAgentEvents, fetchSimTicks } from '$lib/api';
+  import {
+    fetchAgents, activateAgent, deactivateAgent, updateAgent,
+    fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
+  } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
   let agents      = $state([]);
@@ -13,11 +16,16 @@
   let systemLog   = $state([]);
   let orderLog    = $state([]);
   let simLog      = $state(/** @type {any[]} */ ([]));
+  // Global simulator status — when active, the Agent-events panel swaps to
+  // the simulator's event stream so operators only see sim results in the
+  // algo pages while the sim is running.
+  let simActive   = $state(false);
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
   let ws;
   let refreshInterval;
+  let simStatusIv;
 
   function authHeaders() {
     const token = $authStore.token;
@@ -32,10 +40,26 @@
   }
 
   async function loadAgentLog() {
+    // Scope the Agent-events panel by simulator status: while the sim is
+    // running, show ONLY the sim's events (sim_mode=True rows). When idle,
+    // show the real stream. This way the /algo page tracks the sim end-to-end
+    // without the operator having to toggle filters manually.
     try {
-      const data = await fetchRecentAgentEvents(100);
+      const data = simActive ? await fetchSimEvents(100)
+                              : await fetchRecentAgentEvents(100);
       agentEvents = data;
     } catch (e) { /* ignore */ }
+  }
+
+  async function pollSimStatus() {
+    try {
+      const s = await fetchSimStatus();
+      const was = simActive;
+      simActive = !!s.active;
+      // When the sim flips on/off we want the events panel to swap sources
+      // immediately, not on the next 30-second refresh tick.
+      if (was !== simActive) loadAgentLog();
+    } catch (_) { /* cap flag off — treat as idle */ }
   }
 
   async function loadSystemLog() {
@@ -231,16 +255,27 @@
       .map(c => ({ name: c, agents: out[c] }));
   }
 
+  async function runInSim(/** @type {any} */ agent) {
+    // Navigate to the Simulator page pre-armed with this agent's ID. Pick a
+    // generic scenario there, hit Start — the sim will dry-fire this agent
+    // against fabricated data without touching its real cooldown / trigger
+    // state.
+    goto(`/admin/simulator?agent_id=${agent.id}`);
+  }
+
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadAll();
     connectWS();
+    pollSimStatus();
     refreshInterval = setInterval(loadAll, 30000);
+    simStatusIv     = setInterval(pollSimStatus, 4000);
   });
 
   onDestroy(() => {
     if (ws) ws.close();
     if (refreshInterval) clearInterval(refreshInterval);
+    if (simStatusIv)     clearInterval(simStatusIv);
   });
 </script>
 
@@ -249,7 +284,14 @@
 </svelte:head>
 
 <div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">Agents</h1>
+<h1 class="page-title-chip mb-2">
+  Agents
+  {#if simActive}
+    <span class="ml-2 align-middle text-[0.6rem] px-1.5 py-0.5 rounded bg-[#fb7185]/20 text-[#fb7185] border border-[#fb7185]/40 font-mono">
+      SIMULATOR EVENTS
+    </span>
+  {/if}
+</h1>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
@@ -480,9 +522,15 @@
                   <span class="mx-1">|</span>
                   Scope: {agent.scope}
                 </span>
-                <button type="button"
-                  onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
-                  class="text-[#fbbf24] hover:underline">Edit</button>
+                <span class="flex items-center gap-3">
+                  <button type="button"
+                    onclick={(e) => { e.stopPropagation(); runInSim(agent); }}
+                    title="Dry-fire this agent in the Simulator (bypasses schedule / cooldown / baseline)"
+                    class="text-[#fb7185] hover:underline">Run in Simulator</button>
+                  <button type="button"
+                    onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
+                    class="text-[#fbbf24] hover:underline">Edit</button>
+                </span>
               </div>
             </div>
           {/if}

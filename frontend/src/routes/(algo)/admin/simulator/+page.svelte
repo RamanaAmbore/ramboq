@@ -1,37 +1,47 @@
 <script>
-  // Market simulation control plane (/admin/test).
-  // Pairs with backend/api/routes/test.py and backend/api/algo/sim/driver.py.
+  // Market Simulator control plane (/admin/simulator).
+  // Pairs with backend/api/routes/simulator.py and backend/api/algo/sim/driver.py.
   // Gated by cap_in_<branch>.simulator in backend_config.yaml. Default: dev
   // on, prod off. The server returns 400 when the flag is off and this page
   // surfaces the error inline.
 
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { authStore, clientTimestamp } from '$lib/stores';
   import {
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
-    runSimCycle, clearSimArtefacts, fetchSimEvents, fetchSimOrders,
+    runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
+    fetchSimOrders, fetchAgents,
   } from '$lib/api';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
   let events    = $state(/** @type {any[]} */ ([]));
   let orders    = $state(/** @type {any[]} */ ([]));
+  let agents    = $state(/** @type {any[]} */ ([]));
   let error     = $state('');
   let note      = $state('');
   let pickedSlug = $state('');
+  let seedMode  = $state(/** @type {'scripted'|'live'|'live+scenario'} */ ('scripted'));
   let rateMs    = $state(2000);
+  // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
+  // Simulator" on the /algo page). Empty string = run all agents.
+  let agentId   = $state('');
+  let liveSnap  = $state(/** @type {any} */ (null));
   let refreshIv;
 
   async function loadAll() {
     try {
-      const [scList, stat, ev, od] = await Promise.all([
-        fetchSimScenarios(), fetchSimStatus(), fetchSimEvents(100), fetchSimOrders(100),
+      const [scList, stat, ev, od, ag] = await Promise.all([
+        fetchSimScenarios(), fetchSimStatus(), fetchSimEvents(100),
+        fetchSimOrders(100), fetchAgents(),
       ]);
       scenarios = scList;
       status    = stat;
       events    = ev;
       orders    = od;
+      agents    = ag;
       if (!pickedSlug && scenarios.length) pickedSlug = scenarios[0].slug;
     } catch (e) { error = e.message; }
   }
@@ -39,8 +49,11 @@
   async function doStart() {
     error = ''; note = '';
     try {
-      status = await startSim(pickedSlug, rateMs);
-      note = `Started scenario ${pickedSlug} @ ${rateMs}ms`;
+      const opts = { seed_mode: seedMode };
+      if (agentId) opts.agent_ids = [Number(agentId)];
+      status = await startSim(pickedSlug, rateMs, opts);
+      const tag = agentId ? ` (agent #${agentId} only)` : '';
+      note = `Started ${pickedSlug} · seed=${seedMode} · ${rateMs}ms${tag}`;
     } catch (e) { error = e.message; }
   }
   async function doStop() {
@@ -58,17 +71,38 @@
     try { await runSimCycle(); note = 'Agent engine run on current sim state.'; loadAll(); }
     catch (e) { error = e.message; }
   }
+  async function doSeedLive() {
+    error = ''; note = '';
+    try {
+      const snap = await seedSimLive();
+      liveSnap = snap;
+      note = `Live book snapshot: ${snap.holdings_count} holdings · ${snap.positions_count} positions · ${snap.margins_count} margins · accounts=[${snap.accounts.join(', ')}]`;
+      if (seedMode === 'scripted') seedMode = 'live';
+      loadAll();
+    } catch (e) { error = e.message; }
+  }
   async function doClear() {
     error = ''; note = '';
     try {
       const r = await clearSimArtefacts();
-      note = `Cleared ${r.events_deleted} events + ${r.orders_deleted} test orders`;
+      note = `Cleared ${r.events_deleted} events + ${r.orders_deleted} simulator orders`;
       loadAll();
     } catch (e) { error = e.message; }
   }
 
+  // Pick the display name for the armed agent (if any) so the banner is
+  // meaningful instead of just a number.
+  const armedAgent = $derived.by(() => {
+    if (!agentId) return null;
+    return agents.find(a => String(a.id) === String(agentId)) || null;
+  });
+
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
+    // Read agent_id=<id> from URL — lets the /algo "Run in Simulator" button
+    // pre-arm this page with a specific agent.
+    const q = page.url.searchParams.get('agent_id');
+    if (q) agentId = q;
     loadAll();
     refreshIv = setInterval(loadAll, 3000);
   });
@@ -81,9 +115,10 @@
 <h1 class="page-title-chip mb-2">Market Simulator</h1>
 
 <p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  Feeds fabricated holdings / positions / margins into the live agent engine
+  Feeds fabricated per-symbol holdings + positions into the live agent engine
   so you can exercise alerts + actions end-to-end without touching the real
-  broker. Every artefact produced here is tagged <span class="font-mono text-[#fb7185]">TEST</span> —
+  broker. Every artefact produced here is tagged
+  <span class="font-mono text-[#fb7185]">SIMULATOR</span> —
   Telegram preamble, email subject, email banner, agent-event row, paper-traded
   order. Gated by <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span>
   in backend_config.yaml — dev default on, prod default off.
@@ -100,6 +135,15 @@
   </div>
 {/if}
 
+{#if armedAgent}
+  <div class="mb-3 p-2 rounded bg-[#fbbf24]/15 text-[#fbbf24] text-[0.65rem] border border-[#fbbf24]/50">
+    Isolated run armed — will dry-fire <b>#{armedAgent.id} {armedAgent.name}</b>
+    (bypasses schedule / cooldown / baseline gates).
+    <button type="button" onclick={() => { agentId = ''; }}
+      class="ml-2 text-[0.6rem] underline">Clear</button>
+  </div>
+{/if}
+
 <!-- Status bar -->
 <div class="algo-status-card p-3 mb-3" data-status={status.active ? 'triggered' : 'inactive'}>
   <div class="flex items-center flex-wrap gap-2 text-[0.7rem]">
@@ -108,31 +152,56 @@
     {#if status.scenario}
       <span class="font-mono text-[#7dd3fc]">scenario: {status.scenario}</span>
       <span class="text-[#7e97b8]">|</span>
+      <span>seed: {status.seed_mode}</span>
+      <span class="text-[#7e97b8]">|</span>
       <span>tick {status.tick_index}/{status.total_ticks}</span>
       <span class="text-[#7e97b8]">|</span>
       <span>rate: {status.rate_ms}ms</span>
       <span class="text-[#7e97b8]">|</span>
       <span>started: {status.started_at?.slice(0, 19) ?? '—'}</span>
+      {#if status.only_agent_ids?.length}
+        <span class="text-[#7e97b8]">|</span>
+        <span class="text-[#fbbf24]">agents=[{status.only_agent_ids.join(',')}]</span>
+      {/if}
     {/if}
   </div>
+  {#if liveSnap}
+    <div class="text-[0.6rem] text-[#c8d8f0]/70 mt-1">
+      Live snapshot: {liveSnap.snapshot_at?.slice(0, 19)} ·
+      {liveSnap.holdings_count}H / {liveSnap.positions_count}P / {liveSnap.margins_count}M
+      · accounts=[{liveSnap.accounts.join(', ')}]
+    </div>
+  {/if}
 </div>
 
 <!-- Controls -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-  <div class="grid grid-cols-1 md:grid-cols-[1fr_120px_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
+  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
     <div>
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
         {#each scenarios as s}
-          <option value={s.slug}>{s.name} ({s.ticks} ticks)</option>
+          <option value={s.slug}>{s.name} ({s.mode}, {s.ticks} ticks)</option>
         {/each}
+      </select>
+    </div>
+    <div>
+      <label for="sim-seed" class="field-label">Seed</label>
+      <select id="sim-seed" bind:value={seedMode} class="field-input">
+        <option value="scripted">Scripted</option>
+        <option value="live">Live book</option>
+        <option value="live+scenario">Live + scenario</option>
       </select>
     </div>
     <div>
       <label for="sim-rate" class="field-label">Rate (ms)</label>
       <input id="sim-rate" type="number" min="200" step="100" bind:value={rateMs} class="field-input" />
     </div>
+    <button type="button" onclick={doSeedLive}
+      class="text-[0.65rem] py-1 px-3 rounded border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold whitespace-nowrap">
+      Load live book
+    </button>
     <button type="button" onclick={doStart}
       disabled={status.active}
       class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-40">Start</button>
@@ -149,7 +218,7 @@
     </button>
     <button type="button" onclick={doClear}
       class="text-[0.65rem] py-1 px-3 rounded border border-red-500/50 bg-red-500/10 text-red-300 hover:bg-red-500/20 font-semibold">
-      Clear TEST
+      Clear sim
     </button>
   </div>
   {#if pickedSlug}
@@ -158,15 +227,21 @@
       <div class="text-[0.6rem] text-[#c8d8f0]/60 italic mt-2">{picked.description}</div>
     {/if}
   {/if}
+  {#if seedMode !== 'scripted' && !liveSnap}
+    <div class="text-[0.6rem] text-amber-300 mt-2">
+      Seed mode <b>{seedMode}</b> requires a live-book snapshot — press
+      <b>Load live book</b> before Start.
+    </div>
+  {/if}
 </div>
 
-<!-- Recent TEST agent events -->
+<!-- Recent SIMULATOR agent events -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">
-    Recent TEST agent events <span class="opacity-60 font-normal ml-1">({events.length})</span>
+    Recent SIMULATOR agent events <span class="opacity-60 font-normal ml-1">({events.length})</span>
   </div>
   {#if !events.length}
-    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No test events yet. Start a scenario or step to fire agents.</div>
+    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No simulator events yet. Start a scenario or step to fire agents.</div>
   {:else}
     <div class="overflow-x-auto max-h-[30vh]">
       <table class="w-full text-[0.6rem] font-mono">
@@ -184,7 +259,7 @@
               <td class="py-1 pr-3 whitespace-nowrap">{e.timestamp?.slice(0, 19)}</td>
               <td class="py-1 pr-3">#{e.agent_id}</td>
               <td class="py-1 pr-3">
-                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">TEST</span>
+                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">SIM</span>
                 {e.event_type}
               </td>
               <td class="py-1 pr-3 text-[#c8d8f0]/85">{e.trigger_condition || e.detail || '—'}</td>
@@ -196,13 +271,13 @@
   {/if}
 </div>
 
-<!-- Recent TEST orders -->
+<!-- Recent SIMULATOR orders -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">
-    Recent TEST orders <span class="opacity-60 font-normal ml-1">({orders.length})</span>
+    Recent SIMULATOR orders <span class="opacity-60 font-normal ml-1">({orders.length})</span>
   </div>
   {#if !orders.length}
-    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No test orders yet.</div>
+    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No simulator orders yet.</div>
   {:else}
     <div class="overflow-x-auto max-h-[30vh]">
       <table class="w-full text-[0.6rem] font-mono">
@@ -224,7 +299,7 @@
               <td class="py-1 pr-3 whitespace-nowrap">{o.created_at?.slice(0, 19)}</td>
               <td class="py-1 pr-3">{o.account}</td>
               <td class="py-1 pr-3">
-                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">TEST</span>
+                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">SIM</span>
                 {o.symbol}
               </td>
               <td class="py-1 pr-3">{o.transaction_type}</td>

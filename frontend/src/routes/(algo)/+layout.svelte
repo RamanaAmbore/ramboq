@@ -1,7 +1,9 @@
 <script>
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores';
+  import { fetchSimStatus } from '$lib/api';
 
   const { children } = $props();
 
@@ -34,17 +36,33 @@
   }
 
   const algoLinks = [
-    { href: '/dashboard',       label: 'Dashboard' },
-    { href: '/console',         label: 'Terminal'  },
-    { href: '/algo',            label: 'Agents'    },
-    { href: '/orders',          label: 'Orders'    },
-    { href: '/admin',           label: 'Users'     },
-    { href: '/admin/grammar',   label: 'Grammar'   },
-    { href: '/admin/test',      label: 'Test'      },
+    { href: '/dashboard',        label: 'Dashboard' },
+    { href: '/console',          label: 'Terminal'  },
+    { href: '/algo',             label: 'Agents'    },
+    { href: '/orders',           label: 'Orders'    },
+    { href: '/admin',            label: 'Users'     },
+    { href: '/admin/grammar',    label: 'Grammar'   },
+    { href: '/admin/simulator',  label: 'Simulator' },
   ];
 
   let menuOpen = $state(false);
   const closeMenu = () => { menuOpen = false; };
+
+  // ── Global simulator status ─────────────────────────────────────────
+  // Polled every 4 seconds so the SIMULATOR banner appears/disappears on
+  // every algo page without each page having to track status on its own.
+  // Errors silently no-op — the capability flag may be off.
+  let simStatus = $state(/** @type {any} */ ({ active: false }));
+  let simIv;
+  async function pollSim() {
+    try { simStatus = await fetchSimStatus(); }
+    catch (_) { /* cap flag off or auth gone — treat as idle */ }
+  }
+  onMount(() => {
+    pollSim();
+    simIv = setInterval(pollSim, 4000);
+  });
+  onDestroy(() => { if (simIv) clearInterval(simIv); });
 </script>
 
 <div class="algo-viewport">
@@ -117,6 +135,28 @@
         </nav>
       {/if}
     </header>
+
+    {#if simStatus?.active}
+      <div class="sim-banner" role="status" aria-live="polite">
+        <span class="sim-banner-dot"></span>
+        <span class="sim-banner-label">SIMULATOR ACTIVE</span>
+        <span class="sim-banner-sep">·</span>
+        <span>scenario: <b class="sim-banner-scenario">{simStatus.scenario || '—'}</b></span>
+        {#if simStatus.seed_mode}
+          <span class="sim-banner-sep">·</span>
+          <span>seed: <b>{simStatus.seed_mode}</b></span>
+        {/if}
+        <span class="sim-banner-sep">·</span>
+        <span>tick {simStatus.tick_index}/{simStatus.total_ticks}</span>
+        {#if simStatus.only_agent_ids?.length}
+          <span class="sim-banner-sep">·</span>
+          <span>agents=[{simStatus.only_agent_ids.join(',')}]</span>
+        {/if}
+        <span class="sim-banner-spacer"></span>
+        <button type="button" onclick={() => goto('/admin/simulator')}
+                class="sim-banner-link">Open Simulator →</button>
+      </div>
+    {/if}
 
     <main class="algo-content">
       {@render children()}
@@ -308,6 +348,64 @@
   .algo-mobile-item:hover { background: rgba(251,191,36,0.1); color: #fbbf24; }
   .algo-mobile-active { color: #fbbf24; background: rgba(251,191,36,0.1); }
   .algo-mobile-site { color: rgba(150,170,200,0.5); font-size: 0.75rem; }
+
+  /* ── Simulator banner — pinned under the nav when sim is active ────────── */
+  .sim-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.4rem 1rem;
+    background: linear-gradient(90deg,
+                rgba(251,113,133,0.18) 0%,
+                rgba(251,191,36,0.18) 100%);
+    border-top: 1px solid rgba(251,113,133,0.45);
+    border-bottom: 1px solid rgba(251,113,133,0.45);
+    color: #fecaca;
+    font-family: ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    position: sticky;
+    top: 3rem;                  /* sits just under the algo navbar */
+    z-index: 49;
+    animation: sim-banner-pulse 2.2s ease-in-out infinite;
+  }
+  .sim-banner-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: #fb7185;
+    box-shadow: 0 0 6px rgba(251,113,133,0.85);
+    flex-shrink: 0;
+  }
+  .sim-banner-label {
+    color: #fbbf24;
+    letter-spacing: 0.1em;
+    font-size: 0.66rem;
+    font-weight: 800;
+  }
+  .sim-banner-sep { color: rgba(251,191,36,0.5); }
+  .sim-banner-scenario { color: #fde68a; }
+  .sim-banner-spacer { flex: 1; }
+  .sim-banner-link {
+    font-size: 0.62rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 3px;
+    background: rgba(251,191,36,0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.45);
+    cursor: pointer;
+    font-family: ui-monospace, monospace;
+    transition: background-color 0.1s, border-color 0.1s;
+  }
+  .sim-banner-link:hover {
+    background: rgba(251,191,36,0.3);
+    border-color: #fbbf24;
+  }
+  @keyframes sim-banner-pulse {
+    0%, 100% { box-shadow: inset 0 0 0 0 rgba(251,113,133,0);   }
+    50%      { box-shadow: inset 0 0 12px 0 rgba(251,113,133,0.35); }
+  }
 
   /* ── Content ─────────────────────────────────────────────────────────────── */
   .algo-content {

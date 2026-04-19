@@ -141,20 +141,26 @@ export const createAgent      = (payload) => _post('/agents/', payload, { auth: 
 export const validateAgentCondition = (condTree) =>
   _post('/agents/validate-condition', condTree, { auth: true });
 
-// ── Market simulation control plane (/api/test/*) ─────────────────────
+// ── Market simulator control plane (/api/simulator/*) ─────────────────
 // Gated by cap_in_<branch>.simulator in backend_config.yaml. Default:
 // dev on, prod off. Server returns 400 when the flag is off.
-export const fetchSimScenarios    = () => _get('/test/scenarios', { auth: true });
-export const fetchSimStatus       = () => _get('/test/status', { auth: true });
-export const startSim             = (scenario, rate_ms = 2000) =>
-  _post('/test/start', { scenario, rate_ms }, { auth: true });
-export const stopSim              = () => _post('/test/stop', {}, { auth: true });
-export const stepSim              = () => _post('/test/step', {}, { auth: true });
-export const runSimCycle          = () => _post('/test/run-cycle', {}, { auth: true });
-export const clearSimArtefacts    = () => _post('/test/clear', {}, { auth: true });
-export const fetchSimEvents       = (n = 50) => _get(`/test/events/recent?limit=${n}`, { auth: true });
-export const fetchSimOrders       = (n = 50) => _get(`/test/orders/recent?limit=${n}`, { auth: true });
-export const fetchSimTicks        = (n = 100) => _get(`/test/ticks/recent?limit=${n}`, { auth: true });
+export const fetchSimScenarios    = () => _get('/simulator/scenarios', { auth: true });
+export const fetchSimStatus       = () => _get('/simulator/status', { auth: true });
+// `opts` may include: seed_mode ('scripted'|'live'|'live+scenario'),
+// agent_ids (array of IDs to restrict isolation to).
+export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
+  _post('/simulator/start',
+        { scenario, rate_ms, seed_mode: opts.seed_mode || 'scripted',
+          agent_ids: opts.agent_ids || null },
+        { auth: true });
+export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
+export const stepSim              = () => _post('/simulator/step', {}, { auth: true });
+export const runSimCycle          = () => _post('/simulator/run-cycle', {}, { auth: true });
+export const clearSimArtefacts    = () => _post('/simulator/clear', {}, { auth: true });
+export const seedSimLive          = () => _post('/simulator/seed-live', {}, { auth: true });
+export const fetchSimEvents       = (n = 50) => _get(`/simulator/events/recent?limit=${n}`, { auth: true });
+export const fetchSimOrders       = (n = 50) => _get(`/simulator/orders/recent?limit=${n}`, { auth: true });
+export const fetchSimTicks        = (n = 100) => _get(`/simulator/ticks/recent?limit=${n}`, { auth: true });
 
 export async function updateAgent(slug, payload) {
   const res = await fetch(`${BASE}/agents/${slug}`, {

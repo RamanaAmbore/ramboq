@@ -57,9 +57,30 @@ async def init_db() -> None:
             "ALTER TABLE algo_orders ADD COLUMN IF NOT EXISTS mode VARCHAR(8) "
             "NOT NULL DEFAULT 'live'"
         ))
+        # agent_events carries the former test_mode flag. Ensure the column
+        # exists under its new name (sim_mode) whether the DB was created
+        # before or after the rename.
         await conn.execute(text(
-            "ALTER TABLE agent_events ADD COLUMN IF NOT EXISTS test_mode BOOLEAN "
+            "ALTER TABLE agent_events ADD COLUMN IF NOT EXISTS sim_mode BOOLEAN "
             "NOT NULL DEFAULT FALSE"
+        ))
+        # One-shot rename: old deploys carried test_mode. If the legacy column
+        # is still present, copy values into sim_mode then drop it.
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+              IF EXISTS (SELECT 1 FROM information_schema.columns
+                         WHERE table_name='agent_events' AND column_name='test_mode') THEN
+                UPDATE agent_events SET sim_mode = test_mode WHERE sim_mode = FALSE AND test_mode = TRUE;
+                ALTER TABLE agent_events DROP COLUMN test_mode;
+              END IF;
+            END$$;
+        """))
+        # AlgoOrder.mode values: 'test' was the paper-trade sentinel; rename
+        # every existing row to 'sim' so the simulator UI reads them under
+        # the new vocabulary.
+        await conn.execute(text(
+            "UPDATE algo_orders SET mode = 'sim' WHERE mode = 'test'"
         ))
     logger.info("Database: tables verified")
 
