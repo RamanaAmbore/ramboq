@@ -5,7 +5,7 @@ from google.genai import types
 
 from backend.shared.helpers.date_time_utils import timestamp_indian, timestamp_est
 from backend.shared.helpers.ramboq_logger import get_logger
-from backend.shared.helpers.utils import secrets, ramboq_config, ramboq_deploy, is_prod_capable
+from backend.shared.helpers.utils import secrets, ramboq_config, is_enabled
 
 logger = get_logger(__name__)
 
@@ -103,10 +103,8 @@ def get_market_update(strict: bool = False):
     message = f"Market Report — {formatted_ist} | {formatted_est}"
     fallback = None if strict else ramboq_config['market'].replace("Market Report", message)
 
-    if not ramboq_deploy['genai']:
-        return fallback
-    if not is_prod_capable():
-        logger.info("GenAI skipped — not prod-capable (set cap_in_dev to True)")
+    if not is_enabled('genai'):
+        logger.info("GenAI skipped — disabled for this environment")
         return fallback
 
     try:

@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timezone
 
 from backend.shared.helpers.ramboq_logger import get_logger
-from backend.shared.helpers.utils import config, is_prod_capable
+from backend.shared.helpers.utils import config, is_enabled
 
 logger = get_logger(__name__)
 
@@ -64,9 +64,9 @@ async def dispatch(agent, eval_result, broadcast_fn=None):
         channel = ch.get("channel", "")
 
         try:
-            if channel == "telegram" and is_prod_capable() and config.get("telegram"):
+            if channel == "telegram" and is_enabled("telegram"):
                 await _send_telegram(telegram_body)
-            elif channel == "email" and is_prod_capable() and config.get("mail"):
+            elif channel == "email" and is_enabled("mail"):
                 await _send_email_raw(email_subject, email_body)
             elif channel == "websocket" and broadcast_fn:
                 broadcast_fn("agent_alert", {

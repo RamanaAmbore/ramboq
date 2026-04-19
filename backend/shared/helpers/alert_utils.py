@@ -25,7 +25,7 @@ from backend.shared.helpers.ramboq_logger import get_logger
 import urllib3.util.connection
 urllib3.util.connection.HAS_IPV6 = False  # Server IPv6 outbound hangs
 
-from backend.shared.helpers.utils import secrets, config, is_prod_capable
+from backend.shared.helpers.utils import secrets, config, is_enabled
 
 logger = get_logger(__name__)
 
@@ -39,11 +39,8 @@ _MSG_TYPES = {
 def _send_telegram(message: str):
     import logging
     _log = logging.getLogger('backend.api.background')
-    if not is_prod_capable():
-        _log.info("Telegram skipped — cap_in_dev is False")
-        return
-    if not config.get('telegram', False):
-        _log.info("Telegram skipped — telegram flag is False")
+    if not is_enabled('telegram'):
+        _log.info("Telegram skipped — disabled for this environment")
         return
     token = secrets.get('telegram_bot_token', '')
     chat_id = secrets.get('telegram_chat_id', '')

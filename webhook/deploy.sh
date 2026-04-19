@@ -61,11 +61,33 @@ LOG="$APP_ROOT/.log/hook_debug.log"
   CHANGED=$(git diff --name-only "$PREV_HEAD" HEAD)
 
   # --- Restore / merge server-specific config flags ---
+  # Preserves top-level scalars AND the cap_in_dev dict from the server's prior
+  # config. Only keys listed in PRESERVE_SCALARS are carried over — new keys
+  # introduced in the repo config appear unchanged.
   if [ -f "$CONFIG_BAK" ]; then
-    for key in enforce_password_standard cap_in_dev genai telegram mail news_in_dev genai_thinking_budget notify_on_startup alert_loss_abs alert_loss_pct alert_cooldown_minutes; do
-      val=$(grep "^${key}:" "$CONFIG_BAK" | head -1 | sed "s/^${key}:[[:space:]]*//" )
-      [ -n "$val" ] && sed -i "s/^${key}:.*/${key}: ${val}/" "backend/config/backend_config.yaml"
-    done
+    python3 - "$CONFIG_BAK" "backend/config/backend_config.yaml" <<'PYEOF'
+import sys, yaml
+bak_path, new_path = sys.argv[1], sys.argv[2]
+PRESERVE_SCALARS = [
+    "enforce_password_standard", "genai_thinking_budget",
+    "alert_loss_abs", "alert_loss_pct", "alert_cooldown_minutes",
+]
+with open(bak_path) as f: bak = yaml.safe_load(f) or {}
+with open(new_path) as f: new = yaml.safe_load(f) or {}
+for k in PRESERVE_SCALARS:
+    if k in bak:
+        new[k] = bak[k]
+# cap_in_dev: carry the whole dict from the server's backup (so each capability
+# keeps its prior dev/prod setting). Missing keys from the repo default fill in.
+bak_caps = bak.get("cap_in_dev") or {}
+new_caps = new.get("cap_in_dev") or {}
+if isinstance(bak_caps, dict) and isinstance(new_caps, dict):
+    merged = dict(new_caps)
+    merged.update(bak_caps)
+    new["cap_in_dev"] = merged
+with open(new_path, "w") as f:
+    yaml.safe_dump(new, f, default_flow_style=False, sort_keys=False)
+PYEOF
     rm -f "$CONFIG_BAK"
   fi
 

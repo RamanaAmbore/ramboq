@@ -2,9 +2,8 @@
 Stock-market news feed — headlines persisted in Postgres.
 
 Accumulates headlines throughout the day and wipes the table every morning at
-07:00 IST (aligned with the daily market-report refresh). The feature is:
-  - Always on in production (deploy_branch == 'main') as long as cap_in_dev is True.
-  - On any non-main branch, gated by `news_in_dev` in backend_config.yaml.
+07:00 IST (aligned with the daily market-report refresh). Gated by
+is_enabled('market_feed'): always on in prod, on/off per cap_in_dev in dev.
 """
 
 import threading
@@ -27,7 +26,7 @@ from backend.shared.helpers.date_time_utils import (
     timestamp_est,
 )
 from backend.shared.helpers.ramboq_logger import get_logger
-from backend.shared.helpers.utils import config, is_prod_capable
+from backend.shared.helpers.utils import is_enabled
 
 logger = get_logger(__name__)
 
@@ -42,15 +41,7 @@ _last_reset: date | None = None
 
 
 def _news_enabled() -> bool:
-    """
-    Prod: always on when cap_in_dev is True.
-    Non-prod: additionally requires news_in_dev == True.
-    """
-    if not is_prod_capable():
-        return False
-    if config.get('deploy_branch') == 'main':
-        return True
-    return bool(config.get('news_in_dev', True))
+    return is_enabled('market_feed')
 
 
 def _fmt_stamp(dt: datetime) -> str:

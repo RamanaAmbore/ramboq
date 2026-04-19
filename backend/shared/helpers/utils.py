@@ -48,21 +48,36 @@ with open(_CONFIG_DIR / 'backend_config.yaml', 'r', encoding='utf-8', errors='ig
 isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_codes']]
 
 
+def is_enabled(cap: str) -> bool:
+    """
+    Is capability `cap` (e.g., 'genai', 'telegram', 'mail', 'notify_on_startup',
+    'market_feed') enabled in this environment?
+
+    Prod (deploy_branch == 'main'): unconditionally True — every capability runs.
+    Dev / any other branch: read cap_in_dev.<cap> in backend_config.yaml. Missing
+    or falsy values mean disabled. Add a new capability by appending a key under
+    cap_in_dev and calling is_enabled('<cap>') at the usage site.
+    """
+    if config.get('deploy_branch') == 'main':
+        return True
+    caps = config.get('cap_in_dev') or {}
+    if isinstance(caps, dict):
+        return bool(caps.get(cap, False))
+    # Legacy scalar cap_in_dev: True/False — treat as blanket gate
+    return bool(caps)
+
+
 def is_prod_capable():
     """
-    Returns True if production capabilities are enabled for this environment.
-
-    Controlled solely by cap_in_dev in backend_config.yaml — no code changes needed
-    to enable or disable capabilities. Set to True on prod servers. Set to False
-    on dev to avoid consuming CPU/bandwidth when prod is running in parallel.
-
-    Each capability also has its own flag (genai, telegram, mail). Both this
-    function AND the capability flag must be True for a capability to run.
-
-    To add a new production capability: add its flag to backend_config.yaml, gate with
-    is_prod_capable() AND config.get('<flag>'). No other code changes required.
+    Back-compat shim — True on prod, or on dev if any cap_in_dev flag is set.
+    Prefer is_enabled('<cap>') for new code.
     """
-    return bool(config.get('cap_in_dev', False))
+    if config.get('deploy_branch') == 'main':
+        return True
+    caps = config.get('cap_in_dev') or {}
+    if isinstance(caps, dict):
+        return any(bool(v) for v in caps.values())
+    return bool(caps)
 
 
 def capitalize(text):

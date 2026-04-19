@@ -250,15 +250,18 @@ console_log_level: 40
 # App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
 enforce_password_standard: False
 
-# cap_in_dev: master switch for production capabilities in this environment.
-# True on prod and dev — enables GenAI, Telegram, email. Set False to silence everything.
-cap_in_dev: True
+# cap_in_dev: per-capability toggles for the DEV environment.
+# IGNORED on prod (deploy_branch == 'main') where every capability is always on.
+cap_in_dev:
+  genai: True
+  telegram: True
+  mail: True
+  notify_on_startup: $notify_on_startup
+  market_feed: True
 
-# Production capability flags — each independently enables one capability when cap_in_dev is True.
-genai: True
-telegram: True
-mail: True
-notify_on_startup: $notify_on_startup
+# Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
+# it so the full market-report response fits within the budget.
+genai_thinking_budget: 512
 
 # Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
 deploy_branch: main

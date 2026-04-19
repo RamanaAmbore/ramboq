@@ -36,14 +36,14 @@ def main():
         print(f"notify_deploy: config load failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if not cfg.get("cap_in_dev", False):
-        print("notify_deploy: skipped — cap_in_dev is False")
-        return
-    if not cfg.get("notify_on_startup", False):
-        print("notify_deploy: skipped — notify_on_startup is False")
-        return
-
     branch = cfg.get("deploy_branch", "main")
+    caps = cfg.get("cap_in_dev") or {}
+    # Prod (main): always notify. Dev: gated by cap_in_dev.notify_on_startup.
+    if branch != "main":
+        enabled = bool(caps.get("notify_on_startup", False)) if isinstance(caps, dict) else bool(caps)
+        if not enabled:
+            print("notify_deploy: skipped — notify_on_startup disabled for this environment")
+            return
     is_non_main = branch != "main"
     branch_tag = f" [{branch}]" if is_non_main else ""
 

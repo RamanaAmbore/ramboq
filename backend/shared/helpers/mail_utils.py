@@ -18,7 +18,7 @@ class _IPv4SMTP(smtplib.SMTP):
             return sock
         raise OSError(f"Could not connect to {host}:{port} via IPv4")
 
-from backend.shared.helpers.utils import secrets, ramboq_deploy, is_prod_capable
+from backend.shared.helpers.utils import secrets, is_enabled
 
 
 def send_email(name, email_id, subject, html_body):
@@ -49,7 +49,7 @@ def send_email(name, email_id, subject, html_body):
     recipients = email_id
 
     try:
-        if is_prod_capable() and ramboq_deploy.get('mail', False):
+        if is_enabled('mail'):
             with _IPv4SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
