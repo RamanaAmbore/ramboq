@@ -189,6 +189,147 @@ BUILTIN_AGENTS = [
 ]
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  New-grammar loss-rule agents
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Every risk rule from alert_utils' hard-coded engine is expressed here as an
+# Agent row whose `conditions` is a v2 grammar tree (metric/scope/op/value).
+# Seeded INACTIVE so they do not duplicate the alerts still coming out of
+# alert_utils.check_and_alert. Activate one at a time from the /algo UI to
+# run it under the new evaluator; when all parity is confirmed, retire the
+# corresponding arm in alert_utils.
+#
+# Notify channels + cooldown come from the same defaults used today.
+# Suppression deltas and the baseline-gate offset are engine-wide settings
+# still read from backend_config.yaml (alert_suppress_delta_abs,
+# alert_suppress_delta_pct, alert_baseline_offset_min).
+
+_LOSS_AGENTS = [
+    # ── Holdings: static % floors ────────────────────────────────────────
+    dict(slug="loss-hold-acct-static-pct",
+         name="Holdings per-account day loss ≥ 3%",
+         description="Fires when any individual account's holdings day loss crosses the per-account % floor.",
+         conditions={"metric": "day_pct", "scope": "holdings.any_acct", "op": "<=", "value": -3.0},
+         scope="total",  # scope token inside the condition already handles per-account
+         ),
+    dict(slug="loss-hold-total-static-pct",
+         name="Holdings total day loss ≥ 5%",
+         description="Fires when the portfolio total holdings day loss crosses the total % floor.",
+         conditions={"metric": "day_pct", "scope": "holdings.total", "op": "<=", "value": -5.0},
+         scope="total",
+         ),
+
+    # ── Positions: static % floors ───────────────────────────────────────
+    dict(slug="loss-pos-acct-static-pct",
+         name="Positions per-account loss ≥ 2% of margin",
+         description="Fires when any account's positions pnl is ≤ −2% of that account's used margin.",
+         conditions={"metric": "pnl_pct", "scope": "positions.any_acct", "op": "<=", "value": -2.0},
+         scope="total",
+         ),
+    dict(slug="loss-pos-total-static-pct",
+         name="Positions total loss ≥ 2% of margin",
+         description="Fires when the portfolio total positions pnl is ≤ −2% of total used margin.",
+         conditions={"metric": "pnl_pct", "scope": "positions.total", "op": "<=", "value": -2.0},
+         scope="total",
+         ),
+
+    # ── Positions: static ₹ floors ───────────────────────────────────────
+    dict(slug="loss-pos-acct-static-abs",
+         name="Positions per-account loss ≥ ₹30,000",
+         description="Fires when any account's positions pnl is ≤ −₹30,000.",
+         conditions={"metric": "pnl", "scope": "positions.any_acct", "op": "<=", "value": -30000},
+         scope="total",
+         ),
+    dict(slug="loss-pos-total-static-abs",
+         name="Positions total loss ≥ ₹50,000",
+         description="Fires when the portfolio total positions pnl is ≤ −₹50,000.",
+         conditions={"metric": "pnl", "scope": "positions.total", "op": "<=", "value": -50000},
+         scope="total",
+         ),
+
+    # ── Rate-of-change: holdings ────────────────────────────────────────
+    dict(slug="loss-hold-acct-rate-abs",
+         name="Holdings per-account bleeding ≥ ₹2k/min",
+         description="Fires when any account's holdings day-change rate of loss is steeper than ₹2,000/min.",
+         conditions={"metric": "day_rate_abs", "scope": "holdings.any_acct", "op": "<=", "value": -2000},
+         scope="total",
+         ),
+    dict(slug="loss-hold-total-rate-abs",
+         name="Holdings total bleeding ≥ ₹4k/min",
+         description="Fires when the portfolio total holdings day-change rate of loss is steeper than ₹4,000/min.",
+         conditions={"metric": "day_rate_abs", "scope": "holdings.total", "op": "<=", "value": -4000},
+         scope="total",
+         ),
+    dict(slug="loss-hold-any-rate-pct",
+         name="Holdings bleeding ≥ 0.15 %/min",
+         description="Fires on any scope whose holdings %-of-value day rate is worse than 0.15 %/min.",
+         conditions={"any": [
+             {"metric": "day_rate_pct", "scope": "holdings.any_acct", "op": "<=", "value": -0.15},
+             {"metric": "day_rate_pct", "scope": "holdings.total",    "op": "<=", "value": -0.15},
+         ]},
+         scope="total",
+         ),
+
+    # ── Rate-of-change: positions ────────────────────────────────────────
+    dict(slug="loss-pos-acct-rate-abs",
+         name="Positions per-account bleeding ≥ ₹3k/min",
+         description="Fires when any account's positions pnl rate of loss is steeper than ₹3,000/min.",
+         conditions={"metric": "pnl_rate_abs", "scope": "positions.any_acct", "op": "<=", "value": -3000},
+         scope="total",
+         ),
+    dict(slug="loss-pos-total-rate-abs",
+         name="Positions total bleeding ≥ ₹6k/min",
+         description="Fires when the portfolio total positions pnl rate of loss is steeper than ₹6,000/min.",
+         conditions={"metric": "pnl_rate_abs", "scope": "positions.total", "op": "<=", "value": -6000},
+         scope="total",
+         ),
+    dict(slug="loss-pos-any-rate-pct",
+         name="Positions bleeding ≥ 0.25 %/min",
+         description="Fires on any scope whose positions %-of-margin rate is worse than 0.25 %/min.",
+         conditions={"any": [
+             {"metric": "pnl_rate_pct", "scope": "positions.any_acct", "op": "<=", "value": -0.25},
+             {"metric": "pnl_rate_pct", "scope": "positions.total",    "op": "<=", "value": -0.25},
+         ]},
+         scope="total",
+         ),
+
+    # ── Funds: operational negatives ────────────────────────────────────
+    dict(slug="loss-funds-cash-negative",
+         name="Account cash has gone negative",
+         description="Fires when any account's cash balance dips below zero.",
+         conditions={"metric": "cash", "scope": "funds.any_acct", "op": "<", "value": 0},
+         scope="total",
+         ),
+    dict(slug="loss-funds-margin-negative",
+         name="Account available margin has gone negative",
+         description="Fires when any account's available margin dips below zero.",
+         conditions={"metric": "avail_margin", "scope": "funds.any_acct", "op": "<", "value": 0},
+         scope="total",
+         ),
+]
+
+
+# Enrich each row with the common notify + cooldown shape so BUILTIN_AGENTS
+# keeps its existing keys; the engine's scheduler reads these fields.
+_LOSS_AGENT_DEFAULTS = dict(
+    events=[
+        {"channel": "telegram", "enabled": True},
+        {"channel": "email",    "enabled": True},
+        {"channel": "log",      "enabled": True},
+    ],
+    actions=[],                 # notify-only. Attach actions via admin UI later.
+    schedule="market_hours",
+    cooldown_minutes=30,
+    status="inactive",          # activated manually per rule during migration
+)
+
+for _a in _LOSS_AGENTS:
+    for _k, _v in _LOSS_AGENT_DEFAULTS.items():
+        _a.setdefault(_k, _v)
+BUILTIN_AGENTS.extend(_LOSS_AGENTS)
+
+
 async def seed_agents():
     """
     Insert built-in agents if missing. For existing system agents, sync
