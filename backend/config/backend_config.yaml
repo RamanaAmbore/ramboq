@@ -34,11 +34,55 @@ genai_thinking_budget: 512
 # Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
 deploy_branch: main
 
-# Loss alert thresholds — checked after every background performance refresh (during market hours)
-# Set to 0 to disable a threshold. alert_emails and telegram credentials go in secrets.yaml.
-alert_loss_abs: 50000          # alert if day loss > ₹50,000 for any account or TOTAL
-alert_loss_pct: 2.0            # alert if day loss % > 2% for any account or TOTAL
-alert_cooldown_minutes: 30     # minimum minutes between repeat alerts for the same account
+# ── Loss alert thresholds ───────────────────────────────────────────────────
+# Checked after every background performance refresh during market hours.
+# All thresholds are parameterised so they can be tuned on the server without
+# touching code. Set any value to 0 to disable that rule. Telegram credentials
+# and alert_emails go in secrets.yaml.
+#
+# Two categories of rule fire alerts, both designed to "only wake you when
+# something is really going wrong":
+#   1. Static floors  — trip when P&L crosses a fixed threshold (₹ or %).
+#   2. Rate of change — trip when P&L is deteriorating fast (per-minute
+#      over a rolling window). Rate rules are disabled for the first
+#      alert_baseline_offset_min minutes after market open so the normal
+#      opening gap does NOT register as a rate event.
+
+# --- Static floors -----------------------------------------------------------
+# Holdings (long equity) — % only, no absolute floor. Equities seldom move
+# fast enough for ₹-floors to be useful.
+alert_hold_static_pct_acct:  3.0      # per-account holdings day-loss % floor
+alert_hold_static_pct_total: 5.0      # portfolio total holdings day-loss % floor
+
+# Positions (F&O/NFO) — both ₹ and % triggers independently. Loss % is
+# computed as |pnl| / used_margin for that account (total for aggregated).
+alert_pos_static_pct_acct:    2.0     # per-account positions loss % floor
+alert_pos_static_pct_total:   2.0     # portfolio total positions loss % floor
+alert_pos_static_abs_acct:   30000    # per-account positions ₹ loss floor
+alert_pos_static_abs_total:  50000    # portfolio total positions ₹ loss floor
+
+# --- Rate-of-change ----------------------------------------------------------
+alert_rate_window_min: 10             # minutes of history used to compute rate
+
+alert_hold_rate_abs_per_min_acct:   2000   # per-account holdings ₹/min slide
+alert_hold_rate_abs_per_min_total:  4000   # total     holdings ₹/min slide
+alert_hold_rate_pct_per_min:          0.15 # holdings  %/min   (scope-agnostic)
+
+alert_pos_rate_abs_per_min_acct:    3000   # per-account positions ₹/min slide
+alert_pos_rate_abs_per_min_total:   6000   # total     positions ₹/min slide
+alert_pos_rate_pct_per_min:           0.25 # positions %/min  (scope-agnostic)
+
+# --- Suppression -------------------------------------------------------------
+# After a bucket alerts once, block re-firing until one of these is true:
+#   * loss deepened by >= alert_suppress_delta_abs ₹
+#   * loss deepened by >= alert_suppress_delta_pct %
+#   * alert_cooldown_minutes have elapsed
+alert_suppress_delta_abs: 15000
+alert_suppress_delta_pct: 0.5
+alert_cooldown_minutes:   30
+
+# --- Opening-gap handling ----------------------------------------------------
+alert_baseline_offset_min: 15         # minutes after market open before rate rules go live
 
 # Background refresh settings (all times in India IST)
 background_refresh: True

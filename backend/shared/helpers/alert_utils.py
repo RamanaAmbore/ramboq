@@ -243,115 +243,373 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
 # ---------------------------------------------------------------------------
 # Intra-day loss alerts + negative fund balance alert
 # ---------------------------------------------------------------------------
+#
+# Design goals (driven by user requirement "wake me up only when something is
+# really wrong"):
+#   * Prefer fewer, louder alerts over frequent noisy ones.
+#   * Every threshold is configurable via backend_config.yaml.
+#   * Two orthogonal rule families: static floors (you've lost too much) and
+#     rate-of-change (you're losing fast right now).
+#   * Suppress re-alerts as long as the loss is roughly the same and the rate
+#     isn't worsening — one ping, then quiet until the situation changes.
+#
+# Bucket key shape -- used for history, last-alert lookup, and dedup:
+#   (section, scope, kind)
+# where
+#   section = 'holdings' | 'positions'
+#   scope   = masked account id (e.g. "ZG####") | 'TOTAL'
+#   kind    = 'static_pct' | 'static_abs' | 'rate_abs' | 'rate_pct'
+#
+# alert_state keys we touch (the state dict is owned by _task_performance):
+#   alert_state['pnl_history']   {(section, scope): [(ts, pnl_val, pnl_pct), ...]}
+#   alert_state['last_alert']    {(section, scope, kind): (ts, pnl_val, pnl_pct)}
+#   alert_state['session_date']  date — resets pnl_history once per day
+#   alert_state['session_start'] datetime — anchor for the baseline-offset gate
+# Any other keys (e.g. the old 'funds_cash_…' ones) are untouched so funds
+# negative-balance alerts keep their existing simple cooldown behaviour.
+# ---------------------------------------------------------------------------
 
-def _build_alert_rows(sum_holdings, sum_positions, df_margins, alert_loss_abs, alert_loss_pct,
-                      alert_state, cooldown_mins):
-    now = datetime.now()
+# Mapping from a bucket key to a human-readable rule label for the alert row.
+_KIND_LABEL = {
+    'static_pct': 'Static %',
+    'static_abs': 'Static ₹',
+    'rate_abs':   'Rate ₹/min',
+    'rate_pct':   'Rate %/min',
+}
+
+
+def _alert_cfg():
+    """
+    Load all alert_* config values into a plain dict once per call. Keeping
+    this in one place makes it easy to tune thresholds without hunting through
+    call sites, and the defaults here are the last-resort fallback if a key is
+    missing from the YAML (defensive; the repo YAML ships every key).
+    """
+    g = config.get
+    return {
+        # Static floors — holdings (% only, by design)
+        'hold_static_pct_acct':  float(g('alert_hold_static_pct_acct',  3.0)),
+        'hold_static_pct_total': float(g('alert_hold_static_pct_total', 5.0)),
+        # Static floors — positions (both % and ₹)
+        'pos_static_pct_acct':   float(g('alert_pos_static_pct_acct',   2.0)),
+        'pos_static_pct_total':  float(g('alert_pos_static_pct_total',  2.0)),
+        'pos_static_abs_acct':   float(g('alert_pos_static_abs_acct',   30000)),
+        'pos_static_abs_total':  float(g('alert_pos_static_abs_total',  50000)),
+        # Rate-of-change window and thresholds
+        'rate_window_min':       float(g('alert_rate_window_min', 10)),
+        'hold_rate_abs_acct':    float(g('alert_hold_rate_abs_per_min_acct',  2000)),
+        'hold_rate_abs_total':   float(g('alert_hold_rate_abs_per_min_total', 4000)),
+        'hold_rate_pct':         float(g('alert_hold_rate_pct_per_min',       0.15)),
+        'pos_rate_abs_acct':     float(g('alert_pos_rate_abs_per_min_acct',   3000)),
+        'pos_rate_abs_total':    float(g('alert_pos_rate_abs_per_min_total',  6000)),
+        'pos_rate_pct':          float(g('alert_pos_rate_pct_per_min',        0.25)),
+        # Suppression
+        'suppress_delta_abs':    float(g('alert_suppress_delta_abs', 15000)),
+        'suppress_delta_pct':    float(g('alert_suppress_delta_pct', 0.5)),
+        'cooldown_min':          float(g('alert_cooldown_minutes', 30)),
+        # Opening-gap gate
+        'baseline_offset_min':   float(g('alert_baseline_offset_min', 15)),
+    }
+
+
+def _maintain_session(alert_state: dict, now: datetime) -> None:
+    """
+    Reset the rolling history once per trading day and anchor `session_start`
+    for the baseline-offset gate. Called at the top of every check cycle.
+    """
+    today = now.date()
+    if alert_state.get('session_date') != today:
+        alert_state['session_date'] = today
+        alert_state['session_start'] = now
+        alert_state['pnl_history'] = {}
+        # last_alert history also resets so yesterday's ceilings don't suppress
+        # today's alerts.
+        alert_state['last_alert'] = {}
+
+
+def _rate_gate_live(alert_state: dict, now: datetime, offset_min: float) -> bool:
+    """
+    True when enough time has passed since the first tick of the session for
+    rate-of-change rules to be meaningful. Before this, the opening gap would
+    produce a large per-minute rate that isn't really an "intra-day bleed".
+    """
+    start = alert_state.get('session_start')
+    if not start:
+        return False
+    return (now - start) >= timedelta(minutes=offset_min)
+
+
+def _trim_history(hist: list, now: datetime, window_min: float) -> None:
+    """
+    Drop samples older than ~3x the rate window (enough to smooth over restarts
+    but small enough to stay cheap). In-place so the caller's list reference
+    stays valid.
+    """
+    cutoff = now - timedelta(minutes=window_min * 3)
+    hist[:] = [s for s in hist if s[0] >= cutoff]
+
+
+def _compute_rate(hist: list, window_min: float, now: datetime):
+    """
+    Return (rate_abs_per_min, rate_pct_per_min) over the last `window_min`
+    minutes, or (None, None) if there isn't enough data.
+
+    A NEGATIVE rate means we're losing money (pnl shrinking). Callers compare
+    the returned rate to a NEGATIVE threshold to decide whether to fire.
+    """
+    if len(hist) < 2:
+        return (None, None)
+    cutoff = now - timedelta(minutes=window_min)
+    window = [s for s in hist if s[0] >= cutoff]
+    if len(window) < 2:
+        return (None, None)
+    oldest_ts, oldest_pnl, oldest_pct = window[0]
+    latest_ts, latest_pnl, latest_pct = window[-1]
+    mins = (latest_ts - oldest_ts).total_seconds() / 60.0
+    if mins <= 0:
+        return (None, None)
+    return ((latest_pnl - oldest_pnl) / mins,
+            (latest_pct - oldest_pct) / mins if latest_pct is not None and oldest_pct is not None
+            else None)
+
+
+def _suppress(alert_state: dict, key: tuple, now: datetime,
+              pnl_now: float, pct_now: float, cfg: dict) -> bool:
+    """
+    Return True if this alert should be SUPPRESSED (skipped). False to fire.
+
+    We fire when any of these is true:
+      * no previous alert for this bucket this session,
+      * cooldown window has elapsed,
+      * |pnl_now − pnl_last_alert| ≥ suppress_delta_abs, OR
+      * |pct_now − pct_last_alert| ≥ suppress_delta_pct.
+    In other words: if nothing has materially changed AND we're still inside
+    the cooldown, stay quiet.
+    """
+    last = alert_state.get('last_alert', {}).get(key)
+    if not last:
+        return False
+    last_ts, last_pnl, last_pct = last
+    # Cooldown expired → always fire (a new day of pain warrants attention).
+    if (now - last_ts) >= timedelta(minutes=cfg['cooldown_min']):
+        return False
+    # Loss deepened by the configured absolute delta? Fire.
+    if pnl_now is not None and last_pnl is not None:
+        if abs(pnl_now - last_pnl) >= cfg['suppress_delta_abs']:
+            return False
+    # Loss deepened by the configured percentage delta? Fire.
+    if pct_now is not None and last_pct is not None:
+        if abs(pct_now - last_pct) >= cfg['suppress_delta_pct']:
+            return False
+    return True
+
+
+def _record_alert(alert_state: dict, key: tuple, now: datetime,
+                  pnl_now: float, pct_now: float) -> None:
+    alert_state.setdefault('last_alert', {})[key] = (now, pnl_now, pct_now)
+
+
+def _fmt_rate_row(section, scope, kind, value_str, detail_str, abs_thr, pct_thr):
+    """Unified row format for the consolidated alert table (Telegram + email)."""
+    return (section, scope, _KIND_LABEL[kind], value_str, detail_str, abs_thr, pct_thr)
+
+
+def _used_margin_for(df_margins, scope):
+    """
+    Return the used-margin denominator for positions % computation. Scope is
+    either a masked account id or 'TOTAL'. Returns 0 if not found — caller
+    must guard against divide-by-zero.
+    """
+    if df_margins is None or df_margins.empty:
+        return 0.0
+    match = df_margins[df_margins['account'].astype(str) == str(scope)]
+    if match.empty:
+        return 0.0
+    try:
+        return float(match.iloc[0].get('util debits', 0) or 0)
+    except Exception:
+        return 0.0
+
+
+def _eval_holdings(sum_holdings, alert_state, df_margins_unused, now, cfg, gate_live):
+    """
+    Walk the holdings summary. For every account row (individual + TOTAL):
+      * Append the day-loss snapshot to the rolling history (for rate calc).
+      * Test static-% floor (scope-aware threshold).
+      * Test rate-₹/min and rate-%/min triggers (if the baseline gate is live).
+      * Apply suppression and collect triggered rows.
+    """
     rows = []
-
-    def _cooldown_ok(key):
-        last = alert_state.get(key)
-        return not last or (now - last) >= timedelta(minutes=cooldown_mins)
-
-    # Holdings day-loss alerts
     for _, row in sum_holdings.iterrows():
-        account = str(row.get('account', ''))
-        day_val = float(row.get('day_change_val', 0) or 0)
-        day_pct = float(row.get('day_change_percentage', 0) or 0)
+        scope    = str(row.get('account', ''))
+        is_total = (scope == 'TOTAL')
+        day_val  = float(row.get('day_change_val',        0) or 0)
+        day_pct  = float(row.get('day_change_percentage', 0) or 0)
 
-        day_loss_str = f"₹{day_val:,.0f}"
-        day_pct_str  = f"{day_pct:.2f}%"
-        key = f"holdings_{account}"
-        fired = False
+        hist_key = ('holdings', scope)
+        hist = alert_state.setdefault('pnl_history', {}).setdefault(hist_key, [])
+        hist.append((now, day_val, day_pct))
+        _trim_history(hist, now, cfg['rate_window_min'])
 
-        if alert_loss_abs > 0 and day_val < -alert_loss_abs and _cooldown_ok(key):
-            rows.append(("Holdings", account, day_loss_str, day_pct_str,
-                         f"₹{alert_loss_abs:,.0f}", "—"))
-            fired = True
+        pct_floor = cfg['hold_static_pct_total'] if is_total else cfg['hold_static_pct_acct']
+        rate_abs_thr = cfg['hold_rate_abs_total']  if is_total else cfg['hold_rate_abs_acct']
+        rate_pct_thr = cfg['hold_rate_pct']
 
-        if alert_loss_pct > 0 and day_pct < -alert_loss_pct and _cooldown_ok(key):
-            rows.append(("Holdings", account, day_loss_str, day_pct_str,
-                         "—", f"{alert_loss_pct:.1f}%"))
-            fired = True
+        val_str = f"₹{day_val:,.0f}"
+        pct_str = f"{day_pct:.2f}%"
 
-        if fired:
-            alert_state[key] = now
-        elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
-            logger.info(f"Holdings alert suppressed for {account} (cooldown)")
+        # --- Static %
+        if pct_floor > 0 and day_pct <= -pct_floor:
+            key = ('holdings', scope, 'static_pct')
+            if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
+                rows.append(_fmt_rate_row('Holdings', scope, 'static_pct',
+                                           val_str, pct_str, '—', f"{pct_floor:.1f}%"))
+                _record_alert(alert_state, key, now, day_val, day_pct)
 
-    # Positions day-loss alerts
+        # --- Rate (only once enough session has elapsed)
+        if gate_live:
+            r_abs, r_pct = _compute_rate(hist, cfg['rate_window_min'], now)
+            if r_abs is not None and rate_abs_thr > 0 and r_abs <= -rate_abs_thr:
+                key = ('holdings', scope, 'rate_abs')
+                if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
+                    rows.append(_fmt_rate_row('Holdings', scope, 'rate_abs',
+                                               val_str, f"{r_abs:,.0f}/min",
+                                               f"₹{rate_abs_thr:,.0f}/min", '—'))
+                    _record_alert(alert_state, key, now, day_val, day_pct)
+            if r_pct is not None and rate_pct_thr > 0 and r_pct <= -rate_pct_thr:
+                key = ('holdings', scope, 'rate_pct')
+                if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
+                    rows.append(_fmt_rate_row('Holdings', scope, 'rate_pct',
+                                               val_str, f"{r_pct:.2f}%/min",
+                                               '—', f"{rate_pct_thr:.2f}%/min"))
+                    _record_alert(alert_state, key, now, day_val, day_pct)
+    return rows
+
+
+def _eval_positions(sum_positions, alert_state, df_margins, now, cfg, gate_live):
+    """
+    Walk the positions summary. Similar structure to holdings, but:
+      * Position % uses |pnl| / used_margin (read from df_margins per scope).
+      * Positions also has an absolute-₹ static floor.
+    """
+    rows = []
     for _, row in sum_positions.iterrows():
-        account = str(row.get('account', ''))
-        pnl = float(row.get('pnl', 0) or 0)
-        key = f"positions_{account}"
+        scope    = str(row.get('account', ''))
+        is_total = (scope == 'TOTAL')
+        pnl      = float(row.get('pnl', 0) or 0)
+        used_margin = _used_margin_for(df_margins, scope)
+        # Positive when losing, 0 when flat. Percentage of deployed margin.
+        pnl_pct = (pnl / used_margin * 100.0) if used_margin > 0 else 0.0
 
-        if alert_loss_abs > 0 and pnl < -alert_loss_abs and _cooldown_ok(key):
-            rows.append(("Positions", account, f"₹{pnl:,.0f}", "—",
-                         f"₹{alert_loss_abs:,.0f}", "—"))
-            alert_state[key] = now
-        elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
-            logger.info(f"Positions alert suppressed for {account} (cooldown)")
+        hist_key = ('positions', scope)
+        hist = alert_state.setdefault('pnl_history', {}).setdefault(hist_key, [])
+        hist.append((now, pnl, pnl_pct))
+        _trim_history(hist, now, cfg['rate_window_min'])
 
-    # Negative fund balance alerts (cash or avail margin < 0)
-    if df_margins is not None and not df_margins.empty:
-        for _, row in df_margins.iterrows():
-            account   = str(row.get('account', ''))
-            cash      = float(row.get('avail opening_balance', 0) or 0)
-            avail_net = float(row.get('net', 0) or 0)
+        pct_floor = cfg['pos_static_pct_total'] if is_total else cfg['pos_static_pct_acct']
+        abs_floor = cfg['pos_static_abs_total'] if is_total else cfg['pos_static_abs_acct']
+        rate_abs_thr = cfg['pos_rate_abs_total']  if is_total else cfg['pos_rate_abs_acct']
+        rate_pct_thr = cfg['pos_rate_pct']
 
-            for field, val, label in [
-                ('cash', cash, 'Cash'),
-                ('margin', avail_net, 'Avail Margin'),
-            ]:
-                key = f"funds_{field}_{account}"
-                if val < 0 and _cooldown_ok(key):
-                    rows.append(("Funds", account, f"₹{val:,.0f}", f"{label} negative",
-                                 "—", "—"))
+        val_str = f"₹{pnl:,.0f}"
+        pct_str = f"{pnl_pct:.2f}%" if used_margin > 0 else "—"
+
+        # --- Static %  (requires used_margin > 0 to be meaningful)
+        if pct_floor > 0 and used_margin > 0 and pnl_pct <= -pct_floor:
+            key = ('positions', scope, 'static_pct')
+            if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
+                rows.append(_fmt_rate_row('Positions', scope, 'static_pct',
+                                           val_str, pct_str, '—', f"{pct_floor:.1f}%"))
+                _record_alert(alert_state, key, now, pnl, pnl_pct)
+
+        # --- Static ₹
+        if abs_floor > 0 and pnl <= -abs_floor:
+            key = ('positions', scope, 'static_abs')
+            if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
+                rows.append(_fmt_rate_row('Positions', scope, 'static_abs',
+                                           val_str, pct_str, f"₹{abs_floor:,.0f}", '—'))
+                _record_alert(alert_state, key, now, pnl, pnl_pct)
+
+        # --- Rate (gated by baseline offset)
+        if gate_live:
+            r_abs, r_pct = _compute_rate(hist, cfg['rate_window_min'], now)
+            if r_abs is not None and rate_abs_thr > 0 and r_abs <= -rate_abs_thr:
+                key = ('positions', scope, 'rate_abs')
+                if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
+                    rows.append(_fmt_rate_row('Positions', scope, 'rate_abs',
+                                               val_str, f"{r_abs:,.0f}/min",
+                                               f"₹{rate_abs_thr:,.0f}/min", '—'))
+                    _record_alert(alert_state, key, now, pnl, pnl_pct)
+            if r_pct is not None and rate_pct_thr > 0 and used_margin > 0 and r_pct <= -rate_pct_thr:
+                key = ('positions', scope, 'rate_pct')
+                if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
+                    rows.append(_fmt_rate_row('Positions', scope, 'rate_pct',
+                                               val_str, f"{r_pct:.2f}%/min",
+                                               '—', f"{rate_pct_thr:.2f}%/min"))
+                    _record_alert(alert_state, key, now, pnl, pnl_pct)
+    return rows
+
+
+def _eval_negative_funds(df_margins, alert_state, now, cooldown_min):
+    """
+    Unchanged semantics from the previous implementation: fire on cash < 0 or
+    avail margin < 0 with a simple per-bucket cooldown. Kept separate from
+    P&L rules because this is a different class of problem (operational, not
+    market).
+    """
+    rows = []
+    if df_margins is None or df_margins.empty:
+        return rows
+    for _, row in df_margins.iterrows():
+        scope     = str(row.get('account', ''))
+        cash      = float(row.get('avail opening_balance', 0) or 0)
+        avail_net = float(row.get('net', 0) or 0)
+        for field, val, label in (('cash', cash, 'Cash'),
+                                   ('margin', avail_net, 'Avail Margin')):
+            key = f"funds_{field}_{scope}"
+            if val < 0:
+                last_ts = alert_state.get(key)
+                if not last_ts or (now - last_ts) >= timedelta(minutes=cooldown_min):
+                    rows.append(('Funds', scope, '—', f"₹{val:,.0f}",
+                                  f"{label} negative", '—', '—'))
                     alert_state[key] = now
-                elif alert_state.get(key) and (now - alert_state[key]) < timedelta(minutes=cooldown_mins):
-                    logger.info(f"Funds alert suppressed for {account} {label} (cooldown)")
-
-    return rows, alert_state
+    return rows
 
 
 def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display: str,
                     df_margins=None):
     """
-    Check day P&L thresholds and negative fund balances. One row per breached threshold.
-    Returns alert_state (modified in place).
-    df_margins: full margins dataframe; used for negative balance checks.
-    """
-    alert_loss_abs = config.get('alert_loss_abs', 0)
-    alert_loss_pct = config.get('alert_loss_pct', 0)
-    cooldown_mins  = config.get('alert_cooldown_minutes', 30)
+    Main entry point — evaluates every rule for every scope, applies
+    suppression, and emits one consolidated alert (Telegram + email) if any
+    rows survived.
 
-    rows, alert_state = _build_alert_rows(
-        sum_holdings, sum_positions, df_margins,
-        alert_loss_abs, alert_loss_pct,
-        alert_state, cooldown_mins
-    )
+    Signature is unchanged from the previous static-only implementation; the
+    state dict is the long-lived dict owned by _task_performance. Returns the
+    mutated state dict for caller convenience (not required — it's mutated in
+    place).
+    """
+    cfg = _alert_cfg()
+    now = datetime.now()
+    _maintain_session(alert_state, now)
+    gate_live = _rate_gate_live(alert_state, now, cfg['baseline_offset_min'])
+
+    rows = []
+    rows.extend(_eval_holdings(sum_holdings, alert_state, df_margins, now, cfg, gate_live))
+    rows.extend(_eval_positions(sum_positions, alert_state, df_margins, now, cfg, gate_live))
+    rows.extend(_eval_negative_funds(df_margins, alert_state, now, cfg['cooldown_min']))
 
     if not rows:
         return alert_state
 
-    headers = ("Type", "Account", "Value", "Detail", "Abs Thr", "Pct Thr")
-
-    # Telegram: fixed-width monospace
-    tg_table = _fixed_table(headers, rows)
-
-    # Email: HTML table
+    # Columns — "Kind" makes it clear at a glance which rule fired.
+    headers = ("Type", "Account", "Kind", "Value", "Detail", "Abs Thr", "Pct Thr")
+    tg_table         = _fixed_table(headers, rows)
     email_table_html = _html_table(headers, rows)
 
-    parts = []
-    for typ, account, value, detail, abs_thr, pct_thr in rows:
-        thr = "+".join(t for t in [
-            f"Abs {abs_thr}" if abs_thr != "—" else "",
-            f"Pct {pct_thr}" if pct_thr != "—" else "",
-            detail if detail not in ("—", "") else "",
-        ] if t)
-        parts.append(f"{typ} {account} {value} [{thr}]")
+    # Short subject: one "section scope value [kind]" chunk per row.
+    parts = [f"{r[0]} {r[1]} {r[3]} [{r[2]}]" for r in rows]
     subject_detail = " | ".join(parts)
 
     _dispatch('alert', ist_display, tg_table, email_table_html, subject_detail)
-    logger.warning(f"Loss/fund alerts fired: {[(r[0], r[1]) for r in rows]}")
+    logger.warning(f"Loss/fund alerts fired: {[(r[0], r[1], r[2]) for r in rows]}")
     return alert_state

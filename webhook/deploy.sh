@@ -70,12 +70,16 @@ import sys, yaml
 bak_path, new_path = sys.argv[1], sys.argv[2]
 PRESERVE_SCALARS = [
     "enforce_password_standard", "genai_thinking_budget",
-    "alert_loss_abs", "alert_loss_pct", "alert_cooldown_minutes",
 ]
 with open(bak_path) as f: bak = yaml.safe_load(f) or {}
 with open(new_path) as f: new = yaml.safe_load(f) or {}
 for k in PRESERVE_SCALARS:
     if k in bak:
+        new[k] = bak[k]
+# Every alert_* key is operator-tunable; pattern-match so server-side threshold
+# tweaks survive deploys automatically as new alert keys are added.
+for k in list(bak.keys()):
+    if str(k).startswith("alert_"):
         new[k] = bak[k]
 # cap_in_dev: carry the whole dict from the server's backup (so each capability
 # keeps its prior dev/prod setting). Missing keys from the repo default fill in.
