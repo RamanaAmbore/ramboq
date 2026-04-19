@@ -79,6 +79,10 @@ def _is_low_info(title: str) -> bool:
     t = (title or "").strip()
     if not t:
         return True
+    # Question-mark headlines are almost always speculative/clickbait ("Will Nifty
+    # hit 30,000?") — drop them.
+    if '?' in t:
+        return True
     # Strip trailing " - Source" suffix Google News appends, for length checks
     stripped = re.sub(r'\s+[-—|]\s+[^-—|]{1,40}$', '', t)
     if len(stripped) < _MIN_TITLE_CHARS:
