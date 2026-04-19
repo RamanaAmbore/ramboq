@@ -8,8 +8,8 @@ without touching the real broker. Design goals:
 1. **No code branches in the hot path.** The agent engine, dispatcher and
    action handlers are unaware that data came from here — they read
    `test_mode` off `alert_state` and prepend `[TEST]` where appropriate.
-2. **Dev-only.** `assert_dev()` refuses to run on `deploy_branch == 'main'`
-   and requires `cap_in_dev.sim_mode: True`. Auto-stops after 30 minutes.
+2. **Branch-gated.** `assert_dev()` requires `cap_in_<branch>.simulator: True`.
+   Default shipped values: dev on, prod off. Auto-stops after 30 minutes.
 3. **Deterministic replay.** `step()` applies exactly one tick; `start()`
    runs the scenario at a user-set cadence via asyncio.
 
@@ -46,20 +46,27 @@ class SimGuardError(RuntimeError):
 
 def assert_dev() -> None:
     """
-    Prod kill-switch. Simulation must never run on main.
-    Every /api/test endpoint should call this before doing anything.
+    Branch-aware simulator gate.
+
+    The simulator runs only when the capability flag for the current branch
+    allows it. Default shipping values:
+      - cap_in_prod.simulator: False  (explicit off — prod won't run sim)
+      - cap_in_dev.simulator:  True   (explicit on — dev runs sim)
+
+    Flipping cap_in_prod.simulator to True WILL enable the sim on main.
+    That's intentional — the operator may want to exercise the pipeline
+    against fabricated data on a freshly-promoted build before reverting.
+    It is NOT the default.
     """
+    from backend.shared.helpers.utils import is_enabled
+    if is_enabled("simulator"):
+        return
     branch = config.get("deploy_branch", "dev")
-    if branch == "main":
-        raise SimGuardError(
-            "Market simulation is disabled on the main (production) branch."
-        )
-    cap = config.get("cap_in_dev") or {}
-    if not cap.get("sim_mode", False):
-        raise SimGuardError(
-            "Set cap_in_dev.sim_mode: True in backend_config.yaml to enable "
-            "the simulator."
-        )
+    section = "cap_in_prod" if branch == "main" else "cap_in_dev"
+    raise SimGuardError(
+        f"Market simulation is disabled. Set {section}.simulator: True in "
+        f"backend_config.yaml (branch: {branch})."
+    )
 
 
 def load_scenarios() -> list[dict]:

@@ -55,7 +55,7 @@
   async function loadSimLog() {
     // Polled every few seconds while the Simulator tab is visible so the
     // sim's tick timeline stays roughly live. Silently ignores failures
-    // (sim endpoint 400s on prod / when sim_mode is off).
+    // (sim endpoint 400s when cap_in_<branch>.simulator is off).
     try {
       const data = await fetchSimTicks(100);
       simLog = Array.isArray(data) ? data : [];

@@ -16,17 +16,24 @@ console_log_level: 40
 # App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
 enforce_password_standard: False
 
-# cap_in_dev: per-capability toggles for the DEV environment.
-# IGNORED on prod (deploy_branch == 'main') where every capability is always on.
-# Check gate with is_enabled('<cap>'). To add a new capability, append its key below
-# and call is_enabled('<cap>') at the usage site — no other code changes needed.
+# Per-capability toggles. The section consulted at runtime depends on
+# deploy_branch:
+#   - main         → cap_in_prod.<cap>   (missing key ⇒ True, prod defaults on)
+#   - anything else → cap_in_dev.<cap>   (missing key ⇒ False, dev is opt-in)
+# Check gate with is_enabled('<cap>'). deploy.sh preserves both dicts verbatim
+# across deploys so operator tweaks survive.
+
 cap_in_dev:
-  genai: False             # GenAI market update (Gemini)
-  telegram: False          # Telegram alert notifications
-  mail: False              # Email notifications (SMTP)
+  genai:            False  # GenAI market update (Gemini)
+  telegram:         False  # Telegram alert notifications
+  mail:             False  # Email notifications (SMTP)
   notify_on_deploy: True   # Send test Telegram+email on each deploy
-  market_feed: False       # Market news feed (Google News RSS)
-  sim_mode: True           # Enables /api/test endpoints (dev only; never on main)
+  market_feed:      False  # Market news feed (Google News RSS)
+  simulator:        True   # /api/test simulator (dev default: on)
+
+cap_in_prod:
+  simulator:        False  # /api/test simulator (prod default: off — never run
+                           # fabricated market data in production)
 
 # Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
 # it here so the actual market-report response has room (avoids mid-sentence truncation).

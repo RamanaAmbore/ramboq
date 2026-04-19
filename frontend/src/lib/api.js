@@ -142,7 +142,8 @@ export const validateAgentCondition = (condTree) =>
   _post('/agents/validate-condition', condTree, { auth: true });
 
 // ── Market simulation control plane (/api/test/*) ─────────────────────
-// Only works on non-main branches with cap_in_dev.sim_mode: True.
+// Gated by cap_in_<branch>.simulator in backend_config.yaml. Default:
+// dev on, prod off. Server returns 400 when the flag is off.
 export const fetchSimScenarios    = () => _get('/test/scenarios', { auth: true });
 export const fetchSimStatus       = () => _get('/test/status', { auth: true });
 export const startSim             = (scenario, rate_ms = 2000) =>

@@ -81,14 +81,24 @@ for k in PRESERVE_SCALARS:
 for k in list(bak.keys()):
     if str(k).startswith("alert_"):
         new[k] = bak[k]
-# cap_in_dev: carry the whole dict from the server's backup (so each capability
-# keeps its prior dev/prod setting). Missing keys from the repo default fill in.
-bak_caps = bak.get("cap_in_dev") or {}
-new_caps = new.get("cap_in_dev") or {}
-if isinstance(bak_caps, dict) and isinstance(new_caps, dict):
-    merged = dict(new_caps)
-    merged.update(bak_caps)
-    new["cap_in_dev"] = merged
+# cap_in_dev / cap_in_prod: carry the whole dict from the server's backup
+# (so each capability keeps its prior setting). Missing keys from the repo
+# default fill in. Same pattern for both sections so operator tweaks on
+# either environment survive a deploy.
+for sect in ("cap_in_dev", "cap_in_prod"):
+    bak_caps = bak.get(sect) or {}
+    new_caps = new.get(sect) or {}
+    if isinstance(bak_caps, dict) and isinstance(new_caps, dict):
+        merged = dict(new_caps)
+        merged.update(bak_caps)
+        # One-shot rename cleanup: the old key was `sim_mode`, the new one
+        # is `simulator`. When both are present, the new value wins; the
+        # old key is discarded so it doesn't linger as dead weight.
+        if "sim_mode" in merged:
+            if "simulator" not in merged:
+                merged["simulator"] = merged["sim_mode"]
+            merged.pop("sim_mode", None)
+        new[sect] = merged
 with open(new_path, "w") as f:
     yaml.safe_dump(new, f, default_flow_style=False, sort_keys=False)
 PYEOF

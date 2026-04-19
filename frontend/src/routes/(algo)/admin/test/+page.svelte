@@ -1,8 +1,9 @@
 <script>
   // Market simulation control plane (/admin/test).
   // Pairs with backend/api/routes/test.py and backend/api/algo/sim/driver.py.
-  // Only works on non-main branches where cap_in_dev.sim_mode is True; the
-  // server returns 400 otherwise and this page surfaces the error inline.
+  // Gated by cap_in_<branch>.simulator in backend_config.yaml. Default: dev
+  // on, prod off. The server returns 400 when the flag is off and this page
+  // surfaces the error inline.
 
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
@@ -84,8 +85,8 @@
   so you can exercise alerts + actions end-to-end without touching the real
   broker. Every artefact produced here is tagged <span class="font-mono text-[#fb7185]">TEST</span> —
   Telegram preamble, email subject, email banner, agent-event row, paper-traded
-  order. Prod is hard-blocked; dev also requires
-  <span class="font-mono">cap_in_dev.sim_mode: True</span>.
+  order. Gated by <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span>
+  in backend_config.yaml — dev default on, prod default off.
 </p>
 
 {#if error}

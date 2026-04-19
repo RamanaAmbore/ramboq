@@ -51,19 +51,24 @@ isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_co
 def is_enabled(cap: str) -> bool:
     """
     Is capability `cap` (e.g., 'genai', 'telegram', 'mail', 'notify_on_deploy',
-    'market_feed') enabled in this environment?
+    'market_feed', 'simulator') enabled in this environment?
 
-    Prod (deploy_branch == 'main'): unconditionally True — every capability runs.
-    Dev / any other branch: read cap_in_dev.<cap> in backend_config.yaml. Missing
-    or falsy values mean disabled. Add a new capability by appending a key under
-    cap_in_dev and calling is_enabled('<cap>') at the usage site.
+    The capability lives under the section that matches the current branch:
+      - main  → cap_in_prod.<cap>  (missing key ⇒ True: prod stays fully-on by
+                default so existing caps don't silently regress)
+      - other → cap_in_dev.<cap>   (missing key ⇒ False: dev is opt-in)
+
+    To turn a capability off in prod, add it to cap_in_prod with value False
+    (e.g. `simulator: False`). deploy.sh preserves both cap_in_* dicts verbatim
+    across deploys so operator tweaks survive.
     """
-    if config.get('deploy_branch') == 'main':
-        return True
-    caps = config.get('cap_in_dev') or {}
+    branch = config.get('deploy_branch')
+    section = 'cap_in_prod' if branch == 'main' else 'cap_in_dev'
+    caps = config.get(section) or {}
+    default = branch == 'main'  # prod defaults on, dev defaults off
     if isinstance(caps, dict):
-        return bool(caps.get(cap, False))
-    # Legacy scalar cap_in_dev: True/False — treat as blanket gate
+        return bool(caps.get(cap, default))
+    # Legacy scalar cap_in_* True/False — treat as blanket gate
     return bool(caps)
 
 
