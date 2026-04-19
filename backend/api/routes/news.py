@@ -228,17 +228,22 @@ def _fetch_one_feed(url: str) -> list[tuple[datetime, dict]]:
 
 
 def _fetch_rss() -> list[tuple[datetime, dict]]:
-    """Fetch every configured feed in parallel, merge, dedupe by link."""
+    """Fetch every configured feed in parallel; return whatever finished in time."""
     merged: dict[str, tuple[datetime, dict]] = {}
     with ThreadPoolExecutor(max_workers=len(_FEEDS)) as ex:
         future_by_url = {ex.submit(_fetch_one_feed, u): u for u in _FEEDS}
-        for fut in as_completed(future_by_url, timeout=_FEED_TIMEOUT + 2):
-            url = future_by_url[fut]
-            try:
-                for dt, row in fut.result(timeout=0.1):
-                    merged.setdefault(row["link"], (dt, row))
-            except Exception as e:
-                logger.warning(f"News feed {url[:60]}… failed: {e}")
+        try:
+            for fut in as_completed(future_by_url, timeout=_FEED_TIMEOUT + 2):
+                url = future_by_url[fut]
+                try:
+                    for dt, row in fut.result(timeout=0.1):
+                        merged.setdefault(row["link"], (dt, row))
+                except Exception as e:
+                    logger.warning(f"News feed {url[:60]}… failed: {e}")
+        except TimeoutError:
+            # Slow feeds don't kill the batch — keep whatever completed.
+            slow = [url for f, url in future_by_url.items() if not f.done()]
+            logger.warning(f"News: {len(slow)} feed(s) timed out, using partial results")
     return list(merged.values())
 
 
