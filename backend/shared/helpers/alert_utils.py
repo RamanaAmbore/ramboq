@@ -271,11 +271,127 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
 
 # Mapping from a bucket key to a human-readable rule label for the alert row.
 _KIND_LABEL = {
-    'static_pct': 'Static %',
-    'static_abs': 'Static ₹',
-    'rate_abs':   'Rate ₹/min',
-    'rate_pct':   'Rate %/min',
+    'static_pct':      'Static %',
+    'static_abs':      'Static ₹',
+    'rate_abs':        'Rate ₹/min',
+    'rate_pct':        'Rate %/min',
+    'negative_cash':   'Cash < 0',
+    'negative_margin': 'Margin < 0',
 }
+
+# Short section codes for the narrow Telegram layout (mobile-friendly widths).
+_SECTION_SHORT = {'Holdings': 'HLD', 'Positions': 'POS', 'Funds': 'FND'}
+
+
+def _fmt_rupees(n: float) -> str:
+    """Human-readable ₹ string with thousands separator and sign."""
+    return f"-₹{abs(n):,.0f}" if n < 0 else f"₹{n:,.0f}"
+
+
+def _fmt_pct(n: float) -> str:
+    return f"{n:.2f}%"
+
+
+def _tg_alert_body(alerts: list) -> str:
+    """
+    Build the narrow 2-line-per-row Telegram body. Each alert gets:
+      line 1:  ▸ <short> <scope>  <current ₹> (<pct>)
+      line 2:    <rule>  <extra / threshold>
+
+    Keeps rows under ~32 char so they don't wrap on a phone in portrait.
+    """
+    lines = []
+    for a in alerts:
+        short = _SECTION_SHORT.get(a['section'], a['section'][:3].upper())
+        head_right = _fmt_rupees(a['pnl'])
+        if a.get('pct') is not None and a['pct'] != 0:
+            head_right += f" ({_fmt_pct(a['pct'])})"
+        lines.append(f"▸ {short} {a['scope']}  {head_right}")
+
+        # Second line varies slightly by rule so the "why" is obvious at a glance.
+        k = a['kind']
+        label = _KIND_LABEL[k]
+        if k == 'static_pct':
+            lines.append(f"  {label}  floor {a['threshold']}")
+        elif k == 'static_abs':
+            lines.append(f"  {label}  floor {a['threshold']}")
+        elif k == 'rate_abs':
+            lines.append(f"  {label}  now {_fmt_rupees(a['rate_val'])}/min  "
+                         f"floor {a['threshold']}")
+        elif k == 'rate_pct':
+            lines.append(f"  {label}  now {_fmt_pct(a['rate_val'])}/min  "
+                         f"floor {a['threshold']}")
+        else:
+            lines.append(f"  {label}  {a['threshold']}")
+        lines.append("")  # blank line between alerts for easy scanning
+    if lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines)
+
+
+def _email_alert_body(alerts: list) -> str:
+    """
+    Build a proper HTML table for email. Columns: Type, Account, Rule,
+    Current (₹/%), Rate (when applicable), Threshold. Rows are colored by
+    severity kind so rate alerts pop visually.
+    """
+    th = (
+        "background-color:#1a3a5c;color:#ffffff;padding:8px 12px;"
+        "text-align:left;font-size:13px;white-space:nowrap"
+    )
+    td = (
+        "padding:7px 12px;font-size:13px;border-bottom:1px solid #dce3ea;"
+        "white-space:nowrap"
+    )
+    # Mild color cues per rule family. Static floors: yellow. Rate: red.
+    # Funds: grey. Keeps the table scannable without being loud.
+    row_bg = {
+        'static_pct': '#fff8e1',
+        'static_abs': '#fff8e1',
+        'rate_abs':   '#fde2e4',
+        'rate_pct':   '#fde2e4',
+        'negative_cash':   '#eceff1',
+        'negative_margin': '#eceff1',
+    }
+
+    def cell(v, bg=""):
+        style = td + (f";background-color:{bg}" if bg else "")
+        return f"<td style='{style}'>{v}</td>"
+
+    header_cells = "".join(
+        f"<th style='{th}'>{h}</th>"
+        for h in ("Type", "Account", "Rule", "Current P&L", "Rate", "Threshold")
+    )
+    row_html = ""
+    for a in alerts:
+        bg = row_bg.get(a['kind'], "")
+        current = _fmt_rupees(a['pnl'])
+        if a.get('pct') is not None and a['pct'] != 0:
+            current += f"<br><span style='color:#555;font-size:11px'>{_fmt_pct(a['pct'])}</span>"
+        if a.get('rate_val') is None:
+            rate = "—"
+        elif a['kind'] == 'rate_abs':
+            rate = f"{_fmt_rupees(a['rate_val'])}/min"
+        elif a['kind'] == 'rate_pct':
+            rate = f"{_fmt_pct(a['rate_val'])}/min"
+        else:
+            rate = "—"
+        row_html += (
+            "<tr>"
+            + cell(a['section'], bg)
+            + cell(a['scope'], bg)
+            + cell(_KIND_LABEL[a['kind']], bg)
+            + cell(current, bg)
+            + cell(rate, bg)
+            + cell(a['threshold'], bg)
+            + "</tr>"
+        )
+    return (
+        f"<table style='border-collapse:collapse;width:100%'>"
+        f"<thead><tr>{header_cells}</tr></thead>"
+        f"<tbody>{row_html}</tbody>"
+        f"</table>"
+    )
 
 
 def _alert_cfg():
@@ -416,9 +532,16 @@ def _record_alert(alert_state: dict, key: tuple, now: datetime,
     alert_state.setdefault('last_alert', {})[key] = (now, pnl_now, pct_now)
 
 
-def _fmt_rate_row(section, scope, kind, value_str, detail_str, abs_thr, pct_thr):
-    """Unified row format for the consolidated alert table (Telegram + email)."""
-    return (section, scope, _KIND_LABEL[kind], value_str, detail_str, abs_thr, pct_thr)
+def _alert_row(section: str, scope: str, kind: str,
+               pnl: float, pct, rate_val, threshold: str) -> dict:
+    """
+    Structured alert row. `pnl`/`pct` carry raw values so formatters can style
+    them independently. `rate_val` is None for static-rule alerts.
+    """
+    return dict(
+        section=section, scope=scope, kind=kind,
+        pnl=pnl, pct=pct, rate_val=rate_val, threshold=threshold,
+    )
 
 
 def _used_margin_for(df_margins, scope):
@@ -469,8 +592,9 @@ def _eval_holdings(sum_holdings, alert_state, df_margins_unused, now, cfg, gate_
         if pct_floor > 0 and day_pct <= -pct_floor:
             key = ('holdings', scope, 'static_pct')
             if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
-                rows.append(_fmt_rate_row('Holdings', scope, 'static_pct',
-                                           val_str, pct_str, '—', f"{pct_floor:.1f}%"))
+                rows.append(_alert_row('Holdings', scope, 'static_pct',
+                                       day_val, day_pct, None,
+                                       f"-{pct_floor:.1f}%"))
                 _record_alert(alert_state, key, now, day_val, day_pct)
 
         # --- Rate (only once enough session has elapsed)
@@ -479,16 +603,16 @@ def _eval_holdings(sum_holdings, alert_state, df_margins_unused, now, cfg, gate_
             if r_abs is not None and rate_abs_thr > 0 and r_abs <= -rate_abs_thr:
                 key = ('holdings', scope, 'rate_abs')
                 if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
-                    rows.append(_fmt_rate_row('Holdings', scope, 'rate_abs',
-                                               val_str, f"{r_abs:,.0f}/min",
-                                               f"₹{rate_abs_thr:,.0f}/min", '—'))
+                    rows.append(_alert_row('Holdings', scope, 'rate_abs',
+                                           day_val, day_pct, r_abs,
+                                           f"-₹{rate_abs_thr:,.0f}/min"))
                     _record_alert(alert_state, key, now, day_val, day_pct)
             if r_pct is not None and rate_pct_thr > 0 and r_pct <= -rate_pct_thr:
                 key = ('holdings', scope, 'rate_pct')
                 if not _suppress(alert_state, key, now, day_val, day_pct, cfg):
-                    rows.append(_fmt_rate_row('Holdings', scope, 'rate_pct',
-                                               val_str, f"{r_pct:.2f}%/min",
-                                               '—', f"{rate_pct_thr:.2f}%/min"))
+                    rows.append(_alert_row('Holdings', scope, 'rate_pct',
+                                           day_val, day_pct, r_pct,
+                                           f"-{rate_pct_thr:.2f}%/min"))
                     _record_alert(alert_state, key, now, day_val, day_pct)
     return rows
 
@@ -525,16 +649,18 @@ def _eval_positions(sum_positions, alert_state, df_margins, now, cfg, gate_live)
         if pct_floor > 0 and used_margin > 0 and pnl_pct <= -pct_floor:
             key = ('positions', scope, 'static_pct')
             if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
-                rows.append(_fmt_rate_row('Positions', scope, 'static_pct',
-                                           val_str, pct_str, '—', f"{pct_floor:.1f}%"))
+                rows.append(_alert_row('Positions', scope, 'static_pct',
+                                       pnl, pnl_pct, None,
+                                       f"-{pct_floor:.1f}%"))
                 _record_alert(alert_state, key, now, pnl, pnl_pct)
 
         # --- Static ₹
         if abs_floor > 0 and pnl <= -abs_floor:
             key = ('positions', scope, 'static_abs')
             if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
-                rows.append(_fmt_rate_row('Positions', scope, 'static_abs',
-                                           val_str, pct_str, f"₹{abs_floor:,.0f}", '—'))
+                rows.append(_alert_row('Positions', scope, 'static_abs',
+                                       pnl, pnl_pct if used_margin > 0 else None, None,
+                                       f"-₹{abs_floor:,.0f}"))
                 _record_alert(alert_state, key, now, pnl, pnl_pct)
 
         # --- Rate (gated by baseline offset)
@@ -543,16 +669,16 @@ def _eval_positions(sum_positions, alert_state, df_margins, now, cfg, gate_live)
             if r_abs is not None and rate_abs_thr > 0 and r_abs <= -rate_abs_thr:
                 key = ('positions', scope, 'rate_abs')
                 if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
-                    rows.append(_fmt_rate_row('Positions', scope, 'rate_abs',
-                                               val_str, f"{r_abs:,.0f}/min",
-                                               f"₹{rate_abs_thr:,.0f}/min", '—'))
+                    rows.append(_alert_row('Positions', scope, 'rate_abs',
+                                           pnl, pnl_pct if used_margin > 0 else None, r_abs,
+                                           f"-₹{rate_abs_thr:,.0f}/min"))
                     _record_alert(alert_state, key, now, pnl, pnl_pct)
             if r_pct is not None and rate_pct_thr > 0 and used_margin > 0 and r_pct <= -rate_pct_thr:
                 key = ('positions', scope, 'rate_pct')
                 if not _suppress(alert_state, key, now, pnl, pnl_pct, cfg):
-                    rows.append(_fmt_rate_row('Positions', scope, 'rate_pct',
-                                               val_str, f"{r_pct:.2f}%/min",
-                                               '—', f"{rate_pct_thr:.2f}%/min"))
+                    rows.append(_alert_row('Positions', scope, 'rate_pct',
+                                           pnl, pnl_pct, r_pct,
+                                           f"-{rate_pct_thr:.2f}%/min"))
                     _record_alert(alert_state, key, now, pnl, pnl_pct)
     return rows
 
@@ -571,14 +697,14 @@ def _eval_negative_funds(df_margins, alert_state, now, cooldown_min):
         scope     = str(row.get('account', ''))
         cash      = float(row.get('avail opening_balance', 0) or 0)
         avail_net = float(row.get('net', 0) or 0)
-        for field, val, label in (('cash', cash, 'Cash'),
-                                   ('margin', avail_net, 'Avail Margin')):
+        for field, val, kind in (('cash',   cash,       'negative_cash'),
+                                  ('margin', avail_net,  'negative_margin')):
             key = f"funds_{field}_{scope}"
             if val < 0:
                 last_ts = alert_state.get(key)
                 if not last_ts or (now - last_ts) >= timedelta(minutes=cooldown_min):
-                    rows.append(('Funds', scope, '—', f"₹{val:,.0f}",
-                                  f"{label} negative", '—', '—'))
+                    rows.append(_alert_row('Funds', scope, kind,
+                                           val, None, None, "< 0"))
                     alert_state[key] = now
     return rows
 
@@ -608,15 +734,25 @@ def check_and_alert(sum_holdings, sum_positions, alert_state: dict, ist_display:
     if not rows:
         return alert_state
 
-    # Columns — "Kind" makes it clear at a glance which rule fired.
-    headers = ("Type", "Account", "Kind", "Value", "Detail", "Abs Thr", "Pct Thr")
-    tg_table         = _fixed_table(headers, rows)
-    email_table_html = _html_table(headers, rows)
+    # Group logically: Holdings first, then Positions, then Funds. Within each
+    # section, account-level rows before TOTAL so the reader can scan per-acct
+    # before seeing the aggregate.
+    section_order = {'Holdings': 0, 'Positions': 1, 'Funds': 2}
+    rows.sort(key=lambda r: (section_order.get(r['section'], 9),
+                              0 if r['scope'] != 'TOTAL' else 1,
+                              r['scope']))
 
-    # Short subject: one "section scope value [kind]" chunk per row.
-    parts = [f"{r[0]} {r[1]} {r[3]} [{r[2]}]" for r in rows]
+    tg_body    = _tg_alert_body(rows)
+    email_html = _email_alert_body(rows)
+
+    # Compact subject for push notifications / inbox previews.
+    parts = [
+        f"{_SECTION_SHORT.get(r['section'], r['section'])} {r['scope']} {_KIND_LABEL[r['kind']]}"
+        for r in rows
+    ]
     subject_detail = " | ".join(parts)
 
-    _dispatch('alert', ist_display, tg_table, email_table_html, subject_detail)
-    logger.warning(f"Loss/fund alerts fired: {[(r[0], r[1], r[2]) for r in rows]}")
+    _dispatch('alert', ist_display, tg_body, email_html, subject_detail)
+    logger.warning(f"Loss/fund alerts fired: "
+                   f"{[(r['section'], r['scope'], r['kind']) for r in rows]}")
     return alert_state
