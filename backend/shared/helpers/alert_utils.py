@@ -376,32 +376,39 @@ def _compute_rate(hist: list, window_min: float, now: datetime):
 def _suppress(alert_state: dict, key: tuple, now: datetime,
               pnl_now: float, pct_now: float, cfg: dict) -> bool:
     """
-    Return True if this alert should be SUPPRESSED (skipped). False to fire.
+    Return True to SKIP this alert, False to fire.
 
-    We fire when any of these is true:
-      * no previous alert for this bucket this session,
-      * cooldown window has elapsed,
-      * |pnl_now − pnl_last_alert| ≥ suppress_delta_abs, OR
-      * |pct_now − pct_last_alert| ≥ suppress_delta_pct.
-    In other words: if nothing has materially changed AND we're still inside
-    the cooldown, stay quiet.
+    The user-stated goal is "alerts signal a change — if loss is flat, stay
+    quiet, even for hours". So both gates must clear before we re-fire:
+
+      1. Cooldown — at least `cooldown_min` minutes must have elapsed since
+         the last alert for this bucket. This is a hard minimum gap.
+      2. Material change — loss must have deepened by at least
+         `suppress_delta_abs` ₹ or `suppress_delta_pct` %.
+
+    Both-true ⇒ fire. Either one short ⇒ suppress. Consequence: if you hit
+    a threshold and then P&L hovers there, you get exactly ONE alert for
+    that bucket, then silence until something actually gets worse (or the
+    session rolls over the next day and state is wiped).
     """
     last = alert_state.get('last_alert', {}).get(key)
     if not last:
-        return False
+        return False  # first time we've seen this bucket in this session
     last_ts, last_pnl, last_pct = last
-    # Cooldown expired → always fire (a new day of pain warrants attention).
-    if (now - last_ts) >= timedelta(minutes=cfg['cooldown_min']):
+
+    # Gate 1: cooldown must have elapsed.
+    if (now - last_ts) < timedelta(minutes=cfg['cooldown_min']):
+        return True
+
+    # Gate 2: at least one of the deltas must be breached.
+    abs_moved = (pnl_now is not None and last_pnl is not None
+                 and abs(pnl_now - last_pnl) >= cfg['suppress_delta_abs'])
+    pct_moved = (pct_now is not None and last_pct is not None
+                 and abs(pct_now - last_pct) >= cfg['suppress_delta_pct'])
+    if abs_moved or pct_moved:
         return False
-    # Loss deepened by the configured absolute delta? Fire.
-    if pnl_now is not None and last_pnl is not None:
-        if abs(pnl_now - last_pnl) >= cfg['suppress_delta_abs']:
-            return False
-    # Loss deepened by the configured percentage delta? Fire.
-    if pct_now is not None and last_pct is not None:
-        if abs(pct_now - last_pct) >= cfg['suppress_delta_pct']:
-            return False
-    return True
+
+    return True  # cooldown passed but loss is flat → stay quiet
 
 
 def _record_alert(alert_state: dict, key: tuple, now: datetime,
