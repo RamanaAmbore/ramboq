@@ -26,7 +26,7 @@
   const algoLinks = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/console',   label: 'Terminal'  },
-    { href: '/algo',      label: 'AI Agents' },
+    { href: '/algo',      label: 'Agents' },
     { href: '/orders',    label: 'Orders'    },
     { href: '/admin',     label: 'Users'     },
   ];

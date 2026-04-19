@@ -173,11 +173,11 @@
 </script>
 
 <svelte:head>
-  <title>AI Agents | RamboQuant Analytics</title>
+  <title>Agents | RamboQuant Analytics</title>
 </svelte:head>
 
 <div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">AI Agents</h1>
+<h1 class="page-title-chip mb-2">Agents</h1>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>

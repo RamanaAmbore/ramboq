@@ -46,9 +46,14 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     """Create all tables (idempotent)."""
     async with engine.begin() as conn:
-        from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline  # noqa: F401 — ensure model registered
+        from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline, GrammarToken  # noqa: F401 — ensure model registered
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database: tables verified")
+
+    # Seed grammar tokens (condition / notify / action catalog) BEFORE agents
+    # so any agent referencing a token can validate against the catalog.
+    from backend.api.algo.grammar import seed_grammar_tokens
+    await seed_grammar_tokens()
 
     # Seed built-in agents
     from backend.api.algo.agent_engine import seed_agents

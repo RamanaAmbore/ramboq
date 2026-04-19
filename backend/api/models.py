@@ -6,7 +6,7 @@ import secrets as _secrets
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -192,6 +192,70 @@ class MarketReport(Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent grammar — the extensible token catalog that defines every condition,
+# notify channel, and action available to the Agent engine. Built-in tokens
+# are seeded at startup with is_system=True; operators add/tune runtime
+# tokens via the admin UI (planned) without restarting.
+# ---------------------------------------------------------------------------
+
+class GrammarToken(Base):
+    __tablename__ = "grammar_tokens"
+
+    id: Mapped[int]           = mapped_column(primary_key=True, autoincrement=True)
+
+    # Three grammar domains — each has its own token namespace:
+    #   'condition' : metric, scope, operator, function
+    #   'notify'    : channel, format, template
+    #   'action'    : action_type
+    grammar_kind: Mapped[str] = mapped_column(String(16),  nullable=False, index=True)
+    token_kind: Mapped[str]   = mapped_column(String(32),  nullable=False, index=True)
+    token: Mapped[str]        = mapped_column(String(128), nullable=False)
+
+    # Semantic classification of the value the token produces or accepts.
+    # 'number' | 'string' | 'boolean' | 'enum' | 'array' | 'object' | 'void'
+    value_type: Mapped[Optional[str]] = mapped_column(String(16),  nullable=True)
+    # Human-readable unit for numeric metrics: "₹", "%", "₹/min", "%/min", "min", ...
+    units: Mapped[Optional[str]]      = mapped_column(String(16),  nullable=True)
+    description: Mapped[str]          = mapped_column(Text,        nullable=False, default="")
+
+    # Dispatch pointer. For metric/scope/operator/action_type/function: dotted
+    # path to a Python resolver/handler function. For channel/format: dotted
+    # path to a class or callable. The engine imports by name at reload time.
+    resolver: Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)
+
+    # Structured schema describing expected params — used by the admin UI to
+    # render forms and by the runtime to validate. Shape:
+    #   {"param_name": {"type": "number|string|enum|...", "required": true,
+    #                    "enum": [...], "default": ..., "token_ref_ok": true}}
+    params_schema: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # For enum value_types: list of legal string values.
+    enum_values: Mapped[Optional[list]]   = mapped_column(JSONB, nullable=True)
+    # For notify template tokens: the template body with ${placeholder} syntax.
+    template_body: Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+
+    # System tokens ship with the code and are regenerated from seeds each boot.
+    # Operators cannot delete them; they can only deactivate. Custom tokens have
+    # is_system=False and are freely editable/deletable via the admin UI.
+    is_system: Mapped[bool]   = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool]   = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint('grammar_kind', 'token_kind', 'token',
+                         name='uq_grammar_token'),
     )
 
 

@@ -1,5 +1,5 @@
 """
-AI Agents API routes and WebSocket.
+Agents API routes and WebSocket.
 
 GET  /api/algo/status     — current engine state
 GET  /api/algo/positions  — positions flagged for closing
