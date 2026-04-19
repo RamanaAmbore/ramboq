@@ -132,12 +132,37 @@ One row per breached threshold (abs, pct, and fund checks fire separate rows):
 - `—` shown for columns not applicable to that threshold
 - Email uses HTML `<table>`; Telegram uses `<code>` monospace block
 
-### Alert Thresholds (backend_config.yaml)
-```yaml
-alert_loss_abs: 10000          # ₹ absolute day loss threshold (0 = disabled)
-alert_loss_pct: 2.0            # % day loss threshold (0 = disabled)
-alert_cooldown_minutes: 30     # min between repeat alerts for same account+type
-```
+### Intra-day alert rules (`backend_config.yaml`)
+
+Two orthogonal rule families. Any rule firing ⇒ alert row. Every threshold
+parameterised; `deploy.sh` preserves every `alert_*` key across deploys.
+
+**Static floors** — trip when current P&L crosses a fixed ₹ or % line.
+
+| Scope | Holdings % | Holdings ₹ | Positions % | Positions ₹ |
+|---|---|---|---|---|
+| Per account | `alert_hold_static_pct_acct` (3.0) | — | `alert_pos_static_pct_acct` (2.0) | `alert_pos_static_abs_acct` (30000) |
+| Total       | `alert_hold_static_pct_total` (5.0) | — | `alert_pos_static_pct_total` (2.0) | `alert_pos_static_abs_total` (50000) |
+
+Positions % uses `pnl / used_margin × 100`; skipped when `used_margin = 0`.
+
+**Rate of change** — trip when ΔP&L per minute over `alert_rate_window_min` (default 10 min) is too steep.
+
+| Scope | Holdings ₹/min | Holdings %/min | Positions ₹/min | Positions %/min |
+|---|---|---|---|---|
+| Per account | `alert_hold_rate_abs_per_min_acct` (2000) | `alert_hold_rate_pct_per_min` (0.15) | `alert_pos_rate_abs_per_min_acct` (3000) | `alert_pos_rate_pct_per_min` (0.25) |
+| Total       | `alert_hold_rate_abs_per_min_total` (4000) | same | `alert_pos_rate_abs_per_min_total` (6000) | same |
+
+**Global gates**
+
+- **Market hours**: `_task_performance` only runs `check_and_alert` during segment-open hours → zero ticks outside 09:00–23:30 IST.
+- **Baseline offset**: rate rules suppressed for the first `alert_baseline_offset_min` (default 15) minutes after the first tick of the day, so the opening gap isn't an intra-day bleed.
+- **Suppression**: after a bucket fires, re-fire requires BOTH `(now − last_ts) ≥ alert_cooldown_minutes` (=30) AND `(|Δpnl| ≥ alert_suppress_delta_abs (=₹15,000) OR |Δpct| ≥ alert_suppress_delta_pct (=0.5%))`. Flat loss = indefinite silence within the session.
+- **Session rollover**: `alert_state['last_alert']` and `pnl_history` wipe when the date changes, so morning-of-next-day alerts fire fresh if still below a floor.
+
+`alert_cooldown_minutes: 30` is kept (hardens cooldown); `alert_loss_abs` / `alert_loss_pct` are removed — replaced by the matrix above.
+
+Funds `cash < 0` / `avail_margin < 0` alerts use the simpler single-cooldown logic (unchanged).
 
 ### Telegram Setup
 - Bot token and group chat_id stored in `secrets.yaml` as `telegram_bot_token` and `telegram_chat_id`

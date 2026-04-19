@@ -1,19 +1,109 @@
 """
-Alert utilities — market open/close summaries and intra-day loss alerts.
+Alert utilities — market open/close summaries and intra-day P&L alerts.
 
 Message type prefixes:
   Telegram subject : Open | Alert | Close
   Email subject    : RamboQuant Open: | RamboQuant Alert: | RamboQuant Close:
 
-Thresholds (backend_config.yaml):
-  alert_loss_abs:         alert if day loss > this absolute INR value (0 = disabled)
-  alert_loss_pct:         alert if day loss > this % of current value  (0 = disabled)
-  alert_cooldown_minutes: minimum minutes between repeat alerts for same account+type
+───────────────────────────────────────────────────────────────────────────────
+  INTRA-DAY ALERT SYSTEM
+───────────────────────────────────────────────────────────────────────────────
 
-Secrets (secrets.yaml):
-  telegram_bot_token:  bot token from @BotFather
-  telegram_chat_id:    group chat_id (negative integer for groups)
-  alert_emails:        list of email addresses to notify
+Design goals
+  - Fewer, louder alerts. "Something new is wrong" beats "X happened again".
+  - Every threshold / window / delta is in backend_config.yaml (alert_* keys)
+    so the operator can tune without a code change. deploy.sh preserves any
+    key that starts with "alert_" across deploys.
+  - Alert rules fall into two orthogonal families: static floors (you have
+    lost too much) and rate-of-change (you are losing too fast).
+
+Two rule families
+  STATIC FLOORS    — trip when current P&L crosses a fixed ₹ or % threshold.
+  RATE OF CHANGE   — trip when ΔP&L per minute over the last
+                     alert_rate_window_min minutes is too steep.
+
+───────────────────────────────────────────────────────────────────────────────
+  RULE TABLE — fires when the LHS is true (default thresholds shown inline)
+───────────────────────────────────────────────────────────────────────────────
+
+Notation
+  day_pct, day_val  -- from holdings summary (day_change_percentage / _val)
+  pnl               -- current positions pnl (₹)
+  pnl_pct           -- (pnl / used_margin) × 100
+  Δx / Δmin         -- rate of x over the last alert_rate_window_min minutes
+
+HOLDINGS -------------------------------------------------------------------
+  H-1  Static %, per acct   day_pct ≤ −alert_hold_static_pct_acct      (−3.0 %)
+  H-2  Static %, total      day_pct ≤ −alert_hold_static_pct_total     (−5.0 %)
+  H-3  Rate ₹,   per acct   Δday_val/Δmin ≤ −alert_hold_rate_abs_per_min_acct   (−₹2,000/min)
+  H-4  Rate ₹,   total      Δday_val/Δmin ≤ −alert_hold_rate_abs_per_min_total  (−₹4,000/min)
+  H-5  Rate %,   any scope  Δday_pct/Δmin ≤ −alert_hold_rate_pct_per_min        (−0.15 %/min)
+  Holdings has NO absolute-₹ static floor by design (equity day-moves rarely
+  justify one; the % threshold is the reliable signal).
+
+POSITIONS ------------------------------------------------------------------
+  P-1  Static %, per acct   pnl_pct ≤ −alert_pos_static_pct_acct       (−2.0 %)
+  P-2  Static %, total      pnl_pct ≤ −alert_pos_static_pct_total      (−2.0 %)
+  P-3  Static ₹, per acct   pnl ≤ −alert_pos_static_abs_acct           (−₹30,000)
+  P-4  Static ₹, total      pnl ≤ −alert_pos_static_abs_total          (−₹50,000)
+  P-5  Rate ₹,   per acct   Δpnl/Δmin ≤ −alert_pos_rate_abs_per_min_acct     (−₹3,000/min)
+  P-6  Rate ₹,   total      Δpnl/Δmin ≤ −alert_pos_rate_abs_per_min_total    (−₹6,000/min)
+  P-7  Rate %,   any scope  Δpnl_pct/Δmin ≤ −alert_pos_rate_pct_per_min      (−0.25 %/min)
+  P-1 / P-2 / P-7 are skipped when used_margin == 0 (protects against
+  divide-by-zero when the account has no open positions).
+
+FUNDS (operational, not market-driven) -------------------------------------
+  F-1  Cash negative        cash < 0
+  F-2  Margin negative      avail_margin < 0
+
+───────────────────────────────────────────────────────────────────────────────
+  GLOBAL GATES
+───────────────────────────────────────────────────────────────────────────────
+
+Market-hours gate (enforced by background._task_performance)
+  check_and_alert only runs during segment open hours, so weekends / after-
+  hours generate zero ticks. Equity 09:15–15:30 IST; commodity 09:00–23:30.
+
+Baseline gate (rate rules only)
+  Rate rules are suppressed for the first alert_baseline_offset_min (=15)
+  minutes of the session. The opening gap is not an intra-day bleed.
+
+Suppression gate (all P&L rules)
+  After a bucket fires once, re-fire ONLY when BOTH are true:
+    (now − last_ts) ≥ alert_cooldown_minutes                       (=30 min)
+    (|Δpnl| ≥ alert_suppress_delta_abs                             (=₹15,000)
+     OR |Δpct| ≥ alert_suppress_delta_pct)                         (=0.5 %)
+  Flat loss ⇒ indefinite silence within the session.
+
+Session gate
+  When today.date() ≠ alert_state['session_date'], last_alert / pnl_history
+  are wiped. Fresh day, fresh alerts (static rules may fire on the first
+  tick if overnight carry is still below a floor — by design).
+
+───────────────────────────────────────────────────────────────────────────────
+  WORKED EXAMPLE
+───────────────────────────────────────────────────────────────────────────────
+  pos TOTAL: pnl = −₹80,500, used_margin = ₹35,00,000; 10 min ago pnl = −₹20,000.
+    P-2  (−80500/3500000)·100 = −2.30 %       ≤ −2.0 %       FIRE
+    P-4  pnl = −₹80,500                       ≤ −₹50,000     FIRE
+    P-6  (−80500 − (−20000))/10 = −₹6,050/min ≤ −₹6,000/min  FIRE
+    P-7  (−2.30 − (−0.57))/10 = −0.17 %/min   ≤ −0.25 %/min  no
+  Three rows emit in a single consolidated message unless suppressed.
+
+───────────────────────────────────────────────────────────────────────────────
+  alert_state SCHEMA (owned by _task_performance, lives across ticks)
+───────────────────────────────────────────────────────────────────────────────
+  alert_state['session_date']  date   — session rollover key
+  alert_state['session_start'] datetime — anchor for baseline_offset_min
+  alert_state['pnl_history']   {(section, scope): [(ts, pnl, pct), ...]}
+  alert_state['last_alert']    {(section, scope, kind): (ts, pnl, pct)}
+  alert_state['funds_cash_<scope>'] / alert_state['funds_margin_<scope>']
+      datetime — last fire timestamp for the simple funds cooldown.
+
+Secrets (secrets.yaml)
+  telegram_bot_token  bot token from @BotFather
+  telegram_chat_id    group chat_id (negative integer for groups)
+  alert_emails        list of email addresses to notify
 """
 
 from datetime import datetime, timedelta
