@@ -321,7 +321,7 @@
   /* Page-level timestamp line (cyan, matches log timestamps) */
   :global(.algo-ts) {
     font-size: 0.65rem;
-    color: #7dd3fc;
+    color: #fde047;
     margin-bottom: 0.25rem;
     font-family: ui-monospace, monospace;
   }

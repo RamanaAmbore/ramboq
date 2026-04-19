@@ -399,6 +399,6 @@
   }
   .perf-dark :global(.btn-secondary:hover:not(:disabled)) { background: rgba(255,255,255,0.06); }
 
-  /* Dashboard timestamp — cyan to match other algo timestamps */
-  .perf-dark :global(.perf-ts) { color: #7dd3fc !important; }
+  /* Dashboard timestamp — yellow to match log and algo-ts timestamps */
+  .perf-dark :global(.perf-ts) { color: #fde047 !important; }
 </style>
