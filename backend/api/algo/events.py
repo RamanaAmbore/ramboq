@@ -8,6 +8,7 @@ The alert message always includes the trigger condition text.
 """
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from backend.shared.helpers.ramboq_logger import get_logger
@@ -16,13 +17,22 @@ from backend.shared.helpers.utils import config, is_enabled
 logger = get_logger(__name__)
 
 
+@dataclass
+class EvalResult:
+    """Dispatch payload. The v2 grammar engine builds one of these from each
+    fire so the existing dispatch() path keeps working unchanged."""
+    triggered: bool
+    condition_text: str
+    detail: dict
+
+
 async def dispatch(agent, eval_result, broadcast_fn=None):
     """
     Send alert through all enabled channels for an agent.
 
     Args:
         agent: Agent DB row
-        eval_result: EvalResult from conditions.evaluate()
+        eval_result: EvalResult built by the v2 agent engine when a condition fires
         broadcast_fn: optional WebSocket broadcast function
 
     Alert message format (same across channels):

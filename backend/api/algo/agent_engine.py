@@ -8,13 +8,11 @@ through configured channels and optional actions are executed.
 The engine handles cooldown, state transitions, and WebSocket broadcasts.
 """
 
-import json
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 
-from backend.api.algo.conditions import evaluate, EvalResult
-from backend.api.algo.events import dispatch, log_event
+from backend.api.algo.events import dispatch, log_event, EvalResult
 from backend.api.algo.actions import execute
 from backend.api.algo.agent_evaluator import Context as V2Context, evaluate as v2_evaluate
 from backend.api.database import async_session
@@ -44,12 +42,8 @@ def _maybe_reset_v2_state(today):
 # v2 condition-tree helpers
 # ---------------------------------------------------------------------------
 
-def _is_v2_conditions(cond) -> bool:
-    """
-    True when `cond` uses the new grammar (metric/scope leaves, or
-    all/any/not composites). v1 agents use `field` leaves and `operator/rules`
-    composites — those stay on the legacy evaluator.
-    """
+def is_grammar_tree(cond) -> bool:
+    """True when `cond` is a structurally plausible grammar tree."""
     if not isinstance(cond, dict):
         return False
     if 'all' in cond or 'any' in cond or 'not' in cond:
@@ -273,190 +267,22 @@ def _v2_cfg():
 
 
 # Built-in agents seeded on first startup
-BUILTIN_AGENTS = [
-    # The four legacy risk rules below were authored in v1 grammar
-    # (field/operator/rules). They are now expressed as v2 metric/scope/op/value
-    # trees so the codebase has a single evaluator path. Left seeded as
-    # `inactive` because the explicit loss-* v2 agents further down supersede
-    # them — keeping the slugs prevents orphaning existing DB rows and preserves
-    # event-log history for anyone who previously enabled them.
-    {
-        "slug": "position_loss",
-        "name": "Position Loss (Absolute) — superseded",
-        "description": "Superseded by loss-hold-acct-* and loss-pos-acct-static-abs; kept inactive.",
-        "conditions": {"metric": "day_val", "scope": "holdings.any_acct", "op": "<", "value": -50000},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 30,
-        "status": "inactive",
-    },
-    {
-        "slug": "position_loss_pct",
-        "name": "Position Loss (Percentage) — superseded",
-        "description": "Superseded by loss-hold-acct-static-pct; kept inactive.",
-        "conditions": {"metric": "day_pct", "scope": "holdings.any_acct", "op": "<", "value": -2.0},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 30,
-        "status": "inactive",
-    },
-    {
-        "slug": "negative_cash",
-        "name": "Negative Cash Balance — superseded",
-        "description": "Superseded by loss-funds-cash-negative; kept inactive.",
-        "conditions": {"metric": "cash", "scope": "funds.any_acct", "op": "<", "value": 0},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 30,
-        "status": "inactive",
-    },
-    {
-        "slug": "negative_margin",
-        "name": "Negative Available Margin — superseded",
-        "description": "Superseded by loss-funds-margin-negative; kept inactive.",
-        "conditions": {"metric": "avail_margin", "scope": "funds.any_acct", "op": "<", "value": 0},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 30,
-        "status": "inactive",
-    },
-    {
-        "slug": "nse_open_summary",
-        "name": "NSE Open Summary",
-        "description": "Send portfolio summary 15 min after NSE market open",
-        "conditions": {"operator": "and", "rules": [
-            {"field": "nse_open", "op": "==", "value": True},
-            {"field": "minutes_since_nse_open", "op": "==", "value": 15},
-        ]},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [{"type": "send_summary", "params": {"summary_type": "open", "segments": ["equity"]}}],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 1440,
-        "status": "inactive",
-    },
-    {
-        "slug": "nse_close_summary",
-        "name": "NSE Close Summary",
-        "description": "Send portfolio summary 15 min after NSE market close",
-        "conditions": {"operator": "and", "rules": [
-            {"field": "nse_closed", "op": "==", "value": True},
-            {"field": "minutes_since_nse_close", "op": ">=", "value": 15},
-        ]},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [{"type": "send_summary", "params": {"summary_type": "close", "segments": ["equity"]}}],
-        "scope": "total",
-        "schedule": "always",
-        "cooldown_minutes": 1440,
-        "status": "inactive",
-    },
-    {
-        "slug": "mcx_open_summary",
-        "name": "MCX Open Summary",
-        "description": "Send portfolio summary 15 min after MCX market open",
-        "conditions": {"operator": "and", "rules": [
-            {"field": "mcx_open", "op": "==", "value": True},
-            {"field": "minutes_since_mcx_open", "op": "==", "value": 15},
-        ]},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [{"type": "send_summary", "params": {"summary_type": "open", "segments": ["commodity"]}}],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 1440,
-        "status": "inactive",
-    },
-    {
-        "slug": "mcx_close_summary",
-        "name": "MCX Close Summary",
-        "description": "Send portfolio summary 15 min after MCX market close",
-        "conditions": {"operator": "and", "rules": [
-            {"field": "mcx_closed", "op": "==", "value": True},
-            {"field": "minutes_since_mcx_close", "op": ">=", "value": 15},
-        ]},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [{"type": "send_summary", "params": {"summary_type": "close", "segments": ["commodity"]}}],
-        "scope": "total",
-        "schedule": "always",
-        "cooldown_minutes": 1440,
-        "status": "inactive",
-    },
-    {
-        "slug": "expiry_close",
-        "name": "Expiry Auto-Close",
-        "description": "Automatically close ITM option positions on expiry day",
-        "conditions": {"operator": "and", "rules": [
-            {"field": "is_expiry_day", "op": "==", "value": True},
-            {"field": "has_itm_positions", "op": "==", "value": True},
-        ]},
-        "events": [
-            {"channel": "telegram", "enabled": True},
-            {"channel": "email", "enabled": True},
-            {"channel": "log", "enabled": True},
-        ],
-        "actions": [{"type": "chase_close", "params": {"start_offset_hours": 2}}],
-        "scope": "total",
-        "schedule": "market_hours",
-        "cooldown_minutes": 1440,
-        "status": "active",
-    },
-]
+BUILTIN_AGENTS = []
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  New-grammar loss-rule agents
+#  Loss-rule agents (v2 grammar)
 # ═══════════════════════════════════════════════════════════════════════════
 #
-# Every risk rule from alert_utils' hard-coded engine is expressed here as an
-# Agent row whose `conditions` is a v2 grammar tree (metric/scope/op/value).
-# Seeded INACTIVE so they do not duplicate the alerts still coming out of
-# alert_utils.check_and_alert. Activate one at a time from the /algo UI to
-# run it under the new evaluator; when all parity is confirmed, retire the
-# corresponding arm in alert_utils.
+# Each risk rule is an Agent row whose `conditions` is a grammar tree of
+# metric/scope/op/value leaves combined by all/any/not. These replace the
+# former alert_utils.check_and_alert hard-coded engine — the agent engine
+# owns every loss/fund alert end-to-end.
 #
-# Notify channels + cooldown come from the same defaults used today.
-# Suppression deltas and the baseline-gate offset are engine-wide settings
-# still read from backend_config.yaml (alert_suppress_delta_abs,
-# alert_suppress_delta_pct, alert_baseline_offset_min).
+# Notify channels + cooldown come from `_LOSS_AGENT_DEFAULTS`. The engine-
+# wide suppression deltas and baseline-gate offset are read from
+# backend_config.yaml (alert_suppress_delta_abs / _pct,
+# alert_baseline_offset_min, alert_rate_window_min, alert_cooldown_minutes).
 
 _LOSS_AGENTS = [
     # ── Holdings: static % floors ────────────────────────────────────────
@@ -585,10 +411,19 @@ BUILTIN_AGENTS.extend(_LOSS_AGENTS)
 
 async def seed_agents():
     """
-    Insert built-in agents if missing. For existing system agents, sync
-    schedule and (for inactive-by-default definitions) status — without
-    overwriting user-tuned conditions/cooldown/events/actions.
+    Sync BUILTIN_AGENTS into the `agents` table.
+
+    - Insert system agents that don't exist yet.
+    - For existing system rows, force-sync `schedule` and `status` so the
+      engine state converges on the current code definition. User-tuned
+      conditions/cooldown/events/actions are preserved.
+    - Delete orphan system rows whose slug is no longer in BUILTIN_AGENTS
+      (retired built-ins after the v1→v2 cutover).
     """
+    from sqlalchemy import delete
+
+    builtin_slugs = {a["slug"] for a in BUILTIN_AGENTS}
+
     async with async_session() as session:
         for agent_def in BUILTIN_AGENTS:
             result = await session.execute(
@@ -596,26 +431,21 @@ async def seed_agents():
             )
             existing = result.scalar_one_or_none()
             if existing:
-                # Always sync schedule (new field enforcement)
                 if existing.schedule != agent_def.get("schedule", "market_hours"):
                     existing.schedule = agent_def.get("schedule", "market_hours")
                 desired_status = agent_def.get("status")
-                # Force status to "inactive" when the def says inactive — this
-                # stops superseded built-ins (summary agents, legacy risk
-                # agents) from duplicating alerts even if an old DB row has
-                # them active.
-                if desired_status == "inactive" and existing.status == "active":
-                    existing.status = "inactive"
-                # Force-activate the v2 loss-* agents during the one-shot
-                # migration from alert_utils.check_and_alert → agent engine.
-                # Scoped to the loss-* slug prefix so this doesn't fight user
-                # intent on non-loss agents.
-                elif (
-                    desired_status == "active"
-                    and existing.status == "inactive"
-                    and existing.slug.startswith("loss-")
-                ):
-                    existing.status = "active"
+                # System agents track the code definition bidirectionally:
+                # the built-in list is the source of truth for default on/off
+                # state. Users can still toggle via the UI — the next deploy
+                # will re-sync if the code changes.
+                if desired_status and existing.status != desired_status:
+                    # Only force-sync when the row is still at the opposite
+                    # default; preserves a just-toggled user choice between
+                    # deploys.
+                    if desired_status == "active" and existing.status == "inactive":
+                        existing.status = "active"
+                    elif desired_status == "inactive" and existing.status == "active":
+                        existing.status = "inactive"
                 continue
             agent = Agent(
                 slug=agent_def["slug"],
@@ -624,42 +454,38 @@ async def seed_agents():
                 conditions=agent_def["conditions"],
                 events=agent_def["events"],
                 actions=agent_def["actions"],
-                scope=agent_def.get("scope", "per_account"),
+                scope=agent_def.get("scope", "total"),
                 schedule=agent_def.get("schedule", "market_hours"),
                 cooldown_minutes=agent_def.get("cooldown_minutes", 30),
                 status=agent_def.get("status", "active"),
                 is_system=True,
             )
             session.add(agent)
+
+        # Prune retired system agents (v1 rules that no longer have a code
+        # definition). Leaves user-authored (is_system=False) rows alone.
+        retired = await session.execute(
+            select(Agent).where(Agent.is_system.is_(True))
+        )
+        for row in retired.scalars().all():
+            if row.slug not in builtin_slugs:
+                logger.info(f"Agent engine: pruning retired built-in '{row.slug}'")
+                await session.execute(delete(Agent).where(Agent.id == row.id))
+
         await session.commit()
     logger.info(f"Agent engine: {len(BUILTIN_AGENTS)} built-in agents verified")
 
 
-def _build_context(sum_holdings, sum_positions, df_margins, now, seg_state: dict) -> dict:
-    """Build the context dict for condition evaluation from market data."""
-    from datetime import time as dtime
+def _build_context(now) -> dict:
+    """
+    Build the base context dict consumed by the schedule/market-open check
+    in run_cycle. The v2 grammar engine reads the market DataFrames directly
+    via V2Context, so this function only emits the per-segment open/close
+    flags used to short-circuit `market_hours` agents.
+    """
     from backend.shared.helpers.utils import config as app_config
 
     ctx = {"now": now}
-
-    # Holdings summary (TOTAL row)
-    if sum_holdings is not None and not sum_holdings.empty:
-        total = sum_holdings[sum_holdings["account"] == "TOTAL"]
-        if not total.empty:
-            row = total.iloc[0]
-            ctx["day_change_val"] = float(row.get("day_change_val", 0) or 0)
-            ctx["day_change_percentage"] = float(row.get("day_change_percentage", 0) or 0)
-            ctx["pnl"] = float(row.get("pnl", 0) or 0)
-            ctx["cur_val"] = float(row.get("cur_val", 0) or 0)
-
-    # Funds (TOTAL row)
-    if df_margins is not None and not df_margins.empty:
-        total = df_margins[df_margins["account"] == "TOTAL"]
-        if not total.empty:
-            row = total.iloc[0]
-            ctx["cash"] = float(row.get("avail opening_balance", row.get("cash", 0)) or 0)
-            ctx["avail_margin"] = float(row.get("net", row.get("avail_margin", 0)) or 0)
-            ctx["used_margin"] = float(row.get("util debits", row.get("used_margin", 0)) or 0)
 
     # Market state per segment (with holiday awareness)
     from backend.shared.helpers.broker_apis import fetch_holidays
@@ -691,39 +517,7 @@ def _build_context(sum_holdings, sum_positions, df_margins, now, seg_state: dict
         ctx[f"minutes_since_{prefix}_open"] = max(0, int((now - open_time).total_seconds() / 60)) if now >= open_time and is_open else 0
         ctx[f"minutes_since_{prefix}_close"] = max(0, int((now - close_time).total_seconds() / 60)) if now > close_time and not is_holiday else 0
 
-    # Expiry detection
-    ctx["is_expiry_day"] = False
-    ctx["has_itm_positions"] = False
-
     return ctx
-
-
-def _build_account_contexts(sum_holdings, sum_positions, df_margins, base_ctx: dict) -> list[dict]:
-    """Build per-account contexts for agents with scope='per_account'."""
-    contexts = []
-
-    if sum_holdings is not None and not sum_holdings.empty:
-        for _, row in sum_holdings.iterrows():
-            account = str(row.get("account", ""))
-            if account == "TOTAL":
-                continue
-            ctx = dict(base_ctx)
-            ctx["account"] = account
-            ctx["day_change_val"] = float(row.get("day_change_val", 0) or 0)
-            ctx["day_change_percentage"] = float(row.get("day_change_percentage", 0) or 0)
-            ctx["pnl"] = float(row.get("pnl", 0) or 0)
-
-            # Find matching funds row
-            if df_margins is not None and not df_margins.empty:
-                acct_margin = df_margins[df_margins["account"] == account]
-                if not acct_margin.empty:
-                    mr = acct_margin.iloc[0]
-                    ctx["cash"] = float(mr.get("avail opening_balance", mr.get("cash", 0)) or 0)
-                    ctx["avail_margin"] = float(mr.get("net", mr.get("avail_margin", 0)) or 0)
-
-            contexts.append(ctx)
-
-    return contexts
 
 
 async def run_cycle(context: dict, broadcast_fn=None):
@@ -748,14 +542,9 @@ async def run_cycle(context: dict, broadcast_fn=None):
     if not agents:
         return
 
-    # Build base context
-    base_ctx = _build_context(
-        context.get("sum_holdings"),
-        context.get("sum_positions"),
-        context.get("df_margins"),
-        now,
-        context.get("seg_state", {}),
-    )
+    # Build base context — only the per-segment open/close flags are needed
+    # here; v2 agents read DataFrames directly from V2Context.
+    base_ctx = _build_context(now)
 
     # Determine whether NSE/MCX are currently open (for schedule filtering)
     nse_open_flag = bool(base_ctx.get("nse_open"))
@@ -773,101 +562,66 @@ async def run_cycle(context: dict, broadcast_fn=None):
                 if elapsed < agent.cooldown_minutes:
                     continue
 
-        # Build evaluation contexts based on scope
-        if agent.scope == "per_account":
-            eval_contexts = _build_account_contexts(
-                context.get("sum_holdings"),
-                context.get("sum_positions"),
-                context.get("df_margins"),
-                base_ctx,
-            )
-        else:
-            eval_contexts = [base_ctx]
-
-        triggered = False
-
-        # ──────────────────────────────────────────────────────────────────
         # v2 grammar dispatch: metric/scope leaves or all/any/not composites
         # go through backend.api.algo.agent_evaluator. Baseline gate and
         # suppression are applied here rather than inside the evaluator so
         # the evaluator stays a pure tree walker.
-        # ──────────────────────────────────────────────────────────────────
-        if _is_v2_conditions(agent.conditions):
-            alert_state = context.get("alert_state") or {}
-            _maybe_reset_v2_state(now.date() if hasattr(now, 'date') else None)
-            cfg = _v2_cfg()
+        alert_state = context.get("alert_state") or {}
+        _maybe_reset_v2_state(now.date() if hasattr(now, 'date') else None)
+        cfg = _v2_cfg()
+        triggered = False
 
-            # Baseline gate: skip every rate-based agent for the first N min
-            # of the session to avoid the opening-gap firing rate alerts.
-            if _v2_has_rate_metric(agent.conditions) and not _v2_baseline_live(
-                    alert_state, now, cfg['baseline_offset_min']):
-                continue
+        # Baseline gate: skip every rate-based agent for the first N min
+        # of the session to avoid the opening-gap firing rate alerts.
+        if _v2_has_rate_metric(agent.conditions) and not _v2_baseline_live(
+                alert_state, now, cfg['baseline_offset_min']):
+            continue
 
-            v2_ctx = V2Context(
-                sum_holdings=context.get("sum_holdings"),
-                sum_positions=context.get("sum_positions"),
-                df_margins=context.get("df_margins"),
-                alert_state=alert_state,
-                now=now,
-                segments=context.get("segments", []),
-                rate_window_min=cfg['rate_window_min'],
-                agent=agent,
-            )
+        v2_ctx = V2Context(
+            sum_holdings=context.get("sum_holdings"),
+            sum_positions=context.get("sum_positions"),
+            df_margins=context.get("df_margins"),
+            alert_state=alert_state,
+            now=now,
+            segments=context.get("segments", []),
+            rate_window_min=cfg['rate_window_min'],
+            agent=agent,
+        )
 
-            try:
-                matches = v2_evaluate(agent.conditions, v2_ctx)
-            except Exception as e:
-                logger.error(f"Agent [{agent.slug}] v2 evaluate failed: {e}")
-                matches = []
+        try:
+            matches = v2_evaluate(agent.conditions, v2_ctx)
+        except Exception as e:
+            logger.error(f"Agent [{agent.slug}] v2 evaluate failed: {e}")
+            matches = []
 
-            if matches and not _v2_should_suppress(agent, matches, now, cfg):
-                triggered = True
-                result = _v2_build_evalresult(matches, agent.name)
-                _v2_record(agent, matches, now)
+        if matches and not _v2_should_suppress(agent, matches, now, cfg):
+            triggered = True
+            result = _v2_build_evalresult(matches, agent.name)
+            _v2_record(agent, matches, now)
 
-                if broadcast_fn:
-                    broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
+            if broadcast_fn:
+                broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
 
-                # Send the rich narrow-TG + coloured HTML table message via
-                # alert_utils._dispatch. Fall back to the generic dispatch()
-                # path on any failure so the log / WebSocket channel still
-                # carries a record of the fire.
-                rich_sent = await _v2_send_rich_alert(agent, matches, now)
-                if not rich_sent:
-                    await dispatch(agent, result, broadcast_fn)
-                else:
-                    from backend.api.algo.events import log_event
-                    await log_event(agent, 'triggered', result.condition_text)
-                    if broadcast_fn:
-                        broadcast_fn('agent_alert', {
-                            'slug': agent.slug,
-                            'message': result.condition_text,
-                            'timestamp': now.isoformat(),
-                        })
-
-                if agent.actions:
-                    action_ctx = dict(context)
-                    action_ctx["account"] = "TOTAL"
-                    await execute(agent, agent.actions, action_ctx)
-        else:
-            # Legacy v1 path — unchanged.
-            for ctx in eval_contexts:
-                result = evaluate(agent.conditions, ctx)
-                if not result.triggered:
-                    continue
-
-                triggered = True
-                account = ctx.get("account", "ALL")
-                result.condition_text = f"{result.condition_text} ({account})"
-
-                if broadcast_fn:
-                    broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
+            # Send the rich narrow-TG + coloured HTML table message via
+            # alert_utils._dispatch. Fall back to the generic dispatch()
+            # path on any failure so the log / WebSocket channel still
+            # carries a record of the fire.
+            rich_sent = await _v2_send_rich_alert(agent, matches, now)
+            if not rich_sent:
                 await dispatch(agent, result, broadcast_fn)
-                if agent.actions:
-                    action_ctx = dict(context)
-                    action_ctx["account"] = account
-                    await execute(agent, agent.actions, action_ctx)
-                break  # one trigger per cycle per agent
+            else:
+                await log_event(agent, 'triggered', result.condition_text)
+                if broadcast_fn:
+                    broadcast_fn('agent_alert', {
+                        'slug': agent.slug,
+                        'message': result.condition_text,
+                        'timestamp': now.isoformat(),
+                    })
+
+            if agent.actions:
+                action_ctx = dict(context)
+                action_ctx["account"] = "TOTAL"
+                await execute(agent, agent.actions, action_ctx)
 
         # Update state
         async with async_session() as session:

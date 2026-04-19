@@ -47,7 +47,7 @@ Both branches (`main`, `dev`) are kept in sync — every feature is developed on
 - **`date_time_utils.py`** — Indian/EST timezone utilities using `zoneinfo`. `is_market_open(now, holiday_set, market_start, market_end)` — returns True if not in holiday_set, not a weekend, and within time window. Weekends (Sat/Sun) are rejected. Special trading sessions (Muhurat etc.) need an explicit override when reintroduced.
 - **`ramboq_logger.py`** — Rotating file handlers (5MB), line-limited handlers (50 lines), queue-based async logging
 - **`summarise.py`** — Summary/alert helper functions extracted for use by the API background tasks (open/close summary + loss alert check).
-- **`alert_utils.py`** — Loss alert and market summary notifications. `send_summary(sum_holdings, sum_positions, ist_display, msg_type, label, df_margins)` — sends open/close summary including a Funds table (Account | Cash | Avail Margin | Used Margin | Collateral) when `df_margins` is provided. `check_and_alert(sum_holdings, sum_positions, alert_state, ist_display, df_margins)` — checks day P&L thresholds AND negative fund balances (cash < 0 or avail margin < 0), fires one row per breached threshold. Both send via Telegram Bot API and SMTP email. Message type prefixes: Telegram `Open|Alert|Close`, email subject `RamboQuant Open:|RamboQuant Alert:|RamboQuant Close:`. Email uses HTML `<table>` formatting; Telegram uses `<code>` monospace block. Non-main branches show `[branch]` tag in all subjects/headers plus `⚠ Branch: <name>` in Telegram and a yellow banner in email body.
+- **`alert_utils.py`** — Market-summary notifier + delivery helpers shared with the agent engine. Public: `send_summary(sum_holdings, sum_positions, ist_display, msg_type, label, df_margins)` — sends open/close summary (Holdings / Positions / Funds tables) via Telegram + SMTP. Internal (imported by the v2 agent engine): `_tg_alert_body`, `_email_alert_body`, `_dispatch`. Message prefixes: Telegram `Open|Agent|Close`, email subject `RamboQuant Open:|RamboQuant Agent:|RamboQuant Close:`. Non-main branches show `[branch]` tag + ⚠ banner. The former `check_and_alert` loss engine has been retired; all loss / fund-negative rules are now v2 agents (see Agent Framework section).
 
 ### Webhook / Deployment (`webhook/`)
 - **`deploy.sh`** — Unified deploy script. Called as `deploy.sh <ENV> <REF>` where ENV is `prod|dev`. Common section handles git update, config merge, writing `deploy_branch` into `backend_config.yaml`, service restart, and `notify_deploy.py`. Env-specific sections: nginx sync (prod only), `pip install` + `npm run build` (prod/dev).
@@ -140,37 +140,34 @@ One row per breached threshold (abs, pct, and fund checks fire separate rows):
 - Email uses HTML `<table>` with per-kind row colour (yellow = static, red = rate, grey = funds); Telegram uses `<code>` monospace block in the narrow 2-line-per-row format
 - Rows sorted `Holdings → Positions → Funds`, per-account before `TOTAL` — every agent that fires on the same tick consolidates into one message
 
-### Intra-day alert rules (`backend_config.yaml`)
+### Intra-day loss rules — now v2 agents
 
-Two orthogonal rule families. Any rule firing ⇒ alert row. Every threshold
-parameterised; `deploy.sh` preserves every `alert_*` key across deploys.
+Every loss / fund-negative rule ships as a `loss-*` Agent row (grammar tree
+of metric/scope/op/value leaves). See `_LOSS_AGENTS` in
+`backend/api/algo/agent_engine.py` for the 14 seeded rules. Default floors
+(editable live from the /algo page, per agent):
 
-**Static floors** — trip when current P&L crosses a fixed ₹ or % line.
+| Scope (scope token) | Holdings % | Positions % | Positions ₹ |
+|---|---|---|---|
+| Per account (`holdings.any_acct` / `positions.any_acct`) | −3.0 % | −2.0 % | −₹30,000 |
+| Total (`.total`)                                         | −5.0 % | −2.0 % | −₹50,000 |
 
-| Scope | Holdings % | Holdings ₹ | Positions % | Positions ₹ |
-|---|---|---|---|---|
-| Per account | `alert_hold_static_pct_acct` (3.0) | — | `alert_pos_static_pct_acct` (2.0) | `alert_pos_static_abs_acct` (30000) |
-| Total       | `alert_hold_static_pct_total` (5.0) | — | `alert_pos_static_pct_total` (2.0) | `alert_pos_static_abs_total` (50000) |
+Rate rules use the `day_rate_abs` / `day_rate_pct` / `pnl_rate_abs` /
+`pnl_rate_pct` metrics; defaults are −₹2k/min (acct) and −₹4k/min (total)
+for holdings, −₹3k/min (acct) and −₹6k/min (total) for positions, and
+−0.15 %/min (holdings) / −0.25 %/min (positions) scope-agnostic. Two fund
+agents (`loss-funds-cash-negative` / `loss-funds-margin-negative`) fire on
+`cash < 0` and `avail_margin < 0`.
 
-Positions % uses `pnl / used_margin × 100`; skipped when `used_margin = 0`.
+**Global gates** (engine-wide; `alert_*` keys in `backend_config.yaml`):
 
-**Rate of change** — trip when ΔP&L per minute over `alert_rate_window_min` (default 10 min) is too steep.
+- **Market hours**: run_cycle skips `schedule: market_hours` agents outside segment-open hours.
+- **Baseline offset**: `alert_baseline_offset_min` (15). Rate agents stay silent for this long after session start.
+- **Rate window**: `alert_rate_window_min` (10) — minutes of P&L history used to compute ΔP&L/Δmin.
+- **Cooldown**: `alert_cooldown_minutes` (30). After a fire, re-fire requires the cooldown AND (|Δpnl| ≥ `alert_suppress_delta_abs` (₹15k) OR |Δpct| ≥ `alert_suppress_delta_pct` (0.5 %)). Flat loss ⇒ silent for the rest of the session.
+- **Session rollover**: in-memory suppression state wipes on date change.
 
-| Scope | Holdings ₹/min | Holdings %/min | Positions ₹/min | Positions %/min |
-|---|---|---|---|---|
-| Per account | `alert_hold_rate_abs_per_min_acct` (2000) | `alert_hold_rate_pct_per_min` (0.15) | `alert_pos_rate_abs_per_min_acct` (3000) | `alert_pos_rate_pct_per_min` (0.25) |
-| Total       | `alert_hold_rate_abs_per_min_total` (4000) | same | `alert_pos_rate_abs_per_min_total` (6000) | same |
-
-**Global gates**
-
-- **Market hours**: `_task_performance` only runs `check_and_alert` during segment-open hours → zero ticks outside 09:00–23:30 IST.
-- **Baseline offset**: rate rules suppressed for the first `alert_baseline_offset_min` (default 15) minutes after the first tick of the day, so the opening gap isn't an intra-day bleed.
-- **Suppression**: after a bucket fires, re-fire requires BOTH `(now − last_ts) ≥ alert_cooldown_minutes` (=30) AND `(|Δpnl| ≥ alert_suppress_delta_abs (=₹15,000) OR |Δpct| ≥ alert_suppress_delta_pct (=0.5%))`. Flat loss = indefinite silence within the session.
-- **Session rollover**: `alert_state['last_alert']` and `pnl_history` wipe when the date changes, so morning-of-next-day alerts fire fresh if still below a floor.
-
-`alert_cooldown_minutes: 30` is kept (hardens cooldown); `alert_loss_abs` / `alert_loss_pct` are removed — replaced by the matrix above.
-
-Funds `cash < 0` / `avail_margin < 0` alerts use the simpler single-cooldown logic (unchanged).
+`deploy.sh` preserves every `alert_*` key across deploys.
 
 ### Telegram Setup
 - Bot token and group chat_id stored in `secrets.yaml` as `telegram_bot_token` and `telegram_chat_id`
@@ -382,11 +379,11 @@ leaf       ::=  { "metric": <metric-token>,
 - `validate(cond) -> list[str]` — dry-check; every referenced token must exist in the registry. Used by `POST /api/agents/validate-condition` and surfaced in the `/algo` editor's Validate button.
 - `Context` — bundles `sum_holdings`, `sum_positions`, `df_margins`, `alert_state` (for rate history), `now`, `segments`, `rate_window_min`, `agent`.
 
-Legacy agents with `field` leaves and `operator/rules` composites flow through the old evaluator (`backend/api/algo/conditions.py`) unchanged. `run_cycle` auto-detects the grammar per agent.
+The v1 `field/operator/rules` evaluator has been retired; every agent must use the grammar tree above. `run_cycle` calls `agent_evaluator.evaluate` directly.
 
 ### Action grammar
 
-Action tokens (seeded): `place_order`, `modify_order`, `cancel_order`, `cancel_all_orders`, `chase_close_positions`, `monitor_order`, `deactivate_agent`, `set_flag`, `emit_log`. Every token carries a typed `params_schema` with `required` / `enum` / `default` / `token_ref_ok` fields so the admin UI and the runtime agree on the shape. Handlers live in `backend/api/algo/actions.py` (currently stubs that log the invocation — real broker wiring lands when parity with the legacy engine is confirmed on dev).
+Action tokens (seeded): `place_order`, `modify_order`, `cancel_order`, `cancel_all_orders`, `chase_close_positions`, `monitor_order`, `deactivate_agent`, `set_flag`, `emit_log`. Every token carries a typed `params_schema` with `required` / `enum` / `default` / `token_ref_ok` fields so the admin UI and the runtime agree on the shape. Handlers live in `backend/api/algo/actions.py` — currently stubs that log the invocation; real broker wiring lands as each action type is promoted out of stub mode.
 
 ### Admin endpoints
 
@@ -463,7 +460,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else`; copy to server after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh` |
 | Change browser tab title or SEO meta tags | `frontend/src/app.html` and per-route `<svelte:head>` sections |
 | Change footer text | `backend/config/frontend_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
-| Change alert thresholds | `backend/config/backend_config.yaml` — `alert_loss_abs`, `alert_loss_pct`, `alert_cooldown_minutes` |
+| Change a loss threshold | Edit the corresponding `loss-*` agent from the `/algo` page (its condition tree's `value` is the threshold). Engine-wide knobs stay in `backend/config/backend_config.yaml` under `alert_cooldown_minutes`, `alert_rate_window_min`, `alert_baseline_offset_min`, `alert_suppress_delta_abs/_pct`. |
 | Change alert recipients | `backend/config/secrets.yaml` on server — `alert_emails`, `telegram_chat_id` |
 | Enable/disable deploy notification | `backend/config/backend_config.yaml` on server — `notify_on_startup` (True=dev, False=prod) |
 | Add/change market segment hours | `backend/config/backend_config.yaml` — `market_segments` block |

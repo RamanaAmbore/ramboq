@@ -112,30 +112,12 @@
     catch (e) { return { ok: false, error: e.message }; }
   });
 
-  function leafLabel(node) {
-    if (!node) return '';
-    // v2 leaf: metric @ scope op value
-    if (node.metric && node.scope) {
-      const v = typeof node.value === 'number' && Math.abs(node.value) >= 1000
-        ? `₹${node.value.toLocaleString('en-IN')}` : JSON.stringify(node.value);
-      return `${node.metric}@${node.scope} ${node.op || '?'} ${v}`;
-    }
-    // v1 leaf: field op value
-    if (node.field !== undefined) {
-      const v = typeof node.value === 'number' && Math.abs(node.value) >= 1000
-        ? `₹${node.value.toLocaleString('en-IN')}` : JSON.stringify(node.value);
-      return `${node.field} ${node.op || '?'} ${v}`;
-    }
-    return JSON.stringify(node);
-  }
-
-  function treeNodeKind(node) {
-    if (!node || typeof node !== 'object') return 'leaf';
-    if (Array.isArray(node.all)) return 'all';
-    if (Array.isArray(node.any)) return 'any';
-    if (node.not !== undefined) return 'not';
-    if (Array.isArray(node.rules) && node.operator) return node.operator; // v1 composite
-    return 'leaf';
+  function leafLabel(/** @type {any} */ node) {
+    if (!node || !node.metric || !node.scope) return JSON.stringify(node);
+    const v = typeof node.value === 'number' && Math.abs(node.value) >= 1000
+      ? `₹${node.value.toLocaleString('en-IN')}`
+      : JSON.stringify(node.value);
+    return `${node.metric}@${node.scope} ${node.op || '?'} ${v}`;
   }
 
   async function runValidation() {
@@ -202,27 +184,12 @@
     cooldown: 'bg-amber-300', error: 'bg-red-600',
   }[s] || 'bg-slate-500');
 
-  const eventColor = (/** @type {string} */ t) => ({
-    triggered: 'text-orange-600', alert_sent: 'text-yellow-600',
-    action_success: 'text-green-600', action_failed: 'text-red-600',
-    activated: 'text-gray-500', deactivated: 'text-gray-500',
-    config_changed: 'text-purple-600',
-  }[t] || 'text-gray-500');
-
-  const eventIcon = (/** @type {string} */ t) => ({
-    triggered: '🟠', alert_sent: '🟡', action_success: '🟢',
-    action_failed: '🔴', activated: '⚪', deactivated: '⚪', config_changed: '🟣',
-  }[t] || '⚪');
-
   function conditionSummary(/** @type {any} */ cond) {
     if (!cond) return '—';
-    if (cond.operator && cond.rules) {
-      return cond.rules.map(r => conditionSummary(r)).join(` ${cond.operator.toUpperCase()} `);
-    }
-    const f = cond.field || '?';
-    const v = typeof cond.value === 'number' && Math.abs(cond.value) >= 1000
-      ? `₹${cond.value.toLocaleString('en-IN')}` : String(cond.value ?? '?');
-    return `${f} ${cond.op || '?'} ${v}`;
+    if (Array.isArray(cond.all)) return cond.all.map(conditionSummary).join(' AND ');
+    if (Array.isArray(cond.any)) return cond.any.map(conditionSummary).join(' OR ');
+    if (cond.not !== undefined) return `NOT (${conditionSummary(cond.not)})`;
+    return leafLabel(cond);
   }
 
   function actionSummary(/** @type {any[]} */ actions) {
@@ -239,12 +206,10 @@
   // Derive category from slug prefix so new agents bucket automatically
   // without needing a DB field. If the catalog grows unwieldy, promote
   // this to an Agent column later.
-  function categoryFor(slug) {
+  function categoryFor(/** @type {string} */ slug) {
     if (!slug) return 'Other';
-    if (slug.startsWith('loss-') ||
-        slug === 'position_loss' || slug === 'position_loss_pct' ||
-        slug.startsWith('negative_')) return 'Loss & Risk';
-    if (slug.endsWith('_summary') || slug.includes('summary')) return 'Summaries';
+    if (slug.startsWith('loss-')) return 'Loss & Risk';
+    if (slug.includes('summary')) return 'Summaries';
     if (slug.includes('expiry') || slug.includes('close') || slug.includes('order')) return 'Automation';
     return 'Other';
   }
@@ -266,12 +231,6 @@
   }
 
   let expandedSlug = $state(/** @type {string|null} */(null));
-
-  function isV2Conditions(cond) {
-    if (!cond || typeof cond !== 'object') return false;
-    if ('all' in cond || 'any' in cond || 'not' in cond) return true;
-    return 'metric' in cond && 'scope' in cond;
-  }
 
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
@@ -317,9 +276,6 @@
           class="w-full flex items-center gap-2 px-2 py-1 text-left cursor-pointer select-none">
           <span class="w-2 h-2 rounded-full {statusDot(agent.status)} flex-shrink-0"></span>
           <span class="text-xs text-[#fbbf24] flex-1 truncate">{agent.name}</span>
-          {#if isV2Conditions(agent.conditions)}
-            <span class="text-[0.5rem] px-1 py-0 rounded bg-[#7dd3fc]/15 text-[#7dd3fc] border border-[#7dd3fc]/30 uppercase tracking-wider flex-shrink-0">v2</span>
-          {/if}
           <button type="button"
             onclick={(e) => { e.stopPropagation(); toggle(agent); }}
             class="text-[0.55rem] px-1.5 py-0 rounded font-medium border flex-shrink-0
@@ -366,24 +322,23 @@
   </div>
 {/each}
 
-<!-- Recursive tree renderer for the live preview (v1 + v2 condition trees) -->
-{#snippet renderCondNode(node)}
+<!-- Recursive tree renderer for the live preview. Grammar nodes are:
+       { all: [...] } | { any: [...] } | { not: node } | { metric, scope, op, value } -->
+{#snippet renderCondNode(/** @type {any} */ node)}
   {#if !node || typeof node !== 'object'}
     <div class="tree-leaf">{JSON.stringify(node)}</div>
-  {:else if Array.isArray(node.all) || (Array.isArray(node.rules) && node.operator === 'and')}
-    {@const kids = node.all ?? node.rules ?? []}
+  {:else if Array.isArray(node.all)}
     <div class="tree-node tree-node-all">
       <div class="tree-op">ALL</div>
       <div class="tree-children">
-        {#each kids as child}{@render renderCondNode(child)}{/each}
+        {#each node.all as child}{@render renderCondNode(child)}{/each}
       </div>
     </div>
-  {:else if Array.isArray(node.any) || (Array.isArray(node.rules) && node.operator === 'or')}
-    {@const kids = node.any ?? node.rules ?? []}
+  {:else if Array.isArray(node.any)}
     <div class="tree-node tree-node-any">
       <div class="tree-op">ANY</div>
       <div class="tree-children">
-        {#each kids as child}{@render renderCondNode(child)}{/each}
+        {#each node.any as child}{@render renderCondNode(child)}{/each}
       </div>
     </div>
   {:else if node.not !== undefined}

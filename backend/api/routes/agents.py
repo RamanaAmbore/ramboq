@@ -2,7 +2,6 @@
 Agent CRUD API + terminal interpreter.
 
 GET  /api/agents/               — list all agents
-GET  /api/agents/types          — available condition fields, operators, action types
 GET  /api/agents/{slug}         — single agent detail
 POST /api/agents/               — create new agent
 PUT  /api/agents/{slug}         — update agent config
@@ -57,7 +56,7 @@ class AgentCreateRequest(msgspec.Struct):
     events: list
     actions: list = []
     description: str = ""
-    scope: str = "per_account"
+    scope: str = "total"
     schedule: str = "market_hours"
     cooldown_minutes: int = 30
 
@@ -91,32 +90,11 @@ class InterpretResponse(msgspec.Struct):
     success: bool = True
 
 
-# Available fields for condition builder
-CONDITION_FIELDS = [
-    {"key": "day_change_val", "label": "Day P&L (₹)", "type": "number", "category": "holdings"},
-    {"key": "day_change_percentage", "label": "Day P&L (%)", "type": "number", "category": "holdings"},
-    {"key": "pnl", "label": "Total P&L (₹)", "type": "number", "category": "holdings"},
-    {"key": "pnl_percentage", "label": "Total P&L (%)", "type": "number", "category": "holdings"},
-    {"key": "cur_val", "label": "Current Value (₹)", "type": "number", "category": "holdings"},
-    {"key": "cash", "label": "Cash Balance (₹)", "type": "number", "category": "funds"},
-    {"key": "avail_margin", "label": "Available Margin (₹)", "type": "number", "category": "funds"},
-    {"key": "used_margin", "label": "Used Margin (₹)", "type": "number", "category": "funds"},
-    {"key": "collateral", "label": "Collateral (₹)", "type": "number", "category": "funds"},
-    {"key": "nse_open", "label": "NSE Market Open", "type": "boolean", "category": "market"},
-    {"key": "nse_closed", "label": "NSE Market Closed", "type": "boolean", "category": "market"},
-    {"key": "mcx_open", "label": "MCX Market Open", "type": "boolean", "category": "market"},
-    {"key": "mcx_closed", "label": "MCX Market Closed", "type": "boolean", "category": "market"},
-    {"key": "minutes_since_nse_open", "label": "Minutes Since NSE Open", "type": "number", "category": "market"},
-    {"key": "minutes_since_nse_close", "label": "Minutes Since NSE Close", "type": "number", "category": "market"},
-    {"key": "minutes_since_mcx_open", "label": "Minutes Since MCX Open", "type": "number", "category": "market"},
-    {"key": "minutes_since_mcx_close", "label": "Minutes Since MCX Close", "type": "number", "category": "market"},
-    {"key": "is_expiry_day", "label": "Is Expiry Day", "type": "boolean", "category": "expiry"},
-    {"key": "has_itm_positions", "label": "Has ITM Positions", "type": "boolean", "category": "expiry"},
-]
-
-CONDITION_OPERATORS = [">", "<", ">=", "<=", "==", "!="]
-ACTION_TYPES = ["chase_close", "send_summary", "place_order"]
-EVENT_CHANNELS = ["telegram", "email", "websocket", "log"]
+# Legacy field/operator metadata (CONDITION_FIELDS, CONDITION_OPERATORS,
+# ACTION_TYPES, EVENT_CHANNELS) is retired. The frontend now reads the full
+# grammar from GET /api/admin/grammar/tokens — metrics, scopes, operators,
+# channels, templates, and actions are all catalogued in `grammar_tokens`
+# and extensible at runtime. See backend/api/algo/grammar_registry.py.
 
 
 def _agent_to_info(a: Agent) -> AgentInfo:
@@ -147,37 +125,29 @@ class AgentController(Controller):
             agents = result.scalars().all()
         return [_agent_to_info(a) for a in agents]
 
-    @get("/types")
-    async def get_types(self) -> dict:
-        return {
-            "fields": CONDITION_FIELDS,
-            "operators": CONDITION_OPERATORS,
-            "action_types": ACTION_TYPES,
-            "event_channels": EVENT_CHANNELS,
-        }
-
     @post("/validate-condition")
     async def validate_condition(self, data: dict) -> dict:
         """
-        Dry-check a v2 condition tree against the live Grammar Registry.
+        Dry-check a condition tree against the live Grammar Registry.
 
-        Request body shape: the condition tree itself (the same JSON that
-        will be saved into Agent.conditions).
-
-        Response:
-          { "ok": bool, "errors": [str, ...], "grammar": "v1"|"v2" }
-
-        v1 trees (legacy `field`/`operator`+`rules` shape) are accepted
-        without deep validation — they flow through the old evaluator.
+        Request body: the condition tree JSON that will be saved into
+        Agent.conditions. Response: { ok, errors, grammar }. `grammar`
+        is always "v2" since the legacy evaluator has been retired;
+        structurally invalid trees report a single top-level error.
         """
         from backend.api.algo.agent_evaluator import validate as v2_validate
-        from backend.api.algo.agent_engine import _is_v2_conditions
+        from backend.api.algo.agent_engine import is_grammar_tree
 
         cond = data or {}
-        if _is_v2_conditions(cond):
-            errors = v2_validate(cond)
-            return {"ok": not errors, "errors": errors, "grammar": "v2"}
-        return {"ok": True, "errors": [], "grammar": "v1"}
+        if not is_grammar_tree(cond):
+            return {
+                "ok": False,
+                "errors": ["condition tree must be a grammar node: "
+                           "either a metric/scope leaf or an all/any/not composite"],
+                "grammar": "v2",
+            }
+        errors = v2_validate(cond)
+        return {"ok": not errors, "errors": errors, "grammar": "v2"}
 
     @get("/{slug:str}")
     async def get_agent(self, slug: str) -> AgentInfo:

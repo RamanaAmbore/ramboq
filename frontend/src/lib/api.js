@@ -132,14 +132,12 @@ export const deleteGrammarToken = async (id) => {
   }
 };
 export const reloadGrammarRegistry = () => _post('/admin/grammar/reload', {}, { auth: true });
-export const fetchAgentTypes  = () => _get('/agents/types', { auth: true });
 export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
 export const fetchRecentAgentEvents = (n = 100) => _get(`/agents/events/recent?n=${n}`, { auth: true });
 export const createAgent      = (payload) => _post('/agents/', payload, { auth: true });
 
 // Dry-validate a condition tree against the grammar registry. Returns
-// { ok: bool, errors: string[], grammar: 'v1'|'v2' }. v1 trees skip deep
-// checks since they flow through the legacy evaluator.
+// { ok: bool, errors: string[], grammar: 'v2' }.
 export const validateAgentCondition = (condTree) =>
   _post('/agents/validate-condition', condTree, { auth: true });
 
