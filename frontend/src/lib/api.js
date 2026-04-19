@@ -112,6 +112,25 @@ export const patchGrammarToken = async (id, payload) => {
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
   return res.json();
 };
+export const createGrammarToken = async (payload) => {
+  const res = await fetch(`${BASE}/admin/grammar/tokens`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+};
+export const deleteGrammarToken = async (id) => {
+  const res = await fetch(`${BASE}/admin/grammar/tokens/${id}`, {
+    method: 'DELETE', headers: _authHeaders(),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok && res.status !== 204) {
+    const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed');
+  }
+};
 export const reloadGrammarRegistry = () => _post('/admin/grammar/reload', {}, { auth: true });
 export const fetchAgentTypes  = () => _get('/agents/types', { auth: true });
 export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
