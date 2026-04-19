@@ -48,6 +48,19 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline, GrammarToken  # noqa: F401 — ensure model registered
         await conn.run_sync(Base.metadata.create_all)
+
+        # Idempotent column additions for tables that pre-date the column.
+        # PostgreSQL ADD COLUMN IF NOT EXISTS is supported since 9.6 and is a
+        # cheap no-op when the column already exists.
+        from sqlalchemy import text
+        await conn.execute(text(
+            "ALTER TABLE algo_orders ADD COLUMN IF NOT EXISTS mode VARCHAR(8) "
+            "NOT NULL DEFAULT 'live'"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE agent_events ADD COLUMN IF NOT EXISTS test_mode BOOLEAN "
+            "NOT NULL DEFAULT FALSE"
+        ))
     logger.info("Database: tables verified")
 
     # Seed grammar tokens (condition / notify / action catalog) BEFORE agents

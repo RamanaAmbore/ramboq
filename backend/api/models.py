@@ -96,6 +96,7 @@ class AlgoOrder(Base):
     slippage: Mapped[float]      = mapped_column(Float, nullable=True)
     status: Mapped[str]          = mapped_column(String(16), nullable=False, default="pending")
     engine: Mapped[str]          = mapped_column(String(16), nullable=False, default="expiry")  # expiry/manual/interpreter
+    mode: Mapped[str]            = mapped_column(String(8), nullable=False, default="live")     # live/test
     broker_order_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     expiry_date: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)
@@ -172,6 +173,7 @@ class AgentEvent(Base):
     event_type: Mapped[str]      = mapped_column(String(32), nullable=False)
     trigger_condition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    test_mode: Mapped[bool]      = mapped_column(Boolean, nullable=False, default=False)
     timestamp: Mapped[datetime]  = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),

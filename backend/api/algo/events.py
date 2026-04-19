@@ -26,7 +26,7 @@ class EvalResult:
     detail: dict
 
 
-async def dispatch(agent, eval_result, broadcast_fn=None):
+async def dispatch(agent, eval_result, broadcast_fn=None, test_mode: bool = False):
     """
     Send alert through all enabled channels for an agent.
 
@@ -34,6 +34,9 @@ async def dispatch(agent, eval_result, broadcast_fn=None):
         agent: Agent DB row
         eval_result: EvalResult built by the v2 agent engine when a condition fires
         broadcast_fn: optional WebSocket broadcast function
+        test_mode:   when True every surface (subjects, preambles, logs) is
+                     prefixed with TEST so simulated fires are never confused
+                     with real ones.
 
     Alert message format (same across channels):
         Alert [branch] — <Agent Name>
@@ -45,22 +48,26 @@ async def dispatch(agent, eval_result, broadcast_fn=None):
 
     branch = config.get("deploy_branch", "main")
     branch_tag = f" [{branch}]" if branch != "main" else ""
+    test_tag   = "TEST " if test_mode else ""
     ist_display = timestamp_display()
     condition_text = eval_result.condition_text or ""
 
     # Single unified content shown across all channels
     body_lines = [
-        f"Alert{branch_tag} — {agent.name}",
+        f"{test_tag}Alert{branch_tag} — {agent.name}",
         f"When: {ist_display}",
         f"Condition: {condition_text}",
     ]
     telegram_body = "\n".join(body_lines)
-    email_subject = f"RamboQuant Agent{branch_tag}: {agent.name}"
+    email_subject = f"RamboQuant {test_tag}Agent{branch_tag}: {agent.name}"
     email_body = (
         f"<html><body style='font-family:sans-serif'>"
+        + ("<p style='padding:8px;background:#fde4e4;border:1px solid #dc3545;"
+           "border-radius:4px;color:#721c24'>🚨 <b>TEST RUN</b> — fabricated "
+           "market data, not a real alert.</p>" if test_mode else "")
         + (f"<p style='padding:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px'>"
            f"⚠ <b>Branch: {branch}</b></p>" if branch != "main" else "")
-        + f"<p><b>Alert{branch_tag} — {agent.name}</b></p>"
+        + f"<p><b>{test_tag}Alert{branch_tag} — {agent.name}</b></p>"
         + f"<p style='color:#666'>{ist_display}</p>"
         + f"<p><b>Condition:</b> {condition_text}</p>"
         + f"</body></html>"
@@ -83,23 +90,28 @@ async def dispatch(agent, eval_result, broadcast_fn=None):
                     "slug": agent.slug,
                     "message": telegram_body,
                     "condition": condition_text,
+                    "test_mode": test_mode,
                 })
             elif channel == "log":
-                logger.warning(f"ALERT [{agent.slug}]{branch_tag}: {agent.name} — {condition_text}")
+                logger.warning(f"{test_tag}ALERT [{agent.slug}]{branch_tag}: {agent.name} — {condition_text}")
         except Exception as e:
             logger.error(f"Agent event dispatch failed ({channel}): {e}")
 
-    # Persist to agent_events table
-    await _log_event(agent, "triggered", condition_text, eval_result.detail)
+    # Persist to agent_events table (test_mode flag flows through)
+    await _log_event(agent, "triggered", condition_text, eval_result.detail,
+                     test_mode=test_mode)
 
 
-async def log_event(agent, event_type: str, condition_text: str = "", detail: dict = None):
+async def log_event(agent, event_type: str, condition_text: str = "",
+                    detail: dict = None, test_mode: bool = False):
     """Convenience wrapper for logging agent events."""
-    await _log_event(agent, event_type, condition_text, detail)
+    await _log_event(agent, event_type, condition_text, detail, test_mode=test_mode)
 
 
-async def _log_event(agent, event_type: str, condition_text: str = "", detail: dict = None):
-    """Persist event to agent_events table."""
+async def _log_event(agent, event_type: str, condition_text: str = "",
+                     detail: dict = None, test_mode: bool = False):
+    """Persist event to agent_events table. `test_mode` is stored verbatim so
+    the `/api/test/events/recent` endpoint can filter cleanly."""
     try:
         from backend.api.database import async_session
         from backend.api.models import AgentEvent
@@ -110,6 +122,7 @@ async def _log_event(agent, event_type: str, condition_text: str = "", detail: d
                 event_type=event_type,
                 trigger_condition=condition_text,
                 detail=json.dumps(detail) if detail else None,
+                test_mode=test_mode,
             )
             session.add(event)
             await session.commit()

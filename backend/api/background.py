@@ -268,6 +268,17 @@ async def _task_performance(state: dict) -> None:
         if not open_segments:
             continue
 
+        # If the market simulator is running, step out of the real refresh
+        # entirely — the sim driver owns its own tick loop and calls
+        # run_cycle against fabricated data. Mixing a live Kite fetch with
+        # sim state on the same alert_state dict would corrupt rate history.
+        try:
+            from backend.api.algo.sim.driver import get_driver
+            if get_driver().active:
+                continue
+        except Exception:
+            pass
+
         try:
             (df_holdings, sum_holdings), (df_positions, sum_positions) = \
                 await _run(lambda: (_fetch_holdings_direct(), _fetch_positions_direct()))

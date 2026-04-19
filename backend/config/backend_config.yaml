@@ -24,8 +24,9 @@ cap_in_dev:
   genai: False             # GenAI market update (Gemini)
   telegram: False          # Telegram alert notifications
   mail: False              # Email notifications (SMTP)
-  notify_on_deploy: True  # Send test Telegram+email on each deploy
+  notify_on_deploy: True   # Send test Telegram+email on each deploy
   market_feed: False       # Market news feed (Google News RSS)
+  sim_mode: True           # Enables /api/test endpoints (dev only; never on main)
 
 # Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
 # it here so the actual market-report response has room (avoids mid-sentence truncation).

@@ -40,6 +40,7 @@
     { href: '/orders',          label: 'Orders'    },
     { href: '/admin',           label: 'Users'     },
     { href: '/admin/grammar',   label: 'Grammar'   },
+    { href: '/admin/test',      label: 'Test'      },
   ];
 
   let menuOpen = $state(false);

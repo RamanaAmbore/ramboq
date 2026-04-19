@@ -1,0 +1,159 @@
+# Market-simulation scenarios for /api/test.
+#
+# Each scenario declares an initial portfolio (holdings / positions / margins)
+# and a sequence of ticks. Each tick applies a patch to the running state so
+# the sim can drive agents through well-known failure modes.
+#
+# Accounts are masked (ZG#### / ZJ####) to match what the live pipeline
+# emits, so the alert formatters render identically whether data is real
+# or fabricated.
+#
+# Patches use dotted keys:
+#   holdings.<account>.<col>       — float value for that holdings row
+#   holdings.TOTAL.<col>           — float value for the TOTAL row
+#   positions.<account>.<col>      — same, for positions
+#   margins.<account>.<col>        — same, for margins (df_margins)
+#
+# The driver recomputes TOTAL rows automatically after each patch, so you
+# usually only need to patch individual accounts.
+
+- slug: crash-open
+  name: Fast morning crash (Equity)
+  description: Holdings gap down 2% at T+0, another 3.5% over the next 30s. Hits
+    the static per-account % floor immediately and the rate rule shortly after.
+  initial:
+    holdings:
+      - account: ZG####
+        inv_val:  500000
+        cur_val:  490000
+        pnl:      -10000
+        pnl_percentage: -2.0
+        day_change_val: -10000
+        day_change_percentage: -2.0
+      - account: ZJ####
+        inv_val:  300000
+        cur_val:  297000
+        pnl:      -3000
+        pnl_percentage: -1.0
+        day_change_val: -3000
+        day_change_percentage: -1.0
+    positions:
+      - account: ZG####
+        pnl: -5000
+      - account: ZJ####
+        pnl: 2000
+    margins:
+      - account: ZG####
+        avail opening_balance: 120000
+        net:                    95000
+        util debits:            40000
+        avail collateral:       20000
+      - account: ZJ####
+        avail opening_balance:  80000
+        net:                    60000
+        util debits:            20000
+        avail collateral:       10000
+  ticks:
+    - at: 0
+      patch:
+        holdings.ZG####.day_change_percentage: -3.5
+        holdings.ZG####.day_change_val: -17500
+        holdings.ZG####.cur_val: 482500
+    - at: 20
+      patch:
+        holdings.ZG####.day_change_percentage: -5.2
+        holdings.ZG####.day_change_val: -26000
+        holdings.ZG####.cur_val: 474000
+    - at: 40
+      patch:
+        holdings.ZG####.day_change_percentage: -6.1
+        holdings.ZG####.day_change_val: -30500
+        holdings.ZG####.cur_val: 469500
+        holdings.ZJ####.day_change_percentage: -3.2
+        holdings.ZJ####.day_change_val: -9600
+
+- slug: cash-negative
+  name: Margin call / cash goes negative
+  description: Account cash dips below zero. Should trip the loss-funds-cash-negative agent.
+  initial:
+    holdings: []
+    positions: []
+    margins:
+      - account: ZG####
+        avail opening_balance: 5000
+        net:                   4000
+        util debits:           1000
+        avail collateral:      0
+  ticks:
+    - at: 0
+      patch:
+        margins.ZG####.avail opening_balance: -1500
+        margins.ZG####.net: -2500
+
+- slug: positions-abs-breach
+  name: Positions ₹ loss crosses ₹30k (per-acct) + ₹50k (total)
+  description: One account's positions pnl drops to -50k, then -70k. Triggers
+    both per-account and total abs-₹ rules.
+  initial:
+    holdings: []
+    positions:
+      - account: ZG####
+        pnl: -10000
+      - account: ZJ####
+        pnl: -5000
+    margins:
+      - account: ZG####
+        avail opening_balance: 100000
+        net:                    75000
+        util debits:            25000
+        avail collateral:       10000
+      - account: ZJ####
+        avail opening_balance:  50000
+        net:                    40000
+        util debits:            10000
+        avail collateral:        5000
+  ticks:
+    - at: 0
+      patch:
+        positions.ZG####.pnl: -35000
+    - at: 15
+      patch:
+        positions.ZG####.pnl: -55000
+        positions.ZJ####.pnl: -12000
+
+- slug: rate-breach
+  name: Holdings rate-of-change breach
+  description: Day P&L slides fast enough to trip the rate rule after the
+    baseline-offset window (15 min → shorten via step mode or wait).
+  initial:
+    holdings:
+      - account: ZG####
+        inv_val:  500000
+        cur_val:  500000
+        pnl:      0
+        pnl_percentage: 0
+        day_change_val: 0
+        day_change_percentage: 0
+    positions: []
+    margins:
+      - account: ZG####
+        avail opening_balance: 100000
+        net:                    75000
+        util debits:            25000
+        avail collateral:       10000
+  ticks:
+    - at: 0
+      patch:
+        holdings.ZG####.day_change_val:        -5000
+        holdings.ZG####.day_change_percentage: -1.0
+        holdings.ZG####.cur_val:               495000
+    - at: 60
+      patch:
+        holdings.ZG####.day_change_val:        -12000
+        holdings.ZG####.day_change_percentage: -2.4
+        holdings.ZG####.cur_val:               488000
+    - at: 120
+      patch:
+        holdings.ZG####.day_change_val:        -22000
+        holdings.ZG####.day_change_percentage: -4.4
+        holdings.ZG####.cur_val:               478000

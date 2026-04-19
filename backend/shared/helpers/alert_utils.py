@@ -127,42 +127,72 @@ def _branch_banner_html(branch: str) -> str:
     )
 
 
+def _test_banner_html() -> str:
+    """Red banner shown on every simulated-market email."""
+    return (
+        "<div style='background-color:#fde4e4;border:1px solid #dc3545;"
+        "border-radius:4px;padding:8px 14px;margin-bottom:12px;"
+        "font-family:sans-serif;font-size:13px;color:#721c24'>"
+        "&#128680; <strong>TEST RUN — fabricated market data, not a real alert.</strong>"
+        "</div>"
+    )
+
+
 def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: str,
-              subject_detail: str):
-    """Send Telegram + email with correct prefixes for the message type."""
+              subject_detail: str, test_mode: bool = False):
+    """
+    Send Telegram + email with correct prefixes for the message type.
+
+    When `test_mode` is True every surface (subjects, Telegram preamble, email
+    banner, log lines) is tagged `TEST` so the operator — and anybody else in
+    the Telegram group — can distinguish a simulated fire from a real one.
+    """
     import logging
     _log = logging.getLogger('backend.api.background')
-    _log.info(f"_dispatch called: {msg_type} — {subject_detail}")
+    test_prefix = '[TEST] ' if test_mode else ''
+    _log.info(f"_dispatch called: {test_prefix}{msg_type} — {subject_detail}")
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
+    tg_prefix_full    = f"TEST {tg_prefix}"    if test_mode else tg_prefix
+    email_prefix_full = f"TEST {email_prefix}" if test_mode else email_prefix
 
     branch = config.get('deploy_branch', 'main')
     branch_tag = f" [{branch}]" if branch != 'main' else ''
 
-    # Telegram: fixed-width monospace table; branch warning line on non-main
-    branch_line = f"\n⚠ <b>Branch: {branch}</b>" if branch != 'main' else ''
+    # Telegram: fixed-width monospace table; branch + test warning lines
+    warning_lines = []
+    if test_mode:
+        warning_lines.append("&#128680; <b>TEST RUN</b> — fabricated market data")
+    if branch != 'main':
+        warning_lines.append(f"⚠ <b>Branch: {branch}</b>")
+    warning_block = ("\n" + "\n".join(warning_lines)) if warning_lines else ''
+
     telegram_msg = (
-        f"<b>{tg_prefix}{branch_tag} — {ist_display}</b>{branch_line}\n\n"
+        f"<b>{tg_prefix_full}{branch_tag} — {ist_display}</b>{warning_block}\n\n"
         f"<code>{tg_table}</code>"
     )
     _send_telegram(telegram_msg)
 
     alert_emails = secrets.get('alert_emails', [])
     if alert_emails:
-        subject = f"{email_prefix}{branch_tag}{subject_detail}" if branch_tag else f"{email_prefix}{subject_detail}"
-        branch_banner = _branch_banner_html(branch) if branch != 'main' else ''
+        subject = f"{email_prefix_full}{branch_tag}{subject_detail}" if branch_tag else f"{email_prefix_full}{subject_detail}"
+        banners = ''
+        if test_mode:
+            banners += _test_banner_html()
+        if branch != 'main':
+            banners += _branch_banner_html(branch)
         html_body = (
             f"<html><body style='font-family:sans-serif'>"
-            f"{branch_banner}"
-            f"<p style='font-size:14px'><b>{tg_prefix}{branch_tag} — {ist_display}</b></p>"
+            f"{banners}"
+            f"<p style='font-size:14px'><b>{tg_prefix_full}{branch_tag} — {ist_display}</b></p>"
             f"{email_table_html}"
             f"</body></html>"
         )
         for email in alert_emails:
             try:
                 send_email("", email, subject, html_body)
-                logger.info(f"{tg_prefix} email sent to {email}")
+                logger.info(f"{test_prefix}{tg_prefix} email sent to {email}")
             except Exception as e:
-                logger.error(f"Failed to send {tg_prefix} email to {email}: {e}")
+                logger.error(f"Failed to send {test_prefix}{tg_prefix} email to {email}: {e}")
 
 
 # ---------------------------------------------------------------------------

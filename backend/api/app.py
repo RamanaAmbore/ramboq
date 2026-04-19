@@ -35,6 +35,7 @@ from backend.api.routes.instruments import InstrumentsController
 from backend.api.routes.orders import AccountsController, OrdersController
 from backend.api.routes.quote import QuoteController
 from backend.api.routes.positions import PositionsController
+from backend.api.routes.test import TestController
 from backend.api.routes.ws import performance_ws_handler
 from backend.shared.helpers.ramboq_logger import get_logger
 
@@ -122,6 +123,7 @@ _route_handlers = [
     QuoteController,
     ContactController,
     ConfigController,
+    TestController,
     performance_ws_handler,
     algo_ws_handler,
 ]

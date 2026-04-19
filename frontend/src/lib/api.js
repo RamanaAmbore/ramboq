@@ -141,6 +141,19 @@ export const createAgent      = (payload) => _post('/agents/', payload, { auth: 
 export const validateAgentCondition = (condTree) =>
   _post('/agents/validate-condition', condTree, { auth: true });
 
+// ── Market simulation control plane (/api/test/*) ─────────────────────
+// Only works on non-main branches with cap_in_dev.sim_mode: True.
+export const fetchSimScenarios    = () => _get('/test/scenarios', { auth: true });
+export const fetchSimStatus       = () => _get('/test/status', { auth: true });
+export const startSim             = (scenario, rate_ms = 2000) =>
+  _post('/test/start', { scenario, rate_ms }, { auth: true });
+export const stopSim              = () => _post('/test/stop', {}, { auth: true });
+export const stepSim              = () => _post('/test/step', {}, { auth: true });
+export const runSimCycle          = () => _post('/test/run-cycle', {}, { auth: true });
+export const clearSimArtefacts    = () => _post('/test/clear', {}, { auth: true });
+export const fetchSimEvents       = (n = 50) => _get(`/test/events/recent?limit=${n}`, { auth: true });
+export const fetchSimOrders       = (n = 50) => _get(`/test/orders/recent?limit=${n}`, { auth: true });
+
 export async function updateAgent(slug, payload) {
   const res = await fetch(`${BASE}/agents/${slug}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json', ..._authHeaders() },

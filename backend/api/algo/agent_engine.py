@@ -178,7 +178,7 @@ def _v2_match_to_alertrow(match: dict) -> dict:
     )
 
 
-async def _v2_send_rich_alert(agent, matches, now):
+async def _v2_send_rich_alert(agent, matches, now, test_mode: bool = False):
     """
     Render the v2 alert as the same narrow-TG + HTML-table format the legacy
     engine uses, and send through Telegram + email via alert_utils's own
@@ -206,7 +206,8 @@ async def _v2_send_rich_alert(agent, matches, now):
     email_html = _email_alert_body(rows)
     subject    = f"Agent {agent.slug}"
     try:
-        _dispatch('alert', timestamp_display(), tg_body, email_html, subject)
+        _dispatch('alert', timestamp_display(), tg_body, email_html, subject,
+                  test_mode=test_mode)
     except Exception as e:
         logger.error(f"Agent [{agent.slug}] rich alert send failed: {e}")
         return False
@@ -572,6 +573,11 @@ async def run_cycle(context: dict, broadcast_fn=None):
         # suppression are applied here rather than inside the evaluator so
         # the evaluator stays a pure tree walker.
         alert_state = context.get("alert_state") or {}
+        # `test_mode` is set by the simulator; it flows through V2Context and
+        # tags every downstream artefact (Telegram, email, agent_events,
+        # algo_orders) with a TEST marker so real and simulated fires can't
+        # be confused in the logs or the group chat.
+        test_mode = bool(alert_state.get("test_mode") or context.get("test_mode"))
         _maybe_reset_v2_state(now.date() if hasattr(now, 'date') else None)
         cfg = _v2_cfg()
         triggered = False
@@ -611,21 +617,23 @@ async def run_cycle(context: dict, broadcast_fn=None):
             # alert_utils._dispatch. Fall back to the generic dispatch()
             # path on any failure so the log / WebSocket channel still
             # carries a record of the fire.
-            rich_sent = await _v2_send_rich_alert(agent, matches, now)
+            rich_sent = await _v2_send_rich_alert(agent, matches, now, test_mode=test_mode)
             if not rich_sent:
-                await dispatch(agent, result, broadcast_fn)
+                await dispatch(agent, result, broadcast_fn, test_mode=test_mode)
             else:
-                await log_event(agent, 'triggered', result.condition_text)
+                await log_event(agent, 'triggered', result.condition_text, test_mode=test_mode)
                 if broadcast_fn:
                     broadcast_fn('agent_alert', {
                         'slug': agent.slug,
                         'message': result.condition_text,
                         'timestamp': now.isoformat(),
+                        'test_mode': test_mode,
                     })
 
             if agent.actions:
                 action_ctx = dict(context)
                 action_ctx["account"] = "TOTAL"
+                action_ctx["test_mode"] = test_mode
                 await execute(agent, agent.actions, action_ctx)
 
         # Update state
