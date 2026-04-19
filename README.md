@@ -12,7 +12,8 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 | ASGI server | Uvicorn |
 | Frontend | SvelteKit + TailwindCSS + AG Grid |
 | Database | PostgreSQL 17 via SQLAlchemy 2.x + asyncpg |
-| Background | Litestar async tasks (primary) + ARQ/Redis (optional) |
+| Background | Litestar async tasks |
+| Agent engine | DB-backed grammar catalog (`grammar_tokens`) + tree evaluator |
 | DataFrame | Polars (API aggregation) + pandas (broker layer) |
 | Auth | JWT HS256 + PBKDF2-SHA256 passwords |
 | Broker | Zerodha Kite API |
@@ -25,9 +26,11 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 - **Portfolio tracking**: Holdings, positions, funds — per-account and combined views via AG Grid
 - **AI market reports**: Gemini 2.5 Flash with Google Search grounding, cached daily
 - **Real-time updates**: WebSocket push from background tasks to connected browsers
+- **Agent framework**: Every loss/risk rule is a declarative Agent row — grammar tree of `metric / scope / op / value` leaves combined by `all / any / not`. Inline editor with a live graphical tree preview on the `/algo` page; token catalog is editable live at `/admin/grammar`.
+- **Expiry auto-close**: Adaptive limit-order chase engine closes ITM option positions before expiry.
 - **Partner management**: Registration (pending admin approval), KYC, contribution tracking, profit share
-- **Admin dashboard**: User management (create, approve/reject, edit all partner fields), log viewer
-- **Notifications**: Telegram + email alerts for market open/close summaries and loss thresholds
+- **Admin dashboard**: User management (create, approve/reject, edit all partner fields), log viewer, grammar catalog CRUD
+- **Notifications**: Telegram + email for market open/close summaries and every agent alert
 - **Segment-aware**: Equity (NSE/NFO 09:15–15:30) and Commodity (MCX 09:00–23:30) handled independently
 - **Multi-environment**: prod (ramboq.com), dev (dev.ramboq.com)
 
@@ -91,7 +94,20 @@ CREATE DATABASE ramboq_dev OWNER rambo_admin;
 | DELETE | `/api/admin/users/{username}` | admin | Deactivate user |
 | GET | `/api/admin/logs` | admin | Tail log file |
 | POST | `/api/admin/exec` | admin | Run shell command |
-| WS | `/ws/performance` | — | Live push |
+| GET | `/api/agents/` | admin | List all agents |
+| POST | `/api/agents/` | admin | Create custom agent |
+| GET | `/api/agents/{slug}` | admin | Single agent detail |
+| PUT | `/api/agents/{slug}` | admin | Update agent (name, conditions, events, actions, scope, schedule, cooldown) |
+| PUT | `/api/agents/{slug}/activate` / `/deactivate` | admin | Toggle agent on/off |
+| DELETE | `/api/agents/{slug}` | admin | Delete custom agent (system rows rejected) |
+| POST | `/api/agents/validate-condition` | admin | Dry-check a condition tree against the grammar registry |
+| GET | `/api/agents/{slug}/events` | admin | Per-agent alert history |
+| GET | `/api/agents/events/recent` | admin | Most recent alerts across all agents |
+| GET | `/api/admin/grammar/tokens` | admin | List grammar catalog (metrics / scopes / operators / channels / templates / actions) |
+| POST / PATCH / DELETE | `/api/admin/grammar/tokens[/{id}]` | admin | CRUD custom tokens (system tokens are toggle-only) |
+| POST | `/api/admin/grammar/reload` | admin | Hot-rebuild the grammar registry after edits |
+| WS | `/ws/performance` | — | Live push for portfolio |
+| WS | `/ws/algo` | — | Live push for agent alerts + state transitions |
 
 All responses include `refreshed_at` in IST|EST dual-timezone format.
 
@@ -119,15 +135,25 @@ backend/
       config.py         — Post/about content
       orders.py         — Order CRUD (protected)
       ws.py             — WebSocket fan-out
+    algo/
+      agent_engine.py    — `run_cycle` evaluation loop, BUILTIN_AGENTS seed (14 loss-* rules)
+      agent_evaluator.py — Pure tree walker for `all/any/not` + metric/scope/op/value leaves
+      grammar.py         — SYSTEM_TOKENS + resolver functions
+      grammar_registry.py — In-process dispatch table; rebuilt from DB on `/grammar/reload`
+      events.py          — Channel dispatcher (Telegram / email / WebSocket / log) + `EvalResult`
+      actions.py         — Action handler stubs (place_order, chase_close_positions, …)
+      expiry.py          — Expiry-day ITM auto-close engine
+      chase.py           — Adaptive limit-order chase primitives
+    routes/
+      agents.py          — Agent CRUD + /validate-condition
+      grammar.py         — Grammar token CRUD + /reload
+      algo.py            — /ws/algo fan-out
   shared/helpers/       — broker_apis, connections, decorators, alert_utils, genai_api, summarise, ...
-  workers/
-    refresh_worker.py   — ARQ worker (optional alternative to Litestar background)
   scripts/              — One-off admin / maintenance scripts
   config/               — backend_config.yaml, frontend_config.yaml, constants.yaml, secrets.yaml
   requirements.txt      — Core dependencies
   requirements-api.txt  — API-specific dependencies
   run_api.sh            — API entrypoint (cd to repo root, then uvicorn)
-  run_worker.sh         — ARQ worker entrypoint
   pyproject.toml        — ramboq-backend package
 
 frontend/
@@ -147,6 +173,8 @@ frontend/
       contact/        — Contact form
       signin/         — Sign In / Register (name, email, phone, PAN)
       admin/          — User management (create, approve, edit all fields)
+      admin/grammar/  — Grammar catalog (three-tab metric/notify/action CRUD, Reload Registry)
+      algo/           — Agents page — grouped rows, click to expand, edit inline with live tree preview
       portfolio/      — Partner contribution info
 
 webhook/              — deploy.sh, dispatch.sh, service files, hooks.json
@@ -166,17 +194,12 @@ bash backend/run_api.sh
 # Start frontend dev server
 cd frontend && npm install && npm run dev
 # open http://localhost:5173
-
-# Optional: ARQ worker (alternative background mode, needs Redis)
-docker run -d -p 6379:6379 redis:alpine
-bash backend/run_worker.sh
 ```
 
 **Dependencies (`requirements-api.txt`):**
 ```
 litestar[standard]~=2.12
 uvicorn[standard]~=0.34
-redis~=5.2, arq~=0.26        # optional — ARQ worker mode
 polars>=1.0
 httpx~=0.28
 PyJWT~=2.10
@@ -239,21 +262,29 @@ alert_emails:
   - <email>
 ```
 
-### `backend_config.yaml` (tracked — server flags preserved across deploys)
-Key settings: `deploy_branch`, `cap_in_dev`, `genai`, `telegram`, `mail`, `notify_on_startup`, `alert_loss_abs`, `alert_loss_pct`, `performance_refresh_interval`, `market_segments`.
+### `backend_config.yaml` (tracked — server-tuned keys preserved across deploys)
+Top-level keys include: `deploy_branch`, `cap_in_dev` (dict of per-capability toggles: `genai`, `telegram`, `mail`, `notify_on_deploy`, `market_feed`), `performance_refresh_interval`, `open_summary_offset_minutes`, `close_summary_offset_minutes`, `market_segments`, `genai_thinking_budget`.
+
+Agent-engine knobs (all `alert_*` keys survive deploys via a `startswith("alert_")` preserve rule):
+- `alert_rate_window_min` — minutes of history used to compute ΔP&L/Δmin
+- `alert_baseline_offset_min` — rate-based agents stay silent for this many minutes after session start
+- `alert_cooldown_minutes` — minimum time between re-fires of the same agent
+- `alert_suppress_delta_abs` / `alert_suppress_delta_pct` — re-fire also requires the loss to have deepened by this much
+
+Per-rule loss thresholds live on each agent row's condition tree (edit via the `/algo` page), not in this file.
 
 ---
 
 ## Background Processing
 
-Two modes:
+All scheduled work runs inside the API process as asyncio tasks (Litestar `on_startup`). There is no separate worker to start.
 
-| Mode | Command | Redis | Processes |
-|---|---|---|---|
-| Litestar async (default) | `bash backend/run_api.sh` | No | 1 |
-| ARQ worker | `backend/run_api.sh` + `backend/run_worker.sh` | Yes | 2 |
-
-Tasks: market cache warm (daily 08:30 IST), performance refresh (every 5 min during market hours), open/close summaries, loss alerts.
+Tasks:
+- **Market cache warm** — 08:30 IST daily; pre-fetches the Gemini report
+- **Performance refresh** — every 5 min during market hours; fans out to WebSocket + caches
+- **Open / close summaries** — per segment, 15 min after the segment transitions
+- **Agent engine `run_cycle`** — every performance tick; evaluates each active agent's condition tree
+- **Expiry auto-close** — 09:20 IST daily; scans for ITM options approaching expiry
 
 ---
 
@@ -266,12 +297,65 @@ Tasks: market cache warm (daily 08:30 IST), performance refresh (every 5 min dur
 
 ---
 
+## Agent Framework
+
+Ramboq's risk + automation engine is built around four words:
+
+| Word | Meaning |
+|---|---|
+| **Agent** | A declarative rule row (`agents` table) — `condition + notify + actions + scope + schedule + cooldown`. |
+| **Alert** | The runtime event an agent emits when its condition fires (logged to `agent_events`). |
+| **Notify** | A delivery channel (`telegram / email / websocket / log`). |
+| **Action** | A side-effect the alert invokes (`place_order`, `chase_close_positions`, `deactivate_agent`, …). |
+
+### Condition grammar
+
+Conditions are JSON trees. Leaves reference the grammar catalog:
+
+```
+leaf       ::=  { "metric": <metric-token>,
+                  "scope":  <scope-token>,
+                  "op":     <op-token>,
+                  "value":  <literal> }
+
+condition  ::=  leaf
+             |  { "all": [condition, ...] }   AND
+             |  { "any": [condition, ...] }   OR
+             |  { "not": condition }          NOT
+```
+
+Example — *"any account's positions pnl is ≤ −2% of that account's used margin"*:
+```json
+{ "metric": "pnl_pct", "scope": "positions.any_acct", "op": "<=", "value": -2.0 }
+```
+
+### Grammar catalog (`grammar_tokens`)
+
+Every metric, scope, operator, channel, template, and action type is a row in `grammar_tokens`. Adding a new capability is **one DB row + one Python function** at the row's `resolver` dotted path — no engine or schema changes. CRUD via `/admin/grammar` or `POST /api/admin/grammar/tokens`, then hit **Reload Registry** to pick it up hot.
+
+System tokens (`is_system=True`) ship with code and are seeded on every boot — operators can toggle `is_active` but not delete them. Custom tokens support full CRUD.
+
+### Seeded loss agents
+
+14 loss/risk agents are seeded active in `BUILTIN_AGENTS`:
+- **Static floors** — per-account + total variants for holdings %, positions %, positions ₹
+- **Rate of change** — same scopes for ΔP&L/Δmin (₹ and %/min rules)
+- **Funds** — `cash < 0`, `avail_margin < 0`
+
+Each agent is editable from the `/algo` page: click the row to expand, click Edit to morph it into an inline form with a live graphical tree preview. Save or Cancel reverts the row to the normal expanded view.
+
+### Notify + Action
+
+The `events` field lists delivery channels; default seed is `[telegram, email, log]`. The `actions` field is a list of action invocations; stubs are in place for every action type, real broker wiring is activated per-handler as each is promoted out of stub mode.
+
+---
+
 ## Alerts and Notifications
 
 | Event | Telegram | Email |
 |---|---|---|
 | Market open | `Open — Equity/Commodity` | `RamboQuant Open:` |
-| Loss threshold | `Alert` | `RamboQuant Alert:` |
+| Agent fire | `Agent` | `RamboQuant Agent:` |
 | Market close | `Close` | `RamboQuant Close:` |
 | Deploy | `Deploy OK` | `RamboQuant Deploy OK:` |
 
