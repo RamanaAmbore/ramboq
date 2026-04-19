@@ -70,6 +70,7 @@ class SimScenarioInfo(msgspec.Struct):
     description: str
     mode: str
     ticks: int
+    has_initial: bool
 
 
 class SimEventInfo(msgspec.Struct):
@@ -111,6 +112,7 @@ class SimulatorController(Controller):
             out.append(SimScenarioInfo(
                 slug=s["slug"], name=s["name"],
                 description=s["description"], mode=s["mode"], ticks=s["ticks"],
+                has_initial=s["has_initial"],
             ))
         return out
 

@@ -316,6 +316,21 @@ class SimDriver:
         for r in self._positions_rows:
             _recompute_position_row(r)
 
+        # Fail loudly when the seeded state is empty. Without any rows the
+        # scope globs in the scenario will match nothing, the tick log fills
+        # with "(no changes)" entries, and operators spend minutes wondering
+        # why nothing is moving. Seen in the wild on generic-crash +
+        # seed_mode=scripted (that scenario has no `initial` block by design).
+        if not (self._holdings_rows or self._positions_rows or self._margins_rows):
+            self.scenario = None
+            self.active   = False
+            raise SimGuardError(
+                f"Scenario '{scenario_slug}' has no scripted initial state. "
+                f"Press 'Load live book' and pick seed = Live or Live + scenario, "
+                f"or choose a scenario with scripted initial data "
+                f"(crash-open / cash-negative / positions-abs-breach / rate-breach)."
+            )
+
         rng_seed = scen.get("seed")
         self._rng = random.Random(rng_seed) if rng_seed is not None else random.Random()
 
@@ -708,12 +723,17 @@ class SimDriver:
     def scenarios_manifest(self) -> list[dict]:
         out = []
         for s in load_scenarios():
+            initial = s.get("initial") or {}
+            has_initial = bool(
+                initial.get("holdings") or initial.get("positions") or initial.get("margins")
+            )
             out.append({
                 "slug":        s.get("slug"),
                 "name":        s.get("name") or s.get("slug"),
                 "description": s.get("description", ""),
                 "mode":        s.get("mode") or ("symbol" if s.get("ticks", [{}])[0].get("moves") else "aggregate"),
                 "ticks":       len(s.get("ticks", []) or []),
+                "has_initial": has_initial,
             })
         return out
 
