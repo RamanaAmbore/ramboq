@@ -18,7 +18,7 @@
         {
           "match": {
             "type": "value",
-            "value": "ramboq",
+            "value": "algo-trader",
             "parameter": { "source": "payload", "name": "repository.name" }
           }
         },
