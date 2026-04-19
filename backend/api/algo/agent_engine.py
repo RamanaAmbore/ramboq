@@ -421,6 +421,7 @@ async def seed_agents():
       (retired built-ins after the v1→v2 cutover).
     """
     from sqlalchemy import delete
+    from backend.api.models import AgentEvent
 
     builtin_slugs = {a["slug"] for a in BUILTIN_AGENTS}
 
@@ -470,6 +471,10 @@ async def seed_agents():
         for row in retired.scalars().all():
             if row.slug not in builtin_slugs:
                 logger.info(f"Agent engine: pruning retired built-in '{row.slug}'")
+                # agent_events has a FK into agents.id without ON DELETE
+                # CASCADE — clear the child rows first so the parent delete
+                # does not raise ForeignKeyViolationError on startup.
+                await session.execute(delete(AgentEvent).where(AgentEvent.agent_id == row.id))
                 await session.execute(delete(Agent).where(Agent.id == row.id))
 
         await session.commit()
