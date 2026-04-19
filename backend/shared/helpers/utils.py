@@ -50,7 +50,7 @@ isd_codes = [f"{item['country']} ({item['code']})" for item in constants['isd_co
 
 def is_enabled(cap: str) -> bool:
     """
-    Is capability `cap` (e.g., 'genai', 'telegram', 'mail', 'notify_on_startup',
+    Is capability `cap` (e.g., 'genai', 'telegram', 'mail', 'notify_on_deploy',
     'market_feed') enabled in this environment?
 
     Prod (deploy_branch == 'main'): unconditionally True — every capability runs.

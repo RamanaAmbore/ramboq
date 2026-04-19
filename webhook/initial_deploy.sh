@@ -178,9 +178,9 @@ setup_environment() {
 
     local clone_url="${ssh_clone_url:-$REPO_HTTPS}"
     local capabilities="True"
-    local notify_on_startup="False"
+    local notify_on_deploy="False"
     if [ "$branch" != "main" ]; then
-        notify_on_startup="True"
+        notify_on_deploy="True"
     fi
 
     log_step "3. Setting up $app_root (branch: $branch)"
@@ -256,7 +256,7 @@ cap_in_dev:
   genai: True
   telegram: True
   mail: True
-  notify_on_startup: $notify_on_startup
+  notify_on_deploy: $notify_on_deploy
   market_feed: True
 
 # Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap

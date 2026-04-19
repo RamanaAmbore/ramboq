@@ -153,6 +153,12 @@ def get_market_update(strict: bool = False):
         resp = re.sub(r'(?<!\w)_(\S(?:[^_\n]*?\S)?)_(?!\w)', r'\1', resp)  # _text_ → text
         # Normalize all list markers: leading spaces + * or - or • + any ws → "* "
         resp = re.sub(r'(?m)^[ \t]*[-*•][ \t]+', '* ', resp)
+        # But region/category headings (India:, Global:, Asia:, etc.) should
+        # render as plain headings, not bullets.
+        resp = re.sub(
+            r'(?im)^\*\s+((?:india|global|asia|europe|us|usa|commodities|currencies|crypto(?:s|currencies)?|indices|summary|outlook|fii|dii)\b[A-Za-z /&\-]*:)',
+            r'\1', resp,
+        )
 
         logger.info(resp)
         return resp

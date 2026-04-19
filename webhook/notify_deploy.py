@@ -49,9 +49,9 @@ def main():
             return True
         return bool(caps.get(name, False))
 
-    # Skip entirely on dev when notify_on_startup is off.
-    if is_non_main and not _cap("notify_on_startup"):
-        print("notify_deploy: skipped — notify_on_startup disabled for this environment")
+    # Skip entirely on dev when notify_on_deploy is off.
+    if is_non_main and not _cap("notify_on_deploy"):
+        print("notify_deploy: skipped — notify_on_deploy disabled for this environment")
         return
 
     ts = _timestamp()
@@ -74,7 +74,7 @@ def main():
             services_status.append(f"{svc}: unknown")
     svc_text = " | ".join(services_status)
 
-    # notify_on_startup is the single gate for the deploy message — by the time
+    # notify_on_deploy is the single gate for the deploy message — by the time
     # we reach here we've already confirmed it's on (or we're on prod). Telegram
     # and email both fire if their credentials are configured; cap_in_dev.telegram
     # / cap_in_dev.mail gate runtime alerts, not this deploy ping.
