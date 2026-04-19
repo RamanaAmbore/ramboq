@@ -238,6 +238,25 @@ class AlgoController(Controller):
             "detail": result.detail,
         }
 
+    @post("/grammar/reload")
+    async def reload_grammar(self) -> dict:
+        """
+        Rebuild the Grammar Registry dispatch table from grammar_tokens.
+        Called by the (future) admin UI after a token is added / edited /
+        activated so the change goes live without a service restart.
+        """
+        from backend.api.algo.grammar_registry import REGISTRY
+        await REGISTRY.reload()
+        return {
+            "metrics":   len(REGISTRY.metrics),
+            "scopes":    len(REGISTRY.scopes),
+            "operators": len(REGISTRY.operators),
+            "channels":  len(REGISTRY.channels),
+            "formats":   len(REGISTRY.formats),
+            "templates": len(REGISTRY.templates),
+            "actions":   len(REGISTRY.actions),
+        }
+
 
 # ---------------------------------------------------------------------------
 # WebSocket — real-time event stream

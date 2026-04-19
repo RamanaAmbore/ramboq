@@ -110,6 +110,115 @@ def _v2_build_evalresult(matches, agent_name: str) -> EvalResult:
     )
 
 
+# ─── v2 rich-body Telegram + email ────────────────────────────────────────
+#
+# For v2 agents we bypass the generic dispatch() body and use the same
+# narrow-mobile Telegram format + coloured HTML email table that the legacy
+# alert_utils engine already produces. Keeping the user-facing shape
+# consistent across both engines makes parity testing trivial — the
+# operator can spot-diff two messages and only care about the agent slug.
+
+def _v2_match_to_alertrow(match: dict) -> dict:
+    """
+    Convert a v2 evaluator match into the alert-row dict shape consumed by
+    alert_utils._tg_alert_body / _email_alert_body.
+    """
+    scope_tok = match.get('scope', '') or ''
+    metric    = match.get('metric', '') or ''
+    row       = match.get('row')      or {}
+    value     = match.get('value')
+    threshold = match.get('threshold')
+
+    # section — derived from scope token prefix
+    if scope_tok.startswith('holdings'):
+        section = 'Holdings'
+    elif scope_tok.startswith('positions'):
+        section = 'Positions'
+    else:
+        section = 'Funds'
+
+    # kind — derived from metric token. Drives row colour / label.
+    if   metric in ('cash',):                kind = 'negative_cash'
+    elif metric in ('avail_margin',):        kind = 'negative_margin'
+    elif '_rate_abs' in metric:              kind = 'rate_abs'
+    elif '_rate_pct' in metric:              kind = 'rate_pct'
+    elif metric.endswith('_pct') or metric == 'pnl_pct':  kind = 'static_pct'
+    else:                                    kind = 'static_abs'
+
+    # pnl — section-appropriate ₹ value. For rate alerts we still want the
+    # current raw pnl/day_val shown, plus the rate value in rate_val.
+    if section == 'Holdings':
+        pnl = float(row.get('day_change_val', 0) or 0)
+        pct = float(row.get('day_change_percentage', 0) or 0) if row.get('day_change_percentage') is not None else None
+    elif section == 'Positions':
+        pnl = float(row.get('pnl', 0) or 0)
+        pct = None  # computed later only when we have used_margin
+    else:  # Funds
+        if metric == 'cash':
+            pnl = float(row.get('avail opening_balance', 0) or 0)
+        elif metric == 'avail_margin':
+            pnl = float(row.get('net', 0) or 0)
+        else:
+            pnl = float(value or 0)
+        pct = None
+
+    rate_val = value if kind in ('rate_abs', 'rate_pct') else None
+
+    # threshold display — format with units appropriate to the kind
+    try:
+        thr = float(threshold)
+        if kind in ('static_pct', 'rate_pct'):
+            thr_str = f"{thr:.2f}%" + ("/min" if kind == 'rate_pct' else "")
+        elif kind in ('static_abs', 'rate_abs', 'negative_cash', 'negative_margin'):
+            thr_str = f"-₹{abs(thr):,.0f}" + ("/min" if kind == 'rate_abs' else "")
+        else:
+            thr_str = str(threshold)
+    except Exception:
+        thr_str = str(threshold)
+
+    scope_label = str(row.get('account', 'TOTAL'))
+
+    return dict(
+        section=section, scope=scope_label, kind=kind,
+        pnl=pnl, pct=pct, rate_val=rate_val, threshold=thr_str,
+    )
+
+
+async def _v2_send_rich_alert(agent, matches, now):
+    """
+    Render the v2 alert as the same narrow-TG + HTML-table format the legacy
+    engine uses, and send through Telegram + email via alert_utils's own
+    dispatcher (which already branch-tags and honours is_enabled gates).
+    Returns True when at least one channel was attempted.
+    """
+    # Late import avoids the agent_engine → alert_utils cycle at import time.
+    from backend.shared.helpers.alert_utils import (
+        _tg_alert_body, _email_alert_body, _dispatch,
+    )
+    from backend.shared.helpers.date_time_utils import timestamp_display
+
+    rows = [_v2_match_to_alertrow(m) for m in matches]
+    if not rows:
+        return False
+
+    # Sort Holdings → Positions → Funds, per-account before TOTAL (same as
+    # alert_utils).
+    order = {'Holdings': 0, 'Positions': 1, 'Funds': 2}
+    rows.sort(key=lambda r: (order.get(r['section'], 9),
+                              0 if r['scope'] != 'TOTAL' else 1,
+                              r['scope']))
+
+    tg_body    = _tg_alert_body(rows)
+    email_html = _email_alert_body(rows)
+    subject    = f"Agent {agent.slug}"
+    try:
+        _dispatch('alert', timestamp_display(), tg_body, email_html, subject)
+    except Exception as e:
+        logger.error(f"Agent [{agent.slug}] rich alert send failed: {e}")
+        return False
+    return True
+
+
 def _v2_should_suppress(agent, matches, now, cfg) -> bool:
     """
     Per-agent suppression for v2 grammar. Matches the semantics of the old
@@ -701,7 +810,24 @@ async def run_cycle(context: dict, broadcast_fn=None):
 
                 if broadcast_fn:
                     broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
-                await dispatch(agent, result, broadcast_fn)
+
+                # Send the rich narrow-TG + coloured HTML table message via
+                # alert_utils._dispatch. Fall back to the generic dispatch()
+                # path on any failure so the log / WebSocket channel still
+                # carries a record of the fire.
+                rich_sent = await _v2_send_rich_alert(agent, matches, now)
+                if not rich_sent:
+                    await dispatch(agent, result, broadcast_fn)
+                else:
+                    from backend.api.algo.events import log_event
+                    await log_event(agent, 'triggered', result.condition_text)
+                    if broadcast_fn:
+                        broadcast_fn('agent_alert', {
+                            'slug': agent.slug,
+                            'message': result.condition_text,
+                            'timestamp': now.isoformat(),
+                        })
+
                 if agent.actions:
                     action_ctx = dict(context)
                     action_ctx["account"] = "TOTAL"
