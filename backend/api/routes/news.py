@@ -59,6 +59,39 @@ _NOISE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Drop low-information headlines — pure stubs, "X in 10 seconds" fillers, etc.
+_STUB_RE = re.compile(
+    r'^\s*('
+    r'market\s+(update|wrap|recap|roundup|close|open)s?'
+    r'|stock\s+updates?'
+    r'|daily\s+(wrap|recap|roundup)'
+    r'|morning\s+(brief|briefing)'
+    r'|closing\s+bell'
+    r'|news\s+(wrap|recap)'
+    r'|top\s+\d+\s+(news|stocks?|gainers?|losers?)'
+    r')\s*[:\-—|]*\s*$',
+    re.IGNORECASE,
+)
+
+_MIN_TITLE_CHARS = 40  # headlines shorter than this are usually just labels
+_MIN_TITLE_WORDS = 5
+
+
+def _is_low_info(title: str) -> bool:
+    """Drop headlines that carry no substantive information."""
+    t = (title or "").strip()
+    if not t:
+        return True
+    # Strip trailing " - Source" suffix Google News appends, for length checks
+    stripped = re.sub(r'\s+[-—|]\s+[^-—|]{1,40}$', '', t)
+    if len(stripped) < _MIN_TITLE_CHARS:
+        return True
+    if len(stripped.split()) < _MIN_TITLE_WORDS:
+        return True
+    if _STUB_RE.match(stripped):
+        return True
+    return False
+
 _reset_lock = threading.Lock()
 _last_reset: date | None = None
 
@@ -129,6 +162,8 @@ def _fetch_one_feed(url: str) -> list[tuple[datetime, dict]]:
         if not title or not link or not pub:
             continue
         if _NOISE_RE.search(title):
+            continue
+        if _is_low_info(title):
             continue
         try:
             dt = parsedate_to_datetime(pub)
