@@ -321,6 +321,13 @@ async def _task_performance(state: dict) -> None:
                     "ist_display": ist_display,
                     "now": now,
                     "seg_state": seg_state,
+                    # alert_state is the long-lived dict owned here (pnl_history,
+                    # session_start, last_alert buckets, funds_*). Passed so the
+                    # v2 grammar evaluator in run_cycle can read rate history
+                    # and write its own suppression entries without needing a
+                    # parallel state store.
+                    "alert_state": alert_state,
+                    "segments":    segments,
                 }
                 await run_cycle(agent_context, broadcast_fn=_broadcast_event)
             except Exception as ae:

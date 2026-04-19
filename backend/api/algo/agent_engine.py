@@ -16,11 +16,151 @@ from sqlalchemy import select, update
 from backend.api.algo.conditions import evaluate, EvalResult
 from backend.api.algo.events import dispatch, log_event
 from backend.api.algo.actions import execute
+from backend.api.algo.agent_evaluator import Context as V2Context, evaluate as v2_evaluate
 from backend.api.database import async_session
 from backend.api.models import Agent
 from backend.shared.helpers.ramboq_logger import get_logger
+from backend.shared.helpers.utils import config as app_config
 
 logger = get_logger(__name__)
+
+
+# Module-level per-agent suppression state for v2-grammar agents.
+# Keyed by agent slug: {'ts': datetime, 'pnl': float, 'pct': float}.
+# Survives across ticks but is wiped daily by _maybe_reset_v2_state below.
+_V2_LAST_ALERT: dict[str, dict] = {}
+_V2_LAST_RESET_DATE = None
+
+
+def _maybe_reset_v2_state(today):
+    """Wipe v2 suppression state once per new trading day."""
+    global _V2_LAST_RESET_DATE
+    if _V2_LAST_RESET_DATE != today:
+        _V2_LAST_RESET_DATE = today
+        _V2_LAST_ALERT.clear()
+
+
+# ---------------------------------------------------------------------------
+# v2 condition-tree helpers
+# ---------------------------------------------------------------------------
+
+def _is_v2_conditions(cond) -> bool:
+    """
+    True when `cond` uses the new grammar (metric/scope leaves, or
+    all/any/not composites). v1 agents use `field` leaves and `operator/rules`
+    composites — those stay on the legacy evaluator.
+    """
+    if not isinstance(cond, dict):
+        return False
+    if 'all' in cond or 'any' in cond or 'not' in cond:
+        return True
+    return 'metric' in cond and 'scope' in cond
+
+
+def _v2_has_rate_metric(cond) -> bool:
+    """
+    Walk the tree looking for any leaf whose metric is a rate_* metric. When
+    present, the engine applies the opening-gap baseline gate to the whole
+    agent. This keeps the per-agent config simple — operator does not have
+    to set a baseline flag; the engine infers it from the tree.
+    """
+    if not isinstance(cond, dict):
+        return False
+    for key in ('all', 'any'):
+        if key in cond:
+            return any(_v2_has_rate_metric(c) for c in (cond.get(key) or []))
+    if 'not' in cond:
+        return _v2_has_rate_metric(cond['not'])
+    m = cond.get('metric', '') or ''
+    return '_rate_' in m
+
+
+def _v2_baseline_live(alert_state, now, offset_min: float) -> bool:
+    start = alert_state.get('session_start') if alert_state else None
+    if not start:
+        return False
+    from datetime import timedelta
+    return (now - start) >= timedelta(minutes=offset_min)
+
+
+def _v2_build_evalresult(matches, agent_name: str) -> EvalResult:
+    """
+    Wrap v2 matches into an EvalResult so the existing dispatch() function
+    (which renders the Telegram/email body) can consume them unchanged.
+    """
+    # Compact one-liner per match: "scope metric=value (threshold)"
+    lines = []
+    for m in matches[:10]:  # cap — long lists get truncated
+        val = m.get('value')
+        try:
+            val_str = f"{val:,.2f}" if isinstance(val, (int, float)) else str(val)
+        except Exception:
+            val_str = str(val)
+        lines.append(
+            f"{m.get('scope','?')} {m.get('metric','?')}={val_str} "
+            f"({m.get('op','?')} {m.get('threshold','?')})"
+        )
+    if len(matches) > 10:
+        lines.append(f"... +{len(matches) - 10} more")
+    condition_text = " | ".join(lines) or agent_name
+    return EvalResult(
+        triggered=bool(matches),
+        condition_text=condition_text,
+        detail={'matches': matches, 'grammar': 'v2'},
+    )
+
+
+def _v2_should_suppress(agent, matches, now, cfg) -> bool:
+    """
+    Per-agent suppression for v2 grammar. Matches the semantics of the old
+    alert_utils _suppress gate: re-fire requires cooldown elapsed AND a
+    material change in the worst-case value across matches.
+    """
+    from datetime import timedelta
+
+    # Use the WORST (smallest / most-negative) value across matches as the
+    # representative loss number for delta comparisons.
+    worst_val = None
+    for m in matches:
+        v = m.get('value')
+        if v is None:
+            continue
+        if worst_val is None or v < worst_val:
+            worst_val = v
+    if worst_val is None:
+        return False  # no useful value — allow fire
+
+    prev = _V2_LAST_ALERT.get(agent.slug)
+    if not prev:
+        return False
+    if (now - prev['ts']) < timedelta(minutes=cfg['cooldown_min']):
+        return True
+    abs_moved = abs(worst_val - prev.get('val', 0)) >= cfg['suppress_delta_abs']
+    pct_moved = False  # v2 matches carry a single number; pct-delta omitted by design
+    return not (abs_moved or pct_moved)
+
+
+def _v2_record(agent, matches, now) -> None:
+    worst_val = None
+    for m in matches:
+        v = m.get('value')
+        if v is None:
+            continue
+        if worst_val is None or v < worst_val:
+            worst_val = v
+    _V2_LAST_ALERT[agent.slug] = {'ts': now, 'val': worst_val if worst_val is not None else 0.0}
+
+
+def _v2_cfg():
+    """Read the small set of gate/suppression parameters from backend_config.yaml."""
+    g = app_config.get
+    return {
+        'rate_window_min':       float(g('alert_rate_window_min', 10)),
+        'baseline_offset_min':   float(g('alert_baseline_offset_min', 15)),
+        'cooldown_min':          float(g('alert_cooldown_minutes', 30)),
+        'suppress_delta_abs':    float(g('alert_suppress_delta_abs', 15000)),
+        'suppress_delta_pct':    float(g('alert_suppress_delta_pct', 0.5)),
+    }
 
 
 # Built-in agents seeded on first startup
@@ -519,29 +659,72 @@ async def run_cycle(context: dict, broadcast_fn=None):
             eval_contexts = [base_ctx]
 
         triggered = False
-        for ctx in eval_contexts:
-            result = evaluate(agent.conditions, ctx)
-            if not result.triggered:
+
+        # ──────────────────────────────────────────────────────────────────
+        # v2 grammar dispatch: metric/scope leaves or all/any/not composites
+        # go through backend.api.algo.agent_evaluator. Baseline gate and
+        # suppression are applied here rather than inside the evaluator so
+        # the evaluator stays a pure tree walker.
+        # ──────────────────────────────────────────────────────────────────
+        if _is_v2_conditions(agent.conditions):
+            alert_state = context.get("alert_state") or {}
+            _maybe_reset_v2_state(now.date() if hasattr(now, 'date') else None)
+            cfg = _v2_cfg()
+
+            # Baseline gate: skip every rate-based agent for the first N min
+            # of the session to avoid the opening-gap firing rate alerts.
+            if _v2_has_rate_metric(agent.conditions) and not _v2_baseline_live(
+                    alert_state, now, cfg['baseline_offset_min']):
                 continue
 
-            triggered = True
-            account = ctx.get("account", "ALL")
-            result.condition_text = f"{result.condition_text} ({account})"
+            v2_ctx = V2Context(
+                sum_holdings=context.get("sum_holdings"),
+                sum_positions=context.get("sum_positions"),
+                df_margins=context.get("df_margins"),
+                alert_state=alert_state,
+                now=now,
+                segments=context.get("segments", []),
+                rate_window_min=cfg['rate_window_min'],
+                agent=agent,
+            )
 
-            # Broadcast state change
-            if broadcast_fn:
-                broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
+            try:
+                matches = v2_evaluate(agent.conditions, v2_ctx)
+            except Exception as e:
+                logger.error(f"Agent [{agent.slug}] v2 evaluate failed: {e}")
+                matches = []
 
-            # ALERT (always)
-            await dispatch(agent, result, broadcast_fn)
+            if matches and not _v2_should_suppress(agent, matches, now, cfg):
+                triggered = True
+                result = _v2_build_evalresult(matches, agent.name)
+                _v2_record(agent, matches, now)
 
-            # ACTION (optional)
-            if agent.actions:
-                action_ctx = dict(context)
-                action_ctx["account"] = account
-                await execute(agent, agent.actions, action_ctx)
+                if broadcast_fn:
+                    broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
+                await dispatch(agent, result, broadcast_fn)
+                if agent.actions:
+                    action_ctx = dict(context)
+                    action_ctx["account"] = "TOTAL"
+                    await execute(agent, agent.actions, action_ctx)
+        else:
+            # Legacy v1 path — unchanged.
+            for ctx in eval_contexts:
+                result = evaluate(agent.conditions, ctx)
+                if not result.triggered:
+                    continue
 
-            break  # one trigger per cycle per agent
+                triggered = True
+                account = ctx.get("account", "ALL")
+                result.condition_text = f"{result.condition_text} ({account})"
+
+                if broadcast_fn:
+                    broadcast_fn("agent_state", {"slug": agent.slug, "status": "triggered"})
+                await dispatch(agent, result, broadcast_fn)
+                if agent.actions:
+                    action_ctx = dict(context)
+                    action_ctx["account"] = account
+                    await execute(agent, agent.actions, action_ctx)
+                break  # one trigger per cycle per agent
 
         # Update state
         async with async_session() as session:
