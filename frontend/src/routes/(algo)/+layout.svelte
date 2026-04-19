@@ -15,7 +15,17 @@
   });
 
   function isActive(/** @type {string} */ href) {
-    return page.url.pathname.startsWith(href);
+    // Longest-match semantics so sub-pages (e.g. /admin/grammar) don't light up
+    // their parent (/admin) in the hamburger at the same time.
+    const path = page.url.pathname;
+    let bestHref = '';
+    for (const link of algoLinks) {
+      const h = link.href;
+      if ((path === h || path.startsWith(h + '/')) && h.length > bestHref.length) {
+        bestHref = h;
+      }
+    }
+    return href === bestHref;
   }
 
   function signOut() {
