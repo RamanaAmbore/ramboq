@@ -36,19 +36,16 @@ logger = get_logger(__name__)
 
 _CACHE_TTL = 600  # 10-minute route-level coalescing; the DB holds the accumulator
 
-# Curated financial RSS feeds — Indian-first, with two global feeds to catch
-# moves that drive Indian sentiment. All sources are already market-focused,
-# so no AI rerank is needed.
+# Curated Indian financial RSS feeds — market coverage only.
 _FEEDS = [
-    # Indian markets
     "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
     "https://www.moneycontrol.com/rss/marketreports.xml",
     "https://www.moneycontrol.com/rss/business.xml",
     "https://www.business-standard.com/rss/markets-106.rss",
     "https://www.livemint.com/rss/markets",
-    # Global markets
-    "https://news.google.com/rss/search?q=site%3Abloomberg.com+markets&hl=en-US&gl=US&ceid=US:en",
-    "https://news.google.com/rss/search?q=site%3Areuters.com+markets+OR+stocks&hl=en-US&gl=US&ceid=US:en",
+    "https://www.financialexpress.com/market/feed/",
+    "https://www.ndtvprofit.com/feed",
+    "https://www.zeebiz.com/rss/markets",
 ]
 
 # Drop obvious non-market content that sometimes sneaks into general sections.
