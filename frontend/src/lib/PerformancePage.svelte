@@ -315,9 +315,6 @@
 </div>
 {/if}
 
-<h2 class="section-heading">Fund Balances</h2>
-<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
-
 <div class="flex gap-0.5 mb-3">
   {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
     <button
@@ -343,6 +340,9 @@
   <h2 class="section-heading">Holdings</h2>
   <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
+
+<h2 class="section-heading mt-4">Fund Balances</h2>
+<div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
 {#if orderRow}
   <OrderPopup
