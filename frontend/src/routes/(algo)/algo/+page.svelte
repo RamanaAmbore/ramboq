@@ -13,7 +13,8 @@
   let systemLog   = $state([]);
   let orderLog    = $state([]);
   let editing     = $state(null);     // slug of agent being edited
-  let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'per_account', schedule: 'market_hours' }));
+  let expandedSlug = $state(/** @type {string|null} */(null));
+  let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
   let ws;
   let refreshInterval;
 
@@ -218,8 +219,6 @@
       .map(c => ({ name: c, agents: out[c] }));
   }
 
-  let expandedSlug = $state(/** @type {string|null} */(null));
-
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadAll();
@@ -307,10 +306,75 @@
 
         {#if isOpen}
           {#if editing === agent.slug}
-            <!-- ──────── Inline editor + live tree preview ──────── -->
+            <!-- ──────── Inline editor (form on top, tree preview below) ──────── -->
             <div class="px-3 pb-3 pt-2 border-t border-white/5">
-              <!-- Preview at top — condition tree left, notify + actions right -->
-              <div class="agent-preview mb-3">
+              <!-- ── FORM FIELDS ── -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="field-label">Name</label>
+                  <input bind:value={editForm.name} class="field-input" />
+                </div>
+                <div>
+                  <label class="field-label">Description</label>
+                  <input bind:value={editForm.description} class="field-input" />
+                </div>
+                <div>
+                  <label class="field-label">Scope</label>
+                  <select bind:value={editForm.scope} class="field-input">
+                    <option value="total">Total Only</option>
+                    <option value="per_account">Per Account</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Schedule</label>
+                  <select bind:value={editForm.schedule} class="field-input">
+                    <option value="market_hours">Market Hours</option>
+                    <option value="always">Always</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Cooldown (minutes)</label>
+                  <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div>
+                  <label class="field-label">Conditions (JSON)</label>
+                  <textarea bind:value={editForm.conditions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">Events (JSON)</label>
+                  <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+                <div>
+                  <label class="field-label">Actions (JSON)</label>
+                  <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
+                </div>
+              </div>
+
+              {#if validationErrors.length}
+                <div class="mt-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.6rem] border border-red-500/40">
+                  <div class="font-semibold mb-1">Condition validation failed:</div>
+                  <ul class="list-disc ml-4">{#each validationErrors as err}<li>{err}</li>{/each}</ul>
+                </div>
+              {:else if validationGrammar}
+                <div class="mt-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.6rem] border border-emerald-500/30">
+                  Validated — ready to save.
+                </div>
+              {/if}
+
+              <div class="flex gap-2 mt-3">
+                <button type="button" onclick={async () => { await runValidation(); }}
+                  class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
+                  Validate
+                </button>
+                <button type="button" onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
+                <button type="button" onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
+                  class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
+              </div>
+
+              <!-- ── LIVE TREE PREVIEW (below the form) ── -->
+              <div class="agent-preview mt-4 pt-3 border-t border-white/5">
                 <div class="preview-heading">Live preview</div>
                 <div class="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3">
                   <div>
@@ -373,71 +437,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Form fields -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label class="field-label">Name</label>
-                  <input bind:value={editForm.name} class="field-input" />
-                </div>
-                <div>
-                  <label class="field-label">Description</label>
-                  <input bind:value={editForm.description} class="field-input" />
-                </div>
-                <div>
-                  <label class="field-label">Scope</label>
-                  <select bind:value={editForm.scope} class="field-input">
-                    <option value="per_account">Per Account</option>
-                    <option value="total">Total Only</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="field-label">Schedule</label>
-                  <select bind:value={editForm.schedule} class="field-input">
-                    <option value="market_hours">Market Hours</option>
-                    <option value="always">Always</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="field-label">Cooldown (minutes)</label>
-                  <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
-                </div>
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <div>
-                  <label class="field-label">Conditions (JSON)</label>
-                  <textarea bind:value={editForm.conditions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-                </div>
-                <div>
-                  <label class="field-label">Events (JSON)</label>
-                  <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-                </div>
-                <div>
-                  <label class="field-label">Actions (JSON)</label>
-                  <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
-                </div>
-              </div>
-
-              {#if validationErrors.length}
-                <div class="mt-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.6rem] border border-red-500/40">
-                  <div class="font-semibold mb-1">Condition validation failed:</div>
-                  <ul class="list-disc ml-4">{#each validationErrors as err}<li>{err}</li>{/each}</ul>
-                </div>
-              {:else if validationGrammar}
-                <div class="mt-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.6rem] border border-emerald-500/30">
-                  Validated — ready to save.
-                </div>
-              {/if}
-
-              <div class="flex gap-2 mt-3">
-                <button onclick={async () => { await runValidation(); }}
-                  class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
-                  Validate
-                </button>
-                <button onclick={saveEdit} class="btn-primary text-[0.65rem] py-1 px-4">Save</button>
-                <button onclick={() => { editing = null; validationErrors = []; validationGrammar = ''; }}
-                  class="btn-secondary text-[0.65rem] py-1 px-4">Cancel</button>
-              </div>
             </div>
           {:else}
             <!-- ──────── Normal expanded view ──────── -->
@@ -469,7 +468,8 @@
                   <span class="mx-1">|</span>
                   Scope: {agent.scope}
                 </span>
-                <button onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
+                <button type="button"
+                  onclick={(e) => { e.stopPropagation(); startEdit(agent); }}
                   class="text-[#fbbf24] hover:underline">Edit</button>
               </div>
             </div>
