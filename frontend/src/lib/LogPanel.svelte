@@ -232,18 +232,19 @@
     font-family: ui-monospace, monospace;
   }
 
-  /* Vertical "log" label — same two-layer split. writing-mode makes
-     the text flow top-to-bottom; additional rotate(180deg) flips it so
-     it reads bottom-to-top (the direction English readers typically
-     prefer for rotated labels). */
+  /* Vertical "log" label — lowercase on a faint amber background so
+     it reads as a quiet section stamp. Two-layer split (wrap + text)
+     keeps flex layout and writing-mode from conflicting. */
   .log-section-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 0.9rem;
-    padding: 0.1rem 0.15rem;
+    padding: 0.1rem 0.2rem;
     margin-right: 0.15rem;
-    border-right: 1px solid rgba(251,191,36,0.35);
+    background: rgba(251,191,36,0.12);
+    border-right: 1px solid rgba(251,191,36,0.4);
+    border-radius: 3px 0 0 3px;
     align-self: stretch;
   }
   .log-section-text {
@@ -253,8 +254,8 @@
     font-size: 0.5rem;
     font-weight: 700;
     line-height: 1;
-    color: rgba(251,191,36,0.85);
-    text-transform: uppercase;
+    color: #fbbf24;
+    text-transform: none;
     letter-spacing: 0.05em;
     user-select: none;
   }
