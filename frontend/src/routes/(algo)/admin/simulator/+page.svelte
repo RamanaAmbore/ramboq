@@ -12,7 +12,7 @@
   import {
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
-    fetchSimOrders, fetchSimTicks, fetchAgents,
+    fetchSimOrders, fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -45,14 +45,20 @@
   let simLog    = $state(/** @type {any[]} */ ([]));
   let systemLog = $state(/** @type {string[]} */ ([]));
   let logTab    = $state('simulator');
-  // "order" log on this page is filtered sim agent-events — same pattern
-  // LogPanel uses on /agents where orderLog is agent events (filtered
-  // for order-related event types inside LogPanel itself).
-  const orderLog = $derived(events);
+  // orderLog = raw agent events (Terminal tab fallback).
+  // orderRows = structured AlgoOrder rows (both sim + live) — what the
+  // Order tab renders with full side / qty / symbol / price / account.
+  const orderLog  = $derived(events);
+  let   orderRows = $state(/** @type {any[]} */ ([]));
 
   function authHeaders() {
     const token = $authStore.token;
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function loadOrderRows() {
+    try { orderRows = await fetchAlgoOrdersRecent(100, 'all') || []; }
+    catch (_) { /* ignore */ }
   }
 
   async function loadSimLog() {
@@ -68,7 +74,8 @@
   function loadCurrentLog() {
     if (logTab === 'simulator') loadSimLog();
     else if (logTab === 'system') loadSystemLog();
-    // agent / order tabs piggyback on `events` (refreshed by loadAll every 3s)
+    else if (logTab === 'order')  loadOrderRows();
+    // agent tab piggybacks on `events` (refreshed by loadAll every 3s)
   }
 
   async function loadAll() {
@@ -151,7 +158,8 @@
     loadAll();
     loadSimLog();
     loadSystemLog();
-    refreshIv = setInterval(() => { loadAll(); loadCurrentLog(); }, 3000);
+    loadOrderRows();
+    refreshIv = setInterval(() => { loadAll(); loadOrderRows(); loadCurrentLog(); }, 3000);
   });
   onDestroy(() => { if (refreshIv) clearInterval(refreshIv); });
 </script>
@@ -232,8 +240,12 @@
 <!-- Controls -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-  <div class="sim-controls-row">
-    <div>
+
+  <!-- Fields row — Scenario picker takes remaining width (so the dropdown
+       can show long scenario names); other fields have fixed widths so
+       nothing wobbles. Wraps cleanly on narrow / mobile widths. -->
+  <div class="sim-fields-row">
+    <div class="sim-field sim-field-scenario">
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
         {#each scenarios as s}
@@ -241,7 +253,7 @@
         {/each}
       </select>
     </div>
-    <div>
+    <div class="sim-field sim-field-short">
       <label for="sim-seed" class="field-label">Seed</label>
       <select id="sim-seed" bind:value={seedMode} class="field-input">
         <option value="scripted">Scripted</option>
@@ -249,16 +261,16 @@
         <option value="live+scenario">Live + scenario</option>
       </select>
     </div>
-    <div>
+    <div class="sim-field sim-field-tiny">
       <label for="sim-rate" class="field-label">Rate (ms)</label>
       <input id="sim-rate" type="number" min="200" step="100" bind:value={rateMs} class="field-input" />
     </div>
-    <div>
+    <div class="sim-field sim-field-tiny">
       <label for="sim-pos-n" class="field-label" title="Positions refresh every N ticks (1 = every tick)">Pos / N</label>
       <input id="sim-pos-n" type="number" min="1" step="1" placeholder="1"
              bind:value={positionsEveryN} class="field-input" />
     </div>
-    <div>
+    <div class="sim-field sim-field-short">
       <label for="sim-market" class="field-label" title="Simulated market clock — overrides the scenario's YAML value">Market</label>
       <select id="sim-market" bind:value={marketStatePreset} class="field-input">
         <option value="">(scenario)</option>
@@ -271,8 +283,13 @@
         <option value="expiry_day">Expiry day</option>
       </select>
     </div>
+  </div>
+
+  <!-- Buttons row — all uniform width so the block reads as one action
+       bar. Wraps on narrow widths; on mobile each row fits 2-3 buttons. -->
+  <div class="sim-buttons-row">
     <button type="button" onclick={doSeedLive}
-      class="sim-btn sim-btn-load whitespace-nowrap">Load live book</button>
+      class="sim-btn sim-btn-load">Load live book</button>
     <button type="button" onclick={doStart}
       disabled={status.active}
       class="sim-btn sim-btn-primary disabled:opacity-40">Start</button>
@@ -284,8 +301,7 @@
     <button type="button" onclick={doRunCycle}
       class="sim-btn sim-btn-cycle">Run cycle</button>
     <button type="button" onclick={doClear}
-      class="sim-btn sim-btn-danger">Clear sim
-    </button>
+      class="sim-btn sim-btn-danger">Clear sim</button>
   </div>
   {#if pickedSlug}
     {@const picked = scenarios.find(s => s.slug === pickedSlug)}
@@ -394,29 +410,38 @@
 </div>
 
 <style>
-  /* Controls row — single-line when wide, wraps when narrow. Field groups
-     and buttons share the same baseline so nothing jumps by 1px. */
-  .sim-controls-row {
+  /* Controls = two stacked rows. Fields first (wrap freely, Scenario
+     expands to fill slack), then Buttons (uniform width, evenly spaced).
+     Same layout on mobile; only difference is wrapping order. */
+  .sim-fields-row {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0.35rem 0.45rem;
     font-size: 0.62rem;
+    margin-bottom: 0.5rem;
   }
-  .sim-controls-row > div {
-    min-width: 0;
-  }
-  /* First (scenario) picker takes whatever slack remains on the row. */
-  .sim-controls-row > div:first-child {
-    flex: 1 1 220px;
+  .sim-field { min-width: 0; }
+  .sim-field-scenario { flex: 1 1 240px; }     /* takes slack on wide screens */
+  .sim-field-short    { flex: 0 1 140px; }
+  .sim-field-tiny     { flex: 0 1 100px; }
+
+  .sim-buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.35rem;
   }
 
-  /* Compact button — smaller vertical footprint, consistent height with
-     the inputs next to it. Colour-neutral base; per-variant class paints. */
+  /* Compact button — uniform width so all six buttons read as one row.
+     flex:1 1 110px lets them grow equally to fill the buttons row on wide
+     screens and collapse to a readable minimum on mobile. */
   :global(.sim-btn) {
+    flex: 1 1 110px;
+    max-width: 160px;
     font-size: 0.6rem;
     line-height: 1;
-    padding: 0.28rem 0.6rem;
+    padding: 0.35rem 0.5rem;
     border-radius: 3px;
     font-weight: 600;
     font-family: ui-monospace, monospace;
@@ -424,6 +449,7 @@
     cursor: pointer;
     white-space: nowrap;
     letter-spacing: 0.02em;
+    text-align: center;
     transition: background-color 0.08s, border-color 0.08s, color 0.08s;
   }
   :global(.sim-btn:disabled) { cursor: not-allowed; }
@@ -464,13 +490,14 @@
   }
 
   /* Tighten the inputs to match button height so the row doesn't wobble. */
-  :global(.sim-controls-row .field-input) {
+  :global(.sim-fields-row .field-input) {
     font-size: 0.62rem;
     padding: 0.25rem 0.4rem;
     height: auto;
     min-height: 1.55rem;
+    width: 100%;
   }
-  :global(.sim-controls-row .field-label) {
+  :global(.sim-fields-row .field-label) {
     font-size: 0.5rem;
     margin-bottom: 0.1rem;
   }
@@ -486,6 +513,7 @@
   initialTab={logTab}
   cmdHistory={[]}
   {orderLog}
+  {orderRows}
   agentLog={events}
   {systemLog}
   {simLog}

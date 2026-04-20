@@ -7,6 +7,9 @@
    *   heightClass?: string,
    *   cmdHistory?: Array<{status: string, message: string, fields?: Record<string,string>, time: string}>,
    *   orderLog?: Array<any>,
+   *   orderRows?: Array<{id:number, account:string, symbol:string, transaction_type:string,
+   *                       quantity:number, initial_price:number|null, status:string,
+   *                       engine:string, mode:string, detail:string|null, created_at:string}>,
    *   agentLog?: Array<any>,
    *   systemLog?: string[],
    *   simLog?: Array<any>,
@@ -17,6 +20,7 @@
     heightClass = 'flex-1 min-h-0',
     cmdHistory = [],
     orderLog = [],
+    orderRows = [],
     agentLog = [],
     systemLog = [],
     simLog = [],
@@ -84,6 +88,14 @@
     const scen = entry.scenario || '';
     if (entry.kind === 'started')  return `<span class="log-agent-success"><span class="log-ts">[${ts}]</span> ▶ START ${scen} · ${entry.note || ''}</span>`;
     if (entry.kind === 'stopped')  return `<span class="log-info"><span class="log-ts">[${ts}]</span> ■ STOP ${scen} · ${entry.note || ''}</span>`;
+    if (entry.kind === 'order') {
+      const o = entry.order || {};
+      const sideCls = o.side === 'BUY' ? 'log-agent-success' : 'log-agent-failed';
+      const price   = (o.price != null)
+        ? '@₹' + Number(o.price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+        : '';
+      return `<span class="${sideCls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ◆ ${o.side || '?'} ${o.qty ?? '?'} ${o.symbol || '?'} ${price} · ${o.account || '?'} · ${o.agent || ''} ${o.action || ''}</span>`;
+    }
     const cls = _classifySimLine(entry);
     const diffs = (entry.changes || []).map(c => {
       // For price moves, `c.symbol` carries the tradingsymbol and `c.col` is
@@ -119,7 +131,7 @@
   function filteredOrder() {
     return orderLog.filter(e =>
       ORDER_TYPES.has(e.event_type) ||
-      (e.event_type?.startsWith('action_') && /place_order|chase_close/i.test(e.trigger_condition || '')));
+      (e.event_type?.startsWith('action_') && /place_order|close_position|chase_close/i.test(e.trigger_condition || '')));
   }
 
   function _cmdEntryHtml(h) {
@@ -130,7 +142,28 @@
     return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.status} ${h.message} ${chips}</span>`;
   }
 
+  // Render one AlgoOrder row (mode=live or sim) for the Order tab. Keeps
+  // order details — side, qty, symbol, price, account — on one line so
+  // operators can scan placements the same way they'd read a broker blotter.
+  function _orderRowHtml(o) {
+    const t    = o.created_at ? o.created_at.slice(11, 19) : '';
+    const tag  = o.mode === 'sim' ? '<span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span>'
+                                  : '<span class="px-1 rounded bg-[#10b981]/15 text-emerald-300 border border-emerald-500/40">LIVE</span>';
+    const sideCls = o.transaction_type === 'BUY' ? 'log-agent-success' : 'log-agent-failed';
+    const price = (o.initial_price != null)
+      ? '@₹' + Number(o.initial_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+      : '';
+    const status = o.status ? ` <span class="log-chip"><span class="log-chip-key">status:</span>${o.status}</span>` : '';
+    const engine = o.engine ? ` <span class="log-chip"><span class="log-chip-key">engine:</span>${o.engine}</span>` : '';
+    return `<span class="${sideCls}"><span class="log-ts">[${t}]</span> ${tag} ◆ ${o.transaction_type} ${o.quantity} ${o.symbol} ${price} · ${o.account}${status}${engine}</span>`;
+  }
+
   function _orderLogHtml() {
+    // Prefer structured AlgoOrder rows when provided; fall back to the
+    // terminal-command history so the /console page still works.
+    if (orderRows && orderRows.length) {
+      return orderRows.map(_orderRowHtml).join('\n');
+    }
     const lines = cmdHistory.map(h => _cmdEntryHtml(h));
     return lines.length ? lines.join('\n') : '<span class="log-debug">No order events.</span>';
   }

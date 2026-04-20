@@ -158,6 +158,36 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
             await s.commit()
     except Exception as e:
         logger.error(f"[SIM] paper-trade write failed: {e}")
+        return
+
+    # Also push the order into the sim driver's tick log so the Simulator
+    # tab on the LogPanel shows the paper-trade inline with the price-tick
+    # stream. Operators can see "tick 12 price moves" then "order placed"
+    # on the very next line, which mirrors how a live session feels.
+    try:
+        from backend.api.algo.sim.driver import get_driver
+        drv = get_driver()
+        drv._tick_log.append({
+            "ts":         __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+            "tick_index": drv.tick_index,
+            "scenario":   drv.scenario_slug,
+            "kind":       "order",
+            "moves":      [],
+            "changes":    [],
+            "note":       "",
+            # Shape consumed by LogPanel._renderSimLine when kind === 'order'.
+            "order": {
+                "account":  account,
+                "symbol":   symbol,
+                "side":     side,
+                "qty":      qty,
+                "price":    (float(initial_price) if initial_price is not None else None),
+                "agent":    agent.slug,
+                "action":   action_type,
+            },
+        })
+    except Exception as e:
+        logger.debug(f"[SIM] could not record order in tick_log: {e}")
 
 
 async def _action_chase_close(context: dict, params: dict):

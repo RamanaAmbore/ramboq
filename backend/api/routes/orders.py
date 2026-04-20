@@ -11,6 +11,7 @@ GET  /api/accounts/         — list accounts (masked display + unmasked ID for 
 
 import json
 
+import msgspec
 import pandas as pd
 from litestar import Controller, Request, delete, get, post, put
 from litestar.exceptions import HTTPException
@@ -116,6 +117,25 @@ def _fetch_orders() -> OrdersResponse:
     return OrdersResponse(rows=rows, refreshed_at=timestamp_display())
 
 
+class AlgoOrderInfo(msgspec.Struct):
+    """Shape exposed to the frontend Order-log tab. Thin wrapper over the
+    AlgoOrder row — adds a display-ready price string would be nice but
+    the frontend formats it for locale anyway."""
+    id: int
+    account: str
+    symbol: str
+    exchange: str
+    transaction_type: str
+    quantity: int
+    initial_price: float | None
+    fill_price: float | None
+    status: str
+    engine: str
+    mode: str
+    detail: str | None
+    created_at: str
+
+
 class OrdersController(Controller):
     path = "/api/orders"
     guards = [jwt_guard]
@@ -127,6 +147,45 @@ class OrdersController(Controller):
         except Exception as e:
             logger.error(f"Orders API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+    @get("/algo/recent")
+    async def list_algo_orders(self, n: int = 100, mode: str = "all") -> list[AlgoOrderInfo]:
+        """
+        Recent agent-generated orders from the algo_orders table.
+
+        `mode`:
+          - "all"  (default) → every row, newest first. Order-log tab on the
+            agents page uses this so operators see both real and simulated
+            fires with a single fetch.
+          - "live" → mode='live' only
+          - "sim"  → mode='sim'  only
+
+        Response includes `initial_price` (the LIMIT price = sim's LTP at
+        trigger time, or the broker-submitted price in live mode), so the
+        UI can show "SELL 50 NIFTY @ ₹175.50" inline.
+        """
+        from sqlalchemy import desc, select as sql_select
+        from backend.api.database import async_session
+        from backend.api.models import AlgoOrder
+        async with async_session() as s:
+            q = sql_select(AlgoOrder).order_by(desc(AlgoOrder.id)).limit(max(1, min(n, 500)))
+            if mode == "live":
+                q = q.where(AlgoOrder.mode == "live")
+            elif mode == "sim":
+                q = q.where(AlgoOrder.mode == "sim")
+            rows = (await s.execute(q)).scalars().all()
+        return [
+            AlgoOrderInfo(
+                id=r.id, account=r.account, symbol=r.symbol, exchange=r.exchange,
+                transaction_type=r.transaction_type, quantity=r.quantity,
+                initial_price=(float(r.initial_price) if r.initial_price is not None else None),
+                fill_price=(float(r.fill_price) if r.fill_price is not None else None),
+                status=r.status, engine=r.engine, mode=r.mode,
+                detail=r.detail,
+                created_at=r.created_at.isoformat() if r.created_at else "",
+            )
+            for r in rows
+        ]
 
     @post("/place")
     async def place_order(self, data: PlaceOrderRequest) -> PlaceOrderResponse:

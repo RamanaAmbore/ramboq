@@ -183,6 +183,12 @@ export const stepSim              = () => _post('/simulator/step', {}, { auth: t
 export const runSimCycle          = () => _post('/simulator/run-cycle', {}, { auth: true });
 export const clearSimArtefacts    = () => _post('/simulator/clear', {}, { auth: true });
 export const seedSimLive          = () => _post('/simulator/seed-live', {}, { auth: true });
+
+// Agent-generated orders from the algo_orders table. Returns live + sim
+// by default; pass `mode='live'` or `'sim'` to scope. Used by the Order
+// tab of the LogPanel on /agents and /admin/simulator.
+export const fetchAlgoOrdersRecent = (n = 100, mode = 'all') =>
+  _get(`/orders/algo/recent?n=${n}&mode=${mode}`, { auth: true });
 // Synthesize-and-start — scenario generated live from the agent's condition
 // tree. Preferred over manually picking a scenario when the goal is "test
 // this specific agent."
