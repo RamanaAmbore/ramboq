@@ -74,12 +74,27 @@ export const dataCache = {
   insights:  null,   // { content }
 };
 
-/** Format current time like the API's timestamp_display(): IST | EST */
+/**
+ * Compact current time for the page-top timestamp banner. Drops the
+ * weekday and year (the page tells you what year it is) and uses
+ * 24-hour time so IST + EST line up visually. Example:
+ *   "Apr 20, 22:00 IST | 12:30 EDT"
+ * ~28 chars vs the previous ~65. All operationally-useful info kept —
+ * date, both time zones, and the auto-resolving TZ abbreviation (EST
+ * in winter, EDT in summer).
+ */
 export function clientTimestamp() {
   const now = new Date();
-  const ist = now.toLocaleString('en-IN', { weekday: 'short', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) + ' IST';
-  const est = now.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
-  return `${ist} | ${est}`;
+  const datePart = now.toLocaleDateString('en-US', {
+    month: 'short', day: '2-digit', timeZone: 'Asia/Kolkata',
+  });
+  const fmtTime = (tz) => now.toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
+  });
+  const estTz = now.toLocaleTimeString('en-US', {
+    timeZoneName: 'short', timeZone: 'America/New_York',
+  }).split(' ').pop();   // "EST" or "EDT" — depends on season
+  return `${datePart}, ${fmtTime('Asia/Kolkata')} IST | ${fmtTime('America/New_York')} ${estTz}`;
 }
 
 /** Short DD-MMM HH:MM:SS IST | DD-MMM HH:MM:SS EST for log entries. Input: ISO string or Date. */
