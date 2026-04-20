@@ -188,7 +188,7 @@
   }
 </script>
 
-<div class="flex items-stretch gap-0.5 mb-2">
+<div class="flex items-stretch mb-2 log-tab-row">
   <!-- "log" section label — three characters stacked vertically in a
        flex column. No CSS rotation / writing-mode (both failed silently
        in earlier attempts). Reads top-to-bottom: L · O · G. -->
@@ -197,7 +197,7 @@
   </span>
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
-      class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
+      class="log-tab-btn border-b-2 transition-colors
         {logTab === id ? 'border-[#d97706] text-[#fbbf24]' : 'border-transparent text-[#b4c8e6] hover:text-[#fbbf24]'}"
     >{label}</button>
   {/each}
@@ -219,26 +219,39 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* "log" label — stacked letters. Now that we've proved it renders,
-     shrunk to a minimum so the tab row's total width isn't noticeably
-     fatter than without the label. Background + border dropped to
-     keep the footprint to the text itself + a thin divider. */
+  /* Tab row — compact enough that all 6 tabs fit on a 320px mobile
+     viewport without wrapping. No gap; 0.5rem font; tight horizontal
+     padding. Vertical padding stays reasonable so tap targets are
+     still comfortable. */
+  .log-tab-row { gap: 0; }
+  :global(.log-tab-btn) {
+    font-size: 0.5rem;
+    font-weight: 600;
+    padding: 0.15rem 0.35rem;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    font-family: ui-monospace, monospace;
+  }
+
+  /* "log" label — halved again: 0.45 → 0.225rem. Paired with tiny
+     letter-spacing and a 1px divider so it occupies a few pixels
+     without swelling the row. */
   .log-section-wrap {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 0.25rem 0 0;
-    margin-right: 0.25rem;
+    padding: 0 0.15rem 0 0;
+    margin-right: 0.15rem;
     border-right: 1px solid rgba(251,191,36,0.35);
     align-self: stretch;
     font-family: ui-monospace, monospace;
-    font-size: 0.45rem;
+    font-size: 0.35rem;
     font-weight: 700;
     line-height: 1;
     color: rgba(251,191,36,0.85);
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
     user-select: none;
   }
   .log-section-wrap > span { display: block; }
