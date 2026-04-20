@@ -42,6 +42,7 @@
     { href: '/orders',           label: 'Orders'    },
     { href: '/admin',            label: 'Users'     },
     { href: '/admin/tokens',     label: 'Tokens'    },
+    { href: '/admin/settings',   label: 'Settings'  },
     { href: '/admin/simulator',  label: 'Simulator' },
   ];
 

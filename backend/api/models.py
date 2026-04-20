@@ -262,6 +262,41 @@ class GrammarToken(Base):
 
 
 # ---------------------------------------------------------------------------
+# Settings — DB-backed tunables. Previously lived in backend_config.yaml;
+# moved here so operators can tweak thresholds, cadences, and capability
+# flags from /admin/settings without a deploy. Seeded on first boot from
+# YAML defaults (see backend/api/algo/settings_seed.py).
+# ---------------------------------------------------------------------------
+
+class Setting(Base):
+    __tablename__ = "settings"
+
+    id: Mapped[int]           = mapped_column(primary_key=True, autoincrement=True)
+    # Bucket name shown as a section heading on /admin/settings. Seeded
+    # buckets: alerts / performance / simulator / notifications / logging.
+    category: Mapped[str]     = mapped_column(String(32), nullable=False, index=True)
+    # Dotted path key, unique across all categories.
+    key: Mapped[str]          = mapped_column(String(128), unique=True, nullable=False, index=True)
+    # Value type discriminator: 'int' | 'float' | 'bool' | 'string' | 'enum'.
+    value_type: Mapped[str]   = mapped_column(String(16), nullable=False)
+    # Serialised value string — always text; parsers handle coercion.
+    value: Mapped[str]        = mapped_column(Text, nullable=False, default="")
+    # Default shipped with the code; used when "Reset" is pressed.
+    default_value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # One-line human description rendered in the UI.
+    description: Mapped[str]  = mapped_column(Text, nullable=False, default="")
+    # For enum: {"enum": ["..."]}. For numeric: {"min": ..., "max": ..., "step": ...}.
+    schema: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # Units shown after the value in the UI: '₹', '%', 'min', '₹/min', etc.
+    units: Mapped[Optional[str]]   = mapped_column(String(16), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
 # News headlines — accumulated throughout the day, truncated at 07:00 IST
 # ---------------------------------------------------------------------------
 

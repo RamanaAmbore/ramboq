@@ -47,21 +47,29 @@ from backend.shared.helpers.utils import config
 logger = get_logger(__name__)
 
 SCENARIOS_PATH = Path(__file__).parent / "scenarios.yaml"
-AUTO_STOP_AFTER = timedelta(minutes=30)
 TICK_LOG_LIMIT = 200
 
-# Per-section tick cadence — how many sim ticks pass between refreshes of
-# that section's LTPs. 1 = every tick, 30 = once per 30 ticks.
-#
-# Real intraday LTPs on active F&O positions tick many times a second while
-# equity holdings update much less often, so the shipped defaults (positions
-# every tick, holdings every 30th) feel more like a real market session than
-# moving both equally would. Resolution order at start():
-#   1. explicit `SimStartRequest.{holdings,positions}_every_n_ticks` (UI knob)
-#   2. scenario-level `{holdings,positions}_every_n_ticks` field in YAML
-#   3. module default below
+
+def _auto_stop_after() -> timedelta:
+    """Read auto-stop window from DB settings each time (falls back to 30 min)."""
+    from backend.shared.helpers.settings import get_int
+    return timedelta(minutes=get_int("simulator.auto_stop_minutes", 30))
+
+
+def _positions_every_default() -> int:
+    from backend.shared.helpers.settings import get_int
+    return get_int("simulator.positions_every_n_ticks", 1)
+
+
+def _holdings_every_default() -> int:
+    from backend.shared.helpers.settings import get_int
+    return get_int("simulator.holdings_every_n_ticks", 30)
+
+
+# Compatibility shims for callers that still reference these names.
 POSITIONS_UPDATE_EVERY_DEFAULT = 1
 HOLDINGS_UPDATE_EVERY_DEFAULT  = 30
+AUTO_STOP_AFTER                = timedelta(minutes=30)
 
 
 class SimGuardError(RuntimeError):
@@ -331,11 +339,11 @@ class SimDriver:
 
         self.holdings_every_n_ticks = _resolve(
             holdings_every_n_ticks, "holdings_every_n_ticks",
-            HOLDINGS_UPDATE_EVERY_DEFAULT,
+            _holdings_every_default(),
         )
         self.positions_every_n_ticks = _resolve(
             positions_every_n_ticks, "positions_every_n_ticks",
-            POSITIONS_UPDATE_EVERY_DEFAULT,
+            _positions_every_default(),
         )
 
         # Seed the running state — either from scenario.initial, the live-book
@@ -435,9 +443,10 @@ class SimDriver:
     async def _run_loop(self) -> None:
         """Async loop driving the scenario at `rate_ms` cadence."""
         try:
+            auto_stop = _auto_stop_after()
             while self.active:
-                if datetime.now() - self.started_at > AUTO_STOP_AFTER:
-                    logger.warning("[SIMULATOR] Auto-stop after 30 min")
+                if datetime.now() - self.started_at > auto_stop:
+                    logger.warning(f"[SIMULATOR] Auto-stop after {auto_stop}")
                     self.stop()
                     return
                 self._apply_next_tick()

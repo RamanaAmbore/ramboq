@@ -46,7 +46,7 @@ class Base(DeclarativeBase):
 async def init_db() -> None:
     """Create all tables (idempotent)."""
     async with engine.begin() as conn:
-        from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline, GrammarToken  # noqa: F401 — ensure model registered
+        from backend.api.models import User, Agent, AgentEvent, MarketReport, NewsHeadline, GrammarToken, Setting  # noqa: F401 — ensure model registered
         await conn.run_sync(Base.metadata.create_all)
 
         # Idempotent column additions for tables that pre-date the column.
@@ -98,6 +98,12 @@ async def init_db() -> None:
     # Seed built-in agents
     from backend.api.algo.agent_engine import seed_agents
     await seed_agents()
+
+    # Seed DB-backed settings (populates `settings` table from
+    # backend/shared/helpers/settings.py seed list; preserves operator
+    # overrides on subsequent boots).
+    from backend.shared.helpers.settings import seed_settings
+    await seed_settings()
 
 
 async def get_session() -> AsyncSession:

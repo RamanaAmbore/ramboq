@@ -284,14 +284,19 @@ def _v2_unlatch(agent) -> None:
 
 
 def _v2_cfg():
-    """Read the small set of gate/suppression parameters from backend_config.yaml."""
-    g = app_config.get
+    """
+    Read the gate/suppression parameters. Reads from the DB-backed
+    Settings table first (operators can tune these from /admin/settings
+    without a deploy); falls back to backend_config.yaml for the legacy
+    flat keys if the row is absent.
+    """
+    from backend.shared.helpers.settings import get_int, get_float
     return {
-        'rate_window_min':       float(g('alert_rate_window_min', 10)),
-        'baseline_offset_min':   float(g('alert_baseline_offset_min', 15)),
-        'cooldown_min':          float(g('alert_cooldown_minutes', 30)),
-        'suppress_delta_abs':    float(g('alert_suppress_delta_abs', 15000)),
-        'suppress_delta_pct':    float(g('alert_suppress_delta_pct', 0.5)),
+        'rate_window_min':       get_int('alerts.rate_window_min', 10),
+        'baseline_offset_min':   get_int('alerts.baseline_offset_min', 15),
+        'cooldown_min':          get_int('alerts.cooldown_minutes', 30),
+        'suppress_delta_abs':    get_int('alerts.suppress_delta_abs', 15000),
+        'suppress_delta_pct':    get_float('alerts.suppress_delta_pct', 0.5),
     }
 
 

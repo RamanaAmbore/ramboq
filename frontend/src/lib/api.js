@@ -132,6 +132,21 @@ export const deleteGrammarToken = async (id) => {
   }
 };
 export const reloadGrammarRegistry = () => _post('/admin/grammar/reload', {}, { auth: true });
+
+// ── Settings (admin) ────────────────────────────────────────────────────
+export const fetchSettings     = () => _get('/admin/settings/', { auth: true });
+export const updateSetting     = async (key, value) => {
+  const res = await fetch(`${BASE}/admin/settings/${encodeURIComponent(key)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+    body: JSON.stringify({ value: String(value) }),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
+  return res.json();
+};
+export const resetSetting      = (key) =>
+  _post(`/admin/settings/${encodeURIComponent(key)}/reset`, {}, { auth: true });
 export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
 export const fetchRecentAgentEvents = (n = 100) => _get(`/agents/events/recent?n=${n}`, { auth: true });
 export const createAgent      = (payload) => _post('/agents/', payload, { auth: true });
