@@ -218,24 +218,26 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Vertical "log" label sitting just before the first tab. Rotated 90°
-     counterclockwise (writing-mode: vertical-rl + rotate(180)) so letters
-     read bottom-to-top on the left edge. Lowercase + 0.5rem so it's a
-     quiet section marker, not a heading. Hidden on very narrow widths
-     where horizontal space is precious. */
+  /* Vertical "log" label before the first tab. vertical-rl + rotate(180)
+     reads bottom-to-top; lowercase but bright enough to actually be seen
+     (the previous 0.5rem at 0.55 opacity was effectively invisible). */
   .log-section-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     font-family: ui-monospace, monospace;
-    font-size: 0.5rem;
-    letter-spacing: 0.25em;
-    color: rgba(251,191,36,0.55);
-    padding: 0.15rem 0.15rem 0.15rem 0;
-    margin-right: 0.1rem;
-    align-self: stretch;
-    display: inline-flex;
-    align-items: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: #fbbf24;
+    padding: 0.15rem 0.2rem;
+    min-width: 1rem;
+    margin-right: 0.35rem;
     user-select: none;
+    border-right: 1px solid rgba(251,191,36,0.3);
+    align-self: stretch;
   }
   @media (max-width: 520px) {
     .log-section-label { display: none; }
