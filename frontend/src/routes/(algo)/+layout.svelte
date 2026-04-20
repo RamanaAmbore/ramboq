@@ -35,15 +35,18 @@
     goto('/about');
   }
 
+  // Grouped by frequency of use: operational daily work first
+  // (Dashboard / Agents / Orders), then tools (Terminal / Simulator),
+  // then configuration (Tokens / Settings), then user admin last.
   const algoLinks = [
     { href: '/dashboard',        label: 'Dashboard' },
-    { href: '/console',          label: 'Terminal'  },
     { href: '/agents',           label: 'Agents'    },
     { href: '/orders',           label: 'Orders'    },
-    { href: '/admin',            label: 'Users'     },
+    { href: '/console',          label: 'Terminal'  },
+    { href: '/admin/simulator',  label: 'Simulator' },
     { href: '/admin/tokens',     label: 'Tokens'    },
     { href: '/admin/settings',   label: 'Settings'  },
-    { href: '/admin/simulator',  label: 'Simulator' },
+    { href: '/admin',            label: 'Users'     },
   ];
 
   let menuOpen = $state(false);

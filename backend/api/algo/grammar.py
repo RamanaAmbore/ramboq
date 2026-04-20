@@ -440,6 +440,34 @@ SYSTEM_TOKENS: list[dict] = [
                               'description': 'Percent of spread to adjust on each chase step.'},
      }},
 
+    # Simpler one-shot close of a specific position — LIMIT order at the
+    # instrument's current LTP. Side is derived from position direction
+    # (long → SELL to flatten, short → BUY to cover); operators can still
+    # override via `side`. In the simulator, the order is paper-traded:
+    # an AlgoOrder row is written with mode='sim' and initial_price = LTP
+    # at the moment the agent fired, so operators can see exactly what
+    # price the engine would have used.
+    {'grammar_kind': 'action', 'token_kind': 'action_type', 'token': 'close_position',
+     'value_type': 'void',
+     'description': "Close a single open position with a LIMIT order at current LTP. "
+                    "In sim mode, records a paper AlgoOrder with the sim's current LTP "
+                    "so the trade price is visible in order logs.",
+     'resolver': 'backend.api.algo.actions.close_position',
+     'params_schema': {
+         'account':          {'type': 'string',  'required': True,  'token_ref_ok': True,
+                              'description': 'Masked account id (e.g. ZG####).'},
+         'symbol':           {'type': 'string',  'required': True,
+                              'description': 'Tradingsymbol to close. Must match an open position.'},
+         'exchange':         {'type': 'enum',    'enum': ['NSE','BSE','NFO','CDS','MCX'],
+                              'required': False, 'default': 'NFO'},
+         'quantity':         {'type': 'number',  'required': False,  'token_ref_ok': True,
+                              'description': 'Partial close. Omit to flatten the full position.'},
+         'side':             {'type': 'enum',    'enum': ['BUY','SELL'], 'required': False,
+                              'description': 'Override auto-derived side. Default: long → SELL, short → BUY.'},
+         'product':          {'type': 'enum',    'enum': ['MIS','CNC','NRML'],
+                              'required': False, 'default': 'NRML'},
+     }},
+
     {'grammar_kind': 'action', 'token_kind': 'action_type', 'token': 'monitor_order',
      'value_type': 'void',
      'description': 'Poll an order until it fills or times out, then trigger on_fill / on_timeout actions.',

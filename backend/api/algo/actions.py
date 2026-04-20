@@ -40,6 +40,12 @@ async def execute(agent, actions: list, context: dict):
                 await _action_send_summary(context, params)
             elif action_type == "place_order":
                 await _action_place_order(context, params)
+            elif action_type == "close_position":
+                # Live path: currently a stub — logs and returns. Real
+                # broker wiring lands with the action runner. Sim path
+                # never reaches here because sim_mode routes to
+                # _sim_paper_trade above.
+                await close_position(context, params)
             else:
                 logger.warning(f"Agent [{agent.slug}]: unknown action type '{action_type}'")
                 continue
@@ -59,11 +65,42 @@ async def execute(agent, actions: list, context: dict):
                             params, sim_mode=sim_mode)
 
 
+def _sim_ltp_for(account: str, symbol: str) -> tuple[float | None, int | None]:
+    """
+    Look up the current simulated last_price + signed quantity for
+    (account, symbol) from the SimDriver's per-symbol state. Used by
+    paper-trade writers so the AlgoOrder row carries the LIMIT price the
+    sim would have submitted to the broker.
+
+    Returns (None, None) when the symbol isn't in the sim state — the
+    writer then falls back to the price param or leaves the column null.
+    """
+    try:
+        from backend.api.algo.sim.driver import get_driver
+        drv = get_driver()
+        for row in getattr(drv, "_positions_rows", []):
+            if str(row.get("account")) == str(account) and \
+               str(row.get("tradingsymbol")) == str(symbol):
+                lp = row.get("last_price")
+                qty = row.get("quantity")
+                return (float(lp) if lp is not None else None,
+                        int(qty)  if qty is not None else None)
+    except Exception:
+        pass
+    return None, None
+
+
 async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict):
     """
     Record a paper-trade row in algo_orders with mode='sim' for every action
     fired by a simulator run. Leaves no side-effect at the broker — visibility
     only.
+
+    For order-like actions (place_order / close_position / chase_close),
+    the `initial_price` column is set to the sim's current LTP for
+    (account, symbol) so operators can see exactly what price the engine
+    would have placed the limit order at. Falls back to the `price` param
+    if the symbol isn't in the sim state.
     """
     from backend.api.database import async_session
     from backend.api.models import AlgoOrder
@@ -71,23 +108,51 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
     detail = f"[SIMULATOR] agent={agent.slug} action={action_type} params={params}"
     logger.warning(f"[SIMULATOR] paper-trade: {detail}")
 
-    if action_type not in {"place_order", "chase_close", "chase_close_positions"}:
+    if action_type not in {"place_order", "close_position", "chase_close", "chase_close_positions"}:
         # Non-order actions (emit_log, set_flag, monitor_order, deactivate_agent,
         # send_summary, cancel_*) get logged above via log_event — no paper row.
         return
 
+    account = str(params.get("account") or "SIM")
+    symbol  = str(params.get("symbol")  or f"{agent.slug}-{action_type}")
+    ltp, qty_held = _sim_ltp_for(account, symbol)
+
+    # Derive transaction side: explicit param > auto from position direction
+    # > safe default (SELL).
+    if params.get("side") in ("BUY", "SELL"):
+        side = params.get("side")
+    elif params.get("transaction_type") in ("BUY", "SELL"):
+        side = params.get("transaction_type")
+    elif qty_held is not None:
+        side = "SELL" if qty_held > 0 else "BUY"
+    else:
+        side = "SELL"
+
+    # Quantity: explicit > abs(held). Zero when neither is available —
+    # visible in the log as "qty=0" so the operator notices.
+    if params.get("quantity") is not None:
+        qty = int(params.get("quantity") or 0)
+    elif qty_held is not None:
+        qty = abs(int(qty_held))
+    else:
+        qty = 0
+
+    initial_price = ltp if ltp is not None else params.get("price")
+    detail_with_px = (f"{detail} · LTP=₹{ltp:,.2f}" if ltp is not None else detail)
+
     try:
         async with async_session() as s:
             row = AlgoOrder(
-                account=str(params.get("account") or "SIM"),
-                symbol=str(params.get("symbol") or f"{agent.slug}-{action_type}"),
+                account=account,
+                symbol=symbol,
                 exchange=str(params.get("exchange") or "NFO"),
-                transaction_type=str(params.get("transaction_type") or "SELL"),
-                quantity=int(params.get("quantity") or 0),
+                transaction_type=side,
+                quantity=qty,
+                initial_price=(float(initial_price) if initial_price is not None else None),
                 status="simulated",
                 engine="sim",
                 mode="sim",
-                detail=detail,
+                detail=detail_with_px,
             )
             s.add(row)
             await s.commit()
@@ -185,6 +250,22 @@ async def chase_close_positions(ctx, params: dict) -> dict:
     Delegates to ExpiryEngine primitives once the action runner lands.
     """
     return _log_invoke("chase_close_positions", params)
+
+
+async def close_position(ctx, params: dict) -> dict:
+    """
+    One-shot close of a single position with a LIMIT order at current LTP.
+
+    Live mode: wiring pending the action runner landing — logs the
+    invocation so the pipeline is exercised end-to-end without touching
+    the broker.
+
+    Sim mode: dispatched through `_sim_paper_trade` upstream (execute() in
+    this module routes on ctx['sim_mode']), which records an AlgoOrder
+    with initial_price = sim's current LTP for the symbol. So this
+    handler is the LIVE path only.
+    """
+    return _log_invoke("close_position", params)
 
 
 async def monitor_order(ctx, params: dict) -> dict:

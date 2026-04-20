@@ -347,7 +347,8 @@
             <th class="py-1 pr-3">Account</th>
             <th class="py-1 pr-3">Symbol</th>
             <th class="py-1 pr-3">Side</th>
-            <th class="py-1 pr-3">Qty</th>
+            <th class="py-1 pr-3 text-right">Qty</th>
+            <th class="py-1 pr-3 text-right">LIMIT ₹</th>
             <th class="py-1 pr-3">Engine</th>
             <th class="py-1 pr-3">Status</th>
             <th class="py-1 pr-3">Detail</th>
@@ -363,7 +364,10 @@
                 {o.symbol}
               </td>
               <td class="py-1 pr-3">{o.transaction_type}</td>
-              <td class="py-1 pr-3">{o.quantity}</td>
+              <td class="py-1 pr-3 text-right">{o.quantity}</td>
+              <td class="py-1 pr-3 text-right text-[#fbbf24]">
+                {o.initial_price != null ? '₹' + Number(o.initial_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—'}
+              </td>
               <td class="py-1 pr-3">{o.engine}</td>
               <td class="py-1 pr-3">{o.status}</td>
               <td class="py-1 pr-3 text-[#c8d8f0]/85">{o.detail || '—'}</td>

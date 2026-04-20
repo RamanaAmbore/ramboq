@@ -94,6 +94,7 @@ class SimOrderInfo(msgspec.Struct):
     exchange: str
     transaction_type: str
     quantity: int
+    initial_price: float | None   # LIMIT price = sim's LTP when the agent fired
     status: str
     engine: str
     created_at: str
@@ -280,6 +281,7 @@ class SimulatorController(Controller):
             SimOrderInfo(
                 id=r.id, account=r.account, symbol=r.symbol, exchange=r.exchange,
                 transaction_type=r.transaction_type, quantity=r.quantity,
+                initial_price=(float(r.initial_price) if r.initial_price is not None else None),
                 status=r.status, engine=r.engine,
                 created_at=r.created_at.isoformat() if r.created_at else "",
                 detail=r.detail,
