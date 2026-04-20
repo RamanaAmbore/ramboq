@@ -480,8 +480,28 @@
     background: #152033;
     border-color: rgba(255,255,255,0.12);
     color: #e2e8f0;
+    /* Tell Firefox + Chromium-mobile to use our dark palette for the
+       native <select> popup — without this the dropdown list shows the
+       OS light-theme chrome which looks jarring next to the cards. */
+    color-scheme: dark;
+    accent-color: #fbbf24;
   }
   :global(.algo-content .field-input:focus) { border-color: #fbbf24 !important; }
+
+  /* <select> option list — Chromium and Firefox both honour these when
+     the select itself has color-scheme: dark. Safari ignores them (macOS
+     uses system chrome) but at least the dark hint from color-scheme
+     makes the popup contrast correctly. */
+  :global(.algo-content select.field-input option),
+  :global(.algo-content select option) {
+    background-color: #152033;
+    color: #e2e8f0;
+  }
+  :global(.algo-content select.field-input option:checked),
+  :global(.algo-content select option:checked) {
+    background-color: #273552;
+    color: #fbbf24;
+  }
   :global(.algo-content .section-heading) { color: #fbbf24; }
   :global(.algo-content .page-title-chip) { color: #fbbf24; border-color: rgba(251,191,36,0.25); }
   :global(.algo-content .btn-secondary) {
