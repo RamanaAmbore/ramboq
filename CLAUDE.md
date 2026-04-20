@@ -145,7 +145,7 @@ One row per breached threshold (abs, pct, and fund checks fire separate rows):
 Every loss / fund-negative rule ships as a `loss-*` Agent row (grammar tree
 of metric/scope/op/value leaves). See `_LOSS_AGENTS` in
 `backend/api/algo/agent_engine.py` for the 14 seeded rules. Default floors
-(editable live from the /algo page, per agent):
+(editable live from the /agents page, per agent):
 
 | Scope (scope token) | Holdings % | Positions % | Positions ₹ |
 |---|---|---|---|
@@ -310,23 +310,25 @@ In-process TTL cache in `backend/api/cache.py` with per-key locking. `get_neares
 - **`backend/api/algo/expiry.py`** — Expiry-day auto-close: scan ITM/NTM, chase-close positions
 - **`backend/api/algo/agent_engine.py`** — Declarative agent runner. `run_cycle()` enforces each agent's `schedule` field — agents with `schedule: market_hours` are skipped when no market segment is open, preventing stale NSE equity P&L alerts from firing during MCX-only hours (15:30–23:30). `seed_agents()` syncs the `schedule` field on existing DB rows and forces built-in agents to `inactive` when the YAML definition marks them so; user-customized conditions/cooldown/events/actions are preserved.
 - **`backend/api/routes/algo.py`** — Agents API + WebSocket `/ws/algo` + `POST /grammar/reload`
-- **`backend/api/routes/grammar.py`** — Admin Grammar token CRUD (`/api/admin/grammar/tokens*`)
+- **`backend/api/routes/grammar.py`** — Admin token CRUD (`/api/admin/grammar/tokens*`); the UI for this lives at `/admin/tokens` (page title "Tokens")
+- **`backend/api/routes/simulator.py`** — Market simulator control plane (`/api/simulator/*`); pairs with `backend/api/algo/sim/driver.py`
 - **`backend/api/routes/auth.py`** — Login (24h JWT), register (pending approval), me, logout
 - **`backend/api/routes/admin.py`** — Create/approve/reject/update users, logs, exec
 
 ### Built-in Agents (seeded from YAML)
 Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mcx_close_summary`) are **`status: "inactive"` by default** — `_task_performance` and `_task_close` in `backend/api/background.py` already send open/close summaries directly, so enabling the agents would cause duplicate alerts. `seed_agents()` force-resets these four to inactive on every startup.
 
-**New-grammar loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They are seeded INACTIVE to avoid duplicating `alert_utils.check_and_alert` until parity is confirmed; activate one at a time from the `/algo` page.
+**Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
-### SvelteKit Pages
-- **`+layout.svelte`** — Nav with Admin ▾ dropdown (Terminal, Agents, Orders, Users, Grammar); mobile hamburger
-- **`performance/`** — AG Grid with colour-coded P&L, per-account grids, URL ?tab= sync
+### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
+- **`+layout.svelte`** — algo-site top nav: Dashboard · Terminal · Agents · Orders · Users · Tokens · Simulator; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component) — timestamp + Refresh · account dropdown + Positions/Holdings tabs in one row · Fund Balances · active-tab Summary + table. Performance page **always** shows real Kite data; the background refresh keeps going even while the simulator is active.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
 - **`admin/`** — User management with full partner fields
-- **`admin/grammar/`** — Agent grammar catalog (Condition / Notify / Action tabs), create/edit custom tokens, Reload Registry
-- **`algo/`** — Agents page: grouped compact rows (Loss & Risk / Summaries / Automation / Other), click-to-expand, Edit with live condition validation
+- **`admin/tokens/`** — Agent Tokens page (Condition / Notify / Action tabs), create/edit custom tokens, Reload Registry. UI label is "Tokens"; the DB table and Python class keep their legacy names (`grammar_tokens`, `GrammarRegistry`) because the data model IS a grammar in the compiler-theory sense. Route: `/admin/tokens`.
+- **`admin/simulator/`** — Market simulator control plane. Scenario dropdown · Seed (Scripted / Live / Live+scenario) · Rate · Load live book · Start / Stop / Step / Run cycle / Clear sim. Shared `LogPanel` embedded at the bottom, defaulted to the Simulator tab (streams per-symbol LTP diffs in real time). See **Simulator** section below.
+- **`agents/`** (formerly `/algo`) — Agents page: grouped compact rows (Loss & Risk / Summaries / Automation / Other), click-to-expand, Edit with live condition validation, per-row "Run in Simulator" button that deep-links to `/admin/simulator?agent_id=<id>`. The Agent-events panel auto-scopes: real events when sim is idle, sim events when a sim is running.
 - **`console/`** — Terminal: command textarea + output + live log (equal panels)
 - **`orders/`** — Order management
 
@@ -338,14 +340,39 @@ Ramboq's risk + automation engine is built around four words:
 
 | Word | Meaning |
 |---|---|
-| **Agent** | A rule row (DB: `agents`) with `condition + notify + actions + metadata`. |
-| **Alert** | The runtime event an agent emits when its condition fires. Logged to `agent_events`. |
+| **Agent** | A rule row (DB: `agents`) with `condition + notify + actions + metadata`. Seeded from `BUILTIN_AGENTS` in `agent_engine.py` (14 loss rules + 2 fund negatives ship active by default) and extensible via the `/agents` UI. |
+| **Alert** | The runtime event an agent emits when its condition fires. Persisted to `agent_events` with a `sim_mode` flag so real fires can be separated from simulated ones. |
 | **Notify** | A delivery channel (`telegram / email / websocket / log`). |
-| **Action** | A side-effect the alert invokes (order placement, monitoring, modify, cancel, close, flag-set, …). |
+| **Action** | A side-effect the alert invokes (order placement, monitoring, modify, cancel, close, flag-set, …). Handlers in `actions.py`; real broker wiring lands per-action as each is promoted out of stub mode. |
 
-### Grammar (condition / notify / action) — extensible via DB tokens
+### End-to-end flow on a real tick
 
-`grammar_tokens` is the single catalog for everything the engine can see or do. Each row:
+```
+_task_performance (background.py, every 5 min during market hours)
+  └─ fetch_holdings / fetch_positions / fetch_margins  ← live Kite data
+     └─ summarise_holdings / summarise_positions       ← per-account + TOTAL
+        └─ run_cycle(ctx)                              ← agent_engine.py
+           └─ for each active agent:
+              1. schedule gate  — skip market_hours agents outside session
+              2. cooldown gate  — skip if last fire was within cooldown_minutes
+              3. baseline gate  — skip rate-metric agents for first 15 min
+              4. evaluate()     — walk condition tree (agent_evaluator.py)
+              5. suppress gate  — refire only if |Δpnl| or |Δpct| is material
+              6. if matches: dispatch (telegram/email/ws/log) + execute(actions)
+              7. write agent_events row, update last_triggered_at / status
+```
+
+Tokens referenced in a condition (metric `pnl`, scope `positions.any_acct`,
+operator `<=`, value `-30000`) are resolved lazily via `GrammarRegistry`, so
+adding a new metric is one DB row plus one resolver function — no engine
+change.
+
+### Tokens (condition / notify / action) — extensible via DB
+
+The **Tokens page** (`/admin/tokens`) is the UI over the `grammar_tokens`
+table. The engine ships with a full set of system tokens, seeded on every
+boot from `backend/api/algo/grammar.py`; operators can toggle those on/off
+and add custom tokens via the page. Each row:
 
 | Column | Purpose |
 |---|---|
@@ -376,7 +403,7 @@ leaf       ::=  { "metric": <metric-token>,
 
 `backend/api/algo/agent_evaluator.py`:
 - `evaluate(cond, ctx) -> list[match]` — tree walker; empty list means no fire.
-- `validate(cond) -> list[str]` — dry-check; every referenced token must exist in the registry. Used by `POST /api/agents/validate-condition` and surfaced in the `/algo` editor's Validate button.
+- `validate(cond) -> list[str]` — dry-check; every referenced token must exist in the registry. Used by `POST /api/agents/validate-condition` and surfaced in the `/agents` editor's Validate button.
 - `Context` — bundles `sum_holdings`, `sum_positions`, `df_margins`, `alert_state` (for rate history), `now`, `segments`, `rate_window_min`, `agent`.
 
 The v1 `field/operator/rules` evaluator has been retired; every agent must use the grammar tree above. `run_cycle` calls `agent_evaluator.evaluate` directly.
@@ -405,6 +432,145 @@ All gated by `admin_guard`. Every mutating endpoint calls `REGISTRY.reload()` au
 ### Logging
 - API uses `RAMBOQ_LOG_PREFIX=api_` env var for log file naming
 - 3 handlers: rotating log file (5MB × 5), rotating error file, console
+
+---
+
+## Simulator
+
+The simulator feeds fabricated per-symbol holdings + positions + margins
+into the **same** agent engine the real pipeline uses, so alerts, actions,
+and event-logging are all exercised end-to-end without touching the
+broker. **No code branches in the hot path** — the engine only sees a
+`sim_mode` flag on the context dict and tags downstream artefacts with
+`[SIMULATOR]` prefixes.
+
+### Architecture — Model B (per-symbol price driver)
+
+```
+scenario.yaml (moves)      ┌────────────────────────┐
+        │                  │    Real background     │
+        ▼                  │    _task_performance   │    
+   SimDriver       ←─?──→  │   (stays live, only    │ ← Kite API
+  (per-symbol state)       │    run_cycle gated)    │
+        │ every rate_ms    └──────────┬─────────────┘
+        ▼                             │
+   _apply_moves (glob)                ▼
+    last_price ← move               run_cycle(ctx)
+    recompute pnl/cur_val/day_*     (shared — no sim branch)
+        │                             │
+        ▼                             ▼
+   summarise_holdings           dispatch · actions
+   summarise_positions          → Telegram/email/ws/log
+        │                       → agent_events (sim_mode=True)
+        ▼                       → algo_orders (mode='sim')
+   run_cycle(ctx,
+     sim_mode=True,
+     only_agent_ids=...,
+     bypass_schedule=True)
+```
+
+Key files:
+
+| Path | Purpose |
+|---|---|
+| `backend/api/algo/sim/driver.py` | `SimDriver` singleton — per-symbol state, tick loop, move primitives, glob scope matching, live-book seeding |
+| `backend/api/algo/sim/scenarios.yaml` | Scenario catalog (slug, name, mode, optional `initial` per-symbol rows, `ticks` with move primitives) |
+| `backend/api/routes/simulator.py` | `/api/simulator/*` endpoints (admin-guarded) |
+| `frontend/src/routes/(algo)/admin/simulator/+page.svelte` | Control plane UI |
+
+### State shape
+
+`_holdings_rows` and `_positions_rows` are per-symbol dicts matching what
+`broker_apis.fetch_holdings` / `fetch_positions` return (`tradingsymbol`,
+`opening_quantity`, `average_price`, `last_price`, `close_price`, …). When
+a move changes `last_price`, `_recompute_holding_row` / `_recompute_position_row`
+derive every dependent field. `dataframes()` then calls the same
+`summarise_holdings` / `summarise_positions` helpers the live background task
+uses, producing aggregates in the exact shape the evaluator expects.
+
+### Move primitives (in scenario `ticks`)
+
+```yaml
+- at: 0
+  moves:
+    - {type: pct,         scope: "holdings.**",         value: -0.02}   # -2% LTP
+    - {type: abs,         scope: "positions.ZG*.NIFTY*", value: -25}    # ₹-25/share
+    - {type: random_walk, scope: "holdings.**", drift: -0.001, vol: 0.01}
+    - {type: target_pnl,  scope: "positions.ZG*.*",     value: -50000}  # solve ΔLTP
+    - {type: set_margin,  scope: "margins.ZG####",
+        fields: {avail opening_balance: -1500, net: -2500}}
+```
+
+- **`pct`** / **`abs`** — LTP × (1+v) or LTP + v.
+- **`random_walk`** — `LTP ← LTP × (1 + drift + vol·N(0,1))`; seedable via scenario-level `seed:`.
+- **`target_pnl`** — solves `ΔLTP × Σqty = target − currentPnl` uniformly; refuses mixed long/short.
+- **`set_margin`** — price-decoupled; real Kite margin math (SPAN/ELM/product type) is never simulated.
+
+**Scope glob** is `section.account.tradingsymbol` with `*` (single-segment) and `**` (any remaining path). Examples: `holdings.**`, `holdings.ZG*.*`, `positions.*.NIFTY*`, `holdings.ZG####.RELIANCE`.
+
+### Seeding modes
+
+| `seed_mode` | Initial state |
+|---|---|
+| `scripted` | Scenario's `initial:` block (falls loudly if empty) |
+| `live` | Fresh broker fetch via `SimDriver.seed_live()` — 96 holdings / 25 positions / 2 margins snapshotted into the driver |
+| `live+scenario` | Live book first, scripted `initial` rows layered on top |
+
+Scenarios with no `initial:` (e.g. `generic-crash`, `random-walk`) require `seed_mode=live` or `live+scenario`; attempting `scripted` start raises a clear error.
+
+### Gates disabled during a sim
+
+For a sim run, `run_cycle` is called with `bypass_schedule=True` **and** optionally `only_agent_ids=[...]`. That skips:
+
+- the schedule gate (`market_hours` agents run even at 3 AM IST),
+- the cooldown gate (repeated "Run in Simulator" clicks always fire),
+- the baseline gate (rate agents fire immediately, not after 15 min),
+- the suppression gate,
+- and — critically — does **not** mutate the agent row (no cooldown / trigger count leak into real-market state).
+
+The simulator owns its own `_sim_alert_state` dict, so rate history and suppression state never cross with the real pipeline.
+
+### Interaction with the real background task
+
+`_task_performance` keeps running while a sim is active: it fetches live Kite data, refreshes the performance cache, and sends open/close summaries. Only the live `run_cycle` call is skipped (`sim_active` short-circuit at `background.py` ~line 319) — that way `/performance` stays fresh with real data and the only thing that stops firing is the live agent engine.
+
+### `sim_mode` = `True` effects
+
+| Surface | Tag |
+|---|---|
+| Telegram message | `SIMULATOR` prefix + red "SIMULATOR RUN — fabricated market data" line |
+| Email subject | `RamboQuant SIMULATOR Agent: …` |
+| Email body | Red banner `🚨 SIMULATOR RUN — fabricated market data, not a real alert` |
+| `agent_events.sim_mode` | `TRUE` |
+| `algo_orders.mode` | `'sim'` (and `engine='sim'`) |
+| Log prefix | `[SIMULATOR]` |
+| WebSocket `agent_alert` payload | `sim_mode: true` |
+
+### Simulator API — `/api/simulator/*`
+
+| Route | Purpose |
+|---|---|
+| `GET /scenarios` | List available scenarios (slug / name / mode / has_initial / tick count) |
+| `GET /status` | Driver snapshot (active, scenario, seed_mode, tick_index, counts, only_agent_ids) |
+| `POST /start` | Body: `{scenario, rate_ms, seed_mode, agent_ids?}` |
+| `POST /stop` | Halt |
+| `POST /step` | Apply one tick (deterministic debug) |
+| `POST /seed-live` | Snapshot live holdings/positions/margins into `_live_snapshot` (bypasses cache) |
+| `POST /run-cycle` | Immediately run the agent engine against current sim state |
+| `POST /clear` | Delete every sim-mode row from `agent_events` + `algo_orders` |
+| `GET /events/recent?limit=N` | Recent `sim_mode=True` agent events |
+| `GET /orders/recent?limit=N` | Recent `mode='sim'` algo orders |
+| `GET /ticks/recent?limit=N` | Rolling driver tick log (oldest-first) with per-symbol diffs |
+
+Gated by `admin_guard` + the per-branch `cap_in_<branch>.simulator` flag in `backend_config.yaml` (dev default: on, prod default: off).
+
+### Running the simulator
+
+- **Default path**: pick a scripted scenario (e.g. `crash-open`) → Start.
+- **Stress-test your real book**: press **Load live book** → switch Seed to **Live + scenario** → pick `generic-crash` or `random-walk` → Start.
+- **Dry-fire one agent**: on `/agents`, click **Run in Simulator** on a row → arrives at `/admin/simulator?agent_id=<id>` with the agent armed → pick a scenario → Start. The agent fires regardless of its `status`, `schedule`, cooldown, or baseline gate; no real agent state is mutated.
+
+Auto-stops after 30 minutes so a forgotten sim can't bleed forever.
 
 ---
 
@@ -460,7 +626,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | Change deploy branch routing | `webhook/dispatch.sh` — the `if/elif/else`; copy to server after changes: `sudo cp /opt/ramboq/webhook/dispatch.sh /etc/webhook/dispatch.sh` |
 | Change browser tab title or SEO meta tags | `frontend/src/app.html` and per-route `<svelte:head>` sections |
 | Change footer text | `backend/config/frontend_config.yaml` — `footer_name`, `footer_text2`, `footer_mobile_text3`, `footer_desktop_text3` |
-| Change a loss threshold | Edit the corresponding `loss-*` agent from the `/algo` page (its condition tree's `value` is the threshold). Engine-wide knobs stay in `backend/config/backend_config.yaml` under `alert_cooldown_minutes`, `alert_rate_window_min`, `alert_baseline_offset_min`, `alert_suppress_delta_abs/_pct`. |
+| Change a loss threshold | Edit the corresponding `loss-*` agent from the `/agents` page (its condition tree's `value` is the threshold). Engine-wide knobs stay in `backend/config/backend_config.yaml` under `alert_cooldown_minutes`, `alert_rate_window_min`, `alert_baseline_offset_min`, `alert_suppress_delta_abs/_pct`. |
 | Change alert recipients | `backend/config/secrets.yaml` on server — `alert_emails`, `telegram_chat_id` |
 | Enable/disable deploy notification | `backend/config/backend_config.yaml` on server — `notify_on_startup` (True=dev, False=prod) |
 | Add/change market segment hours | `backend/config/backend_config.yaml` — `market_segments` block |

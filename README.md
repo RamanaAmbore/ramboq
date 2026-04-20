@@ -26,10 +26,11 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 - **Portfolio tracking**: Holdings, positions, funds — per-account and combined views via AG Grid
 - **AI market reports**: Gemini 2.5 Flash with Google Search grounding, cached daily
 - **Real-time updates**: WebSocket push from background tasks to connected browsers
-- **Agent framework**: Every loss/risk rule is a declarative Agent row — grammar tree of `metric / scope / op / value` leaves combined by `all / any / not`. Inline editor with a live graphical tree preview on the `/algo` page; token catalog is editable live at `/admin/grammar`.
+- **Agent framework**: Every loss/risk rule is a declarative Agent row — grammar tree of `metric / scope / op / value` leaves combined by `all / any / not`. Inline editor with a live graphical tree preview on the `/agents` page; token catalog is editable live at `/admin/tokens`.
+- **Market Simulator**: Per-symbol price-driven simulator (`/admin/simulator`) that replays scripted scenarios against a scripted book or your live Kite positions. Drives the same agent engine as production — alerts, Telegram/email dispatch, paper-traded orders — all tagged `SIMULATOR` so real vs simulated fires can't be confused.
 - **Expiry auto-close**: Adaptive limit-order chase engine closes ITM option positions before expiry.
 - **Partner management**: Registration (pending admin approval), KYC, contribution tracking, profit share
-- **Admin dashboard**: User management (create, approve/reject, edit all partner fields), log viewer, grammar catalog CRUD
+- **Admin dashboard**: User management (create, approve/reject, edit all partner fields), log viewer, token catalog CRUD
 - **Notifications**: Telegram + email for market open/close summaries and every agent alert
 - **Segment-aware**: Equity (NSE/NFO 09:15–15:30) and Commodity (MCX 09:00–23:30) handled independently
 - **Multi-environment**: prod (ramboq.com), dev (dev.ramboq.com)
@@ -172,10 +173,11 @@ frontend/
       about/          — Static content
       contact/        — Contact form
       signin/         — Sign In / Register (name, email, phone, PAN)
-      admin/          — User management (create, approve, edit all fields)
-      admin/grammar/  — Grammar catalog (three-tab metric/notify/action CRUD, Reload Registry)
-      algo/           — Agents page — grouped rows, click to expand, edit inline with live tree preview
-      portfolio/      — Partner contribution info
+      admin/            — User management (create, approve, edit all fields)
+      admin/tokens/     — Agent Tokens page (three-tab condition/notify/action CRUD, Reload Registry)
+      admin/simulator/  — Market simulator control plane (scenarios + live-book seed + tick stream)
+      agents/           — Agents page — grouped rows, click to expand, edit inline with live tree preview
+      portfolio/        — Partner contribution info
 
 webhook/              — deploy.sh, dispatch.sh, service files, hooks.json
 ```
@@ -329,9 +331,9 @@ Example — *"any account's positions pnl is ≤ −2% of that account's used ma
 { "metric": "pnl_pct", "scope": "positions.any_acct", "op": "<=", "value": -2.0 }
 ```
 
-### Grammar catalog (`grammar_tokens`)
+### Token catalog (`grammar_tokens`)
 
-Every metric, scope, operator, channel, template, and action type is a row in `grammar_tokens`. Adding a new capability is **one DB row + one Python function** at the row's `resolver` dotted path — no engine or schema changes. CRUD via `/admin/grammar` or `POST /api/admin/grammar/tokens`, then hit **Reload Registry** to pick it up hot.
+Every metric, scope, operator, channel, template, and action type is a row in `grammar_tokens`. Adding a new capability is **one DB row + one Python function** at the row's `resolver` dotted path — no engine or schema changes. CRUD via `/admin/tokens` (UI label "Tokens") or `POST /api/admin/grammar/tokens` (backend keeps the compiler-theory "grammar" namespace because the data model IS a grammar), then hit **Reload Registry** to pick it up hot.
 
 System tokens (`is_system=True`) ship with code and are seeded on every boot — operators can toggle `is_active` but not delete them. Custom tokens support full CRUD.
 

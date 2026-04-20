@@ -7,9 +7,11 @@
     deleteGrammarToken, reloadGrammarRegistry,
   } from '$lib/api';
 
-  // Grammar catalog viewer — read + is_active toggle for every token in
-  // grammar_tokens. System tokens are toggle-only (per the backend
-  // contract); custom tokens will get a full edit modal in a later phase.
+  // Agent Tokens page — read + is_active toggle for every token in the
+  // grammar_tokens table. (The DB table and backend class keep the
+  // compiler-theory name "grammar" because that's accurate; the UI calls
+  // it "Tokens" because that's what this page actually shows.) System
+  // tokens are toggle-only; custom tokens get full CRUD via the form below.
 
   /** @type {{id:number, grammar_kind:string, token_kind:string, token:string,
    *          value_type:string|null, units:string|null, description:string,
@@ -167,14 +169,14 @@
   });
 </script>
 
-<svelte:head><title>Grammar | RamboQuant Analytics</title></svelte:head>
+<svelte:head><title>Tokens | RamboQuant Analytics</title></svelte:head>
 
 <div class="algo-ts">{clientTimestamp()}</div>
 
 <div class="algo-status-card p-4 mb-3" data-status="inactive">
   <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
     <h1 class="text-sm font-bold uppercase tracking-wider text-[#fbbf24]">
-      Agent Grammar
+      Agent Tokens
     </h1>
     <div class="flex gap-2">
       <button onclick={openCreate}
@@ -188,10 +190,10 @@
     </div>
   </div>
   <p class="text-[0.65rem] text-[#7e97b8] mb-0">
-    Every token the Agent engine can reference. System tokens are toggle-only.
-    Use the tabs to browse condition / notify / action grammars.
-    After any change, hit <b>Reload registry</b> so the dispatch table refreshes
-    without a service restart.
+    Every token the Agent engine can reference — what agents can CHECK
+    (condition), ALERT (notify), or DO (action). System tokens are toggle-only.
+    After any change, hit <b>Reload registry</b> so the dispatch table
+    refreshes without a service restart.
   </p>
 </div>
 
@@ -215,7 +217,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
       <div>
-        <label class="field-label">Grammar</label>
+        <label class="field-label">Category</label>
         <select bind:value={form.grammar_kind} disabled={editingId != null} class="field-input">
           <option value="condition">condition</option>
           <option value="notify">notify</option>
@@ -315,7 +317,7 @@
 {#if loading}
   <div class="text-center text-[#7e97b8] text-xs animate-pulse py-6">Loading tokens…</div>
 {:else if !filtered().length}
-  <div class="text-center text-[#7e97b8] text-xs py-6">No tokens in this grammar.</div>
+  <div class="text-center text-[#7e97b8] text-xs py-6">No tokens in this category.</div>
 {:else}
   <div class="algo-status-card p-0 overflow-hidden" data-status="inactive">
     <table class="w-full text-[0.65rem]">

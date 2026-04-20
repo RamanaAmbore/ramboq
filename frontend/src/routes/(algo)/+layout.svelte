@@ -17,7 +17,7 @@
   });
 
   function isActive(/** @type {string} */ href) {
-    // Longest-match semantics so sub-pages (e.g. /admin/grammar) don't light up
+    // Longest-match semantics so sub-pages (e.g. /admin/tokens) don't light up
     // their parent (/admin) in the hamburger at the same time.
     const path = page.url.pathname;
     let bestHref = '';
@@ -41,7 +41,7 @@
     { href: '/agents',           label: 'Agents'    },
     { href: '/orders',           label: 'Orders'    },
     { href: '/admin',            label: 'Users'     },
-    { href: '/admin/grammar',    label: 'Grammar'   },
+    { href: '/admin/tokens',     label: 'Tokens'    },
     { href: '/admin/simulator',  label: 'Simulator' },
   ];
 
