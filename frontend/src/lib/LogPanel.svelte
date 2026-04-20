@@ -189,11 +189,14 @@
 </script>
 
 <div class="flex items-stretch gap-0.5 mb-2">
-  <!-- Tiny vertical "log" label sitting just before the Order tab — labels
-       the section without eating horizontal space. Writing-mode rotates
-       the text 90° counterclockwise; kept lowercase at 0.5rem so it
-       reads as a quiet section marker, not a heading. -->
-  <span class="log-section-label" aria-hidden="true">log</span>
+  <!-- Vertical "log" label sitting just before the Order tab. Two-layer
+       structure — outer .log-section-wrap is the flex item that sizes +
+       borders the cell, inner .log-section-text is what rotates.
+       Splitting it this way sidesteps the flex-child + writing-mode
+       layout collapse we hit with a single span. -->
+  <span class="log-section-wrap" aria-hidden="true">
+    <span class="log-section-text">log</span>
+  </span>
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
       class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
@@ -218,13 +221,21 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Vertical "log" label before the first tab. vertical-rl + rotate(180)
-     reads bottom-to-top; lowercase but bright enough to actually be seen
-     (the previous 0.5rem at 0.55 opacity was effectively invisible). */
-  .log-section-label {
+  /* Vertical "log" label before the first tab. Outer wrap is the flex
+     item that handles spacing + border; inner text handles the rotation.
+     Flex + writing-mode on the same element was the bug — the element
+     collapsed to zero width and the text rendered invisibly. */
+  .log-section-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 1.2rem;
+    padding: 0.2rem 0.15rem;
+    margin-right: 0.25rem;
+    border-right: 1px solid rgba(251,191,36,0.3);
+    align-self: stretch;
+  }
+  .log-section-text {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     font-family: ui-monospace, monospace;
@@ -232,14 +243,9 @@
     font-weight: 700;
     letter-spacing: 0.2em;
     color: #fbbf24;
-    padding: 0.15rem 0.2rem;
-    min-width: 1rem;
-    margin-right: 0.35rem;
     user-select: none;
-    border-right: 1px solid rgba(251,191,36,0.3);
-    align-self: stretch;
   }
   @media (max-width: 520px) {
-    .log-section-label { display: none; }
+    .log-section-wrap { display: none; }
   }
 </style>
