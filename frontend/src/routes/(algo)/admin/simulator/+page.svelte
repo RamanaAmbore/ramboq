@@ -77,22 +77,37 @@
     // agent tab piggybacks on `events` (refreshed by loadAll every 3s)
   }
 
-  async function loadAll() {
-    // Orders used to be fetched here for the (removed) bottom table.
-    // The LogPanel Order tab now pulls them via loadOrderRows instead, so
-    // we skip the extra Sim-orders endpoint and save one round-trip per
-    // 3-second refresh.
+  // Hot-path (every 3s): status + events. These actually change per tick.
+  // Scenarios + agents are near-static — fetched once on mount and only
+  // refreshed on explicit Reload (scenarios) or after an Agent ON/OFF
+  // toggle from /agents (out of scope here). Cutting them from the hot
+  // loop halves the request count per refresh.
+  async function loadHot() {
     try {
-      const [scList, stat, ev, ag] = await Promise.all([
-        fetchSimScenarios(), fetchSimStatus(), fetchSimEvents(100),
-        fetchAgents(),
+      const [stat, ev] = await Promise.all([
+        fetchSimStatus(), fetchSimEvents(100),
+      ]);
+      status = stat;
+      events = ev;
+    } catch (e) { error = e.message; }
+  }
+
+  async function loadStatic() {
+    try {
+      const [scList, ag] = await Promise.all([
+        fetchSimScenarios(), fetchAgents(),
       ]);
       scenarios = scList;
-      status    = stat;
-      events    = ev;
       agents    = ag;
       if (!pickedSlug && scenarios.length) pickedSlug = scenarios[0].slug;
     } catch (e) { error = e.message; }
+  }
+
+  // Kept as a single entry point — doSeedLive / doClear / doRunCycle / doStart
+  // all call loadAll() to immediately reflect the change in the UI without
+  // waiting for the next poll tick.
+  async function loadAll() {
+    await Promise.all([loadHot(), loadStatic()]);
   }
 
   async function doStart() {
@@ -161,7 +176,9 @@
     loadSimLog();
     loadSystemLog();
     loadOrderRows();
-    refreshIv = setInterval(() => { loadAll(); loadOrderRows(); loadCurrentLog(); }, 3000);
+    // Hot loop: status + events + algo orders + current-tab log every 3s.
+    // Static data (scenarios, agents) fetched once above; not re-polled.
+    refreshIv = setInterval(() => { loadHot(); loadOrderRows(); loadCurrentLog(); }, 3000);
   });
   onDestroy(() => { if (refreshIv) clearInterval(refreshIv); });
 </script>
@@ -215,7 +232,7 @@
         market: <span class="text-[#fde68a]">{status.market_state_preset ?? 'mid_session'}</span>
       </span>
       <span class="text-[#7e97b8]">|</span>
-      <span>started: {status.started_at?.slice(0, 19) ?? '—'}</span>
+      <span>started: {status.started_at?.slice(11, 19) ?? '—'}</span>
       {#if status.only_agent_ids?.length}
         <span class="text-[#7e97b8]">|</span>
         <span class="text-[#fbbf24]">agents=[{status.only_agent_ids.join(',')}]</span>
@@ -224,7 +241,7 @@
   </div>
   {#if liveSnap}
     <div class="text-[0.6rem] text-[#c8d8f0]/70 mt-1">
-      Live snapshot: {liveSnap.snapshot_at?.slice(0, 19)} ·
+      Live snapshot: {liveSnap.snapshot_at?.slice(11, 19)} ·
       {liveSnap.positions_count}P / {liveSnap.margins_count}M
       · accounts=[{liveSnap.accounts.join(', ')}]
     </div>

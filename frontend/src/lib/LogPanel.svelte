@@ -86,15 +86,15 @@
   function _renderSimLine(entry) {
     const ts = entry.ts ? entry.ts.slice(11, 19) : '';  // HH:MM:SS
     const scen = entry.scenario || '';
-    if (entry.kind === 'started')  return `<span class="log-agent-success"><span class="log-ts">[${ts}]</span> ▶ START ${scen} · ${entry.note || ''}</span>`;
-    if (entry.kind === 'stopped')  return `<span class="log-info"><span class="log-ts">[${ts}]</span> ■ STOP ${scen} · ${entry.note || ''}</span>`;
+    if (entry.kind === 'started')  return `<span class="log-agent-success"><span class="log-ts">${ts}</span> ▶ START ${scen} · ${entry.note || ''}</span>`;
+    if (entry.kind === 'stopped')  return `<span class="log-info"><span class="log-ts">${ts}</span> ■ STOP ${scen} · ${entry.note || ''}</span>`;
     if (entry.kind === 'order') {
       const o = entry.order || {};
       const sideCls = o.side === 'BUY' ? 'log-agent-success' : 'log-agent-failed';
       const price   = (o.price != null)
         ? '@₹' + Number(o.price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
         : '';
-      return `<span class="${sideCls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ◆ ${o.side || '?'} ${o.qty ?? '?'} ${o.symbol || '?'} ${price} · ${o.account || '?'} · ${o.agent || ''} ${o.action || ''}</span>`;
+      return `<span class="${sideCls}"><span class="log-ts">${ts}</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ◆ ${o.side || '?'} ${o.qty ?? '?'} ${o.symbol || '?'} ${price} · ${o.account || '?'} · ${o.agent || ''} ${o.action || ''}</span>`;
     }
     const cls = _classifySimLine(entry);
     const diffs = (entry.changes || []).map(c => {
@@ -109,7 +109,7 @@
       return `<span class="log-chip"><span class="log-chip-key">${field}:</span>${arrow}${delta}</span>`;
     }).join(' ');
     const head = `tick ${entry.tick_index} · ${scen}`;
-    return `<span class="${cls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ${head} ${diffs || '(no changes)'}</span>`;
+    return `<span class="${cls}"><span class="log-ts">${ts}</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ${head} ${diffs || '(no changes)'}</span>`;
   }
 
   const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);
@@ -139,7 +139,7 @@
     const chips = h.fields ? Object.entries(h.fields)
       .map(([k, v]) => `<span class="log-chip"><span class="log-chip-key">${k}:</span>${v}</span>`)
       .join(' ') : '';
-    return `<span class="${cls}"><span class="log-ts">[${h.time}]</span> ${h.status} ${h.message} ${chips}</span>`;
+    return `<span class="${cls}"><span class="log-ts">${h.time}</span> ${h.status} ${h.message} ${chips}</span>`;
   }
 
   // Render one AlgoOrder row (mode=live or sim) for the Order tab. Keeps
@@ -155,7 +155,7 @@
       : '';
     const status = o.status ? ` <span class="log-chip"><span class="log-chip-key">status:</span>${o.status}</span>` : '';
     const engine = o.engine ? ` <span class="log-chip"><span class="log-chip-key">engine:</span>${o.engine}</span>` : '';
-    return `<span class="${sideCls}"><span class="log-ts">[${t}]</span> ${tag} ◆ ${o.transaction_type} ${o.quantity} ${o.symbol} ${price} · ${o.account}${status}${engine}</span>`;
+    return `<span class="${sideCls}"><span class="log-ts">${t}</span> ${tag} ◆ ${o.transaction_type} ${o.quantity} ${o.symbol} ${price} · ${o.account}${status}${engine}</span>`;
   }
 
   function _orderLogHtml() {
@@ -172,11 +172,11 @@
     const cmdLines = cmdHistory.map(h => ({ ts: h.time, html: _cmdEntryHtml(h) }));
     const orderLines = filteredOrder().map(e => {
       const t = logTime(e.timestamp);
-      return { ts: t, html: `<span class="${orderClass(e.event_type)}"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
+      return { ts: t, html: `<span class="${orderClass(e.event_type)}"><span class="log-ts">${t}</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
     });
     const agentLines = agentLog.map(e => {
       const t = logTime(e.timestamp);
-      return { ts: t, html: `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
+      return { ts: t, html: `<span class="log-agent-default"><span class="log-ts">${t}</span> ${e.event_type||''} ${e.trigger_condition||''}</span>` };
     });
     const all = [...cmdLines, ...orderLines, ...agentLines];
     return all.length ? all.map(x => x.html).join('\n') : '<span class="log-debug">No events.</span>';
@@ -199,15 +199,15 @@
 
 <pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = logTime(e.timestamp);
-  return `<span class="log-agent-default"><span class="log-ts">[${t}]</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
+  return `<span class="log-agent-default"><span class="log-ts">${t}</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{@html newsItems.map(n => {
   const safeTitle = (n.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const safeLink  = (n.link || '').replace(/"/g,'&quot;');
   const safeSrc   = (n.source || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const src = safeSrc ? ` <span class="log-chip"><span class="log-chip-key">src:</span>${safeSrc}</span>` : '';
-  return `<span class="log-info"><span class="log-ts">[${n.timestamp}]</span> <a href="${safeLink}" target="_blank" rel="noopener">${safeTitle}</a>${src}</span>`;
+  return `<span class="log-info"><span class="log-ts">${n.timestamp}</span> <a href="${safeLink}" target="_blank" rel="noopener">${safeTitle}</a>${src}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No headlines.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
   const t = parseLogLineTime(l);
   const rest = t ? stripTs(l) : l;
-  return `<span class="${sysClass(l)}">${t ? `<span class="log-ts">[${t}]</span> ` : ''}${rest}</span>`;
+  return `<span class="${sysClass(l)}">${t ? `<span class="log-ts">${t}</span> ` : ''}${rest}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>

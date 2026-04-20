@@ -65,6 +65,11 @@
       // When the sim flips on/off we want the events panel to swap sources
       // immediately, not on the next 30-second refresh tick.
       if (was !== simActive) loadAgentLog();
+      // While the sim is running, refresh the Simulator tab's tick stream
+      // on every status poll (4s) so /agents shows the same up-to-date
+      // stream as /admin/simulator. Without this, simLog only updated on
+      // the 30-second loadAll cycle — the Simulator tab looked stale.
+      if (simActive) loadSimLog();
     } catch (_) { /* cap flag off — treat as idle */ }
   }
 
@@ -264,6 +269,43 @@
       .map(c => ({ name: c, agents: out[c] }));
   }
 
+  // Action-type skeletons used by the quick-add pills below the Actions
+  // textarea. Each entry is a legal action dict the operator can tune after
+  // it lands in the JSON. Keys match the seeded grammar_tokens action list.
+  const ACTION_SKELETONS = {
+    close_position: {
+      type: "close_position",
+      params: { account: "ZG####", symbol: "<tradingsymbol>", exchange: "NFO", product: "NRML" },
+    },
+    place_order: {
+      type: "place_order",
+      params: { account: "ZG####", symbol: "<tradingsymbol>", exchange: "NFO",
+                side: "SELL", qty: 50, order_type: "LIMIT" },
+    },
+    chase_close_positions: {
+      type: "chase_close_positions",
+      params: { scope: "total", timeout_minutes: 10, adjust_pct: 0.1 },
+    },
+    cancel_all_orders: {
+      type: "cancel_all_orders",
+      params: { scope: "total" },
+    },
+    emit_log: {
+      type: "emit_log",
+      params: { level: "info", message: "Agent fired" },
+    },
+  };
+
+  /** @type {(kind: keyof ACTION_SKELETONS) => void} */
+  function addAction(kind) {
+    let arr;
+    try { arr = JSON.parse(editForm.actions || '[]'); }
+    catch (_) { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+    arr.push(ACTION_SKELETONS[kind]);
+    editForm.actions = JSON.stringify(arr, null, 2);
+  }
+
   async function runInSim(/** @type {any} */ agent) {
     // Call the synthesizer endpoint — the backend builds a scenario from
     // THIS agent's condition tree at call time (no scenarios.yaml entry
@@ -419,7 +461,25 @@
                   <textarea bind:value={editForm.events} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
                 </div>
                 <div>
-                  <label class="field-label">Actions (JSON)</label>
+                  <div class="flex items-center justify-between flex-wrap gap-1">
+                    <label class="field-label">Actions (JSON)</label>
+                    <!-- Quick-add pills — click appends a skeleton action
+                         entry so operators don't have to remember the
+                         exact shape. Params are templated to legal values;
+                         the operator tunes them after. -->
+                    <div class="flex flex-wrap gap-1">
+                      <button type="button" onclick={() => addAction('close_position')}
+                        class="action-add-pill action-add-close">+ close_position</button>
+                      <button type="button" onclick={() => addAction('place_order')}
+                        class="action-add-pill action-add-place">+ place_order</button>
+                      <button type="button" onclick={() => addAction('chase_close_positions')}
+                        class="action-add-pill action-add-chase">+ chase_close</button>
+                      <button type="button" onclick={() => addAction('cancel_all_orders')}
+                        class="action-add-pill action-add-cancel">+ cancel_all</button>
+                      <button type="button" onclick={() => addAction('emit_log')}
+                        class="action-add-pill action-add-log">+ log</button>
+                    </div>
+                  </div>
                   <textarea bind:value={editForm.actions} class="field-input font-mono text-[0.6rem]" rows="5"></textarea>
                 </div>
               </div>
@@ -673,6 +733,31 @@
     margin-top: 0.2rem;
     overflow-x: auto;
   }
+
+  /* Quick-add action pills next to the Actions textarea. Compact, colour-
+     coded by rough semantic group so they don't visually blend together. */
+  .action-add-pill {
+    font-size: 0.5rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid;
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.08s, border-color 0.08s;
+  }
+  .action-add-close  { background: rgba(251,113,133,0.12); color: #fb7185; border-color: rgba(251,113,133,0.4); }
+  .action-add-close:hover  { background: rgba(251,113,133,0.25); border-color: #fb7185; }
+  .action-add-place  { background: rgba(16,185,129,0.12);  color: #6ee7b7; border-color: rgba(16,185,129,0.4); }
+  .action-add-place:hover  { background: rgba(16,185,129,0.25); border-color: #10b981; }
+  .action-add-chase  { background: rgba(251,191,36,0.12);  color: #fbbf24; border-color: rgba(251,191,36,0.4); }
+  .action-add-chase:hover  { background: rgba(251,191,36,0.25); border-color: #fbbf24; }
+  .action-add-cancel { background: rgba(148,163,184,0.12); color: #cbd5e1; border-color: rgba(148,163,184,0.35); }
+  .action-add-cancel:hover { background: rgba(148,163,184,0.25); border-color: #94a3b8; }
+  .action-add-log    { background: rgba(125,211,252,0.12); color: #7dd3fc; border-color: rgba(125,211,252,0.4); }
+  .action-add-log:hover    { background: rgba(125,211,252,0.25); border-color: #7dd3fc; }
 </style>
 
 <LogPanel
