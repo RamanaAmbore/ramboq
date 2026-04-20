@@ -128,8 +128,10 @@
 <svelte:head><title>Terminal | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-  <div class="algo-ts">{clientTimestamp()}</div>
-  <h1 class="page-title-chip mb-2">Terminal</h1>
+  <div class="page-header">
+    <h1 class="page-title-chip">Terminal</h1>
+    <span class="algo-ts">{clientTimestamp()}</span>
+  </div>
 
   <!-- Command input -->
   <div class="relative mb-2">

@@ -171,13 +171,12 @@
 
 <svelte:head><title>Tokens | RamboQuant Analytics</title></svelte:head>
 
-<div class="algo-ts">{clientTimestamp()}</div>
-
 <div class="algo-status-card p-4 mb-3" data-status="inactive">
   <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
     <h1 class="text-sm font-bold uppercase tracking-wider text-[#fbbf24]">
       Agent Tokens
     </h1>
+    <span class="algo-ts">{clientTimestamp()}</span>
     <div class="flex gap-2">
       <button onclick={openCreate}
         class="text-[0.65rem] py-1 px-3 rounded border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold">

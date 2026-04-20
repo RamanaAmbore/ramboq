@@ -77,8 +77,10 @@
 
 <svelte:head><title>Settings | RamboQuant Analytics</title></svelte:head>
 
-<div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">Settings</h1>
+<div class="page-header">
+  <h1 class="page-title-chip">Settings</h1>
+  <span class="algo-ts">{clientTimestamp()}</span>
+</div>
 
 <p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
   DB-backed tunables. Edits here take effect on the next agent tick / sim run

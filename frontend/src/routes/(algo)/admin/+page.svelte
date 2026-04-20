@@ -93,11 +93,10 @@
   });
 </script>
 
-<div class="algo-ts mb-2">{clientTimestamp()}</div>
-
 <div class="algo-status-card p-5 pt-4" data-status="inactive">
-  <div class="flex items-center justify-between mb-1">
+  <div class="flex items-center justify-between mb-1 gap-2 flex-wrap">
     <h1 class="text-sm font-bold uppercase tracking-wider text-[#fbbf24] mb-0">User Management</h1>
+    <span class="algo-ts">{clientTimestamp()}</span>
     <button onclick={() => showCreate = !showCreate}
       class="text-[0.65rem] py-1 px-3 rounded border border-[#fbbf24]/50 bg-[#fbbf24]/15 text-[#fbbf24] hover:bg-[#fbbf24]/25 font-semibold">
       {showCreate ? 'Cancel' : 'Create User'}

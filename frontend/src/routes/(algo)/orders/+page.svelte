@@ -170,8 +170,10 @@
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
-<div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-1">Orders</h1>
+<div class="page-header">
+  <h1 class="page-title-chip">Orders</h1>
+  <span class="algo-ts">{clientTimestamp()}</span>
+</div>
 
 {#if error}<div class="mb-1 p-1.5 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>{/if}
 {#if success}<div class="mb-1 p-1.5 rounded bg-green-50 text-green-700 text-xs border border-green-200">{success}</div>{/if}

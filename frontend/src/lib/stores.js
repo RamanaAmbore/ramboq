@@ -75,26 +75,33 @@ export const dataCache = {
 };
 
 /**
- * Compact current time for the page-top timestamp banner. Drops the
- * weekday and year (the page tells you what year it is) and uses
- * 24-hour time so IST + EST line up visually. Example:
- *   "Apr 20, 22:00 IST | 12:30 EDT"
- * ~28 chars vs the previous ~65. All operationally-useful info kept —
- * date, both time zones, and the auto-resolving TZ abbreviation (EST
- * in winter, EDT in summer).
+ * Compact page-top timestamp banner. Drops the year (implied) and uses
+ * 3-letter weekday + 3-letter month so an English reader can't
+ * mis-parse "20" as a year. 12-hour time with AM/PM; double-space
+ * between date and time for visual breathing room. Example:
+ *   "Mon Apr 20  11:06 PM IST | Mon Apr 20  01:36 PM EDT"
+ * Both date halves repeated because IST and EST are frequently on
+ * different calendar days — the per-zone date keeps it unambiguous.
+ * Auto-resolves EST/EDT by season.
  */
 export function clientTimestamp() {
   const now = new Date();
-  const datePart = now.toLocaleDateString('en-US', {
-    month: 'short', day: '2-digit', timeZone: 'Asia/Kolkata',
-  });
-  const fmtTime = (tz) => now.toLocaleTimeString('en-GB', {
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
-  });
+  const fmt = (tz) => {
+    // en-GB gives "Mon, 20 Apr, 11:06 PM" — reorder to "Mon Apr 20  11:06 PM"
+    // so the day number stays next to the month and can't be read as a year.
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short', day: '2-digit', month: 'short',
+      hour: '2-digit', minute: '2-digit', hour12: true,
+      timeZone: tz,
+    }).formatToParts(now);
+    const pick = (t) => (parts.find(p => p.type === t) || {}).value || '';
+    const dayPeriod = pick('dayPeriod').replace('am','AM').replace('pm','PM');
+    return `${pick('weekday')} ${pick('month')} ${pick('day')}  ${pick('hour')}:${pick('minute')} ${dayPeriod}`;
+  };
   const estTz = now.toLocaleTimeString('en-US', {
     timeZoneName: 'short', timeZone: 'America/New_York',
-  }).split(' ').pop();   // "EST" or "EDT" — depends on season
-  return `${datePart}, ${fmtTime('Asia/Kolkata')} IST | ${fmtTime('America/New_York')} ${estTz}`;
+  }).split(' ').pop();   // "EST" / "EDT" by season
+  return `${fmt('Asia/Kolkata')} IST | ${fmt('America/New_York')} ${estTz}`;
 }
 
 /** Short DD-MMM HH:MM:SS IST | DD-MMM HH:MM:SS EST for log entries. Input: ISO string or Date. */

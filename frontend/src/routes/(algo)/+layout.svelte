@@ -417,12 +417,26 @@
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
   .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
 
-  /* Page-level timestamp line (cyan, matches log timestamps) */
+  /* Page-top header row — H1 on the left, timestamp right-aligned on
+     the same line to conserve vertical space. Wraps to its own line on
+     narrow widths. Used by every admin page via `.page-header`. */
+  :global(.page-header) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Page-level timestamp (cyan, matches log timestamps). Works inline
+     inside .page-header OR stand-alone when a page renders it on its
+     own row (left over on public pages). */
   :global(.algo-ts) {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     color: #fde047;
-    margin-bottom: 0.25rem;
     font-family: ui-monospace, monospace;
+    white-space: nowrap;
   }
 
   /* Algo dark-theme overrides for classes shared with public pages */

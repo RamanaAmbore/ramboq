@@ -343,15 +343,17 @@
   <title>Agents | RamboQuant Analytics</title>
 </svelte:head>
 
-<div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">
-  Agents
-  {#if simActive}
-    <span class="ml-2 align-middle text-[0.6rem] px-1.5 py-0.5 rounded bg-[#fb7185]/20 text-[#fb7185] border border-[#fb7185]/40 font-mono">
-      SIMULATOR EVENTS
-    </span>
-  {/if}
-</h1>
+<div class="page-header">
+  <h1 class="page-title-chip">
+    Agents
+    {#if simActive}
+      <span class="ml-2 align-middle text-[0.6rem] px-1.5 py-0.5 rounded bg-[#fb7185]/20 text-[#fb7185] border border-[#fb7185]/40 font-mono">
+        SIMULATOR EVENTS
+      </span>
+    {/if}
+  </h1>
+  <span class="algo-ts">{clientTimestamp()}</span>
+</div>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-50 text-red-700 text-xs border border-red-200">{error}</div>
