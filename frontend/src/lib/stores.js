@@ -75,28 +75,23 @@ export const dataCache = {
 };
 
 /**
- * Compact page-top timestamp banner. Drops the year (implied) and uses
- * 3-letter weekday + 3-letter month so an English reader can't
- * mis-parse "20" as a year. 12-hour time with AM/PM; double-space
- * between date and time for visual breathing room. Example:
- *   "Mon Apr 20  11:06 PM IST | Mon Apr 20  01:36 PM EDT"
- * Both date halves repeated because IST and EST are frequently on
- * different calendar days — the per-zone date keeps it unambiguous.
- * Auto-resolves EST/EDT by season.
+ * Compact page-top timestamp banner. Day-first (20 Apr) to match
+ * Indian / British convention; 3-letter weekday + 3-letter month;
+ * year dropped; 24-hour time. Example:
+ *   "Mon 20 Apr  23:06 IST | Mon 20 Apr  13:36 EDT"
+ * Both date halves repeated so IST/EST day-boundary cases stay
+ * unambiguous. Auto-resolves EST/EDT by season.
  */
 export function clientTimestamp() {
   const now = new Date();
   const fmt = (tz) => {
-    // en-GB gives "Mon, 20 Apr, 11:06 PM" — reorder to "Mon Apr 20  11:06 PM"
-    // so the day number stays next to the month and can't be read as a year.
     const parts = new Intl.DateTimeFormat('en-GB', {
       weekday: 'short', day: '2-digit', month: 'short',
-      hour: '2-digit', minute: '2-digit', hour12: true,
+      hour: '2-digit', minute: '2-digit', hour12: false,
       timeZone: tz,
     }).formatToParts(now);
     const pick = (t) => (parts.find(p => p.type === t) || {}).value || '';
-    const dayPeriod = pick('dayPeriod').replace('am','AM').replace('pm','PM');
-    return `${pick('weekday')} ${pick('month')} ${pick('day')}  ${pick('hour')}:${pick('minute')} ${dayPeriod}`;
+    return `${pick('weekday')} ${pick('day')} ${pick('month')}  ${pick('hour')}:${pick('minute')}`;
   };
   const estTz = now.toLocaleTimeString('en-US', {
     timeZoneName: 'short', timeZone: 'America/New_York',

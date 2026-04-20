@@ -188,7 +188,12 @@
   }
 </script>
 
-<div class="flex gap-0.5 mb-2">
+<div class="flex items-stretch gap-0.5 mb-2">
+  <!-- Tiny vertical "log" label sitting just before the Order tab — labels
+       the section without eating horizontal space. Writing-mode rotates
+       the text 90° counterclockwise; kept lowercase at 0.5rem so it
+       reads as a quiet section marker, not a heading. -->
+  <span class="log-section-label" aria-hidden="true">log</span>
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
       class="px-3 py-1 text-xs font-medium border-b-2 transition-colors
@@ -211,3 +216,28 @@
   const rest = t ? stripTs(l) : l;
   return `<span class="${sysClass(l)}">${t ? `<span class="log-ts">${t}</span> ` : ''}${rest}</span>`;
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
+
+<style>
+  /* Vertical "log" label sitting just before the first tab. Rotated 90°
+     counterclockwise (writing-mode: vertical-rl + rotate(180)) so letters
+     read bottom-to-top on the left edge. Lowercase + 0.5rem so it's a
+     quiet section marker, not a heading. Hidden on very narrow widths
+     where horizontal space is precious. */
+  .log-section-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: ui-monospace, monospace;
+    font-size: 0.5rem;
+    letter-spacing: 0.25em;
+    color: rgba(251,191,36,0.55);
+    padding: 0.15rem 0.15rem 0.15rem 0;
+    margin-right: 0.1rem;
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+  }
+  @media (max-width: 520px) {
+    .log-section-label { display: none; }
+  }
+</style>

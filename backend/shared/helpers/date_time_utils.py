@@ -53,13 +53,19 @@ def current_time_indian():
 
 def timestamp_display() -> str:
     """
-    Returns a formatted dual-timezone timestamp string for alerts and emails.
-    Example: Mon, March 30, 2026, 09:30 AM IST | Mon, March 30, 2026, 10:00 PM EDT
+    Compact dual-timezone timestamp for alerts, emails, and public-site
+    refreshed_at strings. Day-first, 3-letter weekday + month, 24-hour
+    time, year dropped (implied by the session). Matches
+    stores.js::clientTimestamp so client-generated banners and
+    server-generated refreshed_at stamps look identical everywhere.
+
+    Example: "Mon 20 Apr  23:06 IST | Mon 20 Apr  13:36 EDT"
+    %Z renders EST / EDT automatically by season.
     """
     now_ist = timestamp_indian()
     now_est = timestamp_est()
-    ist_str = now_ist.strftime('%a, %B %d, %Y, %I:%M %p IST')
-    est_str = now_est.strftime('%a, %B %d, %Y, %I:%M %p %Z')
+    ist_str = now_ist.strftime('%a %d %b  %H:%M IST')
+    est_str = now_est.strftime('%a %d %b  %H:%M %Z')
     return f"{ist_str} | {est_str}"
 
 
