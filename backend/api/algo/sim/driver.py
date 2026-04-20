@@ -50,6 +50,14 @@ SCENARIOS_PATH = Path(__file__).parent / "scenarios.yaml"
 AUTO_STOP_AFTER = timedelta(minutes=30)
 TICK_LOG_LIMIT = 200
 
+# Positions move every sim tick; holdings move once every N ticks by default.
+# Real intraday LTPs on active F&O positions tick many times a second while
+# equity holdings update much less often, so letting every tick move both
+# equally makes the sim feel synthetic and noisy. 30:1 is a reasonable
+# default — a scenario can override it with a top-level `holdings_every_n_ticks`
+# field in scenarios.yaml.
+HOLDINGS_UPDATE_EVERY_DEFAULT = 30
+
 
 class SimGuardError(RuntimeError):
     """Raised when an operator tries to run the sim in a forbidden context."""
@@ -186,6 +194,10 @@ class SimDriver:
         # Optional: list of agent IDs to restrict this sim to — lets the
         # operator dry-fire a single agent from the /algo page.
         self.only_agent_ids: list[int] | None = None
+        # How often holdings LTPs refresh relative to positions (1 = every
+        # tick, 30 = once per 30 ticks). Loaded from the scenario or the
+        # global default at start().
+        self.holdings_every_n_ticks: int = HOLDINGS_UPDATE_EVERY_DEFAULT
         self._task: Optional[asyncio.Task] = None
 
         # Running per-symbol state (copied from scenario + / or live book).
@@ -226,6 +238,7 @@ class SimDriver:
             "margins_count":    len(self._margins_rows),
             "only_agent_ids":   list(self.only_agent_ids) if self.only_agent_ids else [],
             "live_snapshot_at": (self._live_snapshot or {}).get("snapshot_at"),
+            "holdings_every_n_ticks": self.holdings_every_n_ticks,
         }
 
     # ── DataFrame builder the agent engine consumes ───────────────────
@@ -284,6 +297,14 @@ class SimDriver:
         self.tick_index     = 0
         self.started_at     = datetime.now()
         self.only_agent_ids = list(only_agent_ids) if only_agent_ids else None
+        # Scenario-level override for the holdings refresh cadence — falls
+        # back to the module default (30). Clamp to >=1 so we never divide
+        # by zero or disable holdings forever.
+        raw_interval = scen.get("holdings_every_n_ticks", HOLDINGS_UPDATE_EVERY_DEFAULT)
+        try:
+            self.holdings_every_n_ticks = max(1, int(raw_interval))
+        except (TypeError, ValueError):
+            self.holdings_every_n_ticks = HOLDINGS_UPDATE_EVERY_DEFAULT
 
         # Seed the running state — either from scenario.initial, the live-book
         # snapshot, or both stacked.
@@ -457,11 +478,20 @@ class SimDriver:
     def _apply_moves(self, moves: list[dict]) -> list[dict]:
         """Apply a list of price moves and return change diffs for the tick log."""
         changes: list[dict] = []
+        # Positions update every tick; holdings only every Nth tick. This
+        # makes the sim feel like a real market where F&O positions move
+        # many times per minute while equity holdings ripple through much
+        # more slowly. The modulo check uses the pre-increment tick_index so
+        # tick 0 always refreshes holdings (matches how a live session feels
+        # at market open).
+        holdings_tick = (self.tick_index % self.holdings_every_n_ticks) == 0
         for move in moves:
             mtype = (move.get("type") or "").lower()
             scope = move.get("scope") or ""
             if mtype == "set_margin":
                 changes.extend(self._apply_set_margin(scope, move))
+                continue
+            if scope.startswith("holdings.") and not holdings_tick:
                 continue
             matched = self._scope_matches(scope)
             if not matched:

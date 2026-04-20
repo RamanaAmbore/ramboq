@@ -238,6 +238,12 @@ It feeds fabricated holdings / positions / margins into the **same** agent engin
 - **Recent SIMULATOR orders** — paper-traded orders from sim actions.
 - **Log panel** (shared across the admin pages) — the **Simulator** tab streams one line per tick with per-symbol price diffs in real time.
 
+### Tick cadence — positions move 30× more often than holdings
+
+Real markets are asymmetric: an active F&O position's LTP ticks many times per minute, while an equity holding's LTP updates far less frequently. To match that feel, the simulator refreshes **positions every tick** and **holdings once every 30 ticks** by default. So if you're watching the Simulator log and wondering why you see 29 "positions-only" ticks and then one tick full of holdings diffs — that's working as intended.
+
+A scenario can override the ratio by adding `holdings_every_n_ticks: <N>` at the top level (use `1` if you want holdings to move on every tick, same as positions). Margin patches via `set_margin` are independent and fire on whatever tick the scenario places them on.
+
 ### Three seeding modes
 
 Scenarios decide what moves; seeding decides what moves them.
