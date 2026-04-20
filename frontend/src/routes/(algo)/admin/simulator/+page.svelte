@@ -412,11 +412,17 @@
     background: #d97706; color: #0a1020; border-color: #d97706;
   }
   :global(.sim-btn-primary:hover:not(:disabled)) { background: #fbbf24; border-color: #fbbf24; }
+  /* Stop button — muted red halt-state background so it's visually
+     distinct from Start (amber primary) and Clear (danger). Not the
+     bright red of Clear because Stop isn't destructive — it just halts.
+     The duller pink-red separates the semantics cleanly. */
   :global(.sim-btn-secondary) {
-    background: transparent; color: #c8d8f0; border-color: rgba(255,255,255,0.2);
+    background: rgba(248,113,113,0.15);
+    color: #fca5a5;
+    border-color: rgba(248,113,113,0.45);
   }
   :global(.sim-btn-secondary:hover:not(:disabled)) {
-    background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.5); color: #fbbf24;
+    background: rgba(248,113,113,0.25); border-color: #f87171; color: #fecaca;
   }
   :global(.sim-btn-load) {
     background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.5);
