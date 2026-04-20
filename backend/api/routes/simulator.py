@@ -62,6 +62,11 @@ class SimStartRequest(msgspec.Struct):
     # schedule / cooldown / baseline gates so the operator can dry-fire a
     # single agent from the /algo page.
     agent_ids: Optional[list[int]] = None
+    # Per-section tick cadence overrides. None = use scenario YAML value,
+    # falling back to the module defaults (positions=1, holdings=30).
+    # Clamped to >= 1 server-side.
+    holdings_every_n_ticks:  Optional[int] = None
+    positions_every_n_ticks: Optional[int] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
@@ -127,6 +132,8 @@ class SimulatorController(Controller):
                 data.scenario, data.rate_ms,
                 seed_mode=data.seed_mode,
                 only_agent_ids=data.agent_ids,
+                holdings_every_n_ticks=data.holdings_every_n_ticks,
+                positions_every_n_ticks=data.positions_every_n_ticks,
             )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))

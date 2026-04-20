@@ -146,12 +146,19 @@ export const validateAgentCondition = (condTree) =>
 // dev on, prod off. Server returns 400 when the flag is off.
 export const fetchSimScenarios    = () => _get('/simulator/scenarios', { auth: true });
 export const fetchSimStatus       = () => _get('/simulator/status', { auth: true });
-// `opts` may include: seed_mode ('scripted'|'live'|'live+scenario'),
-// agent_ids (array of IDs to restrict isolation to).
+// `opts` may include:
+//   seed_mode: 'scripted' | 'live' | 'live+scenario'
+//   agent_ids: number[]   (restrict isolation to these agents)
+//   holdings_every_n_ticks / positions_every_n_ticks: number | null
+//     — override per-section tick cadence; null = fall back to scenario YAML
+//       or module default.
 export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
   _post('/simulator/start',
-        { scenario, rate_ms, seed_mode: opts.seed_mode || 'scripted',
-          agent_ids: opts.agent_ids || null },
+        { scenario, rate_ms,
+          seed_mode:               opts.seed_mode || 'scripted',
+          agent_ids:               opts.agent_ids || null,
+          holdings_every_n_ticks:  opts.holdings_every_n_ticks  ?? null,
+          positions_every_n_ticks: opts.positions_every_n_ticks ?? null },
         { auth: true });
 export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
 export const stepSim              = () => _post('/simulator/step', {}, { auth: true });

@@ -248,11 +248,24 @@ It feeds fabricated holdings / positions / margins into the **same** agent engin
 - **Recent SIMULATOR orders** — paper-traded orders from sim actions.
 - **Log panel** (shared across the admin pages) — the **Simulator** tab streams one line per tick with per-symbol price diffs in real time.
 
-### Tick cadence — positions move 30× more often than holdings
+### Tick cadence — positions and holdings refresh independently
 
-Real markets are asymmetric: an active F&O position's LTP ticks many times per minute, while an equity holding's LTP updates far less frequently. To match that feel, the simulator refreshes **positions every tick** and **holdings once every 30 ticks** by default. So if you're watching the Simulator log and wondering why you see 29 "positions-only" ticks and then one tick full of holdings diffs — that's working as intended.
+Real markets are asymmetric: an active F&O position's LTP ticks many times per minute, while an equity holding's LTP updates far less frequently. The simulator mirrors that: you can set a separate **cadence** for each section — the number of ticks between refreshes.
 
-A scenario can override the ratio by adding `holdings_every_n_ticks: <N>` at the top level (use `1` if you want holdings to move on every tick, same as positions). Margin patches via `set_margin` are independent and fire on whatever tick the scenario places them on.
+Defaults:
+
+- **Positions** — refresh **every tick** (cadence = 1)
+- **Holdings** — refresh **once every 30 ticks** (cadence = 30)
+
+So if you're watching the Simulator log and wondering why you see 29 position-only ticks and then one tick full of holdings diffs — that's working as intended.
+
+**Three places to set the cadence** (most specific wins):
+
+1. **Controls row on the Simulator page** — `Pos / N` and `Hld / N` inputs next to Rate. Leave blank to fall back to the scenario's value; put a number to override for this one run.
+2. **Scenario YAML** — top-level `positions_every_n_ticks: <N>` / `holdings_every_n_ticks: <N>` baked into the scenario. Useful when a scripted scenario depends on a specific rhythm (e.g. `crash-open` sets `holdings_every_n_ticks: 1` so its three-tick holdings cascade actually moves each tick).
+3. **Module defaults** — 1 and 30 respectively, shipped in `driver.py`.
+
+Margin patches via `set_margin` are cadence-independent — they fire on whatever tick the scenario schedules them on. Tick 0 always refreshes both sections (matches how a live session feels at market open) regardless of cadence.
 
 ### Three seeding modes
 
