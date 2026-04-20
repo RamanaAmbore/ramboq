@@ -231,11 +231,6 @@
     cooldown: 'bg-amber-300', error: 'bg-red-600',
   }[s] || 'bg-slate-500');
 
-  function actionSummary(/** @type {any[]} */ actions) {
-    if (!actions || !actions.length) return 'Alert only';
-    return actions.map(a => a.type).join(', ');
-  }
-
   function channelSummary(/** @type {any[]} */ events) {
     if (!events) return '—';
     return events.filter(e => e.enabled).map(e => e.channel).join(', ');
@@ -532,9 +527,28 @@
 
               <div class="text-[0.6rem] text-[#c8d8f0]/75 mt-2 mb-1">
                 <span class="text-[#7e97b8]">Alert via:</span> {channelSummary(agent.events)}
-                <span class="mx-1 text-[#7e97b8]">|</span>
-                <span class="text-[#7e97b8]">Do:</span> {actionSummary(agent.actions)}
               </div>
+              <!-- Actions list — surface each action and its params so
+                   close_position / place_order / chase_close_positions are
+                   visible at a glance with the account / symbol / qty they
+                   target. Previously this was just a comma-joined type
+                   list and the params were invisible unless the operator
+                   hit Edit. -->
+              <div class="preview-section-label mt-2">Actions</div>
+              {#if agent.actions && agent.actions.length}
+                <div class="space-y-1">
+                  {#each agent.actions as a}
+                    <div class="preview-action">
+                      <span class="preview-action-type">{a.type || '?'}</span>
+                      {#if a.params && Object.keys(a.params).length}
+                        <pre class="preview-action-params">{JSON.stringify(a.params, null, 2)}</pre>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">alert-only (no actions)</div>
+              {/if}
               <div class="flex items-center justify-between text-[0.55rem] text-[#7e97b8] mt-2">
                 <span>
                   Last fire: {agent.last_triggered_at?.slice(0, 16) || '—'}

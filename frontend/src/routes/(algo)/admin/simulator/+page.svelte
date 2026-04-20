@@ -12,14 +12,13 @@
   import {
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
-    fetchSimOrders, fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
+    fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
   let events    = $state(/** @type {any[]} */ ([]));
-  let orders    = $state(/** @type {any[]} */ ([]));
   let agents    = $state(/** @type {any[]} */ ([]));
   let error     = $state('');
   let note      = $state('');
@@ -79,15 +78,18 @@
   }
 
   async function loadAll() {
+    // Orders used to be fetched here for the (removed) bottom table.
+    // The LogPanel Order tab now pulls them via loadOrderRows instead, so
+    // we skip the extra Sim-orders endpoint and save one round-trip per
+    // 3-second refresh.
     try {
-      const [scList, stat, ev, od, ag] = await Promise.all([
+      const [scList, stat, ev, ag] = await Promise.all([
         fetchSimScenarios(), fetchSimStatus(), fetchSimEvents(100),
-        fetchSimOrders(100), fetchAgents(),
+        fetchAgents(),
       ]);
       scenarios = scList;
       status    = stat;
       events    = ev;
-      orders    = od;
       agents    = ag;
       if (!pickedSlug && scenarios.length) pickedSlug = scenarios[0].slug;
     } catch (e) { error = e.message; }
@@ -166,18 +168,10 @@
 
 <svelte:head><title>Market Simulator | RamboQuant Analytics</title></svelte:head>
 
-<div class="algo-ts">{clientTimestamp()}</div>
-<h1 class="page-title-chip mb-2">Market Simulator</h1>
-
-<p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  Feeds fabricated per-symbol holdings + positions into the live agent engine
-  so you can exercise alerts + actions end-to-end without touching the real
-  broker. Every artefact produced here is tagged
-  <span class="font-mono text-[#fb7185]">SIMULATOR</span> —
-  Telegram preamble, email subject, email banner, agent-event row, paper-traded
-  order. Gated by <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span>
-  in backend_config.yaml — dev default on, prod default off.
-</p>
+<div class="flex items-baseline justify-between mb-2">
+  <h1 class="page-title-chip" title="Feeds fabricated positions into the live agent engine. Every alert, email, and paper-traded order is tagged SIMULATOR so it can't be confused with a real fire. Gated by cap_in_<branch>.simulator.">Simulator</h1>
+  <span class="algo-ts">{clientTimestamp()}</span>
+</div>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">
@@ -237,10 +231,8 @@
   {/if}
 </div>
 
-<!-- Controls -->
+<!-- Controls card — no header label (the fields + buttons speak for themselves) -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
-  <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-
   <!-- Fields row — Scenario picker takes remaining width (so the dropdown
        can show long scenario names); other fields have fixed widths so
        nothing wobbles. Wraps cleanly on narrow / mobile widths. -->
@@ -325,89 +317,13 @@
   {/if}
 </div>
 
-<!-- Recent SIMULATOR agent events -->
-<div class="algo-status-card p-3 mb-3" data-status="inactive">
-  <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">
-    Recent SIMULATOR agent events <span class="opacity-60 font-normal ml-1">({events.length})</span>
-  </div>
-  {#if !events.length}
-    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No simulator events yet. Start a scenario or step to fire agents.</div>
-  {:else}
-    <div class="overflow-x-auto max-h-[30vh]">
-      <table class="w-full text-[0.6rem] font-mono">
-        <thead class="text-[#fbbf24] sticky top-0 bg-[#0c1220]">
-          <tr class="text-left">
-            <th class="py-1 pr-3">When</th>
-            <th class="py-1 pr-3">Agent</th>
-            <th class="py-1 pr-3">Type</th>
-            <th class="py-1 pr-3">Condition / detail</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each events as e}
-            <tr class="border-t border-white/5 align-top">
-              <td class="py-1 pr-3 whitespace-nowrap">{e.timestamp?.slice(0, 19)}</td>
-              <td class="py-1 pr-3">#{e.agent_id}</td>
-              <td class="py-1 pr-3">
-                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">SIM</span>
-                {e.event_type}
-              </td>
-              <td class="py-1 pr-3 text-[#c8d8f0]/85">{e.trigger_condition || e.detail || '—'}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-</div>
-
-<!-- Recent SIMULATOR orders -->
-<div class="algo-status-card p-3 mb-3" data-status="inactive">
-  <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">
-    Recent SIMULATOR orders <span class="opacity-60 font-normal ml-1">({orders.length})</span>
-  </div>
-  {#if !orders.length}
-    <div class="text-[0.6rem] text-[#c8d8f0]/60 italic">No simulator orders yet.</div>
-  {:else}
-    <div class="overflow-x-auto max-h-[30vh]">
-      <table class="w-full text-[0.6rem] font-mono">
-        <thead class="text-[#fbbf24] sticky top-0 bg-[#0c1220]">
-          <tr class="text-left">
-            <th class="py-1 pr-3">When</th>
-            <th class="py-1 pr-3">Account</th>
-            <th class="py-1 pr-3">Symbol</th>
-            <th class="py-1 pr-3">Side</th>
-            <th class="py-1 pr-3 text-right">Qty</th>
-            <th class="py-1 pr-3 text-right">LIMIT ₹</th>
-            <th class="py-1 pr-3">Engine</th>
-            <th class="py-1 pr-3">Status</th>
-            <th class="py-1 pr-3">Detail</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each orders as o}
-            <tr class="border-t border-white/5 align-top">
-              <td class="py-1 pr-3 whitespace-nowrap">{o.created_at?.slice(0, 19)}</td>
-              <td class="py-1 pr-3">{o.account}</td>
-              <td class="py-1 pr-3">
-                <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30 mr-1">SIM</span>
-                {o.symbol}
-              </td>
-              <td class="py-1 pr-3">{o.transaction_type}</td>
-              <td class="py-1 pr-3 text-right">{o.quantity}</td>
-              <td class="py-1 pr-3 text-right text-[#fbbf24]">
-                {o.initial_price != null ? '₹' + Number(o.initial_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—'}
-              </td>
-              <td class="py-1 pr-3">{o.engine}</td>
-              <td class="py-1 pr-3">{o.status}</td>
-              <td class="py-1 pr-3 text-[#c8d8f0]/85">{o.detail || '—'}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-</div>
+<!-- The old "Recent SIMULATOR agent events" and "Recent SIMULATOR orders"
+     tables used to live here. Both were duplicating data that the
+     LogPanel below now surfaces cleanly:
+       - Agent tab:   sim_mode=True agent events (with SIM badge)
+       - Order tab:   AlgoOrder rows with side/qty/symbol/price + SIM/LIVE mode tag
+     Keeping them both would just eat ~60vh of screen and force the
+     operator to scan two places. Removed. -->
 
 <style>
   /* Controls = two stacked rows. Fields first (wrap freely, Scenario
