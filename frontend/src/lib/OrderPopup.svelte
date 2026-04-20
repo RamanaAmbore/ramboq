@@ -125,14 +125,16 @@
       <button onclick={onclose} class="popup-close">&times;</button>
     </div>
 
-    <!-- Action buttons -->
+    <!-- Action buttons — each carries its own tinted idle state so the
+         green-for-open / red-for-close semantics are legible before
+         selection, not only after a click. -->
     <div class="popup-actions">
       <button onclick={() => buildCommand('add')}
-        class="popup-action-btn {action === 'add' ? 'popup-action-add-active' : 'popup-action-idle'}">
+        class="popup-action-btn {action === 'add' ? 'popup-action-add-active' : 'popup-action-add-idle'}">
         Add Position
       </button>
       <button onclick={() => buildCommand('close')}
-        class="popup-action-btn {action === 'close' ? 'popup-action-close-active' : 'popup-action-idle'}">
+        class="popup-action-btn {action === 'close' ? 'popup-action-close-active' : 'popup-action-close-idle'}">
         Close Position
       </button>
     </div>
@@ -249,14 +251,32 @@
     border: 1px solid;
     transition: background 0.08s, border-color 0.08s, color 0.08s;
   }
-  .popup-action-idle {
-    border-color: rgba(255,255,255,0.14);
-    background: rgba(39,53,82,0.55);
-    color: rgba(200,216,240,0.75);
+  /* Idle buttons carry their own semantic tint — green for Add (opens
+     a position), red for Close (closes a position) — so the colour cue
+     is legible before any click. Active state is a stronger saturation
+     of the same hue. */
+  .popup-action-add-idle {
+    border-color: rgba(34,197,94,0.4);
+    background: rgba(34,197,94,0.1);
+    color: rgba(134,239,172,0.85);
   }
-  .popup-action-idle:hover { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.45); color: #fbbf24; }
-  .popup-action-add-active   { border-color: rgba(34,197,94,0.65); background: rgba(34,197,94,0.2);  color: #4ade80; }
-  .popup-action-close-active { border-color: rgba(239,68,68,0.65); background: rgba(239,68,68,0.2);  color: #f87171; }
+  .popup-action-add-idle:hover {
+    background: rgba(34,197,94,0.18);
+    border-color: rgba(34,197,94,0.6);
+    color: #4ade80;
+  }
+  .popup-action-close-idle {
+    border-color: rgba(239,68,68,0.4);
+    background: rgba(239,68,68,0.1);
+    color: rgba(252,165,165,0.85);
+  }
+  .popup-action-close-idle:hover {
+    background: rgba(239,68,68,0.18);
+    border-color: rgba(239,68,68,0.6);
+    color: #f87171;
+  }
+  .popup-action-add-active   { border-color: rgba(34,197,94,0.75); background: rgba(34,197,94,0.28);  color: #4ade80; font-weight: 800; }
+  .popup-action-close-active { border-color: rgba(239,68,68,0.75); background: rgba(239,68,68,0.28);  color: #f87171; font-weight: 800; }
   .popup-cmd-area {
     padding: 0.5rem 0.75rem 0.6rem;
     position: relative;

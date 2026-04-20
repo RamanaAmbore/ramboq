@@ -485,24 +485,36 @@
   }
   :global(.algo-content .field-input:focus) { border-color: #fbbf24 !important; }
 
-  /* <select> option list — matches the OrderPopup palette:
-     base row = #1d2a44 (the darker half of the popup gradient), rows
-     alternate via the select's own bg, and the active row picks up the
-     amber accent consistent with .btn-primary / .popup-action-add-active. */
+  /* <select> element + dropdown popup — matches the OrderPopup modal's
+     palette (linear-gradient(#273552 → #1d2a44) + amber accent border).
+     Native browsers render the option list as OS chrome, but setting
+     background-color + color on <option> is honoured by Chromium + FF,
+     so the dropdown reads as a continuation of the OrderPopup instead
+     of a foreign OS widget. */
+  :global(.algo-content select.field-input) {
+    background-image: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
+    background-color: #1d2a44;
+    border-color: rgba(251,191,36,0.25);
+  }
+  :global(.algo-content select.field-input:hover) {
+    border-color: rgba(251,191,36,0.5);
+  }
   :global(.algo-content select.field-input option),
   :global(.algo-content select option) {
     background-color: #1d2a44;
     color: #e2e8f0;
+    padding: 0.35rem 0.5rem;
   }
   :global(.algo-content select.field-input option:checked),
   :global(.algo-content select option:checked) {
     background-color: #273552;
     color: #fbbf24;
-    font-weight: 600;
+    font-weight: 700;
   }
   :global(.algo-content select.field-input option:hover),
   :global(.algo-content select option:hover) {
-    background-color: #2e3d5b;
+    background-color: rgba(251,191,36,0.15);
+    color: #fbbf24;
   }
   :global(.algo-content .section-heading) { color: #fbbf24; }
   :global(.algo-content .page-title-chip) { color: #fbbf24; border-color: rgba(251,191,36,0.25); }
