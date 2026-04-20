@@ -90,80 +90,71 @@ def _sim_ltp_for(account: str, symbol: str) -> tuple[float | None, int | None]:
     return None, None
 
 
-async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict):
+def _sim_positions_in_scope(params: dict) -> list[dict]:
     """
-    Record a paper-trade row in algo_orders with mode='sim' for every action
-    fired by a simulator run. Leaves no side-effect at the broker — visibility
-    only.
+    Return the per-symbol position rows that a scope-level action like
+    `chase_close_positions` would hit in real life. Used when a
+    scope-only action fires in sim — we expand it into one paper-trade
+    per actual position so the Order / Simulator logs show real
+    account / symbol / qty / LTP instead of a placeholder.
 
-    For order-like actions (place_order / close_position / chase_close),
-    the `initial_price` column is set to the sim's current LTP for
-    (account, symbol) so operators can see exactly what price the engine
-    would have placed the limit order at. Falls back to the `price` param
-    if the symbol isn't in the sim state.
+    `params.scope`: 'total' (default) → every position in the sim
+                    'account'         → positions filtered by params.account
+    """
+    scope = (params.get("scope") or "total").lower()
+    acct_filter = str(params.get("account") or "") if scope == "account" else None
+    try:
+        from backend.api.algo.sim.driver import get_driver
+        drv = get_driver()
+        rows = getattr(drv, "_positions_rows", []) or []
+        if acct_filter:
+            rows = [r for r in rows if str(r.get("account")) == acct_filter]
+        return list(rows)
+    except Exception:
+        return []
+
+
+async def _write_sim_order(agent, action_type: str, resolved: dict):
+    """
+    Write ONE AlgoOrder row (mode='sim') + push a 'kind=order' entry to
+    the sim driver's tick log so the Order + Simulator tabs both show
+    the full order details. `resolved` must contain real
+    account / symbol / side / qty / price — callers resolve these from
+    either the action params (close_position, place_order) or from the
+    sim's per-symbol state (chase_close_positions expands per-position).
     """
     from backend.api.database import async_session
     from backend.api.models import AlgoOrder
 
-    detail = f"[SIM] agent={agent.slug} action={action_type} params={params}"
-    logger.warning(f"[SIM] paper-trade: {detail}")
+    account = resolved["account"]
+    symbol  = resolved["symbol"]
+    side    = resolved["side"]
+    qty     = int(resolved["qty"] or 0)
+    price   = resolved.get("price")
+    exchange = resolved.get("exchange") or "NFO"
 
-    if action_type not in {"place_order", "close_position", "chase_close", "chase_close_positions"}:
-        # Non-order actions (emit_log, set_flag, monitor_order, deactivate_agent,
-        # send_summary, cancel_*) get logged above via log_event — no paper row.
-        return
-
-    account = str(params.get("account") or "SIM")
-    symbol  = str(params.get("symbol")  or f"{agent.slug}-{action_type}")
-    ltp, qty_held = _sim_ltp_for(account, symbol)
-
-    # Derive transaction side: explicit param > auto from position direction
-    # > safe default (SELL).
-    if params.get("side") in ("BUY", "SELL"):
-        side = params.get("side")
-    elif params.get("transaction_type") in ("BUY", "SELL"):
-        side = params.get("transaction_type")
-    elif qty_held is not None:
-        side = "SELL" if qty_held > 0 else "BUY"
-    else:
-        side = "SELL"
-
-    # Quantity: explicit > abs(held). Zero when neither is available —
-    # visible in the log as "qty=0" so the operator notices.
-    if params.get("quantity") is not None:
-        qty = int(params.get("quantity") or 0)
-    elif qty_held is not None:
-        qty = abs(int(qty_held))
-    else:
-        qty = 0
-
-    initial_price = ltp if ltp is not None else params.get("price")
-    detail_with_px = (f"{detail} · LTP=₹{ltp:,.2f}" if ltp is not None else detail)
+    # Human-readable print-style line — shows up as logger.warning AND as
+    # the AlgoOrder.detail column AND inside the tick_log entry so the
+    # operator sees the same sentence in all three places.
+    price_str = f"@₹{price:,.2f}" if price is not None else "@MARKET"
+    pretty = (f"[SIM] {agent.slug} → {action_type}: {side} {qty} "
+              f"{symbol} {price_str} · acct={account}")
+    logger.warning(pretty)
 
     try:
         async with async_session() as s:
-            row = AlgoOrder(
-                account=account,
-                symbol=symbol,
-                exchange=str(params.get("exchange") or "NFO"),
-                transaction_type=side,
-                quantity=qty,
-                initial_price=(float(initial_price) if initial_price is not None else None),
-                status="simulated",
-                engine="sim",
-                mode="sim",
-                detail=detail_with_px,
-            )
-            s.add(row)
+            s.add(AlgoOrder(
+                account=account, symbol=symbol, exchange=exchange,
+                transaction_type=side, quantity=qty,
+                initial_price=(float(price) if price is not None else None),
+                status="simulated", engine="sim", mode="sim",
+                detail=pretty,
+            ))
             await s.commit()
     except Exception as e:
         logger.error(f"[SIM] paper-trade write failed: {e}")
         return
 
-    # Also push the order into the sim driver's tick log so the Simulator
-    # tab on the LogPanel shows the paper-trade inline with the price-tick
-    # stream. Operators can see "tick 12 price moves" then "order placed"
-    # on the very next line, which mirrors how a live session feels.
     try:
         from backend.api.algo.sim.driver import get_driver
         drv = get_driver()
@@ -174,20 +165,89 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
             "kind":       "order",
             "moves":      [],
             "changes":    [],
-            "note":       "",
-            # Shape consumed by LogPanel._renderSimLine when kind === 'order'.
+            "note":       pretty,
             "order": {
-                "account":  account,
-                "symbol":   symbol,
-                "side":     side,
-                "qty":      qty,
-                "price":    (float(initial_price) if initial_price is not None else None),
-                "agent":    agent.slug,
-                "action":   action_type,
+                "account": account, "symbol": symbol, "side": side, "qty": qty,
+                "price":   (float(price) if price is not None else None),
+                "agent":   agent.slug, "action": action_type,
             },
         })
     except Exception as e:
         logger.debug(f"[SIM] could not record order in tick_log: {e}")
+
+
+async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict):
+    """
+    Paper-trade dispatcher for sim-mode action fires.
+
+    - `close_position` / `place_order` — params already specify
+      account + symbol; write ONE AlgoOrder using those params, with
+      the LIMIT price = sim's current LTP for that symbol.
+    - `chase_close_positions` / `chase_close` — scope-level actions.
+      Expand into ONE paper-trade per open position in scope, each
+      carrying the real account / symbol / qty / LTP. Operators see a
+      realistic picture of what the chase engine would have tried to
+      close.
+    - Non-order actions (emit_log / set_flag / monitor_order /
+      deactivate_agent / cancel_* / send_summary) — no paper row,
+      just the log_event that execute() already writes.
+    """
+    if action_type in {"chase_close", "chase_close_positions"}:
+        positions = _sim_positions_in_scope(params)
+        if not positions:
+            # Scope matched nothing — still record one row so the fire is
+            # visible in the logs, but make it obvious nothing closed.
+            logger.warning(f"[SIM] {agent.slug} → {action_type}: scope matched 0 positions")
+            await _write_sim_order(agent, action_type, {
+                "account": str(params.get("account") or "TOTAL"),
+                "symbol":  "(no positions in scope)",
+                "side":    "SELL", "qty": 0, "price": None,
+                "exchange": "NFO",
+            })
+            return
+        for p in positions:
+            qty_held = int(p.get("quantity") or 0)
+            await _write_sim_order(agent, action_type, {
+                "account":  str(p.get("account", "SIM")),
+                "symbol":   str(p.get("tradingsymbol", "")),
+                "side":     "SELL" if qty_held > 0 else "BUY",
+                "qty":      abs(qty_held),
+                "price":    p.get("last_price"),
+                "exchange": str(p.get("exchange") or "NFO"),
+            })
+        return
+
+    if action_type in {"place_order", "close_position"}:
+        account = str(params.get("account") or "SIM")
+        symbol  = str(params.get("symbol")  or f"{agent.slug}-{action_type}")
+        ltp, qty_held = _sim_ltp_for(account, symbol)
+        if params.get("side") in ("BUY", "SELL"):
+            side = params.get("side")
+        elif params.get("transaction_type") in ("BUY", "SELL"):
+            side = params.get("transaction_type")
+        elif qty_held is not None:
+            side = "SELL" if qty_held > 0 else "BUY"
+        else:
+            side = "SELL"
+        if params.get("quantity") is not None:
+            qty = int(params.get("quantity") or 0)
+        elif qty_held is not None:
+            qty = abs(int(qty_held))
+        else:
+            qty = 0
+        price = ltp if ltp is not None else params.get("price")
+        await _write_sim_order(agent, action_type, {
+            "account":  account,
+            "symbol":   symbol,
+            "side":     side,
+            "qty":      qty,
+            "price":    price,
+            "exchange": str(params.get("exchange") or "NFO"),
+        })
+        return
+
+    # Non-order action — no paper row. The log_event call in execute()
+    # already captures the action_success event.
 
 
 async def _action_chase_close(context: dict, params: dict):
