@@ -15,6 +15,7 @@
     fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
+  import Select   from '$lib/Select.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
@@ -256,11 +257,12 @@
   <div class="sim-scenario-row">
     <div class="sim-field sim-field-scenario-full">
       <label for="sim-scenario" class="field-label">Scenario</label>
-      <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
-        {#each scenarios as s}
-          <option value={s.slug}>{s.name} ({s.mode}, {s.ticks} ticks)</option>
-        {/each}
-      </select>
+      <Select id="sim-scenario" bind:value={pickedSlug}
+        options={scenarios.map(s => ({
+          value: s.slug,
+          label: s.name,
+          hint:  `${s.mode} · ${s.ticks} ticks`,
+        }))} />
     </div>
   </div>
 
@@ -270,11 +272,12 @@
   <div class="sim-fields-row sim-fields-compact">
     <div class="sim-field">
       <label for="sim-seed" class="field-label">Seed</label>
-      <select id="sim-seed" bind:value={seedMode} class="field-input">
-        <option value="scripted">Scripted</option>
-        <option value="live">Live book</option>
-        <option value="live+scenario">Live + scenario</option>
-      </select>
+      <Select id="sim-seed" bind:value={seedMode}
+        options={[
+          { value: 'scripted',      label: 'Scripted' },
+          { value: 'live',          label: 'Live book' },
+          { value: 'live+scenario', label: 'Live + scenario' },
+        ]} />
     </div>
     <div class="sim-field">
       <label for="sim-rate" class="field-label">Rate (ms)</label>
@@ -287,19 +290,19 @@
     </div>
     <div class="sim-field">
       <label for="sim-market" class="field-label" title="Simulated market clock — overrides the scenario's YAML value">Market</label>
-      <select id="sim-market" bind:value={marketStatePreset} class="field-input">
-        <option value="">(scenario)</option>
-        <option value="pre_open">Pre-open</option>
-        <option value="at_open">At open</option>
-        <option value="mid_session">Mid-session</option>
-        <option value="pre_close">Pre-close</option>
-        <option value="at_close">At close</option>
-        <option value="post_close">Post-close</option>
-        <option value="expiry_day">Expiry day</option>
-      </select>
+      <Select id="sim-market" bind:value={marketStatePreset}
+        options={[
+          { value: '',            label: '(scenario)' },
+          { value: 'pre_open',    label: 'Pre-open' },
+          { value: 'at_open',     label: 'At open' },
+          { value: 'mid_session', label: 'Mid-session' },
+          { value: 'pre_close',   label: 'Pre-close' },
+          { value: 'at_close',    label: 'At close' },
+          { value: 'post_close',  label: 'Post-close' },
+          { value: 'expiry_day',  label: 'Expiry day' },
+        ]} />
     </div>
   </div>
-
   <!-- Buttons row — all uniform width so the block reads as one action
        bar. Wraps on narrow widths; on mobile each row fits 2-3 buttons. -->
   <div class="sim-buttons-row">
