@@ -86,7 +86,12 @@
     if (entry.kind === 'stopped')  return `<span class="log-info"><span class="log-ts">[${ts}]</span> ■ STOP ${scen} · ${entry.note || ''}</span>`;
     const cls = _classifySimLine(entry);
     const diffs = (entry.changes || []).map(c => {
-      const field = `${c.section}.${c.account}.${c.col}`;
+      // For price moves, `c.symbol` carries the tradingsymbol and `c.col` is
+      // always last_price — show the symbol so the operator sees which
+      // instrument moved. For margin patches `c.symbol` is empty and `c.col`
+      // names the field being set.
+      const leaf  = c.symbol ? c.symbol : c.col;
+      const field = `${c.section}.${c.account}.${leaf}`;
       const arrow = `${_fmtVal(c.prev)}→${_fmtVal(c.next)}`;
       const delta = (typeof c.delta === 'number') ? ` (Δ ${_fmtVal(c.delta)})` : '';
       return `<span class="log-chip"><span class="log-chip-key">${field}:</span>${arrow}${delta}</span>`;
