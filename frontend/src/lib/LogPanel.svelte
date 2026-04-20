@@ -219,29 +219,26 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* "log" label — three letters stacked vertically in a flex column.
-     Sized up + given a faint amber background so it's genuinely visible
-     on a dark theme; prior attempts were too small / too subtle to
-     catch on a bright monitor. */
+  /* "log" label — stacked letters. Now that we've proved it renders,
+     shrunk to a minimum so the tab row's total width isn't noticeably
+     fatter than without the label. Background + border dropped to
+     keep the footprint to the text itself + a thin divider. */
   .log-section-wrap {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.05rem;
-    padding: 0.25rem 0.4rem;
-    margin-right: 0.3rem;
-    background: rgba(251,191,36,0.1);
-    border-right: 2px solid rgba(251,191,36,0.55);
-    border-radius: 3px 0 0 3px;
+    padding: 0 0.25rem 0 0;
+    margin-right: 0.25rem;
+    border-right: 1px solid rgba(251,191,36,0.35);
     align-self: stretch;
     font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0;
+    font-size: 0.45rem;
+    font-weight: 700;
     line-height: 1;
-    color: #fbbf24;
+    color: rgba(251,191,36,0.85);
     text-transform: uppercase;
+    letter-spacing: 0.02em;
     user-select: none;
   }
   .log-section-wrap > span { display: block; }
