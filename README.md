@@ -2,6 +2,8 @@
 
 A production web application for **RamboQuant Analytics LLP** at [ramboq.com](https://ramboq.com). The app provides portfolio performance tracking, AI market updates, partner management, investment information, and real-time notifications.
 
+> **New admin?** Read [ADMIN_GUIDE.md](ADMIN_GUIDE.md) — a plain-English walkthrough of Agents, Tokens, and the Simulator, aimed at someone using the site for the first time.
+
 ## Architecture
 
 **Litestar API + SvelteKit frontend.**

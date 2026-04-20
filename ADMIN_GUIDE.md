@@ -1,0 +1,355 @@
+# RamboQuant Admin Guide
+
+A walkthrough of the four things an admin cares about on this site:
+
+1. **Agents** — rules that watch the portfolio and fire when something worth knowing happens.
+2. **Tokens** — the vocabulary agents are written in.
+3. **The Simulator** — lets you safely test what an agent would do under a hypothetical market.
+4. **How it all fits together** — what happens at runtime when your book moves.
+
+No code reading required. If you can use a dropdown and a form, you can use all of this.
+
+---
+
+## The four words
+
+Everything on the admin site revolves around four ideas:
+
+| Word | Plain English |
+|---|---|
+| **Agent** | A rule — "if X happens, tell me (and maybe do something)". Lives as a row on the **Agents** page. |
+| **Alert** | The moment an agent's rule became true. Sent through Telegram, email, and the live log. |
+| **Notify** | *How* an alert reaches you — telegram / email / browser / log. |
+| **Action** | *What* the system does in response — e.g. place an order, close a position, deactivate a flag. |
+
+Think of an agent as a sentence: **"When _condition_ is true, _notify_ me through these channels and _do_ these actions."**
+
+---
+
+## How agents work — end to end
+
+Here's what happens every 5 minutes during market hours:
+
+```
+Kite broker  ──►  holdings / positions / margins  ──►  summarise per account + total
+                                                        │
+                                                        ▼
+                         ┌──────────────── run_cycle ────────────────┐
+                         │  for each ACTIVE agent:                    │
+                         │    1. is the market open?                  │
+                         │    2. is the cooldown finished?            │
+                         │    3. does the condition match?            │
+                         │    4. has something material changed since │
+                         │       the last alert?                      │
+                         │    5. if yes: send alerts + run actions    │
+                         └────────────────────┬───────────────────────┘
+                                              ▼
+           Telegram + email + browser live log + agent-events row in the DB
+                                              │
+                                              ▼
+                       (if the agent has actions:  place_order / chase_close / …)
+```
+
+Each of those numbered gates exists to keep noise down. Cooldowns prevent spam. The baseline gate prevents opening-bell panic alerts. The suppression gate prevents re-alerting when the loss hasn't changed much.
+
+---
+
+## Anatomy of an agent
+
+Every row on the **Agents** page (`/agents`) has four moving parts:
+
+### 1. Conditions — the rule itself
+
+Conditions are a tree you can read left-to-right. Three shapes are allowed:
+
+| Shape | Meaning |
+|---|---|
+| **leaf** | A single test: `metric` + `scope` + `operator` + `value` |
+| **all** | AND of children — every child must be true |
+| **any** | OR of children — at least one child must be true |
+| **not** | NEGATION — true when the child is false |
+
+A leaf looks like this in JSON:
+
+```json
+{
+  "metric": "pnl",
+  "scope":  "positions.any_acct",
+  "op":     "<=",
+  "value":  -30000
+}
+```
+
+Read it in English:
+> "The **pnl** (metric) of **any account's positions** (scope) is **≤** (operator) **₹-30,000** (value)."
+
+A composite tree:
+
+```json
+{
+  "any": [
+    { "metric": "day_pct", "scope": "holdings.any_acct", "op": "<=", "value": -3.0 },
+    { "metric": "day_pct", "scope": "holdings.total",    "op": "<=", "value": -5.0 }
+  ]
+}
+```
+
+> "Either any account's day loss is at least 3 %, or the total day loss is at least 5 %."
+
+### 2. Notify channels
+
+A list like:
+
+```json
+[
+  { "channel": "telegram", "enabled": true },
+  { "channel": "email",    "enabled": true },
+  { "channel": "log",      "enabled": true }
+]
+```
+
+You can mix and match `telegram` / `email` / `websocket` / `log`. Disable one by flipping `enabled` to `false`.
+
+### 3. Actions
+
+Empty list `[]` means "alert only — don't do anything." Otherwise the list describes what to *do* when the alert fires:
+
+```json
+[
+  { "type": "chase_close_positions",
+    "params": { "account": "ZG0790", "exchange": "NFO" } }
+]
+```
+
+The action shapes (place order, modify, cancel, close, log, deactivate, etc.) all come from the **Tokens** page — more on that next.
+
+### 4. Metadata
+
+- **Scope** — `total` or `per_account` (display grouping)
+- **Schedule** — `market_hours` (default) or `always`
+- **Cooldown (minutes)** — minimum time between two fires of this agent. Default 30.
+- **Status** — `active` / `inactive` / `cooldown`. Toggle with the ON/OFF button on the agent row.
+
+---
+
+## Tokens — the vocabulary agents are written in
+
+You can't invent words out of thin air when writing a condition. Every `metric`, `scope`, `op`, `channel`, and `action type` must be a **registered token**. The Tokens page (`/admin/tokens`) is where those words live.
+
+### Three categories
+
+The Tokens page has three tabs — three *kinds* of tokens, each playing a different role:
+
+| Category | Tokens inside | Answers the question… |
+|---|---|---|
+| **Condition** | `metric`, `scope`, `operator` | *What can agents check?* |
+| **Notify**    | `channel`, `format`, `template` | *How can agents alert?* |
+| **Action**    | `action_type` | *What can agents do?* |
+
+### System tokens vs custom tokens
+
+- **System** tokens ship with the application. They have the orange "system" badge. You can **enable/disable** them (is_active toggle) but you cannot rename or delete them. Built-in metrics like `pnl`, `day_pct`, `cash`, built-in scopes like `holdings.any_acct`, `positions.total`, and built-in action types like `place_order`, `chase_close_positions` all live here.
+- **Custom** tokens are ones you create on this page. Full CRUD — you can edit, delete, and change anything about them.
+
+### What one token row looks like
+
+Each row carries more than just a name. The fields you'll see when editing:
+
+| Field | Meaning |
+|---|---|
+| **Category** | `condition`, `notify`, or `action` |
+| **Token kind** | Sub-type. For condition: `metric` / `scope` / `operator`. For notify: `channel` / `format` / `template`. For action: `action_type`. |
+| **Token** | The word itself — what authors type into an agent (e.g. `pnl`, `<=`, `telegram`). Must be unique within its (category, kind). |
+| **Value type** | What kind of value this token produces or accepts — `number`, `string`, `boolean`, `enum`, `array`, `object`, `void`. |
+| **Units** | Human-readable label for numeric metrics: `₹`, `%`, `₹/min`, `%/min`, `min`. |
+| **Description** | One line explaining what it means. Shows in the Agents-page editor as tooltip-like help. |
+| **Resolver** | Python dotted path to the function that implements the token. Required for system-integrated tokens; omit for simple enum/string tokens that the engine doesn't need to call into. |
+| **Params schema** | For action tokens — what arguments the action expects (account, symbol, quantity, side, …). JSON schema. |
+| **Enum values** | For enum value types — the allowed strings. |
+| **Template body** | For notify template tokens — the message body with `${placeholder}` syntax. |
+
+### Creating a token
+
+1. Go to `/admin/tokens` → click **+ New token** (emerald button, top right).
+2. Pick a **Category** (condition / notify / action).
+3. Pick a **Token kind** — the form adapts. A condition `metric` needs a `resolver` (Python function that returns a number for a given row); a `scope` needs a resolver that returns a list of rows; an `operator` is usually a built-in comparator.
+4. Fill in the token string, description, value type, optional units.
+5. For action tokens, define the `params_schema` (JSON) — this is what the Agents page uses to render the action's sub-form.
+6. Save → the row appears in the list.
+7. **Click "Reload registry"** (yellow button, top right). Tokens are loaded into an in-memory dispatch table at startup; the reload button rebuilds that table so your new token is usable *without* restarting the server.
+
+That's it. The new token is now a word agents can use.
+
+### How tokens help agent creation
+
+Every dropdown in the Agents editor is populated from the Tokens table:
+
+- The condition editor autocompletes metric/scope/operator names from whatever's in the catalog.
+- The "validate" button (on the Agents editor) checks every token referenced in your condition against the live registry — typos fail here, not at runtime.
+- The actions editor renders its form using the action token's `params_schema`, so you only see fields relevant to the action you picked.
+
+In short: **the Tokens page is the one place you extend the system.** Adding a new kind of check or a new kind of action is "one token row + one Python function," no deploy, no code change in the engine.
+
+---
+
+## Creating an agent — step by step
+
+Open `/agents`. Agents are grouped by category (Loss & Risk, Summaries, Automation, Other) so existing ones are easy to find.
+
+To create or edit:
+
+1. Click a row to expand it and read the current condition tree in plain English.
+2. Click **Edit** on the row. The inline form appears:
+   - **Name** / **Description** — human-readable
+   - **Scope** — `total` / `per_account`
+   - **Schedule** — `market_hours` / `always`
+   - **Cooldown (minutes)** — 30 is a reasonable default
+   - **Conditions (JSON)** — the condition tree (see above)
+   - **Events (JSON)** — notify channels list
+   - **Actions (JSON)** — action list, or `[]` for alert-only
+3. **Click Validate** (cyan button). The server dry-checks your condition tree against the live token registry and returns any unknown tokens. You'll get a green banner or an error list.
+4. Click **Save** once validation passes.
+
+A freshly-saved agent is `inactive` by default. Click the OFF pill to flip it to ON. It will start evaluating on the next tick.
+
+### Copy-an-existing pattern (recommended)
+
+The easiest way to build your first custom agent is to click into any `loss-*` row, look at its condition tree, and clone-edit a new agent with slightly different thresholds. The 14 seeded loss agents cover static `%`, static `₹`, rate `₹/min`, and rate `%/min` variants at both per-account and total scope — between them they exercise almost every condition-grammar feature.
+
+---
+
+## The Simulator — try it before you trust it
+
+The Simulator (`/admin/simulator`) answers the question:
+
+> "If the market did X, what would my agents do?"
+
+It feeds fabricated holdings / positions / margins into the **same** agent engine the real pipeline uses. Alerts, Telegram messages, email sends, paper-traded orders — all of them fire, but every one is tagged `SIMULATOR` so nobody confuses them with real alerts.
+
+### What you see on the page
+
+- **Status bar** — `RUNNING` / `idle`, active scenario, seed mode, tick number.
+- **Controls row** — scenario dropdown, seed mode, rate, plus buttons:
+  - **Load live book** — snapshots your real Kite positions into the sim.
+  - **Start / Stop / Step** — run continuously, halt, or apply one tick manually.
+  - **Run cycle** — run the agent engine against the current sim state right now.
+  - **Clear sim** — delete every past SIMULATOR event and order row from the DB.
+- **Recent SIMULATOR agent events** — table of fires since the last Clear.
+- **Recent SIMULATOR orders** — paper-traded orders from sim actions.
+- **Log panel** (shared across the admin pages) — the **Simulator** tab streams one line per tick with per-symbol price diffs in real time.
+
+### Three seeding modes
+
+Scenarios decide what moves; seeding decides what moves them.
+
+| Mode | Starting state | Use it when… |
+|---|---|---|
+| **Scripted** | The scenario's built-in `initial` block (fake accounts + symbols) | Deterministic regression test — same inputs every run |
+| **Live** | Snapshot of your real Kite positions | You want to see what your *actual* book would look like after a hypothetical move |
+| **Live + scenario** | Live snapshot, then the scenario's scripted extras layered on top | You want a real-book stress test (e.g. `generic-crash` scenario with your real positions) |
+
+For Live / Live+scenario: **always press "Load live book" first**, then change the Seed dropdown, then press Start.
+
+### Running it
+
+1. Go to `/admin/simulator`.
+2. Pick a scenario. `crash-open` and `rate-breach` work great with Scripted; `generic-crash` and `random-walk` need Live or Live+scenario.
+3. Pick seed mode and (if not Scripted) press **Load live book**.
+4. Set **Rate (ms)** — how fast to advance ticks. 2000 ms = 1 tick every 2 seconds is fine.
+5. Press **Start**.
+6. Switch to the **Simulator** tab at the bottom. Every tick shows up with per-symbol price moves:
+
+   ```
+   [12:34:56] SIMULATOR tick 3 · generic-crash
+     holdings.ZG####.RELIANCE:  4822.03→4725.59 (Δ -96.44)
+     holdings.ZG####.ACMESOLAR: 298.90→292.92   (Δ -5.98)
+     ...
+   ```
+
+7. Sim auto-stops at 30 minutes. Stop early with the red **Stop** button.
+
+### Testing one specific agent
+
+On the `/agents` page, every row has a **Run in Simulator** button. Click it:
+
+- Navigates to `/admin/simulator?agent_id=<id>`
+- Pre-arms the page to run *only that agent*, bypassing schedule / cooldown / baseline gates
+- Pick a scenario and Start → the chosen agent fires as often as its condition is true, without affecting any real state
+
+This is the safest way to test a new agent before activating it.
+
+### What gets tagged
+
+Because `sim_mode=True` flows through the pipeline, every artefact is marked:
+
+| Surface | Tag |
+|---|---|
+| Telegram | `SIMULATOR` prefix + red "SIMULATOR RUN — fabricated market data" line |
+| Email subject | `RamboQuant SIMULATOR Agent: …` |
+| Email body | Red banner at the top |
+| agent_events row | `sim_mode = true` |
+| algo_orders row | `mode = 'sim'` |
+| Log line | `[SIMULATOR] …` |
+
+So real alerts and simulated alerts are never in the same bucket.
+
+### While the sim runs
+
+- The red **SIMULATOR ACTIVE** banner pins to the top of every admin page.
+- The `/agents` page's event table auto-switches to showing only sim events.
+- The `/performance` page keeps showing **real** data — the live Kite refresh continues even during a sim, only the live agent engine is paused.
+
+---
+
+## Recipes
+
+**A) "Add a custom loss rule for one specific account"**
+1. Go to `/agents` → Copy the condition from `loss-pos-acct-static-abs`.
+2. Edit a new agent slug like `loss-zg0790-positions`.
+3. In the condition, replace `"scope": "positions.any_acct"` with a scope that matches only the account you care about (e.g. a new custom scope token you create on the Tokens page).
+4. Validate → Save → Run in Simulator with a scenario like `positions-abs-breach` → confirm it fires.
+5. Flip it to ON.
+
+**B) "Add a new metric the engine doesn't have yet"**
+1. Write a Python function somewhere under `backend/api/algo/` that takes `(ctx, row)` and returns a number.
+2. Go to `/admin/tokens` → **+ New token** → Category `condition`, kind `metric`, resolver set to the dotted path of your function.
+3. Save → Reload registry.
+4. Your metric is now usable in any agent's condition leaf.
+
+**C) "Find out what would happen if the market drops 6% right now"**
+1. `/admin/simulator` → Scenario `generic-crash` → Load live book → Seed `Live + scenario` → Start.
+2. Watch the Simulator log tab for price moves; watch the events table for which agents would fire.
+3. Stop when you've seen enough. Hit **Clear sim** to wipe the test rows.
+
+---
+
+## Safety checklist before flipping a new agent to ON
+
+- [ ] Description explains what it does and why.
+- [ ] Condition tree passes **Validate** on the Agents editor.
+- [ ] Cooldown is at least a few minutes (prevents spam).
+- [ ] Schedule is `market_hours` unless you actually want it firing overnight.
+- [ ] Ran in the Simulator with a representative scenario and got the expected fires.
+- [ ] If the agent has **actions** (not just alerts): the action's params are correct and the action is safe to run against your book.
+
+---
+
+## Where to go when something looks wrong
+
+| Problem | Look here |
+|---|---|
+| Agent didn't fire when it should have | `/agents` → Last fire timestamp + Count on the row; also the Simulator tab in the log panel |
+| Sim shows ticks but no price changes | You probably picked a scenario with no scripted initial in Scripted mode — switch to Live+scenario and Load live book first |
+| Custom token won't appear in the Agents editor | Did you press **Reload registry** after saving? Is the token's `is_active` on? |
+| Alerts not reaching Telegram/email | Check `cap_in_<branch>.telegram` and `cap_in_<branch>.mail` in `backend_config.yaml`; dev may have these off by default |
+| "Invalid username or password" on sign-in | Ask the server admin to reset your password — there's no forgot-password flow yet |
+
+---
+
+## Glossary
+
+- **Branch**: `main` = production (`ramboq.com`), everything else = dev (`dev.ramboq.com`). Agents, tokens, and sims on dev don't affect production.
+- **Capability flag**: `cap_in_dev.<feature>` / `cap_in_prod.<feature>` in `backend_config.yaml`. Toggles whether a capability (simulator, telegram, mail, genai, market_feed) is live on that branch.
+- **Dispatch registry**: The in-memory index that maps each token name to its implementation. Rebuilt from the Tokens table at startup and on **Reload registry**.
+- **Masked account**: Accounts are rendered as `ZG####` / `ZJ####` in the UI and in alerts to avoid leaking numeric IDs. Internally the real IDs (`ZG0790`, `ZJ6294`) are used.
+- **Tick**: One step of the simulator. Each tick applies a set of price moves and then invokes the agent engine once.
