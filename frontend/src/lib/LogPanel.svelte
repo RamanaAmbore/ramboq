@@ -220,28 +220,27 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Tab row — tabs bumped +20% (0.4 → 0.48rem) after the prior pass.
-     No inter-tab gap; tight horizontal padding so all 6 still fit on a
-     mobile viewport. */
+  /* Tab row — another +30% on the previous 0.48rem → 0.62rem. Padding
+     scaled proportionally. Still no inter-tab gap so mobile fit holds. */
   .log-tab-row { gap: 0; }
   :global(.log-tab-btn) {
-    font-size: 0.48rem;
+    font-size: 0.62rem;
     font-weight: 600;
-    padding: 0.14rem 0.34rem;
+    padding: 0.18rem 0.44rem;
     white-space: nowrap;
     letter-spacing: 0.02em;
     font-family: ui-monospace, monospace;
   }
 
-  /* Vertical "log" label using writing-mode. Outer wrap = flex item
-     with fixed width; inner text carries writing-mode: vertical-lr so
-     "log" flows top-to-bottom. Splitting the concerns avoids the
-     flex + writing-mode collapse that bit earlier attempts. */
+  /* Vertical "log" label — same two-layer split. writing-mode makes
+     the text flow top-to-bottom; additional rotate(180deg) flips it so
+     it reads bottom-to-top (the direction English readers typically
+     prefer for rotated labels). */
   .log-section-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 0.8rem;
+    min-width: 0.9rem;
     padding: 0.1rem 0.15rem;
     margin-right: 0.15rem;
     border-right: 1px solid rgba(251,191,36,0.35);
@@ -249,8 +248,9 @@
   }
   .log-section-text {
     writing-mode: vertical-lr;
+    transform: rotate(180deg);
     font-family: ui-monospace, monospace;
-    font-size: 0.48rem;
+    font-size: 0.5rem;
     font-weight: 700;
     line-height: 1;
     color: rgba(251,191,36,0.85);
