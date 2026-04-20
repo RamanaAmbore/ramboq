@@ -50,6 +50,72 @@ SCENARIOS_PATH = Path(__file__).parent / "scenarios.yaml"
 TICK_LOG_LIMIT = 200
 
 
+# Market-state presets the simulator exposes to scenarios + the UI. Each
+# preset maps to the segment-flag + minutes-since-open/close overrides
+# `_build_context()` will respect, so time-aware agents (rate rules with
+# baseline gates, minutes_until_close conditions, expiry rules) fire
+# against a simulated clock instead of wall-clock time.
+MARKET_STATE_PRESETS: dict[str, dict] = {
+    "pre_open":     {"nse_open": False, "mcx_open": False,
+                     "minutes_since_nse_open": 0,   "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 0,   "minutes_since_mcx_close": 0,
+                     "is_expiry_day": False},
+    "at_open":      {"nse_open": True,  "mcx_open": True,
+                     "minutes_since_nse_open": 1,   "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 1,   "minutes_since_mcx_close": 0,
+                     "is_expiry_day": False},
+    "mid_session":  {"nse_open": True,  "mcx_open": True,
+                     "minutes_since_nse_open": 180, "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 180, "minutes_since_mcx_close": 0,
+                     "is_expiry_day": False},
+    "pre_close":    {"nse_open": True,  "mcx_open": True,
+                     "minutes_since_nse_open": 360, "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 360, "minutes_since_mcx_close": 0,
+                     "is_expiry_day": False},
+    "at_close":     {"nse_open": False, "mcx_open": True,
+                     "minutes_since_nse_open": 375, "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 375, "minutes_since_mcx_close": 0,
+                     "is_expiry_day": False},
+    "post_close":   {"nse_open": False, "mcx_open": False,
+                     "minutes_since_nse_open": 375, "minutes_since_nse_close": 60,
+                     "minutes_since_mcx_open": 375, "minutes_since_mcx_close": 60,
+                     "is_expiry_day": False},
+    # Thursday expiry scenario — mid-session on the day the weekly options
+    # settle. Flips is_expiry_day so expiry auto-close agents engage.
+    "expiry_day":   {"nse_open": True,  "mcx_open": True,
+                     "minutes_since_nse_open": 240, "minutes_since_nse_close": 0,
+                     "minutes_since_mcx_open": 240, "minutes_since_mcx_close": 0,
+                     "is_expiry_day": True},
+}
+
+
+def _resolve_market_state(spec: dict | None) -> dict:
+    """
+    Turn a scenario's `market_state` block (or a runtime UI override)
+    into a flat dict of overrides consumable by _build_context. Unknown
+    presets fall back to mid_session and log a warning.
+    """
+    if not spec:
+        return dict(MARKET_STATE_PRESETS["mid_session"])
+    out: dict = {}
+    preset = spec.get("preset") if isinstance(spec, dict) else None
+    if preset:
+        if preset not in MARKET_STATE_PRESETS:
+            logger.warning(
+                f"[SIMULATOR] Unknown market_state preset '{preset}' — "
+                f"using mid_session. Valid: {list(MARKET_STATE_PRESETS)}"
+            )
+            preset = "mid_session"
+        out.update(MARKET_STATE_PRESETS[preset])
+    # Explicit fields in the spec override the preset (e.g. "use pre_close
+    # but flip is_expiry_day").
+    for k, v in (spec or {}).items():
+        if k == "preset":
+            continue
+        out[k] = v
+    return out
+
+
 def _auto_stop_after() -> timedelta:
     """Read auto-stop window from DB settings each time (falls back to 30 min)."""
     from backend.shared.helpers.settings import get_int
@@ -183,6 +249,11 @@ class SimDriver:
         # every tick. Resolved at start() from request override, scenario
         # YAML, or DB setting `simulator.positions_every_n_ticks`.
         self.positions_every_n_ticks: int = POSITIONS_UPDATE_EVERY_DEFAULT
+        # Simulated market state — dict of overrides passed into run_cycle's
+        # _build_context so time-aware agents see a simulated clock. Keyed
+        # by preset or explicit fields; see MARKET_STATE_PRESETS.
+        self.market_state: dict = dict(MARKET_STATE_PRESETS["mid_session"])
+        self.market_state_preset: str = "mid_session"
         self._task: Optional[asyncio.Task] = None
 
         # Running per-symbol state. Holdings is deliberately unused (empty
@@ -226,6 +297,8 @@ class SimDriver:
             "only_agent_ids":   list(self.only_agent_ids) if self.only_agent_ids else [],
             "live_snapshot_at": (self._live_snapshot or {}).get("snapshot_at"),
             "positions_every_n_ticks": self.positions_every_n_ticks,
+            "market_state_preset":     self.market_state_preset,
+            "market_state":            dict(self.market_state),
         }
 
     # ── DataFrame builder the agent engine consumes ───────────────────
@@ -267,6 +340,7 @@ class SimDriver:
               *, seed_mode: str = "scripted",
               only_agent_ids: list[int] | None = None,
               positions_every_n_ticks: int | None = None,
+              market_state_override: dict | None = None,
               inline_scenario: dict | None = None) -> dict:
         """
         Start the sim against a named scenario from scenarios.yaml, or an
@@ -302,6 +376,16 @@ class SimDriver:
             self.positions_every_n_ticks = max(1, int(raw_pos))
         except (TypeError, ValueError):
             self.positions_every_n_ticks = _positions_every_default()
+
+        # Market-state resolution — request override > scenario YAML > default.
+        # Both accept the same shape: {preset: "…"} or explicit fields.
+        spec = market_state_override if market_state_override else scen.get("market_state")
+        self.market_state = _resolve_market_state(spec)
+        self.market_state_preset = (
+            (spec or {}).get("preset")
+            if isinstance(spec, dict) and spec.get("preset") in MARKET_STATE_PRESETS
+            else "mid_session"
+        )
 
         # Seed the running state — either from scenario.initial, the live-book
         # snapshot, or both stacked. For the live modes, auto-snapshot if the
@@ -432,6 +516,10 @@ class SimDriver:
                 "segments":       [],
                 "alert_state":    self._sim_alert_state,
                 "sim_mode":       True,
+                # Simulated clock + segment flags — picked up by run_cycle →
+                # _build_context so time-aware agents evaluate against the
+                # scenario's market state, not wall-clock time.
+                "market_state":   dict(self.market_state),
             }
             # Isolated ("Run in Simulator" per-agent) runs want every tick
             # to fire so the operator gets immediate feedback — they bypass

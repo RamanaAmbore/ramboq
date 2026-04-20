@@ -166,14 +166,17 @@ export const fetchSimStatus       = () => _get('/simulator/status', { auth: true
 //   agent_ids: number[]   (restrict isolation to these agents)
 //   positions_every_n_ticks: number | null
 //     — positions cadence override; null = fall back to scenario YAML or
-//       the DB setting `simulator.positions_every_n_ticks`. Positions-only
-//       sim; no holdings cadence.
+//       the DB setting `simulator.positions_every_n_ticks`.
+//   market_state_preset: one of pre_open | at_open | mid_session |
+//       pre_close | at_close | post_close | expiry_day, or null to use
+//       the scenario's YAML value.
 export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
   _post('/simulator/start',
         { scenario, rate_ms,
           seed_mode:               opts.seed_mode || 'scripted',
           agent_ids:               opts.agent_ids || null,
-          positions_every_n_ticks: opts.positions_every_n_ticks ?? null },
+          positions_every_n_ticks: opts.positions_every_n_ticks ?? null,
+          market_state_preset:     opts.market_state_preset || null },
         { auth: true });
 export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
 export const stepSim              = () => _post('/simulator/step', {}, { auth: true });

@@ -515,12 +515,25 @@ async def seed_agents():
     logger.info(f"Agent engine: {len(BUILTIN_AGENTS)} built-in agents verified")
 
 
-def _build_context(now) -> dict:
+def _build_context(now, sim_overrides: dict | None = None) -> dict:
     """
     Build the base context dict consumed by the schedule/market-open check
     in run_cycle. The v2 grammar engine reads the market DataFrames directly
     via V2Context, so this function only emits the per-segment open/close
     flags used to short-circuit `market_hours` agents.
+
+    `sim_overrides` (optional) is the simulator's way to pretend the clock
+    is somewhere it isn't. When non-None, keys in the override dict win
+    over the computed values — so a scenario can declare "NSE is open, 30
+    minutes before close, today is an expiry day" regardless of wall-clock
+    time. Expected keys:
+
+        nse_open / nse_closed / nse_holiday / mcx_open / mcx_closed / mcx_holiday (bool)
+        minutes_since_nse_open / minutes_since_nse_close
+        minutes_since_mcx_open / minutes_since_mcx_close   (int)
+        is_expiry_day       (bool, reserved — expiry agents read it directly)
+
+    The real path passes None and we fall through to the live computation.
     """
     from backend.shared.helpers.utils import config as app_config
 
@@ -555,6 +568,13 @@ def _build_context(now) -> dict:
         ctx[f"{prefix}_holiday"] = is_holiday
         ctx[f"minutes_since_{prefix}_open"] = max(0, int((now - open_time).total_seconds() / 60)) if now >= open_time and is_open else 0
         ctx[f"minutes_since_{prefix}_close"] = max(0, int((now - close_time).total_seconds() / 60)) if now > close_time and not is_holiday else 0
+
+    # Sim-mode overrides — a scenario's `market_state` block wins over the
+    # computed values above. Only keys present in the override dict are
+    # replaced, so a partial override (e.g. just `is_expiry_day`) is safe.
+    if sim_overrides:
+        for k, v in sim_overrides.items():
+            ctx[k] = v
 
     return ctx
 
@@ -604,9 +624,11 @@ async def run_cycle(context: dict, broadcast_fn=None,
     if not agents:
         return
 
-    # Build base context — only the per-segment open/close flags are needed
-    # here; v2 agents read DataFrames directly from V2Context.
-    base_ctx = _build_context(now)
+    # Build base context. When the simulator passes a `market_state`
+    # override dict on the context, forward it so the per-segment open
+    # flags reflect the simulated clock (e.g. "pre_close" preset) instead
+    # of real wall-clock time.
+    base_ctx = _build_context(now, sim_overrides=context.get("market_state"))
 
     # Determine whether NSE/MCX are currently open (for schedule filtering)
     nse_open_flag = bool(base_ctx.get("nse_open"))

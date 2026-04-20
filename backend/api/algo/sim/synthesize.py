@@ -353,6 +353,20 @@ def synthesize_for_agent(agent) -> dict:
         )
 
     initial, ticks = synth(leaf)
+
+    # Pick a market-state preset that matches the agent's intent:
+    # rate-metric agents want the session already well underway (so the
+    # 15-min baseline gate doesn't silence them and the rate window has
+    # history); expiry-related slugs get the expiry_day preset; everything
+    # else runs mid_session which keeps segment flags on.
+    slug = (agent.slug or "").lower()
+    if "expiry" in slug:
+        preset = "expiry_day"
+    elif "rate" in metric:
+        preset = "mid_session"    # rate evaluator still has history
+    else:
+        preset = "mid_session"
+
     return {
         "slug":  f"agent-{agent.slug}-auto",
         "name":  f"Auto: {agent.name}",
@@ -363,6 +377,7 @@ def synthesize_for_agent(agent) -> dict:
             f"{leaf.get('value')}."
         ),
         "positions_every_n_ticks": 1,
+        "market_state": {"preset": preset},
         "initial": initial,
         "ticks":   ticks,
     }

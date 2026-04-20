@@ -248,6 +248,24 @@ It feeds fabricated holdings / positions / margins into the **same** agent engin
 - **Recent SIMULATOR orders** — paper-traded orders from sim actions.
 - **Log panel** (shared across the admin pages) — the **Simulator** tab streams one line per tick with per-symbol price diffs in real time.
 
+### Simulated market clock
+
+Time-aware agents (rate rules with a baseline gate, anything that checks `minutes_until_close`, expiry-day auto-close rules) need a realistic clock. The simulator provides one via **market-state presets**:
+
+| Preset | What it simulates |
+|---|---|
+| `pre_open`     | Before the session (no segment flags open) |
+| `at_open`      | Market just opened (1 min into session) |
+| `mid_session`  | Default — 3 hours into the session |
+| `pre_close`    | 6 hours in, close not yet passed |
+| `at_close`     | Just after equity close, MCX still running |
+| `post_close`   | Both segments done |
+| `expiry_day`   | Mid-session on an expiry day — flips `is_expiry_day=true` so expiry agents engage |
+
+Three places to set it (most specific wins): **Market dropdown** on the Simulator page → **scenario YAML** (`market_state: {preset: pre_close}`) → default `mid_session`. The Run-in-Simulator button on the Agents page picks a sensible preset from the agent's metric (`expiry_day` for expiry-slug agents, `mid_session` otherwise) so per-agent tests just work.
+
+The running sim's status bar shows `market: <preset>` next to the tick counter.
+
 ### Tick cadence — positions only
 
 The simulator is **positions-only**. Holdings aren't simulated at all because intraday risk lives in F&O positions + fund negatives; holdings-based agents (`day_pct`, `day_rate_abs`, `day_rate_pct`) validate against live production data only. If you press **Run in Simulator** on a holdings agent, you'll get a clear error telling you so.

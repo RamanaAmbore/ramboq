@@ -7,11 +7,20 @@
 # will refuse to build a scenario for them.
 #
 # Each scenario declares:
-#   slug        — stable id referenced by the UI + API
-#   mode        — 'symbol' (default) | 'aggregate' (legacy)
-#   initial:    — optional per-symbol rows (not needed when seed=live)
-#   ticks:      — list of {at, moves} entries; moves are pct / abs /
-#                 random_walk / target_pnl / set_margin
+#   slug          — stable id referenced by the UI + API
+#   mode          — 'symbol' (default) | 'aggregate' (legacy)
+#   market_state  — OPTIONAL presets for the simulated clock & segment
+#                    flags. Keys:
+#                      preset: one of pre_open | at_open | mid_session |
+#                              pre_close | at_close | post_close | expiry_day
+#                      Or explicit overrides:
+#                        nse_open / mcx_open (bool)
+#                        minutes_since_nse_open / minutes_since_nse_close (int)
+#                        is_expiry_day (bool)
+#                    Defaults to preset=mid_session when absent.
+#   initial:      — optional per-symbol rows (not needed when seed=live)
+#   ticks:        — list of {at, moves} entries; moves are pct / abs /
+#                   random_walk / target_pnl / set_margin
 #
 # Glob syntax is `section.account.tradingsymbol`. `*` matches one segment,
 # `**` matches any remaining path. All scenarios below target
@@ -23,6 +32,7 @@
 - slug: generic-crash
   name: Generic crash (-1% / -2% / -3% positions)
   mode: symbol
+  market_state: {preset: mid_session}
   description: >-
     Three-tick drawdown on positions. Fires the static % and ₹ floors on
     long-heavy books; rate rules fire once the bleed is sustained.
@@ -44,6 +54,7 @@
 - slug: generic-euphoria
   name: Generic euphoria (+1% / +2% / +3% positions)
   mode: symbol
+  market_state: {preset: mid_session}
   description: >-
     Three-tick rally on positions. Shorts (short options, short futures)
     lose money here — catches the stress cases the crash scenario misses.
@@ -66,6 +77,7 @@
 - slug: extreme-crash
   name: Extreme crash (-3% / -6% / -10% positions)
   mode: symbol
+  market_state: {preset: mid_session}
   description: >-
     Three-tick catastrophic drawdown. Trips per-account AND total floors,
     static AND rate rules, on a long-heavy book. Use it to exercise the
@@ -88,6 +100,7 @@
 - slug: extreme-euphoria
   name: Extreme euphoria (+3% / +6% / +10% positions)
   mode: symbol
+  market_state: {preset: mid_session}
   description: >-
     Three-tick explosive rally. Short F&O books take severe losses.
     Mirror stress test to extreme-crash.

@@ -67,6 +67,10 @@ class SimStartRequest(msgspec.Struct):
     # back to the DB setting `simulator.positions_every_n_ticks`. Clamped
     # to >= 1 server-side. (Positions-only sim — no holdings cadence.)
     positions_every_n_ticks: Optional[int] = None
+    # Market-state preset override. One of: pre_open / at_open /
+    # mid_session / pre_close / at_close / post_close / expiry_day.
+    # None = use scenario YAML's market_state block (or default mid_session).
+    market_state_preset: Optional[str] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
@@ -157,11 +161,16 @@ class SimulatorController(Controller):
     @post("/start")
     async def start(self, data: SimStartRequest) -> dict:
         try:
+            market_state_override = (
+                {"preset": data.market_state_preset}
+                if data.market_state_preset else None
+            )
             return get_driver().start(
                 data.scenario, data.rate_ms,
                 seed_mode=data.seed_mode,
                 only_agent_ids=data.agent_ids,
                 positions_every_n_ticks=data.positions_every_n_ticks,
+                market_state_override=market_state_override,
             )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -217,6 +226,7 @@ class SimulatorController(Controller):
                 # Propagated into V2Context → picked up by _dispatch and actions
                 "alert_state":    {"sim_mode": True},
                 "sim_mode":       True,
+                "market_state":   dict(drv.market_state),
             }
             isolated = bool(drv.only_agent_ids)
             await run_cycle(

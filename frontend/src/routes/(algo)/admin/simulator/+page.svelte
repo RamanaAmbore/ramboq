@@ -27,8 +27,10 @@
   let seedMode  = $state(/** @type {'scripted'|'live'|'live+scenario'} */ ('scripted'));
   let rateMs    = $state(2000);
   // Positions cadence override — blank means "use scenario / DB default".
-  // Positions-only sim; no holdings cadence.
   let positionsEveryN = $state(/** @type {number | ''} */ (''));
+  // Simulated market state — overrides the scenario's YAML preset. Blank
+  // = use whatever the scenario declares (defaulting to mid_session).
+  let marketStatePreset = $state(/** @type {''|'pre_open'|'at_open'|'mid_session'|'pre_close'|'at_close'|'post_close'|'expiry_day'} */(''));
   // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
@@ -91,10 +93,12 @@
       if (agentId) opts.agent_ids = [Number(agentId)];
       // Blank input = use scenario / DB default; a number = override.
       if (positionsEveryN !== '' && positionsEveryN != null) opts.positions_every_n_ticks = Number(positionsEveryN);
+      if (marketStatePreset) opts.market_state_preset = marketStatePreset;
       status = await startSim(pickedSlug, rateMs, opts);
       const tag = agentId ? ` (agent #${agentId} only)` : '';
       const cadTag = ` · P:${status.positions_every_n_ticks}`;
-      note = `Started ${pickedSlug} · seed=${seedMode} · ${rateMs}ms${cadTag}${tag}`;
+      const msTag  = status.market_state_preset ? ` · market=${status.market_state_preset}` : '';
+      note = `Started ${pickedSlug} · seed=${seedMode} · ${rateMs}ms${cadTag}${msTag}${tag}`;
     } catch (e) { error = e.message; }
   }
   async function doStop() {
@@ -205,6 +209,10 @@
         cadence P:{status.positions_every_n_ticks}
       </span>
       <span class="text-[#7e97b8]">|</span>
+      <span title="Simulated market state — segment flags + minutes-since-open drive time-aware agents">
+        market: <span class="text-[#fde68a]">{status.market_state_preset ?? 'mid_session'}</span>
+      </span>
+      <span class="text-[#7e97b8]">|</span>
       <span>started: {status.started_at?.slice(0, 19) ?? '—'}</span>
       {#if status.only_agent_ids?.length}
         <span class="text-[#7e97b8]">|</span>
@@ -224,7 +232,7 @@
 <!-- Controls -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_100px_90px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
+  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_100px_90px_130px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
     <div>
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
@@ -249,6 +257,19 @@
       <label for="sim-pos-n" class="field-label" title="Positions refresh every N ticks (1 = every tick)">Pos / N</label>
       <input id="sim-pos-n" type="number" min="1" step="1" placeholder="1"
              bind:value={positionsEveryN} class="field-input" />
+    </div>
+    <div>
+      <label for="sim-market" class="field-label" title="Simulated market clock — overrides the scenario's YAML value">Market</label>
+      <select id="sim-market" bind:value={marketStatePreset} class="field-input">
+        <option value="">(scenario)</option>
+        <option value="pre_open">Pre-open</option>
+        <option value="at_open">At open</option>
+        <option value="mid_session">Mid-session</option>
+        <option value="pre_close">Pre-close</option>
+        <option value="at_close">At close</option>
+        <option value="post_close">Post-close</option>
+        <option value="expiry_day">Expiry day</option>
+      </select>
     </div>
     <button type="button" onclick={doSeedLive}
       class="text-[0.65rem] py-1 px-3 rounded border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold whitespace-nowrap">
