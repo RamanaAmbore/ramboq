@@ -183,10 +183,12 @@ class SimulatorController(Controller):
                 "alert_state":    {"sim_mode": True},
                 "sim_mode":       True,
             }
+            isolated = bool(drv.only_agent_ids)
             await run_cycle(
                 ctx, _broadcast_event,
                 only_agent_ids=drv.only_agent_ids,
                 bypass_schedule=True,
+                bypass_suppression=isolated,
             )
             return {"ok": True, "sim": drv.snapshot()}
         except SimGuardError as e:

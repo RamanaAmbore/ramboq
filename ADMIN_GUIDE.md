@@ -24,6 +24,16 @@ Everything on the admin site revolves around four ideas:
 
 Think of an agent as a sentence: **"When _condition_ is true, _notify_ me through these channels and _do_ these actions."**
 
+### When agents re-fire (latching semantic)
+
+To avoid spamming you when a drawdown persists, agents follow a two-tier rule:
+
+- **Static agents** (absolute ₹ floor or % floor — e.g. "pnl ≤ −₹30k", "day loss ≥ 3%") fire **once** the first time the threshold is crossed, then **latch silent** as long as the condition keeps matching. They re-arm automatically when the value recovers above the threshold. This means a loss that sits flat at −₹40k won't fire the static agent every tick — you get one notification at the crossing, not a stream.
+- **Rate-of-change agents** ("pnl bleeding ≥ ₹3k/min") keep re-firing while the bleed is accelerating, gated by cooldown (default 30 min) and a material-change threshold (default ₹15k move between fires). The whole point of these agents is to wake you up when the situation is getting materially worse.
+- **Session rollover** (new trading day, detected automatically) clears every latch.
+
+Put together: the first alert when things go bad is the static agent. After that, it's rate agents telling you if it's getting worse faster. When things recover, everything re-arms silently.
+
 ---
 
 ## How agents work — end to end
@@ -254,7 +264,7 @@ Scenarios decide what moves; seeding decides what moves them.
 | **Live** | Snapshot of your real Kite positions | You want to see what your *actual* book would look like after a hypothetical move |
 | **Live + scenario** | Live snapshot, then the scenario's scripted extras layered on top | You want a real-book stress test (e.g. `generic-crash` scenario with your real positions) |
 
-For Live / Live+scenario: **always press "Load live book" first**, then change the Seed dropdown, then press Start.
+For Live / Live+scenario: you can press **Load live book** to snapshot now, or just pick Live / Live+scenario and hit **Start** — the driver auto-snapshots if you haven't already. Load live book manually when you want a *fresh* snapshot right before starting (e.g. after placing real orders).
 
 ### Running it
 

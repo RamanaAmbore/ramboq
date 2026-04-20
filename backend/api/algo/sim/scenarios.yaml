@@ -64,6 +64,7 @@
 - slug: crash-open
   name: Fast morning crash (Equity)
   mode: symbol
+  holdings_every_n_ticks: 1    # scripted scenario — drive holdings per-tick
   description: >-
     Two accounts holding blue-chips. Tick 0 gaps down 2%; tick 1 another
     3.5% on one account; tick 2 spreads the drawdown to the second. Hits
@@ -145,12 +146,73 @@
         - {type: target_pnl, scope: "positions.ZJ####.*", value: -15000}
 
 # ─────────────────────────────────────────────────────────────────────────
+# Positions rate-of-change breach — drives positions pnl down smoothly so
+# loss-pos-acct-rate-abs (-₹3k/min/acct), loss-pos-total-rate-abs (-₹6k/min),
+# and loss-pos-any-rate-pct (-0.25 %/min) all fire. The static ₹ floors can
+# also fire later in the sequence once pnl drops past -₹30k/acct; that's
+# fine — both agent families co-exist.
+# ─────────────────────────────────────────────────────────────────────────
+- slug: pos-rate-breach
+  name: Positions rate-of-change breach
+  mode: symbol
+  description: >-
+    Two option positions lose steady money over eight ticks — each tick
+    walks per-account pnl further down by ~₹4k (well above the ₹3k/min
+    per-account floor) and total pnl by ~₹8k (above the ₹6k/min total).
+    Hits every positions rate rule; static ₹ rules also engage past tick 7.
+    Use Run-in-Simulator on a rate agent to skip the 15-min baseline gate.
+  initial:
+    holdings: []
+    positions:
+      - {account: ZG####, tradingsymbol: NIFTY25APRPE22000, exchange: NFO,
+         quantity: 50, average_price: 200, last_price: 200, close_price: 200}
+      - {account: ZJ####, tradingsymbol: BANKNIFTY25APRPE48000, exchange: NFO,
+         quantity: 25, average_price: 400, last_price: 400, close_price: 400}
+    margins:
+      - {account: ZG####, avail opening_balance: 100000, net: 75000, util debits: 25000, avail collateral: 10000}
+      - {account: ZJ####, avail opening_balance:  50000, net: 40000, util debits: 10000, avail collateral:  5000}
+  ticks:
+    - at: 0
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value:  -4000}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -2000}
+    - at: 1
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value:  -8500}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -4500}
+    - at: 2
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -13500}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -7500}
+    - at: 3
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -19000}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value: -11000}
+    - at: 4
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -25000}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value: -15000}
+    - at: 5
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -31500}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value: -19500}
+    - at: 6
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -38500}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value: -24500}
+    - at: 7
+      moves:
+        - {type: target_pnl, scope: "positions.ZG####.*", value: -46000}
+        - {type: target_pnl, scope: "positions.ZJ####.*", value: -30000}
+
+# ─────────────────────────────────────────────────────────────────────────
 # Rate-of-change breach — smooth decay so the rate agent picks it up after
 # the baseline window (or immediately when bypass_schedule is on).
 # ─────────────────────────────────────────────────────────────────────────
 - slug: rate-breach
   name: Holdings rate-of-change breach
   mode: symbol
+  holdings_every_n_ticks: 1    # scripted scenario — drive holdings per-tick
   description: >-
     Holdings bleed 0.35% per tick — over ten ticks the rate-₹/min and
     rate-%/min rules both fire. Use the Run-in-Simulator button to bypass

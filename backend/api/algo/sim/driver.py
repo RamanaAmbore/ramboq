@@ -307,12 +307,20 @@ class SimDriver:
             self.holdings_every_n_ticks = HOLDINGS_UPDATE_EVERY_DEFAULT
 
         # Seed the running state — either from scenario.initial, the live-book
-        # snapshot, or both stacked.
+        # snapshot, or both stacked. For the live modes, auto-snapshot if the
+        # operator hasn't pressed "Load live book" yet — there's no reason to
+        # gate Start on a separate button click; the expected behaviour is
+        # "just fetch a fresh book and go."
         if seed_mode in ("live", "live+scenario"):
             if not self._live_snapshot:
-                raise SimGuardError(
-                    "seed_mode requires a live-book snapshot. "
-                    "POST /api/simulator/seed-live first.")
+                try:
+                    self.seed_live()
+                except Exception as e:
+                    raise SimGuardError(
+                        f"Auto-seed of live book failed: {e}. "
+                        f"Try POST /api/simulator/seed-live manually to surface "
+                        f"the broker error."
+                    )
             self._holdings_rows  = copy.deepcopy(self._live_snapshot["holdings"])
             self._positions_rows = copy.deepcopy(self._live_snapshot["positions"])
             self._margins_rows   = copy.deepcopy(self._live_snapshot["margins"])
@@ -434,10 +442,16 @@ class SimDriver:
                 "alert_state":    self._sim_alert_state,
                 "sim_mode":       True,
             }
+            # Isolated ("Run in Simulator" per-agent) runs want every tick
+            # to fire so the operator gets immediate feedback — they bypass
+            # suppression. General sim runs keep suppression on so the same
+            # breach doesn't fire on every tick.
+            isolated = bool(self.only_agent_ids)
             await run_cycle(
                 ctx, _broadcast_event,
                 only_agent_ids=self.only_agent_ids,
-                bypass_schedule=True,   # sim is always "out of hours" for market_hours agents
+                bypass_schedule=True,
+                bypass_suppression=isolated,
             )
         except Exception as e:
             logger.error(f"[SIMULATOR] run_cycle failed: {e}")

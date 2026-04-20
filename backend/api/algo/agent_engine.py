@@ -216,9 +216,21 @@ async def _v2_send_rich_alert(agent, matches, now, sim_mode: bool = False):
 
 def _v2_should_suppress(agent, matches, now, cfg) -> bool:
     """
-    Per-agent suppression for v2 grammar. Matches the semantics of the old
-    alert_utils _suppress gate: re-fire requires cooldown elapsed AND a
-    material change in the worst-case value across matches.
+    Per-agent suppression for v2 grammar.
+
+    Two semantics depending on whether the agent uses a rate metric:
+
+    - **Static agents** (threshold floors like `pnl <= -30000` or `day_pct <= -3`)
+      latch on first fire. They stay silent for the rest of the session as
+      long as the condition keeps matching. They re-arm ONLY when a cycle
+      sees zero matches (caller clears the latch in that case), i.e. the
+      value has recovered above the threshold. This prevents the "same
+      breach keeps screaming every tick" behaviour operators saw in the
+      simulator and in real-market prolonged drawdowns.
+
+    - **Rate agents** (ΔP&L/Δmin): keep the cooldown + material-delta logic.
+      Rate rules are *meant* to re-fire when the bleed accelerates — that's
+      the whole point — so we gate on cooldown elapsed + |Δvalue| material.
     """
     from datetime import timedelta
 
@@ -231,17 +243,23 @@ def _v2_should_suppress(agent, matches, now, cfg) -> bool:
             continue
         if worst_val is None or v < worst_val:
             worst_val = v
-    if worst_val is None:
-        return False  # no useful value — allow fire
 
     prev = _V2_LAST_ALERT.get(agent.slug)
     if not prev:
         return False
+
+    # Static agents: latched since the last fire. Re-fire blocked until the
+    # latch is cleared by run_cycle on a no-match tick (see below).
+    if not _v2_has_rate_metric(agent.conditions):
+        return True
+
+    # Rate agents: cooldown + material delta.
+    if worst_val is None:
+        return False
     if (now - prev['ts']) < timedelta(minutes=cfg['cooldown_min']):
         return True
     abs_moved = abs(worst_val - prev.get('val', 0)) >= cfg['suppress_delta_abs']
-    pct_moved = False  # v2 matches carry a single number; pct-delta omitted by design
-    return not (abs_moved or pct_moved)
+    return not abs_moved
 
 
 def _v2_record(agent, matches, now) -> None:
@@ -253,6 +271,16 @@ def _v2_record(agent, matches, now) -> None:
         if worst_val is None or v < worst_val:
             worst_val = v
     _V2_LAST_ALERT[agent.slug] = {'ts': now, 'val': worst_val if worst_val is not None else 0.0}
+
+
+def _v2_unlatch(agent) -> None:
+    """
+    Clear the static-agent latch so the agent is armed for its next fire.
+    Called by run_cycle on any tick where the agent produced zero matches —
+    i.e. the condition has recovered. Safe to call unconditionally; no-op
+    if the agent was never latched.
+    """
+    _V2_LAST_ALERT.pop(agent.slug, None)
 
 
 def _v2_cfg():
@@ -528,7 +556,8 @@ def _build_context(now) -> dict:
 
 async def run_cycle(context: dict, broadcast_fn=None,
                     only_agent_ids: list[int] | None = None,
-                    bypass_schedule: bool = False):
+                    bypass_schedule: bool = False,
+                    bypass_suppression: bool = False):
     """
     Main agent evaluation cycle. Called from background.py every refresh.
 
@@ -539,9 +568,15 @@ async def run_cycle(context: dict, broadcast_fn=None,
                         IDs and include them regardless of `status` — lets the
                         simulator dry-run an inactive agent without flipping
                         it on globally.
-        bypass_schedule: when True, ignore each agent's `schedule` field (so a
-                         `market_hours` agent still runs outside market
-                         hours). Used by the simulator.
+        bypass_schedule: when True, ignore the market_hours gate, the DB
+                        cooldown status, and the rate-metric baseline offset.
+                        The simulator uses this because sim ticks aren't
+                        tied to wall-clock market hours.
+        bypass_suppression: when True, ALSO skip the per-agent suppression
+                        latch. Reserved for isolated single-agent "Run in
+                        Simulator" runs where the operator wants every click
+                        to fire; general sim runs keep suppression on so a
+                        prolonged breach fires once, not every tick.
     """
     now = context.get("now")
     if not now:
@@ -626,9 +661,16 @@ async def run_cycle(context: dict, broadcast_fn=None,
             logger.error(f"Agent [{agent.slug}] v2 evaluate failed: {e}")
             matches = []
 
-        # Suppression gate is also bypassed for isolated sim runs so repeated
-        # "Run in Simulator" clicks always fire.
-        if matches and (bypass_schedule or not _v2_should_suppress(agent, matches, now, cfg)):
+        # No matches this tick — clear any static-agent latch so the agent
+        # re-arms for a future re-breach. This is the other half of the
+        # latching semantic defined in `_v2_should_suppress`.
+        if not matches:
+            _v2_unlatch(agent)
+
+        # Suppression gate: general sim runs and the live path BOTH go
+        # through it; only isolated single-agent sim runs bypass it so
+        # repeated "Run in Simulator" clicks always fire.
+        if matches and (bypass_suppression or not _v2_should_suppress(agent, matches, now, cfg)):
             triggered = True
             result = _v2_build_evalresult(matches, agent.name)
             _v2_record(agent, matches, now)
@@ -659,9 +701,11 @@ async def run_cycle(context: dict, broadcast_fn=None,
                 action_ctx["sim_mode"] = sim_mode
                 await execute(agent, agent.actions, action_ctx)
 
-        # Update state. For isolated sim runs we never mutate the agent row —
-        # the whole point is to dry-fire without leaking cooldown / trigger
-        # count into the real-market state machine.
+        # Update state. For any sim run (schedule-bypassed) we never mutate
+        # the agent row — the whole point of the simulator is to exercise the
+        # pipeline without leaking cooldown / trigger count into real-market
+        # state. The real path runs with bypass_schedule=False and does
+        # update the row.
         if not bypass_schedule:
             async with async_session() as session:
                 if triggered:
