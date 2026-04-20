@@ -143,12 +143,12 @@
     {#if simStatus?.active}
       <div class="sim-banner" role="status" aria-live="polite">
         <span class="sim-banner-dot"></span>
-        <span class="sim-banner-label">SIMULATOR ACTIVE</span>
+        <span class="sim-banner-label">SIMULATOR</span>
         <span class="sim-banner-sep">·</span>
-        <span>scenario: <b class="sim-banner-scenario">{simStatus.scenario || '—'}</b></span>
+        <span><b class="sim-banner-scenario">{simStatus.scenario || '—'}</b></span>
         {#if simStatus.seed_mode}
           <span class="sim-banner-sep">·</span>
-          <span>seed: <b>{simStatus.seed_mode}</b></span>
+          <span>seed {simStatus.seed_mode}</span>
         {/if}
         <span class="sim-banner-sep">·</span>
         <span>tick {simStatus.tick_index}/{simStatus.total_ticks}</span>
@@ -156,9 +156,6 @@
           <span class="sim-banner-sep">·</span>
           <span>agents=[{simStatus.only_agent_ids.join(',')}]</span>
         {/if}
-        <span class="sim-banner-spacer"></span>
-        <button type="button" onclick={() => goto('/admin/simulator')}
-                class="sim-banner-link">Open Simulator →</button>
       </div>
     {/if}
 
@@ -353,62 +350,50 @@
   .algo-mobile-active { color: #fbbf24; background: rgba(251,191,36,0.1); }
   .algo-mobile-site { color: rgba(150,170,200,0.5); font-size: 0.75rem; }
 
-  /* ── Simulator banner — pinned under the nav when sim is active ────────── */
+  /* ── Simulator banner — pinned under the nav when sim is active ──────────
+     Opaque background (solid over a tinted overlay) so page content
+     scrolling underneath never bleeds through. Compact padding so it
+     steals minimum vertical space. */
   .sim-banner {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.4rem 1rem;
-    background: linear-gradient(90deg,
-                rgba(251,113,133,0.18) 0%,
-                rgba(251,191,36,0.18) 100%);
+    gap: 0.45rem;
+    padding: 0.2rem 0.85rem;
+    background-color: #0a1020;   /* solid under the tint — prevents bleed */
+    background-image: linear-gradient(90deg,
+                      rgba(251,113,133,0.22) 0%,
+                      rgba(251,191,36,0.22) 100%);
     border-top: 1px solid rgba(251,113,133,0.45);
     border-bottom: 1px solid rgba(251,113,133,0.45);
     color: #fecaca;
     font-family: ui-monospace, monospace;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     position: sticky;
     top: 3rem;                  /* sits just under the algo navbar */
     z-index: 49;
     animation: sim-banner-pulse 2.2s ease-in-out infinite;
   }
   .sim-banner-dot {
-    width: 0.6rem;
-    height: 0.6rem;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     background: #fb7185;
-    box-shadow: 0 0 6px rgba(251,113,133,0.85);
+    box-shadow: 0 0 5px rgba(251,113,133,0.85);
     flex-shrink: 0;
   }
   .sim-banner-label {
     color: #fbbf24;
     letter-spacing: 0.1em;
-    font-size: 0.66rem;
+    font-size: 0.6rem;
     font-weight: 800;
   }
   .sim-banner-sep { color: rgba(251,191,36,0.5); }
   .sim-banner-scenario { color: #fde68a; }
-  .sim-banner-spacer { flex: 1; }
-  .sim-banner-link {
-    font-size: 0.62rem;
-    padding: 0.12rem 0.55rem;
-    border-radius: 3px;
-    background: rgba(251,191,36,0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(251,191,36,0.45);
-    cursor: pointer;
-    font-family: ui-monospace, monospace;
-    transition: background-color 0.1s, border-color 0.1s;
-  }
-  .sim-banner-link:hover {
-    background: rgba(251,191,36,0.3);
-    border-color: #fbbf24;
-  }
   @keyframes sim-banner-pulse {
     0%, 100% { box-shadow: inset 0 0 0 0 rgba(251,113,133,0);   }
-    50%      { box-shadow: inset 0 0 12px 0 rgba(251,113,133,0.35); }
+    50%      { box-shadow: inset 0 0 10px 0 rgba(251,113,133,0.30); }
   }
 
   /* ── Content ─────────────────────────────────────────────────────────────── */

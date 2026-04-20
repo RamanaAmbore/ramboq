@@ -232,7 +232,7 @@
 <!-- Controls -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_100px_90px_130px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
+  <div class="sim-controls-row">
     <div>
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
@@ -272,26 +272,19 @@
       </select>
     </div>
     <button type="button" onclick={doSeedLive}
-      class="text-[0.65rem] py-1 px-3 rounded border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold whitespace-nowrap">
-      Load live book
-    </button>
+      class="sim-btn sim-btn-load whitespace-nowrap">Load live book</button>
     <button type="button" onclick={doStart}
       disabled={status.active}
-      class="btn-primary text-[0.65rem] py-1 px-3 disabled:opacity-40">Start</button>
+      class="sim-btn sim-btn-primary disabled:opacity-40">Start</button>
     <button type="button" onclick={doStop}
       disabled={!status.active}
-      class="btn-secondary text-[0.65rem] py-1 px-3 disabled:opacity-40">Stop</button>
+      class="sim-btn sim-btn-secondary disabled:opacity-40">Stop</button>
     <button type="button" onclick={doStep}
-      class="text-[0.65rem] py-1 px-3 rounded border border-[#7dd3fc]/50 bg-[#7dd3fc]/15 text-[#7dd3fc] hover:bg-[#7dd3fc]/25 font-semibold">
-      Step
-    </button>
+      class="sim-btn sim-btn-step">Step</button>
     <button type="button" onclick={doRunCycle}
-      class="text-[0.65rem] py-1 px-3 rounded border border-[#fbbf24]/50 bg-[#fbbf24]/15 text-[#fbbf24] hover:bg-[#fbbf24]/25 font-semibold">
-      Run cycle
-    </button>
+      class="sim-btn sim-btn-cycle">Run cycle</button>
     <button type="button" onclick={doClear}
-      class="text-[0.65rem] py-1 px-3 rounded border border-red-500/50 bg-red-500/10 text-red-300 hover:bg-red-500/20 font-semibold">
-      Clear sim
+      class="sim-btn sim-btn-danger">Clear sim
     </button>
   </div>
   {#if pickedSlug}
@@ -399,6 +392,89 @@
     </div>
   {/if}
 </div>
+
+<style>
+  /* Controls row — single-line when wide, wraps when narrow. Field groups
+     and buttons share the same baseline so nothing jumps by 1px. */
+  .sim-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.35rem 0.45rem;
+    font-size: 0.62rem;
+  }
+  .sim-controls-row > div {
+    min-width: 0;
+  }
+  /* First (scenario) picker takes whatever slack remains on the row. */
+  .sim-controls-row > div:first-child {
+    flex: 1 1 220px;
+  }
+
+  /* Compact button — smaller vertical footprint, consistent height with
+     the inputs next to it. Colour-neutral base; per-variant class paints. */
+  :global(.sim-btn) {
+    font-size: 0.6rem;
+    line-height: 1;
+    padding: 0.28rem 0.6rem;
+    border-radius: 3px;
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    transition: background-color 0.08s, border-color 0.08s, color 0.08s;
+  }
+  :global(.sim-btn:disabled) { cursor: not-allowed; }
+
+  :global(.sim-btn-primary) {
+    background: #d97706; color: #0a1020; border-color: #d97706;
+  }
+  :global(.sim-btn-primary:hover:not(:disabled)) { background: #fbbf24; border-color: #fbbf24; }
+  :global(.sim-btn-secondary) {
+    background: transparent; color: #c8d8f0; border-color: rgba(255,255,255,0.2);
+  }
+  :global(.sim-btn-secondary:hover:not(:disabled)) {
+    background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.5); color: #fbbf24;
+  }
+  :global(.sim-btn-load) {
+    background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.5);
+  }
+  :global(.sim-btn-load:hover) {
+    background: rgba(16,185,129,0.25); border-color: #10b981;
+  }
+  :global(.sim-btn-step) {
+    background: rgba(125,211,252,0.15); color: #7dd3fc; border-color: rgba(125,211,252,0.5);
+  }
+  :global(.sim-btn-step:hover) {
+    background: rgba(125,211,252,0.25); border-color: #7dd3fc;
+  }
+  :global(.sim-btn-cycle) {
+    background: rgba(251,191,36,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.5);
+  }
+  :global(.sim-btn-cycle:hover) {
+    background: rgba(251,191,36,0.25); border-color: #fbbf24;
+  }
+  :global(.sim-btn-danger) {
+    background: rgba(239,68,68,0.1); color: #fca5a5; border-color: rgba(239,68,68,0.5);
+  }
+  :global(.sim-btn-danger:hover) {
+    background: rgba(239,68,68,0.2); border-color: #ef4444;
+  }
+
+  /* Tighten the inputs to match button height so the row doesn't wobble. */
+  :global(.sim-controls-row .field-input) {
+    font-size: 0.62rem;
+    padding: 0.25rem 0.4rem;
+    height: auto;
+    min-height: 1.55rem;
+  }
+  :global(.sim-controls-row .field-label) {
+    font-size: 0.5rem;
+    margin-bottom: 0.1rem;
+  }
+</style>
 
 <!-- Shared log panel — same widget as /agents, defaulted to the Simulator
      tab so the first thing an operator sees on this page is the live tick
