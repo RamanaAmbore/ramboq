@@ -1,0 +1,414 @@
+"""
+Condition-tree → scenario synthesiser for the Market Simulator.
+
+Core insight: an agent's condition tree already contains everything needed
+to build a scenario that will make it fire — metric + scope + operator +
+threshold. This module turns a stored Agent row into an in-memory scenario
+dict shaped identically to entries in `scenarios.yaml`, so the existing
+SimDriver.start() path runs it with no code changes.
+
+That removes the "add an agent → add a scenario" maintenance coupling:
+the scenario is always in sync with the condition because it's derived
+from the condition.
+
+Scope
+  - Leaf conditions (metric / scope / op / value) — fully supported.
+  - `all` / `any` / `not` composites — pick the "most-likely-to-fire"
+    leaf and aim for that. `all` needs every leaf to be true, so we
+    target the tightest threshold; `any` needs just one, so we target
+    the loosest. `not` inverts the intent and is rarely correct for a
+    "make this fire" scenario — we warn and fall back to the inner leaf.
+
+Output shape (identical to scenarios.yaml entries)
+  {
+    "slug":  "agent-<slug>-auto",
+    "name":  "Auto: <agent.name>",
+    "mode":  "symbol",
+    "holdings_every_n_ticks": 1,   # per-tick for determinism
+    "positions_every_n_ticks": 1,
+    "initial": { "holdings": [...], "positions": [...], "margins": [...] },
+    "ticks":   [ {"at": 0, "moves": [...]}, ... ],
+  }
+
+Deliberately minimal: we only seed the rows and symbols the agent's scope
+will match, not the whole book. Keeps the tick log readable and the sim
+state deterministic.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from backend.shared.helpers.ramboq_logger import get_logger
+
+logger = get_logger(__name__)
+
+
+# ═════════════════════════════════════════════════════════════════════════
+#  Tree navigation
+# ═════════════════════════════════════════════════════════════════════════
+
+def _is_leaf(node: Any) -> bool:
+    return isinstance(node, dict) and "metric" in node and "scope" in node
+
+
+def pick_target_leaf(cond: Any) -> Optional[dict]:
+    """
+    Walk the condition tree and pick the single leaf we'll aim to fire.
+
+      leaf                     → that leaf
+      all / any[leaf, leaf…]   → loosest threshold (smallest |value|) for `any`;
+                                 tightest (largest |value|) for `all`
+      not [inner]              → inner leaf (operator noted but not flipped —
+                                 a "make NOT X fire" scenario is not the same
+                                 as "make X fire"; we warn and target inner).
+
+    Returns None when the tree has no usable leaves.
+    """
+    if not isinstance(cond, dict):
+        return None
+    if _is_leaf(cond):
+        return cond
+    if "all" in cond:
+        leaves = [pick_target_leaf(c) for c in (cond.get("all") or [])]
+        leaves = [l for l in leaves if l]
+        if not leaves:
+            return None
+        # Tightest threshold — the one hardest to trip; if we trip it, the
+        # others (looser) come along for the ride.
+        return max(leaves, key=lambda l: abs(float(l.get("value") or 0)))
+    if "any" in cond:
+        leaves = [pick_target_leaf(c) for c in (cond.get("any") or [])]
+        leaves = [l for l in leaves if l]
+        if not leaves:
+            return None
+        # Loosest threshold — only one leaf needs to fire for ANY.
+        return min(leaves, key=lambda l: abs(float(l.get("value") or 0)))
+    if "not" in cond:
+        logger.warning(
+            "synthesize: 'not' composite encountered — targeting inner leaf "
+            "without inverting. Scenario may not actually trip the NOT."
+        )
+        return pick_target_leaf(cond.get("not"))
+    return None
+
+
+# ═════════════════════════════════════════════════════════════════════════
+#  Metric → move-sequence mapping
+# ═════════════════════════════════════════════════════════════════════════
+#
+# Given a chosen leaf, build (initial_rows, ticks) that will trip it.
+#
+# Metrics covered (all seeded loss/fund system metrics):
+#   pnl              — positions pnl in ₹               → target_pnl on positions
+#   pnl_pct          — positions pnl as % of margin     → target_pnl (computed)
+#   day_pct          — holdings day-change %            → pct on holdings
+#   day_rate_abs     — ΔP&L/min absolute                → scheduled pct over window
+#   day_rate_pct     — Δ%/min                           → scheduled pct over window
+#   pnl_rate_abs     — positions ΔP&L/min               → scheduled target_pnl
+#   pnl_rate_pct     — positions Δ%/min                 → scheduled target_pnl
+#   cash             — avail opening_balance            → set_margin
+#   avail_margin     — net                              → set_margin
+
+_SCRIPTED_ACCOUNTS = ["ZG####", "ZJ####"]
+
+
+def _rate_window_min(ctx: dict) -> float:
+    """Read alert_rate_window_min from backend_config — matches the evaluator."""
+    try:
+        from backend.shared.helpers.utils import config
+        return float(config.get("alert_rate_window_min", 10))
+    except Exception:
+        return 10.0
+
+
+def _scope_accounts(scope: str) -> list[str]:
+    """
+    Extract the target account masks from the scope token.
+      holdings.any_acct / holdings.total   → both scripted accounts
+      positions.ZG####  / exact             → that account only
+    """
+    parts = scope.split(".", 2)
+    if len(parts) < 2:
+        return _SCRIPTED_ACCOUNTS
+    sub = parts[1]
+    if sub in ("any_acct", "total"):
+        return _SCRIPTED_ACCOUNTS
+    return [sub]
+
+
+def _section_of(scope: str) -> str:
+    """Return 'holdings' | 'positions' | 'funds' based on the scope prefix."""
+    if scope.startswith("holdings"):
+        return "holdings"
+    if scope.startswith("positions"):
+        return "positions"
+    if scope.startswith("funds") or scope.startswith("margins"):
+        return "funds"
+    return "positions"   # fall back — positions is the most common
+
+
+def _default_holding_row(account: str) -> dict:
+    return {
+        "account": account, "tradingsymbol": "RELIANCE", "exchange": "NSE",
+        "opening_quantity": 100, "average_price": 5000.0,
+        "last_price": 5000.0, "close_price": 5000.0,
+    }
+
+
+def _default_position_row(account: str) -> dict:
+    # Default long option position — positive quantity so target_pnl negative
+    # moves work without mixed-sign refusal.
+    return {
+        "account": account, "tradingsymbol": "NIFTY25APRPE22000", "exchange": "NFO",
+        "quantity": 50, "average_price": 200.0,
+        "last_price": 200.0, "close_price": 200.0,
+    }
+
+
+def _default_margin_row(account: str) -> dict:
+    return {
+        "account": account,
+        "avail opening_balance": 100000,
+        "net": 75000,
+        "util debits": 25000,
+        "avail collateral": 10000,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  Per-metric synthesisers — each returns (initial_section_rows, ticks)
+# ─────────────────────────────────────────────────────────────────────────
+
+def _synth_pnl(leaf: dict) -> tuple[dict, list]:
+    """Drive positions.pnl to the threshold in 3 ticks via target_pnl."""
+    value    = float(leaf.get("value") or 0)
+    accounts = _scope_accounts(leaf.get("scope", ""))
+    target   = value * 1.2   # go 20 % past the threshold so it clearly trips
+
+    positions = [_default_position_row(a) for a in accounts]
+    margins   = [_default_margin_row(a)   for a in accounts]
+
+    ticks = []
+    for i, frac in enumerate([0.4, 0.7, 1.0]):
+        moves = []
+        for a in accounts:
+            per_acct = target * frac / len(accounts)
+            moves.append({"type": "target_pnl",
+                           "scope": f"positions.{a}.*", "value": per_acct})
+        ticks.append({"at": i, "moves": moves})
+    return {"positions": positions, "margins": margins, "holdings": []}, ticks
+
+
+def _synth_pnl_pct(leaf: dict) -> tuple[dict, list]:
+    """
+    pnl_pct ≤ value% of util_margin. We produce the same setup as _synth_pnl
+    but pick a pnl such that pnl / used_margin crosses the pct threshold.
+    """
+    pct      = float(leaf.get("value") or 0)
+    accounts = _scope_accounts(leaf.get("scope", ""))
+    util     = 25000.0   # matches _default_margin_row
+
+    positions = [_default_position_row(a) for a in accounts]
+    margins   = [_default_margin_row(a)   for a in accounts]
+
+    target_abs = util * (pct / 100.0) * 1.2   # 20 % past threshold
+    ticks = []
+    for i, frac in enumerate([0.4, 0.7, 1.0]):
+        moves = []
+        for a in accounts:
+            moves.append({"type": "target_pnl",
+                           "scope": f"positions.{a}.*",
+                           "value": target_abs * frac / len(accounts)})
+        ticks.append({"at": i, "moves": moves})
+    return {"positions": positions, "margins": margins, "holdings": []}, ticks
+
+
+def _synth_day_pct(leaf: dict) -> tuple[dict, list]:
+    """holdings day_change_percentage ≤ value (e.g. -3). pct move on holdings."""
+    pct_threshold = float(leaf.get("value") or 0)
+    accounts      = _scope_accounts(leaf.get("scope", ""))
+
+    holdings = [_default_holding_row(a) for a in accounts]
+    margins  = [_default_margin_row(a)  for a in accounts]
+
+    # Each tick moves holdings by ~half of the threshold; 3 ticks covers ×1.5
+    per_tick = (pct_threshold / 100.0) / 2.0
+    ticks = []
+    for i in range(3):
+        ticks.append({"at": i, "moves": [
+            {"type": "pct", "scope": "holdings.**", "value": per_tick},
+        ]})
+    return {"holdings": holdings, "positions": [], "margins": margins}, ticks
+
+
+def _synth_day_rate_abs(leaf: dict) -> tuple[dict, list]:
+    """
+    day_rate_abs ≤ N ₹/min. Drive day_change_val down smoothly at a rate
+    that crosses N/min over the alert_rate_window_min window.
+    """
+    rate_per_min = float(leaf.get("value") or 0)   # negative
+    accounts     = _scope_accounts(leaf.get("scope", ""))
+    window_min   = _rate_window_min({})
+    # Build a scenario with 1 tick per minute for 'window' minutes, each
+    # tick knocking holdings day_change_val down by ~|rate|.
+    # One pct on a ₹500k holding that moves ₹2k is 2000/500000 = 0.4 %.
+    # Simplification: deliver a flat per-tick pct that equates to the rate.
+    holdings = [_default_holding_row(a) for a in accounts]
+    margins  = [_default_margin_row(a)  for a in accounts]
+
+    # Each holding has cur_val 500k so a delta of |rate| ₹ = |rate|/500000.
+    cur_val_each = 500000.0 * len(accounts)
+    pct_per_tick = (rate_per_min * 1.2) / cur_val_each     # 20 % past
+    ticks = [{"at": i, "moves": [
+        {"type": "pct", "scope": "holdings.**", "value": pct_per_tick},
+    ]} for i in range(int(window_min) + 1)]
+    return {"holdings": holdings, "positions": [], "margins": margins}, ticks
+
+
+def _synth_day_rate_pct(leaf: dict) -> tuple[dict, list]:
+    """day_rate_pct ≤ N %/min. Same shape as day_rate_abs, pct is direct."""
+    rate_pct_per_min = float(leaf.get("value") or 0)   # negative
+    accounts         = _scope_accounts(leaf.get("scope", ""))
+    window_min       = _rate_window_min({})
+
+    holdings = [_default_holding_row(a) for a in accounts]
+    margins  = [_default_margin_row(a)  for a in accounts]
+    per_tick = (rate_pct_per_min / 100.0) * 1.2
+    ticks = [{"at": i, "moves": [
+        {"type": "pct", "scope": "holdings.**", "value": per_tick},
+    ]} for i in range(int(window_min) + 1)]
+    return {"holdings": holdings, "positions": [], "margins": margins}, ticks
+
+
+def _synth_pnl_rate_abs(leaf: dict) -> tuple[dict, list]:
+    """
+    pnl_rate_abs ≤ N ₹/min. Smooth positions pnl decay at N ₹/min for
+    rate_window_min minutes.
+    """
+    rate_per_min = float(leaf.get("value") or 0)   # negative
+    accounts     = _scope_accounts(leaf.get("scope", ""))
+    window_min   = int(_rate_window_min({}))
+
+    positions = [_default_position_row(a) for a in accounts]
+    margins   = [_default_margin_row(a)   for a in accounts]
+
+    ticks = []
+    for i in range(window_min + 1):
+        moves = []
+        for a in accounts:
+            # Cumulative target at tick i = rate × (i+1) × 1.2 (past threshold)
+            moves.append({"type": "target_pnl",
+                           "scope": f"positions.{a}.*",
+                           "value": rate_per_min * (i + 1) * 1.2 / len(accounts)})
+        ticks.append({"at": i, "moves": moves})
+    return {"positions": positions, "margins": margins, "holdings": []}, ticks
+
+
+def _synth_pnl_rate_pct(leaf: dict) -> tuple[dict, list]:
+    """pnl_rate_pct ≤ N %/min. Similar — pct of util_margin per minute."""
+    rate_pct   = float(leaf.get("value") or 0)
+    accounts   = _scope_accounts(leaf.get("scope", ""))
+    window_min = int(_rate_window_min({}))
+    util       = 25000.0
+
+    positions = [_default_position_row(a) for a in accounts]
+    margins   = [_default_margin_row(a)   for a in accounts]
+
+    # Δpnl/min as % of util → in ₹, rate = util × (pct/100).
+    rate_abs_per_min = util * (rate_pct / 100.0)
+    ticks = []
+    for i in range(window_min + 1):
+        moves = []
+        for a in accounts:
+            moves.append({"type": "target_pnl",
+                           "scope": f"positions.{a}.*",
+                           "value": rate_abs_per_min * (i + 1) * 1.2 / len(accounts)})
+        ticks.append({"at": i, "moves": moves})
+    return {"positions": positions, "margins": margins, "holdings": []}, ticks
+
+
+def _synth_cash_negative(leaf: dict) -> tuple[dict, list]:
+    """cash < 0. One-shot set_margin driving avail opening_balance below 0."""
+    accounts = _scope_accounts(leaf.get("scope", ""))
+    margins  = [_default_margin_row(a) for a in accounts]
+    ticks = [{"at": 0, "moves": [
+        {"type": "set_margin", "scope": f"margins.{a}",
+         "fields": {"avail opening_balance": -1500, "net": -2500}}
+        for a in accounts
+    ]}]
+    return {"holdings": [], "positions": [], "margins": margins}, ticks
+
+
+def _synth_margin_negative(leaf: dict) -> tuple[dict, list]:
+    """avail_margin < 0. set_margin on `net`."""
+    accounts = _scope_accounts(leaf.get("scope", ""))
+    margins  = [_default_margin_row(a) for a in accounts]
+    ticks = [{"at": 0, "moves": [
+        {"type": "set_margin", "scope": f"margins.{a}",
+         "fields": {"net": -2500}}
+        for a in accounts
+    ]}]
+    return {"holdings": [], "positions": [], "margins": margins}, ticks
+
+
+_METRIC_SYNTH = {
+    "pnl":            _synth_pnl,
+    "pnl_pct":        _synth_pnl_pct,
+    "day_pct":        _synth_day_pct,
+    "day_rate_abs":   _synth_day_rate_abs,
+    "day_rate_pct":   _synth_day_rate_pct,
+    "pnl_rate_abs":   _synth_pnl_rate_abs,
+    "pnl_rate_pct":   _synth_pnl_rate_pct,
+    "cash":           _synth_cash_negative,
+    "avail_margin":   _synth_margin_negative,
+}
+
+
+# ═════════════════════════════════════════════════════════════════════════
+#  Public entry point
+# ═════════════════════════════════════════════════════════════════════════
+
+class SynthesizeError(RuntimeError):
+    """Raised when an agent's condition isn't synthesizable (unknown metric,
+    empty tree, etc.). The route handler turns this into a 400."""
+
+
+def synthesize_for_agent(agent) -> dict:
+    """
+    Turn an Agent row into a scenario dict that will trip that agent.
+
+    Raises SynthesizeError when the condition tree is empty or uses a
+    metric we don't know how to synthesise for. The admin UI should catch
+    that and suggest either (a) running a generic stress scenario instead
+    or (b) writing a scripted scenario by hand.
+    """
+    leaf = pick_target_leaf(agent.conditions)
+    if leaf is None:
+        raise SynthesizeError(
+            f"Agent '{agent.slug}' has no leaf conditions to synthesise from."
+        )
+    metric = leaf.get("metric", "")
+    synth  = _METRIC_SYNTH.get(metric)
+    if synth is None:
+        raise SynthesizeError(
+            f"No synthesiser for metric '{metric}'. "
+            f"Known metrics: {sorted(_METRIC_SYNTH.keys())}. "
+            f"Pick a generic stress scenario on /admin/simulator instead."
+        )
+
+    initial, ticks = synth(leaf)
+    return {
+        "slug":  f"agent-{agent.slug}-auto",
+        "name":  f"Auto: {agent.name}",
+        "mode":  "symbol",
+        "description": (
+            f"Synthesised from agent #{agent.id} ({agent.slug}) — targets "
+            f"leaf {metric}@{leaf.get('scope')} {leaf.get('op')} "
+            f"{leaf.get('value')}."
+        ),
+        "holdings_every_n_ticks":  1,
+        "positions_every_n_ticks": 1,
+        "initial": initial,
+        "ticks":   ticks,
+    }

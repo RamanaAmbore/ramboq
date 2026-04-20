@@ -2,47 +2,34 @@
 #
 # Model B — per-symbol state + LTP-driven ticks.
 #
+# With the synthesizer (backend/api/algo/sim/synthesize.py), scenarios are
+# no longer hand-maintained per agent — the "Run in Simulator" button on
+# the /agents page builds a scenario from the agent's own condition tree
+# at click time. What lives here now is a small set of **agent-agnostic
+# book-wide stress tests**: generic crash, generic euphoria, random walk.
+# These work against any seeded book (scripted initial isn't required —
+# the synthesizer or seed=live provides state).
+#
 # Each scenario declares:
 #   slug        — stable id referenced by the UI + API
-#   mode        — 'symbol' (default, price-driver) | 'aggregate' (legacy)
-#   initial:    — per-symbol rows for holdings/positions (optional when
-#                 operator starts with seed_mode=live)
-#   ticks:      — list of {at, moves} entries; `at` is advisory (0-based
-#                 tick index), `moves` is a list of price-move primitives
+#   mode        — 'symbol' (default) | 'aggregate' (legacy)
+#   initial:    — optional per-symbol rows (not required when seed=live)
+#   ticks:      — list of {at, moves} entries; `moves` is a list of move
+#                 primitives (pct / abs / random_walk / target_pnl / set_margin)
 #
-# Move primitives (symbol mode):
-#   - {type: pct,         scope: "<glob>", value: -0.03}    # -3% to LTP
-#   - {type: abs,         scope: "<glob>", value: -25}      # ₹-25 per LTP
-#   - {type: random_walk, scope: "<glob>", drift: -0.001, vol: 0.01}
-#   - {type: target_pnl,  scope: "<glob>", value: -50000}   # solve ΔLTP → target
-#   - {type: set_margin,  scope: "margins.<acct>", fields: {...}}  # price-decoupled
-#
-# Glob syntax is `section.account.tradingsymbol`. `*` = any chars in one
-# segment, `**` = any remaining path. Examples:
-#   holdings.**                            # every holding, any account
-#   holdings.ZG*.*                         # any holding in ZG-prefixed accounts
-#   positions.*.NIFTY*                     # every NIFTY position, any account
-#   holdings.ZG####.RELIANCE               # exact match
-#
-# All derived fields (cur_val, pnl, day_change_val, TOTAL rows) are
-# recomputed by the driver each tick — authors only specify LTP moves.
-#
-# Account codes use the masked form (ZG####) because the live pipeline masks
-# before the agent engine sees the data. Seed-from-live paths apply the same
-# masking so scenarios that hardcode ZG####/ZJ#### also match real books.
+# Glob syntax is `section.account.tradingsymbol`. `*` matches one segment,
+# `**` matches any remaining path. `holdings.**`, `positions.*.NIFTY*`, etc.
 
 # ─────────────────────────────────────────────────────────────────────────
-# Generic crash — works against ANY seeded book. Meant for seed_mode=live
-# so you can drop your real positions into the sim and watch the loss
-# agents fire.
+# Generic crash — prices DOWN. Hurts long holdings and long positions.
 # ─────────────────────────────────────────────────────────────────────────
 - slug: generic-crash
   name: Generic crash (-6% holdings, -3% positions)
   mode: symbol
   description: >-
     Drops every holding 2% / 4% / 6% across three ticks, positions -1% / -2%
-    / -3%. Designed for seed_mode=live — stress-tests your actual book.
-    No scripted initial state — start the sim with seed='live'.
+    / -3%. Designed for seed_mode=live — stress-tests your actual long book.
+    Short positions benefit here; use generic-euphoria for short stress.
   ticks:
     - at: 0
       moves:
@@ -58,192 +45,31 @@
         - {type: pct, scope: "positions.**", value: -0.01}
 
 # ─────────────────────────────────────────────────────────────────────────
-# Fast morning crash on equity — scripted per-symbol initial so rules that
-# require specific account codes fire deterministically.
+# Generic euphoria — prices UP. Hurts SHORT positions (common in F&O
+# books that sell options or carry short futures). Holdings benefit here
+# since they can't be short.
 # ─────────────────────────────────────────────────────────────────────────
-- slug: crash-open
-  name: Fast morning crash (Equity)
+- slug: generic-euphoria
+  name: Generic euphoria (+3% positions over 3 ticks)
   mode: symbol
-  holdings_every_n_ticks: 1    # scripted scenario — drive holdings per-tick
   description: >-
-    Two accounts holding blue-chips. Tick 0 gaps down 2%; tick 1 another
-    3.5% on one account; tick 2 spreads the drawdown to the second. Hits
-    the per-account static % floor and then the total one.
-  initial:
-    holdings:
-      - {account: ZG####, tradingsymbol: RELIANCE, exchange: NSE,
-         opening_quantity: 100, average_price: 5000, last_price: 4900, close_price: 5000}
-      - {account: ZJ####, tradingsymbol: TCS, exchange: NSE,
-         opening_quantity: 50,  average_price: 6000, last_price: 5940, close_price: 6000}
-    positions:
-      - {account: ZG####, tradingsymbol: NIFTY25APRFUT, exchange: NFO,
-         quantity: 50, average_price: 22000, last_price: 21900, close_price: 22000}
-      - {account: ZJ####, tradingsymbol: BANKNIFTY25APRFUT, exchange: NFO,
-         quantity: 25, average_price: 48000, last_price: 48080, close_price: 48000}
-    margins:
-      - {account: ZG####, avail opening_balance: 120000, net: 95000, util debits: 40000, avail collateral: 20000}
-      - {account: ZJ####, avail opening_balance:  80000, net: 60000, util debits: 20000, avail collateral: 10000}
+    Rallies every position +1% / +2% / +3% across three ticks. For F&O
+    books with short options / short futures, an up-move is a loss —
+    this catches the stress cases the crash scenario misses.
   ticks:
     - at: 0
       moves:
-        - {type: pct, scope: "holdings.ZG####.*", value: -0.0153}   # -1.53% to hit -3.5% vs close
+        - {type: pct, scope: "positions.**", value: 0.01}
     - at: 1
       moves:
-        - {type: pct, scope: "holdings.ZG####.*", value: -0.0175}   # another -1.75% → -5.2% vs close
+        - {type: pct, scope: "positions.**", value: 0.01}
     - at: 2
       moves:
-        - {type: pct, scope: "holdings.ZG####.*", value: -0.0095}
-        - {type: pct, scope: "holdings.ZJ####.*", value: -0.0225}
+        - {type: pct, scope: "positions.**", value: 0.01}
 
 # ─────────────────────────────────────────────────────────────────────────
-# Cash goes negative — fires loss-funds-cash-negative. Price-decoupled.
-# ─────────────────────────────────────────────────────────────────────────
-- slug: cash-negative
-  name: Margin call / cash goes negative
-  mode: symbol
-  description: >-
-    Uses set_margin to drive avail opening_balance below zero in one tick.
-    No holdings / positions required — tests the fund-negative agent in
-    isolation.
-  initial:
-    holdings: []
-    positions: []
-    margins:
-      - {account: ZG####, avail opening_balance: 5000, net: 4000, util debits: 1000, avail collateral: 0}
-  ticks:
-    - at: 0
-      moves:
-        - {type: set_margin, scope: "margins.ZG####",
-           fields: {avail opening_balance: -1500, net: -2500}}
-
-# ─────────────────────────────────────────────────────────────────────────
-# Positions ₹ floor breach — uses target_pnl to land exactly on the
-# threshold so the rule fires deterministically.
-# ─────────────────────────────────────────────────────────────────────────
-- slug: positions-abs-breach
-  name: Positions ₹ loss crosses ₹30k (per-acct) + ₹50k (total)
-  mode: symbol
-  description: >-
-    Target_pnl walks LTPs until per-account pnl hits -₹35k, then total pnl
-    hits -₹70k. Trips both per-account and total abs-₹ rules.
-  initial:
-    holdings: []
-    positions:
-      - {account: ZG####, tradingsymbol: NIFTY25APRPE22000, exchange: NFO,
-         quantity: 50, average_price: 200, last_price: 180, close_price: 200}
-      - {account: ZJ####, tradingsymbol: BANKNIFTY25APRPE48000, exchange: NFO,
-         quantity: 25, average_price: 400, last_price: 380, close_price: 400}
-    margins:
-      - {account: ZG####, avail opening_balance: 100000, net: 75000, util debits: 25000, avail collateral: 10000}
-      - {account: ZJ####, avail opening_balance:  50000, net: 40000, util debits: 10000, avail collateral:  5000}
-  ticks:
-    - at: 0
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -35000}
-    - at: 1
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -55000}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -15000}
-
-# ─────────────────────────────────────────────────────────────────────────
-# Positions rate-of-change breach — drives positions pnl down smoothly so
-# loss-pos-acct-rate-abs (-₹3k/min/acct), loss-pos-total-rate-abs (-₹6k/min),
-# and loss-pos-any-rate-pct (-0.25 %/min) all fire. The static ₹ floors can
-# also fire later in the sequence once pnl drops past -₹30k/acct; that's
-# fine — both agent families co-exist.
-# ─────────────────────────────────────────────────────────────────────────
-- slug: pos-rate-breach
-  name: Positions rate-of-change breach
-  mode: symbol
-  description: >-
-    Two option positions lose steady money over eight ticks — each tick
-    walks per-account pnl further down by ~₹4k (well above the ₹3k/min
-    per-account floor) and total pnl by ~₹8k (above the ₹6k/min total).
-    Hits every positions rate rule; static ₹ rules also engage past tick 7.
-    Use Run-in-Simulator on a rate agent to skip the 15-min baseline gate.
-  initial:
-    holdings: []
-    positions:
-      - {account: ZG####, tradingsymbol: NIFTY25APRPE22000, exchange: NFO,
-         quantity: 50, average_price: 200, last_price: 200, close_price: 200}
-      - {account: ZJ####, tradingsymbol: BANKNIFTY25APRPE48000, exchange: NFO,
-         quantity: 25, average_price: 400, last_price: 400, close_price: 400}
-    margins:
-      - {account: ZG####, avail opening_balance: 100000, net: 75000, util debits: 25000, avail collateral: 10000}
-      - {account: ZJ####, avail opening_balance:  50000, net: 40000, util debits: 10000, avail collateral:  5000}
-  ticks:
-    - at: 0
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value:  -4000}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -2000}
-    - at: 1
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value:  -8500}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -4500}
-    - at: 2
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -13500}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value:  -7500}
-    - at: 3
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -19000}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -11000}
-    - at: 4
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -25000}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -15000}
-    - at: 5
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -31500}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -19500}
-    - at: 6
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -38500}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -24500}
-    - at: 7
-      moves:
-        - {type: target_pnl, scope: "positions.ZG####.*", value: -46000}
-        - {type: target_pnl, scope: "positions.ZJ####.*", value: -30000}
-
-# ─────────────────────────────────────────────────────────────────────────
-# Rate-of-change breach — smooth decay so the rate agent picks it up after
-# the baseline window (or immediately when bypass_schedule is on).
-# ─────────────────────────────────────────────────────────────────────────
-- slug: rate-breach
-  name: Holdings rate-of-change breach
-  mode: symbol
-  holdings_every_n_ticks: 1    # scripted scenario — drive holdings per-tick
-  description: >-
-    Holdings bleed 0.35% per tick — over ten ticks the rate-₹/min and
-    rate-%/min rules both fire. Use the Run-in-Simulator button to bypass
-    the 15-minute baseline gate for fast feedback.
-  initial:
-    holdings:
-      - {account: ZG####, tradingsymbol: HDFC, exchange: NSE,
-         opening_quantity: 100, average_price: 5000, last_price: 5000, close_price: 5000}
-    positions: []
-    margins:
-      - {account: ZG####, avail opening_balance: 100000, net: 75000, util debits: 25000, avail collateral: 10000}
-  ticks:
-    - at: 0
-      moves:
-        - {type: pct, scope: "holdings.**", value: -0.0035}
-    - at: 1
-      moves:
-        - {type: pct, scope: "holdings.**", value: -0.0035}
-    - at: 2
-      moves:
-        - {type: pct, scope: "holdings.**", value: -0.0035}
-    - at: 3
-      moves:
-        - {type: pct, scope: "holdings.**", value: -0.0035}
-    - at: 4
-      moves:
-        - {type: pct, scope: "holdings.**", value: -0.0035}
-
-# ─────────────────────────────────────────────────────────────────────────
-# Random walk — drift-down stress test on whatever positions exist.
-# Great with seed_mode=live to see how your real book reacts over 5 minutes.
+# Random walk — drift-with-vol stress on whatever positions exist. Good
+# for "no agent in particular; does anything fire unexpectedly?"
 # ─────────────────────────────────────────────────────────────────────────
 - slug: random-walk
   name: Random walk (drift down)

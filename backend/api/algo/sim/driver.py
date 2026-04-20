@@ -292,13 +292,24 @@ class SimDriver:
               *, seed_mode: str = "scripted",
               only_agent_ids: list[int] | None = None,
               holdings_every_n_ticks: int | None = None,
-              positions_every_n_ticks: int | None = None) -> dict:
+              positions_every_n_ticks: int | None = None,
+              inline_scenario: dict | None = None) -> dict:
+        """
+        Start the sim against a named scenario from scenarios.yaml, or an
+        `inline_scenario` dict (same shape) built at call time by the
+        synthesiser. Inline scenarios do not live in the YAML catalog —
+        useful for per-agent auto-generated tests.
+        """
         assert_enabled()
         if self.active:
             raise SimGuardError("Sim is already running — stop it first.")
-        scen = get_scenario(scenario_slug)
-        if not scen:
-            raise SimGuardError(f"Unknown scenario '{scenario_slug}'")
+        if inline_scenario is not None:
+            scen = inline_scenario
+            scenario_slug = scen.get("slug") or scenario_slug
+        else:
+            scen = get_scenario(scenario_slug)
+            if not scen:
+                raise SimGuardError(f"Unknown scenario '{scenario_slug}'")
 
         self.scenario_slug  = scenario_slug
         self.scenario       = scen

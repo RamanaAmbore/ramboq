@@ -5,6 +5,7 @@
   import {
     fetchAgents, activateAgent, deactivateAgent, updateAgent,
     fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
+    startSimForAgent,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -256,11 +257,20 @@
   }
 
   async function runInSim(/** @type {any} */ agent) {
-    // Navigate to the Simulator page pre-armed with this agent's ID. Pick a
-    // generic scenario there, hit Start — the sim will dry-fire this agent
-    // against fabricated data without touching its real cooldown / trigger
-    // state.
-    goto(`/admin/simulator?agent_id=${agent.id}`);
+    // Call the synthesizer endpoint — the backend builds a scenario from
+    // THIS agent's condition tree at call time (no scenarios.yaml entry
+    // needed), then starts the sim scoped to just this agent, with
+    // suppression and schedule gates bypassed so every tick that matches
+    // fires. Flip the log panel to the Simulator tab so the operator sees
+    // the tick stream immediately.
+    error = '';
+    try {
+      await startSimForAgent(agent.id);
+      logTab = 'simulator';
+      loadSimLog();
+    } catch (e) {
+      error = `Run-in-Simulator failed: ${e.message}`;
+    }
   }
 
   onMount(() => {

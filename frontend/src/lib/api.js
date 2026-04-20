@@ -165,6 +165,11 @@ export const stepSim              = () => _post('/simulator/step', {}, { auth: t
 export const runSimCycle          = () => _post('/simulator/run-cycle', {}, { auth: true });
 export const clearSimArtefacts    = () => _post('/simulator/clear', {}, { auth: true });
 export const seedSimLive          = () => _post('/simulator/seed-live', {}, { auth: true });
+// Synthesize-and-start — scenario generated live from the agent's condition
+// tree. Preferred over manually picking a scenario when the goal is "test
+// this specific agent."
+export const startSimForAgent     = (agentId, rate_ms = 2000) =>
+  _post(`/simulator/start-for-agent/${agentId}?rate_ms=${rate_ms}`, {}, { auth: true });
 export const fetchSimEvents       = (n = 50) => _get(`/simulator/events/recent?limit=${n}`, { auth: true });
 export const fetchSimOrders       = (n = 50) => _get(`/simulator/orders/recent?limit=${n}`, { auth: true });
 export const fetchSimTicks        = (n = 100) => _get(`/simulator/ticks/recent?limit=${n}`, { auth: true });

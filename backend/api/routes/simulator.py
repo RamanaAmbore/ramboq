@@ -39,9 +39,10 @@ from backend.api.algo.sim.driver import (
     get_driver,
     load_scenarios,
 )
+from backend.api.algo.sim.synthesize import synthesize_for_agent, SynthesizeError
 from backend.api.auth_guard import admin_guard
 from backend.api.database import async_session
-from backend.api.models import AgentEvent, AlgoOrder
+from backend.api.models import Agent, AgentEvent, AlgoOrder
 from backend.shared.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
@@ -124,6 +125,34 @@ class SimulatorController(Controller):
     @get("/status")
     async def status(self) -> dict:
         return get_driver().snapshot()
+
+    @post("/start-for-agent/{agent_id:int}")
+    async def start_for_agent(self, agent_id: int, rate_ms: int = 2000) -> dict:
+        """
+        Start the sim against a scenario **synthesised from one agent's
+        condition tree**. The scenario is built at call-time (nothing lives
+        in scenarios.yaml for it) — zero maintenance when the agent catalog
+        changes. Bypasses suppression + schedule gates so the operator
+        gets immediate feedback.
+        """
+        from sqlalchemy import select
+        async with async_session() as s:
+            row = (await s.execute(select(Agent).where(Agent.id == agent_id))).scalar_one_or_none()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Agent id={agent_id} not found")
+        try:
+            scen = synthesize_for_agent(row)
+        except SynthesizeError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        try:
+            return get_driver().start(
+                scen["slug"], rate_ms,
+                seed_mode="scripted",
+                only_agent_ids=[agent_id],
+                inline_scenario=scen,
+            )
+        except SimGuardError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     @post("/start")
     async def start(self, data: SimStartRequest) -> dict:
