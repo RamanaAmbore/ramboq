@@ -219,34 +219,30 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Tab row — compact enough that all 6 tabs fit on a 320px mobile
-     viewport without wrapping. No gap; 0.5rem font; tight horizontal
-     padding. Vertical padding stays reasonable so tap targets are
-     still comfortable. */
+  /* Tab row — further -20% pass. Tabs now ~0.4rem and paddings trimmed
+     accordingly. All 6 tabs + the log label fit comfortably within a
+     320px viewport with slack to spare. */
   .log-tab-row { gap: 0; }
   :global(.log-tab-btn) {
-    font-size: 0.5rem;
+    font-size: 0.4rem;
     font-weight: 600;
-    padding: 0.15rem 0.35rem;
+    padding: 0.12rem 0.28rem;
     white-space: nowrap;
     letter-spacing: 0.02em;
     font-family: ui-monospace, monospace;
   }
 
-  /* "log" label — halved again: 0.45 → 0.225rem. Paired with tiny
-     letter-spacing and a 1px divider so it occupies a few pixels
-     without swelling the row. */
   .log-section-wrap {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 0.15rem 0 0;
-    margin-right: 0.15rem;
+    padding: 0 0.12rem 0 0;
+    margin-right: 0.12rem;
     border-right: 1px solid rgba(251,191,36,0.35);
     align-self: stretch;
     font-family: ui-monospace, monospace;
-    font-size: 0.35rem;
+    font-size: 0.28rem;
     font-weight: 700;
     line-height: 1;
     color: rgba(251,191,36,0.85);
