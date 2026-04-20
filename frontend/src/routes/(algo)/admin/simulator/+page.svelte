@@ -250,11 +250,11 @@
 
 <!-- Controls card — no header label (the fields + buttons speak for themselves) -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
-  <!-- Fields row — Scenario picker takes remaining width (so the dropdown
-       can show long scenario names); other fields have fixed widths so
-       nothing wobbles. Wraps cleanly on narrow / mobile widths. -->
-  <div class="sim-fields-row">
-    <div class="sim-field sim-field-scenario">
+  <!-- Row 1 — Scenario picker on its own row (full width). Scenario
+       names are long ("Extreme euphoria (+3% / +6% / +10% positions)")
+       so giving them the whole row avoids truncation. -->
+  <div class="sim-scenario-row">
+    <div class="sim-field sim-field-scenario-full">
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
         {#each scenarios as s}
@@ -262,7 +262,13 @@
         {/each}
       </select>
     </div>
-    <div class="sim-field sim-field-short">
+  </div>
+
+  <!-- Row 2 — Seed / Rate / Pos / Market — four compact fields in
+       the same row. Smaller font + tighter padding so all four fit
+       without wrapping on a normal desktop. -->
+  <div class="sim-fields-row sim-fields-compact">
+    <div class="sim-field">
       <label for="sim-seed" class="field-label">Seed</label>
       <select id="sim-seed" bind:value={seedMode} class="field-input">
         <option value="scripted">Scripted</option>
@@ -270,16 +276,16 @@
         <option value="live+scenario">Live + scenario</option>
       </select>
     </div>
-    <div class="sim-field sim-field-tiny">
+    <div class="sim-field">
       <label for="sim-rate" class="field-label">Rate (ms)</label>
       <input id="sim-rate" type="number" min="200" step="100" bind:value={rateMs} class="field-input" />
     </div>
-    <div class="sim-field sim-field-tiny">
+    <div class="sim-field">
       <label for="sim-pos-n" class="field-label" title="Positions refresh every N ticks (1 = every tick)">Pos / N</label>
       <input id="sim-pos-n" type="number" min="1" step="1" placeholder="1"
              bind:value={positionsEveryN} class="field-input" />
     </div>
-    <div class="sim-field sim-field-short">
+    <div class="sim-field">
       <label for="sim-market" class="field-label" title="Simulated market clock — overrides the scenario's YAML value">Market</label>
       <select id="sim-market" bind:value={marketStatePreset} class="field-input">
         <option value="">(scenario)</option>
@@ -343,21 +349,36 @@
      operator to scan two places. Removed. -->
 
 <style>
-  /* Controls = two stacked rows. Fields first (wrap freely, Scenario
-     expands to fill slack), then Buttons (uniform width, evenly spaced).
-     Same layout on mobile; only difference is wrapping order. */
+  /* Controls layout: Scenario on its own row (long names get full width),
+     then Seed/Rate/Pos/Market on one compact row (smaller + tighter).
+     Buttons follow below. */
+  .sim-scenario-row {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 0.4rem;
+    font-size: 0.62rem;
+  }
   .sim-fields-row {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.35rem 0.45rem;
-    font-size: 0.62rem;
+    gap: 0.35rem 0.4rem;
+    font-size: 0.6rem;
     margin-bottom: 0.5rem;
   }
-  .sim-field { min-width: 0; }
-  .sim-field-scenario { flex: 1 1 240px; }     /* takes slack on wide screens */
-  .sim-field-short    { flex: 0 1 140px; }
-  .sim-field-tiny     { flex: 0 1 100px; }
+  .sim-field { min-width: 0; flex: 1 1 100px; }
+  .sim-field-scenario-full { flex: 1 1 100%; }
+
+  /* Compact row = tighter field-input paddings so all 4 fit on one line
+     at normal desktop widths. */
+  :global(.sim-fields-compact .field-input) {
+    font-size: 0.6rem !important;
+    padding: 0.2rem 0.35rem !important;
+    min-height: 1.4rem !important;
+  }
+  :global(.sim-fields-compact .field-label) {
+    font-size: 0.48rem !important;
+  }
 
   .sim-buttons-row {
     display: flex;

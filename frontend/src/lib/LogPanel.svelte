@@ -189,13 +189,11 @@
 </script>
 
 <div class="flex items-stretch gap-0.5 mb-2">
-  <!-- Vertical "log" label sitting just before the Order tab. Two-layer
-       structure — outer .log-section-wrap is the flex item that sizes +
-       borders the cell, inner .log-section-text is what rotates.
-       Splitting it this way sidesteps the flex-child + writing-mode
-       layout collapse we hit with a single span. -->
+  <!-- "log" section label — three characters stacked vertically in a
+       flex column. No CSS rotation / writing-mode (both failed silently
+       in earlier attempts). Reads top-to-bottom: L · O · G. -->
   <span class="log-section-wrap" aria-hidden="true">
-    <span class="log-section-text">log</span>
+    <span>l</span><span>o</span><span>g</span>
   </span>
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
@@ -221,27 +219,23 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Vertical "log" label before the first tab. Outer wrap is the flex
-     item that handles spacing + border; inner text handles the rotation.
-     Flex + writing-mode on the same element was the bug — the element
-     collapsed to zero width and the text rendered invisibly. */
+  /* "log" label — three letters stacked vertically. No CSS rotation /
+     writing-mode (both failed to render in earlier attempts); just a
+     flex-column container with one <span> per letter. Bullet-proof. */
   .log-section-wrap {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-width: 1.2rem;
-    padding: 0.2rem 0.15rem;
+    padding: 0.1rem 0.3rem;
     margin-right: 0.25rem;
     border-right: 1px solid rgba(251,191,36,0.3);
     align-self: stretch;
-  }
-  .log-section-text {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
     font-family: ui-monospace, monospace;
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     font-weight: 700;
-    letter-spacing: 0.2em;
+    letter-spacing: 0;
+    line-height: 1.15;
     color: #fbbf24;
     user-select: none;
   }

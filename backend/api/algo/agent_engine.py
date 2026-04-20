@@ -420,6 +420,29 @@ _LOSS_AGENTS = [
          conditions={"metric": "avail_margin", "scope": "funds.any_acct", "op": "<", "value": 0},
          scope="total",
          ),
+
+    # ── Auto-close on severe loss (destructive — ships INACTIVE) ────────
+    # This agent is the concrete example of a close-positions action that
+    # operators can study, copy, or activate directly. It ships inactive
+    # because auto-closing is a broker-touching action and should be an
+    # explicit opt-in, not a default. Run it in the simulator first, then
+    # flip it ON from the /agents page when you're confident.
+    dict(slug="loss-pos-total-auto-close",
+         name="Auto-close positions on total ≥ ₹50k loss",
+         description=(
+             "When total positions pnl ≤ -₹50k, calls chase_close_positions "
+             "(adaptive limit-order chase engine) to flatten every open "
+             "position. Ships INACTIVE — destructive; enable from /agents "
+             "after you've run the simulator against it."
+         ),
+         conditions={"metric": "pnl", "scope": "positions.total", "op": "<=", "value": -50000},
+         scope="total",
+         actions=[
+             {"type": "chase_close_positions",
+              "params": {"scope": "total", "timeout_minutes": 10, "adjust_pct": 0.1}},
+         ],
+         status="inactive",
+         ),
 ]
 
 

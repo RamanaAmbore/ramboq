@@ -417,6 +417,40 @@
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
   .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
 
+  /* Visible scrollbars on algo pages. Default browser scrollbars on
+     dark themes are so low-contrast they're easy to miss when content
+     overflows; colouring the thumb in the site's amber makes "there is
+     more below" obvious at a glance. Firefox uses `scrollbar-color`;
+     WebKit/Blink use the pseudo-elements. Idle state is faint, hover is
+     bright so moving the mouse near the bar lights it up. */
+  :global(.algo-viewport),
+  :global(.algo-viewport *),
+  :global(.algo-content *) {
+    scrollbar-color: rgba(251,191,36,0.45) rgba(148,163,184,0.08);
+    scrollbar-width: thin;
+  }
+  :global(.algo-viewport ::-webkit-scrollbar),
+  :global(.algo-content ::-webkit-scrollbar) {
+    width: 10px;
+    height: 10px;
+  }
+  :global(.algo-viewport ::-webkit-scrollbar-track),
+  :global(.algo-content ::-webkit-scrollbar-track) {
+    background: rgba(148,163,184,0.06);
+  }
+  :global(.algo-viewport ::-webkit-scrollbar-thumb),
+  :global(.algo-content ::-webkit-scrollbar-thumb) {
+    background: rgba(251,191,36,0.45);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  :global(.algo-viewport ::-webkit-scrollbar-thumb:hover),
+  :global(.algo-content ::-webkit-scrollbar-thumb:hover) {
+    background: #fbbf24;
+    background-clip: padding-box;
+  }
+
   /* Page-top header row — H1 on the left, timestamp right-aligned on
      the same line to conserve vertical space. Wraps to its own line on
      narrow widths. Used by every admin page via `.page-header`. */
