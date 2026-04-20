@@ -50,14 +50,14 @@ async def execute(agent, actions: list, context: dict):
                 logger.warning(f"Agent [{agent.slug}]: unknown action type '{action_type}'")
                 continue
 
-            tag = "[SIMULATOR] " if sim_mode else ""
+            tag = "[SIM] " if sim_mode else ""
             logger.info(f"{tag}Agent [{agent.slug}]: action '{action_type}' completed")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_success", f"{tag}Action: {action_type}",
                             params, sim_mode=sim_mode)
 
         except Exception as e:
-            tag = "[SIMULATOR] " if sim_mode else ""
+            tag = "[SIM] " if sim_mode else ""
             logger.error(f"{tag}Agent [{agent.slug}]: action '{action_type}' failed: {e}")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_failed",
@@ -105,8 +105,8 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
     from backend.api.database import async_session
     from backend.api.models import AlgoOrder
 
-    detail = f"[SIMULATOR] agent={agent.slug} action={action_type} params={params}"
-    logger.warning(f"[SIMULATOR] paper-trade: {detail}")
+    detail = f"[SIM] agent={agent.slug} action={action_type} params={params}"
+    logger.warning(f"[SIM] paper-trade: {detail}")
 
     if action_type not in {"place_order", "close_position", "chase_close", "chase_close_positions"}:
         # Non-order actions (emit_log, set_flag, monitor_order, deactivate_agent,
@@ -157,7 +157,7 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
             s.add(row)
             await s.commit()
     except Exception as e:
-        logger.error(f"[SIMULATOR] paper-trade write failed: {e}")
+        logger.error(f"[SIM] paper-trade write failed: {e}")
 
 
 async def _action_chase_close(context: dict, params: dict):

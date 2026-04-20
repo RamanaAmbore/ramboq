@@ -93,7 +93,10 @@ async def dispatch(agent, eval_result, broadcast_fn=None, sim_mode: bool = False
                     "sim_mode": sim_mode,
                 })
             elif channel == "log":
-                logger.warning(f"{sim_tag}ALERT [{agent.slug}]{branch_tag}: {agent.name} — {condition_text}")
+                # Log lines use [SIM] for brevity; user-facing Telegram /
+                # email keep the longer "SIMULATOR " prefix above.
+                log_sim_tag = "[SIM] " if sim_mode else ""
+                logger.warning(f"{log_sim_tag}ALERT [{agent.slug}]{branch_tag}: {agent.name} — {condition_text}")
         except Exception as e:
             logger.error(f"Agent event dispatch failed ({channel}): {e}")
 

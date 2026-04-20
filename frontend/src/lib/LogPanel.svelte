@@ -97,7 +97,7 @@
       return `<span class="log-chip"><span class="log-chip-key">${field}:</span>${arrow}${delta}</span>`;
     }).join(' ');
     const head = `tick ${entry.tick_index} · ${scen}`;
-    return `<span class="${cls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIMULATOR</span> ${head} ${diffs || '(no changes)'}</span>`;
+    return `<span class="${cls}"><span class="log-ts">[${ts}]</span> <span class="px-1 rounded bg-[#fb7185]/15 text-[#fb7185] border border-[#fb7185]/30">SIM</span> ${head} ${diffs || '(no changes)'}</span>`;
   }
 
   const ORDER_TYPES = new Set(['order_placed','order_cancelled','order_rejected','order_filled']);

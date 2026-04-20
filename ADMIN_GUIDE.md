@@ -329,7 +329,7 @@ Because `sim_mode=True` flows through the pipeline, every artefact is marked:
 | Email body | Red banner at the top |
 | agent_events row | `sim_mode = true` |
 | algo_orders row | `mode = 'sim'` |
-| Log line | `[SIMULATOR] …` |
+| Log line | `[SIM] …` (short prefix to conserve log width) |
 
 So real alerts and simulated alerts are never in the same bucket.
 

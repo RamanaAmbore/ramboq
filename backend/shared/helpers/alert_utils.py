@@ -150,7 +150,7 @@ def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: 
     """
     import logging
     _log = logging.getLogger('backend.api.background')
-    sim_prefix = '[SIMULATOR] ' if sim_mode else ''
+    sim_prefix = '[SIM] ' if sim_mode else ''
     _log.info(f"_dispatch called: {sim_prefix}{msg_type} — {subject_detail}")
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
     tg_prefix_full    = f"SIMULATOR {tg_prefix}"    if sim_mode else tg_prefix

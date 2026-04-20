@@ -79,6 +79,7 @@ class AgentEventInfo(msgspec.Struct):
     trigger_condition: str | None
     detail: str | None
     timestamp: str
+    sim_mode: bool
 
 
 class InterpretRequest(msgspec.Struct):
@@ -245,22 +246,39 @@ class AgentController(Controller):
                 id=e.id, agent_id=e.agent_id, event_type=e.event_type,
                 trigger_condition=e.trigger_condition, detail=e.detail,
                 timestamp=e.timestamp.isoformat() if e.timestamp else "",
+                sim_mode=bool(e.sim_mode),
             )
             for e in events
         ]
 
     @get("/events/recent")
-    async def get_recent_events(self, n: int = 100) -> list[AgentEventInfo]:
+    async def get_recent_events(self, n: int = 100, mode: str = "live") -> list[AgentEventInfo]:
+        """
+        Recent agent events across every agent.
+
+        `mode` filters by sim_mode:
+          - "live" (default) → only real fires. This is what the /agents
+            page wants so simulated fires from a finished sim don't
+            linger in the agent log after Stop.
+          - "sim"   → only sim_mode=True fires (same data /api/simulator/events
+            returns, exposed here for convenience).
+          - "all"   → both.
+        """
         async with async_session() as session:
-            result = await session.execute(
-                select(AgentEvent).order_by(AgentEvent.id.desc()).limit(n)
-            )
+            query = select(AgentEvent).order_by(AgentEvent.id.desc()).limit(n)
+            if mode == "live":
+                query = query.where(AgentEvent.sim_mode.is_(False))
+            elif mode == "sim":
+                query = query.where(AgentEvent.sim_mode.is_(True))
+            # "all" → no filter
+            result = await session.execute(query)
             events = result.scalars().all()
         return [
             AgentEventInfo(
                 id=e.id, agent_id=e.agent_id, event_type=e.event_type,
                 trigger_condition=e.trigger_condition, detail=e.detail,
                 timestamp=e.timestamp.isoformat() if e.timestamp else "",
+                sim_mode=bool(e.sim_mode),
             )
             for e in events
         ]

@@ -441,8 +441,9 @@ The simulator feeds fabricated per-symbol **positions** + margins into
 the **same** agent engine the real pipeline uses, so alerts, actions, and
 event-logging are all exercised end-to-end without touching the broker.
 **No code branches in the hot path** — the engine only sees a `sim_mode`
-flag on the context dict and tags downstream artefacts with `[SIMULATOR]`
-prefixes.
+flag on the context dict and tags downstream artefacts: `[SIM]` for log
+lines and detail strings, `SIMULATOR` for user-facing Telegram / email
+surfaces.
 
 **Positions-only by design.** Holdings aren't simulated — intraday risk
 lives in F&O positions + fund-negatives, and that's the scope. Agents
@@ -554,7 +555,7 @@ The simulator owns its own `_sim_alert_state` dict, so rate history and suppress
 | Email body | Red banner `🚨 SIMULATOR RUN — fabricated market data, not a real alert` |
 | `agent_events.sim_mode` | `TRUE` |
 | `algo_orders.mode` | `'sim'` (and `engine='sim'`) |
-| Log prefix | `[SIMULATOR]` |
+| Log prefix | `[SIM]` (short form — Telegram/email surfaces keep the longer `SIMULATOR` form) |
 | WebSocket `agent_alert` payload | `sim_mode: true` |
 
 ### Simulator API — `/api/simulator/*`

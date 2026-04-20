@@ -14,7 +14,7 @@ Design goals
      live path. `sum_holdings` is always an empty frame.
   2. **No code branches in the hot path.** The agent engine, dispatcher and
      action handlers are unaware that data came from here — they read
-     `sim_mode` off `alert_state` and prepend `[SIMULATOR]` where needed.
+     `sim_mode` off `alert_state` and prepend `[SIM]` where needed.
   3. **Branch-gated.** `assert_enabled()` requires `cap_in_<branch>.simulator
      = True`. Default shipped values: dev on, prod off. Auto-stops after 30
      minutes so a forgotten sim can't bleed forever.
@@ -102,7 +102,7 @@ def _resolve_market_state(spec: dict | None) -> dict:
     if preset:
         if preset not in MARKET_STATE_PRESETS:
             logger.warning(
-                f"[SIMULATOR] Unknown market_state preset '{preset}' — "
+                f"[SIM] Unknown market_state preset '{preset}' — "
                 f"using mid_session. Valid: {list(MARKET_STATE_PRESETS)}"
             )
             preset = "mid_session"
@@ -420,18 +420,39 @@ class SimDriver:
         for r in self._positions_rows:
             _recompute_position_row(r)
 
-        # Fail loudly when the seeded state is empty. Without any rows the
-        # scope globs in the scenario will match nothing, the tick log fills
-        # with "(no changes)" entries, and operators spend minutes wondering
-        # why nothing is moving.
+        # When scripted seeding leaves the state empty (a scenario without
+        # an `initial:` block — all 5 shipped ones + every synthesized
+        # scenario), auto-upgrade to live+scenario and snapshot the real
+        # book. Saves the operator from having to flip seed_mode manually
+        # every time they press Start. Only reachable in `scripted` mode;
+        # live / live+scenario paths already seeded earlier.
+        if seed_mode == "scripted" and not (self._positions_rows or self._margins_rows):
+            logger.info(
+                f"[SIM] '{scenario_slug}' has no scripted initial — "
+                f"auto-loading live book."
+            )
+            try:
+                if not self._live_snapshot:
+                    self.seed_live()
+                self._positions_rows = copy.deepcopy(self._live_snapshot["positions"])
+                self._margins_rows   = copy.deepcopy(self._live_snapshot["margins"])
+                for r in self._positions_rows:
+                    _recompute_position_row(r)
+                self.seed_mode = "live"   # reflect what actually happened
+            except Exception as e:
+                self.scenario = None
+                self.active   = False
+                raise SimGuardError(
+                    f"Scenario '{scenario_slug}' has no scripted initial state "
+                    f"and auto-load of live book failed: {e}"
+                )
+
         if not (self._positions_rows or self._margins_rows):
             self.scenario = None
             self.active   = False
             raise SimGuardError(
-                f"Scenario '{scenario_slug}' has no scripted initial state. "
-                f"Press 'Load live book' and pick seed = Live or Live + scenario, "
-                f"or choose a scenario with scripted initial data "
-                f"(crash-open / cash-negative / positions-abs-breach / rate-breach)."
+                f"Scenario '{scenario_slug}' has no initial state and the live "
+                f"book returned no positions or margins. Nothing to simulate."
             )
 
         rng_seed = scen.get("seed")
@@ -446,7 +467,7 @@ class SimDriver:
         )
         self.active = True
         logger.warning(
-            f"[SIMULATOR] Started scenario={scenario_slug} seed={seed_mode} "
+            f"[SIM] Started scenario={scenario_slug} seed={seed_mode} "
             f"rate={self.rate_ms}ms agents={self.only_agent_ids or 'all'}"
         )
         self._task = asyncio.create_task(self._run_loop(), name="sim-driver")
@@ -463,7 +484,7 @@ class SimDriver:
             kind="stopped", moves=[], changes=[],
             note=f"Stopped after {self.tick_index} ticks",
         )
-        logger.warning(f"[SIMULATOR] Stopped after {self.tick_index} ticks")
+        logger.warning(f"[SIM] Stopped after {self.tick_index} ticks")
         return self.snapshot()
 
     def step(self) -> dict:
@@ -480,7 +501,7 @@ class SimDriver:
             auto_stop = _auto_stop_after()
             while self.active:
                 if datetime.now() - self.started_at > auto_stop:
-                    logger.warning(f"[SIMULATOR] Auto-stop after {auto_stop}")
+                    logger.warning(f"[SIM] Auto-stop after {auto_stop}")
                     self.stop()
                     return
                 self._apply_next_tick()
@@ -489,7 +510,7 @@ class SimDriver:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"[SIMULATOR] Loop crashed: {e}")
+            logger.error(f"[SIM] Loop crashed: {e}")
             self.active = False
 
     # Long-lived alert_state for the simulator — kept separate from the real
@@ -533,7 +554,7 @@ class SimDriver:
                 bypass_suppression=isolated,
             )
         except Exception as e:
-            logger.error(f"[SIMULATOR] run_cycle failed: {e}")
+            logger.error(f"[SIM] run_cycle failed: {e}")
 
     # ── Tick + move application ──────────────────────────────────────
 
@@ -583,13 +604,13 @@ class SimDriver:
                 changes.extend(self._apply_set_margin(scope, move))
                 continue
             if scope.startswith("holdings."):
-                logger.debug(f"[SIMULATOR] ignoring holdings scope '{scope}' (positions-only sim)")
+                logger.debug(f"[SIM] ignoring holdings scope '{scope}' (positions-only sim)")
                 continue
             if scope.startswith("positions.") and not positions_tick:
                 continue
             matched = self._scope_matches(scope)
             if not matched:
-                logger.info(f"[SIMULATOR] move {mtype} scope='{scope}' matched nothing")
+                logger.info(f"[SIM] move {mtype} scope='{scope}' matched nothing")
                 continue
             if mtype == "pct":
                 changes.extend(self._apply_pct(matched, float(move.get("value") or 0)))
@@ -603,7 +624,7 @@ class SimDriver:
                 target = float(move.get("value") or 0)
                 changes.extend(self._apply_target_pnl(matched, target))
             else:
-                logger.warning(f"[SIMULATOR] unknown move type '{mtype}'")
+                logger.warning(f"[SIM] unknown move type '{mtype}'")
         return changes
 
     def _scope_matches(self, scope: str) -> list[tuple[str, dict]]:
@@ -669,7 +690,7 @@ class SimDriver:
             if q != 0:
                 signs.add(1 if q > 0 else -1)
         if len(signs) > 1:
-            logger.warning("[SIMULATOR] target_pnl refused — scope has mixed long/short")
+            logger.warning("[SIM] target_pnl refused — scope has mixed long/short")
             return []
         if qty_sum == 0:
             return []
@@ -692,7 +713,7 @@ class SimDriver:
         changes = []
         parts = scope.split(".", 1)
         if len(parts) != 2 or parts[0] != "margins":
-            logger.warning(f"[SIMULATOR] set_margin bad scope '{scope}'")
+            logger.warning(f"[SIM] set_margin bad scope '{scope}'")
             return changes
         acct_glob = parts[1]
         fields = move.get("fields") or {}
@@ -742,7 +763,7 @@ class SimDriver:
         for key, val in patch.items():
             parts = key.split(".", 2)
             if len(parts) != 3:
-                logger.warning(f"[SIMULATOR] malformed legacy patch key '{key}'")
+                logger.warning(f"[SIM] malformed legacy patch key '{key}'")
                 continue
             section, account, col = parts
             rows = {
@@ -751,7 +772,7 @@ class SimDriver:
                 "margins":   self._margins_rows,
             }.get(section)
             if rows is None:
-                logger.warning(f"[SIMULATOR] unknown section '{section}' in patch")
+                logger.warning(f"[SIM] unknown section '{section}' in patch")
                 continue
             match = next((r for r in rows if r.get("account") == account), None)
             if match is None:
@@ -802,7 +823,7 @@ class SimDriver:
             "snapshot_at": datetime.now().isoformat(timespec="seconds"),
         }
         logger.info(
-            f"[SIMULATOR] seed-live: {len(positions)} positions / "
+            f"[SIM] seed-live: {len(positions)} positions / "
             f"{len(margins)} margins snapshotted (holdings skipped — positions-only sim)"
         )
         return {
