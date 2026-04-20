@@ -189,11 +189,12 @@
 </script>
 
 <div class="flex items-stretch mb-2 log-tab-row">
-  <!-- "log" section label — three characters stacked vertically in a
-       flex column. No CSS rotation / writing-mode (both failed silently
-       in earlier attempts). Reads top-to-bottom: L · O · G. -->
+  <!-- "log" label rotated 90°. Two-layer split so the flex parent
+       (wrap) reserves the column width and the child carries the
+       rotation via writing-mode: vertical-lr (text flows top-to-bottom
+       naturally, no transform needed). -->
   <span class="log-section-wrap" aria-hidden="true">
-    <span>l</span><span>o</span><span>g</span>
+    <span class="log-section-text">log</span>
   </span>
   {#each TABS as [id, label]}
     <button onclick={() => setTab(id)}
@@ -219,36 +220,42 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* Tab row — further -20% pass. Tabs now ~0.4rem and paddings trimmed
-     accordingly. All 6 tabs + the log label fit comfortably within a
-     320px viewport with slack to spare. */
+  /* Tab row — tabs bumped +20% (0.4 → 0.48rem) after the prior pass.
+     No inter-tab gap; tight horizontal padding so all 6 still fit on a
+     mobile viewport. */
   .log-tab-row { gap: 0; }
   :global(.log-tab-btn) {
-    font-size: 0.4rem;
+    font-size: 0.48rem;
     font-weight: 600;
-    padding: 0.12rem 0.28rem;
+    padding: 0.14rem 0.34rem;
     white-space: nowrap;
     letter-spacing: 0.02em;
     font-family: ui-monospace, monospace;
   }
 
+  /* Vertical "log" label using writing-mode. Outer wrap = flex item
+     with fixed width; inner text carries writing-mode: vertical-lr so
+     "log" flows top-to-bottom. Splitting the concerns avoids the
+     flex + writing-mode collapse that bit earlier attempts. */
   .log-section-wrap {
     display: inline-flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 0.12rem 0 0;
-    margin-right: 0.12rem;
+    min-width: 0.8rem;
+    padding: 0.1rem 0.15rem;
+    margin-right: 0.15rem;
     border-right: 1px solid rgba(251,191,36,0.35);
     align-self: stretch;
+  }
+  .log-section-text {
+    writing-mode: vertical-lr;
     font-family: ui-monospace, monospace;
-    font-size: 0.28rem;
+    font-size: 0.48rem;
     font-weight: 700;
     line-height: 1;
     color: rgba(251,191,36,0.85);
     text-transform: uppercase;
-    letter-spacing: 0;
+    letter-spacing: 0.05em;
     user-select: none;
   }
-  .log-section-wrap > span { display: block; }
 </style>
