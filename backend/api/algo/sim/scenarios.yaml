@@ -1,61 +1,52 @@
 # Market-simulation scenarios for /api/simulator/*.
 #
-# Model B — per-symbol state + LTP-driven ticks.
-#
-# With the synthesizer (backend/api/algo/sim/synthesize.py), scenarios are
-# no longer hand-maintained per agent — the "Run in Simulator" button on
-# the /agents page builds a scenario from the agent's own condition tree
-# at click time. What lives here now is a small set of **agent-agnostic
-# book-wide stress tests**: generic crash, generic euphoria, random walk.
-# These work against any seeded book (scripted initial isn't required —
-# the synthesizer or seed=live provides state).
+# Positions-only simulator. Holdings are NOT simulated — we only exercise
+# F&O positions + fund-negative conditions, because that's where intraday
+# risk lives. Agents that check holdings metrics (day_pct, day_rate_abs,
+# day_rate_pct) run against live production data only; the synthesizer
+# will refuse to build a scenario for them.
 #
 # Each scenario declares:
 #   slug        — stable id referenced by the UI + API
 #   mode        — 'symbol' (default) | 'aggregate' (legacy)
-#   initial:    — optional per-symbol rows (not required when seed=live)
-#   ticks:      — list of {at, moves} entries; `moves` is a list of move
-#                 primitives (pct / abs / random_walk / target_pnl / set_margin)
+#   initial:    — optional per-symbol rows (not needed when seed=live)
+#   ticks:      — list of {at, moves} entries; moves are pct / abs /
+#                 random_walk / target_pnl / set_margin
 #
 # Glob syntax is `section.account.tradingsymbol`. `*` matches one segment,
-# `**` matches any remaining path. `holdings.**`, `positions.*.NIFTY*`, etc.
+# `**` matches any remaining path. All scenarios below target
+# `positions.**` so they apply uniformly to whatever positions exist.
 
 # ─────────────────────────────────────────────────────────────────────────
-# Generic crash — prices DOWN. Hurts long holdings and long positions.
+# Generic crash — modest DOWN moves. Hurts long positions.
 # ─────────────────────────────────────────────────────────────────────────
 - slug: generic-crash
-  name: Generic crash (-6% holdings, -3% positions)
+  name: Generic crash (-1% / -2% / -3% positions)
   mode: symbol
   description: >-
-    Drops every holding 2% / 4% / 6% across three ticks, positions -1% / -2%
-    / -3%. Designed for seed_mode=live — stress-tests your actual long book.
-    Short positions benefit here; use generic-euphoria for short stress.
+    Three-tick drawdown on positions. Fires the static % and ₹ floors on
+    long-heavy books; rate rules fire once the bleed is sustained.
   ticks:
     - at: 0
       moves:
-        - {type: pct, scope: "holdings.**",  value: -0.02}
         - {type: pct, scope: "positions.**", value: -0.01}
     - at: 1
       moves:
-        - {type: pct, scope: "holdings.**",  value: -0.02}
         - {type: pct, scope: "positions.**", value: -0.01}
     - at: 2
       moves:
-        - {type: pct, scope: "holdings.**",  value: -0.02}
         - {type: pct, scope: "positions.**", value: -0.01}
 
 # ─────────────────────────────────────────────────────────────────────────
-# Generic euphoria — prices UP. Hurts SHORT positions (common in F&O
-# books that sell options or carry short futures). Holdings benefit here
-# since they can't be short.
+# Generic euphoria — modest UP moves. Hurts SHORT positions (short options,
+# short futures). Mirror of generic-crash.
 # ─────────────────────────────────────────────────────────────────────────
 - slug: generic-euphoria
-  name: Generic euphoria (+3% positions over 3 ticks)
+  name: Generic euphoria (+1% / +2% / +3% positions)
   mode: symbol
   description: >-
-    Rallies every position +1% / +2% / +3% across three ticks. For F&O
-    books with short options / short futures, an up-move is a loss —
-    this catches the stress cases the crash scenario misses.
+    Three-tick rally on positions. Shorts (short options, short futures)
+    lose money here — catches the stress cases the crash scenario misses.
   ticks:
     - at: 0
       moves:
@@ -68,19 +59,62 @@
         - {type: pct, scope: "positions.**", value: 0.01}
 
 # ─────────────────────────────────────────────────────────────────────────
-# Random walk — drift-with-vol stress on whatever positions exist. Good
-# for "no agent in particular; does anything fire unexpectedly?"
+# Extreme crash — large DOWN moves. Fires every loss agent with room to
+# spare. Useful for worst-case stress testing and confirming the action
+# layer (chase_close_positions, cancel_all, etc.) reacts correctly.
+# ─────────────────────────────────────────────────────────────────────────
+- slug: extreme-crash
+  name: Extreme crash (-3% / -6% / -10% positions)
+  mode: symbol
+  description: >-
+    Three-tick catastrophic drawdown. Trips per-account AND total floors,
+    static AND rate rules, on a long-heavy book. Use it to exercise the
+    whole alert chain at once.
+  ticks:
+    - at: 0
+      moves:
+        - {type: pct, scope: "positions.**", value: -0.03}
+    - at: 1
+      moves:
+        - {type: pct, scope: "positions.**", value: -0.06}
+    - at: 2
+      moves:
+        - {type: pct, scope: "positions.**", value: -0.10}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Extreme euphoria — mirror of extreme-crash. Large UP move; crushes a
+# short-heavy book.
+# ─────────────────────────────────────────────────────────────────────────
+- slug: extreme-euphoria
+  name: Extreme euphoria (+3% / +6% / +10% positions)
+  mode: symbol
+  description: >-
+    Three-tick explosive rally. Short F&O books take severe losses.
+    Mirror stress test to extreme-crash.
+  ticks:
+    - at: 0
+      moves:
+        - {type: pct, scope: "positions.**", value: 0.03}
+    - at: 1
+      moves:
+        - {type: pct, scope: "positions.**", value: 0.06}
+    - at: 2
+      moves:
+        - {type: pct, scope: "positions.**", value: 0.10}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Random walk — drift-with-vol stress on positions. Useful for
+# "does anything fire that I didn't expect?" over 30+ ticks.
 # ─────────────────────────────────────────────────────────────────────────
 - slug: random-walk
-  name: Random walk (drift down)
+  name: Random walk (drift down, vol 0.5%)
   mode: symbol
   seed: 42
   description: >-
-    Geometric random walk on every holding + position: drift -0.1%/tick,
-    vol 0.5%. Seeded (42) so runs are reproducible. Pair with
-    seed_mode=live to shake your real book.
+    Geometric random walk on every position: drift -0.1%/tick, vol 0.5%.
+    Seeded so two runs at the same scenario produce identical moves.
+    Pair with seed_mode=live to shake your real book.
   ticks:
     - at: 0
       moves:
-        - {type: random_walk, scope: "holdings.**",  drift: -0.001, vol: 0.005}
         - {type: random_walk, scope: "positions.**", drift: -0.001, vol: 0.005}

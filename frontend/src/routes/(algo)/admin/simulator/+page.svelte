@@ -26,9 +26,8 @@
   let pickedSlug = $state('');
   let seedMode  = $state(/** @type {'scripted'|'live'|'live+scenario'} */ ('scripted'));
   let rateMs    = $state(2000);
-  // Per-section cadence overrides — blank means "use scenario / default".
-  // Module defaults: holdings=30 ticks, positions=1 tick.
-  let holdingsEveryN  = $state(/** @type {number | ''} */ (''));
+  // Positions cadence override — blank means "use scenario / DB default".
+  // Positions-only sim; no holdings cadence.
   let positionsEveryN = $state(/** @type {number | ''} */ (''));
   // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
   // Simulator" on the /algo page). Empty string = run all agents.
@@ -90,12 +89,11 @@
     try {
       const opts = { seed_mode: seedMode };
       if (agentId) opts.agent_ids = [Number(agentId)];
-      // Blank input = use scenario / module default; a number = override.
-      if (holdingsEveryN  !== '' && holdingsEveryN  != null) opts.holdings_every_n_ticks  = Number(holdingsEveryN);
+      // Blank input = use scenario / DB default; a number = override.
       if (positionsEveryN !== '' && positionsEveryN != null) opts.positions_every_n_ticks = Number(positionsEveryN);
       status = await startSim(pickedSlug, rateMs, opts);
       const tag = agentId ? ` (agent #${agentId} only)` : '';
-      const cadTag = ` · H:${status.holdings_every_n_ticks}/P:${status.positions_every_n_ticks}`;
+      const cadTag = ` · P:${status.positions_every_n_ticks}`;
       note = `Started ${pickedSlug} · seed=${seedMode} · ${rateMs}ms${cadTag}${tag}`;
     } catch (e) { error = e.message; }
   }
@@ -119,7 +117,7 @@
     try {
       const snap = await seedSimLive();
       liveSnap = snap;
-      note = `Live book snapshot: ${snap.holdings_count} holdings · ${snap.positions_count} positions · ${snap.margins_count} margins · accounts=[${snap.accounts.join(', ')}]`;
+      note = `Live book snapshot: ${snap.positions_count} positions · ${snap.margins_count} margins · accounts=[${snap.accounts.join(', ')}]`;
       if (seedMode === 'scripted') seedMode = 'live';
       loadAll();
     } catch (e) { error = e.message; }
@@ -203,8 +201,8 @@
       <span class="text-[#7e97b8]">|</span>
       <span>rate: {status.rate_ms}ms</span>
       <span class="text-[#7e97b8]">|</span>
-      <span title="Holdings / Positions refresh every N ticks">
-        cadence H:{status.holdings_every_n_ticks}/P:{status.positions_every_n_ticks}
+      <span title="Positions refresh every N ticks">
+        cadence P:{status.positions_every_n_ticks}
       </span>
       <span class="text-[#7e97b8]">|</span>
       <span>started: {status.started_at?.slice(0, 19) ?? '—'}</span>
@@ -217,7 +215,7 @@
   {#if liveSnap}
     <div class="text-[0.6rem] text-[#c8d8f0]/70 mt-1">
       Live snapshot: {liveSnap.snapshot_at?.slice(0, 19)} ·
-      {liveSnap.holdings_count}H / {liveSnap.positions_count}P / {liveSnap.margins_count}M
+      {liveSnap.positions_count}P / {liveSnap.margins_count}M
       · accounts=[{liveSnap.accounts.join(', ')}]
     </div>
   {/if}
@@ -226,7 +224,7 @@
 <!-- Controls -->
 <div class="algo-status-card p-3 mb-3" data-status="inactive">
   <div class="text-[0.55rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2">Controls</div>
-  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_100px_90px_90px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
+  <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_100px_90px_auto_auto_auto_auto_auto_auto] gap-2 items-end text-[0.65rem]">
     <div>
       <label for="sim-scenario" class="field-label">Scenario</label>
       <select id="sim-scenario" bind:value={pickedSlug} class="field-input">
@@ -251,11 +249,6 @@
       <label for="sim-pos-n" class="field-label" title="Positions refresh every N ticks (1 = every tick)">Pos / N</label>
       <input id="sim-pos-n" type="number" min="1" step="1" placeholder="1"
              bind:value={positionsEveryN} class="field-input" />
-    </div>
-    <div>
-      <label for="sim-hld-n" class="field-label" title="Holdings refresh every N ticks (30 = once per 30 ticks)">Hld / N</label>
-      <input id="sim-hld-n" type="number" min="1" step="1" placeholder="30"
-             bind:value={holdingsEveryN} class="field-input" />
     </div>
     <button type="button" onclick={doSeedLive}
       class="text-[0.65rem] py-1 px-3 rounded border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold whitespace-nowrap">

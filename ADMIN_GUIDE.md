@@ -248,24 +248,17 @@ It feeds fabricated holdings / positions / margins into the **same** agent engin
 - **Recent SIMULATOR orders** — paper-traded orders from sim actions.
 - **Log panel** (shared across the admin pages) — the **Simulator** tab streams one line per tick with per-symbol price diffs in real time.
 
-### Tick cadence — positions and holdings refresh independently
+### Tick cadence — positions only
 
-Real markets are asymmetric: an active F&O position's LTP ticks many times per minute, while an equity holding's LTP updates far less frequently. The simulator mirrors that: you can set a separate **cadence** for each section — the number of ticks between refreshes.
+The simulator is **positions-only**. Holdings aren't simulated at all because intraday risk lives in F&O positions + fund negatives; holdings-based agents (`day_pct`, `day_rate_abs`, `day_rate_pct`) validate against live production data only. If you press **Run in Simulator** on a holdings agent, you'll get a clear error telling you so.
 
-Defaults:
+Positions refresh every tick by default (cadence = 1). Three places to override, most specific wins:
 
-- **Positions** — refresh **every tick** (cadence = 1)
-- **Holdings** — refresh **once every 30 ticks** (cadence = 30)
+1. **Pos / N** input on the Simulator page — blank = use scenario / DB default.
+2. **Scenario YAML** — top-level `positions_every_n_ticks: <N>`.
+3. **DB setting** — `simulator.positions_every_n_ticks` on `/admin/settings`.
 
-So if you're watching the Simulator log and wondering why you see 29 position-only ticks and then one tick full of holdings diffs — that's working as intended.
-
-**Three places to set the cadence** (most specific wins):
-
-1. **Controls row on the Simulator page** — `Pos / N` and `Hld / N` inputs next to Rate. Leave blank to fall back to the scenario's value; put a number to override for this one run.
-2. **Scenario YAML** — top-level `positions_every_n_ticks: <N>` / `holdings_every_n_ticks: <N>` baked into the scenario. Useful when a scripted scenario depends on a specific rhythm (e.g. `crash-open` sets `holdings_every_n_ticks: 1` so its three-tick holdings cascade actually moves each tick).
-3. **Module defaults** — 1 and 30 respectively, shipped in `driver.py`.
-
-Margin patches via `set_margin` are cadence-independent — they fire on whatever tick the scenario schedules them on. Tick 0 always refreshes both sections (matches how a live session feels at market open) regardless of cadence.
+Margin patches via `set_margin` are cadence-independent — they fire on whatever tick the scenario schedules them on. Tick 0 always refreshes (matches how a live session feels at market open).
 
 ### Three seeding modes
 
@@ -282,8 +275,8 @@ For Live / Live+scenario: you can press **Load live book** to snapshot now, or j
 ### Running it
 
 1. Go to `/admin/simulator`.
-2. Pick a scenario. `crash-open` and `rate-breach` work great with Scripted; `generic-crash` and `random-walk` need Live or Live+scenario.
-3. Pick seed mode and (if not Scripted) press **Load live book**.
+2. Pick a scenario. All five (`generic-crash`, `generic-euphoria`, `extreme-crash`, `extreme-euphoria`, `random-walk`) are positions-only and work with Live or Live+scenario. Start with a generic one; move to extreme variants when you want to trip every threshold at once.
+3. Pick seed mode and (optionally) press **Load live book** — the driver auto-snapshots if you pick Live / Live+scenario and haven't already.
 4. Set **Rate (ms)** — how fast to advance ticks. 2000 ms = 1 tick every 2 seconds is fine.
 5. Press **Start**.
 6. Switch to the **Simulator** tab at the bottom. Every tick shows up with per-symbol price moves:
@@ -336,7 +329,7 @@ So real alerts and simulated alerts are never in the same bucket.
 1. Go to `/agents` → Copy the condition from `loss-pos-acct-static-abs`.
 2. Edit a new agent slug like `loss-zg0790-positions`.
 3. In the condition, replace `"scope": "positions.any_acct"` with a scope that matches only the account you care about (e.g. a new custom scope token you create on the Tokens page).
-4. Validate → Save → Run in Simulator with a scenario like `positions-abs-breach` → confirm it fires.
+4. Validate → Save → **Run in Simulator** on the agent row → confirm it fires (the synthesizer builds a scenario targeting this specific agent's condition; no need to pick one manually).
 5. Flip it to ON.
 
 **B) "Add a new metric the engine doesn't have yet"**

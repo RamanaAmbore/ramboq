@@ -1,17 +1,17 @@
 """
 Market-price simulation driver for /api/simulator/*.
 
-The driver feeds fabricated per-symbol holdings / positions into the running
-agent engine so operators can exercise the full alert + action pipeline
-without touching the real broker.
+**Positions-only simulator.** Holdings are intentionally not part of the
+simulation — intraday risk lives in F&O positions + fund negatives, which
+is what this exercises end-to-end. Agents checking holdings metrics
+(day_pct, day_rate_abs, day_rate_pct) run against live production data
+only; the synthesizer refuses to build a scenario for them.
 
 Design goals
   1. **Price-driver, not aggregate-driver.** Each tick moves per-symbol
-     `last_price`; all derived fields (`cur_val`, `pnl`, `day_change_val`,
-     `day_change_percentage`, per-account aggregates, TOTAL rows) are
-     recomputed from the raw symbol state via `summarise_holdings` /
-     `summarise_positions`. This gives the agent engine exactly the same
-     DataFrame shape it receives in production.
+     `last_price` on positions; `pnl` is recomputed from it. The agent
+     engine sees `sum_positions` + `df_margins` in the same shape as the
+     live path. `sum_holdings` is always an empty frame.
   2. **No code branches in the hot path.** The agent engine, dispatcher and
      action handlers are unaware that data came from here — they read
      `sim_mode` off `alert_state` and prepend `[SIMULATOR]` where needed.
@@ -61,14 +61,8 @@ def _positions_every_default() -> int:
     return get_int("simulator.positions_every_n_ticks", 1)
 
 
-def _holdings_every_default() -> int:
-    from backend.shared.helpers.settings import get_int
-    return get_int("simulator.holdings_every_n_ticks", 30)
-
-
-# Compatibility shims for callers that still reference these names.
+# Compatibility shim for callers that still reference the old name.
 POSITIONS_UPDATE_EVERY_DEFAULT = 1
-HOLDINGS_UPDATE_EVERY_DEFAULT  = 30
 AUTO_STOP_AFTER                = timedelta(minutes=30)
 
 
@@ -123,28 +117,6 @@ def get_scenario(slug: str) -> Optional[dict]:
 # ═════════════════════════════════════════════════════════════════════════
 #  Per-row math — LTP changes drive every derived field.
 # ═════════════════════════════════════════════════════════════════════════
-
-def _recompute_holding_row(row: dict) -> None:
-    """
-    Mutate a holdings row in-place: recompute derived fields from the current
-    `last_price`. Matches the shape broker_apis.fetch_holdings produces, so
-    the downstream summarise_holdings call sees identical input.
-    """
-    qty  = float(row.get("opening_quantity") or 0)
-    avg  = float(row.get("average_price")    or 0)
-    lp   = float(row.get("last_price")       or 0)
-    cp   = float(row.get("close_price")      or 0)
-    inv  = avg * qty
-    cur  = lp  * qty
-    pnl  = cur - inv
-    dchg = lp  - cp
-    row["inv_val"]        = inv
-    row["cur_val"]        = cur
-    row["pnl"]            = pnl
-    row["day_change"]     = dchg
-    row["day_change_val"] = dchg * qty
-    row["pnl_percentage"] = (pnl / inv * 100) if inv else 0.0
-
 
 def _recompute_position_row(row: dict) -> None:
     """
@@ -207,15 +179,15 @@ class SimDriver:
         # Optional: list of agent IDs to restrict this sim to — lets the
         # operator dry-fire a single agent from the /algo page.
         self.only_agent_ids: list[int] | None = None
-        # Per-section tick cadence — how often each section's LTPs refresh.
-        # 1 = every tick (fastest; realistic for active positions), 30 =
-        # once per 30 ticks (slower; realistic for equity holdings). Set at
-        # start() from the request override, scenario YAML, or module default.
+        # Positions tick cadence — how often positions' LTPs refresh. 1 =
+        # every tick. Resolved at start() from request override, scenario
+        # YAML, or DB setting `simulator.positions_every_n_ticks`.
         self.positions_every_n_ticks: int = POSITIONS_UPDATE_EVERY_DEFAULT
-        self.holdings_every_n_ticks:  int = HOLDINGS_UPDATE_EVERY_DEFAULT
         self._task: Optional[asyncio.Task] = None
 
-        # Running per-symbol state (copied from scenario + / or live book).
+        # Running per-symbol state. Holdings is deliberately unused (empty
+        # forever) — positions-only sim. Kept here so `dataframes()` can
+        # still return a valid empty sum_holdings frame.
         self._holdings_rows: list[dict] = []
         self._positions_rows: list[dict] = []
         self._margins_rows: list[dict] = []
@@ -253,7 +225,6 @@ class SimDriver:
             "margins_count":    len(self._margins_rows),
             "only_agent_ids":   list(self.only_agent_ids) if self.only_agent_ids else [],
             "live_snapshot_at": (self._live_snapshot or {}).get("snapshot_at"),
-            "holdings_every_n_ticks":  self.holdings_every_n_ticks,
             "positions_every_n_ticks": self.positions_every_n_ticks,
         }
 
@@ -262,22 +233,18 @@ class SimDriver:
     def dataframes(self) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Return (sum_holdings, sum_positions, df_margins) in the exact shape
-        the real background task feeds into run_cycle — per-account rows + a
-        TOTAL row. We call the same summarise helpers the live path uses so
-        any rounding / derived-column quirks are identical.
+        the real background task feeds into run_cycle. sum_holdings is
+        always empty (positions-only sim); sum_positions uses the same
+        summarise helper the live path uses so rounding matches.
         """
-        from backend.shared.helpers.summarise import (
-            summarise_holdings, summarise_positions,
-        )
+        from backend.shared.helpers.summarise import summarise_positions
 
-        df_h_raw = pd.DataFrame(self._holdings_rows) if self._holdings_rows else pd.DataFrame()
         df_p_raw = pd.DataFrame(self._positions_rows) if self._positions_rows else pd.DataFrame()
 
-        # summarise_holdings takes an optional full-summary frame for cash
-        # columns — we don't have that at sim-time, so pass an empty frame.
-        empty = pd.DataFrame(columns=["account"])
-        sum_h = summarise_holdings(df_h_raw, empty) if not df_h_raw.empty \
-                else pd.DataFrame(columns=["account", "inv_val", "cur_val", "pnl", "day_change_val"])
+        # Holdings-based agents (loss-hold-*) will see zero rows and
+        # therefore never fire in the sim. That's the point — they're
+        # untestable by design here; they only evaluate against live data.
+        sum_h = pd.DataFrame(columns=["account", "inv_val", "cur_val", "pnl", "day_change_val"])
         sum_p = summarise_positions(df_p_raw) if not df_p_raw.empty \
                 else pd.DataFrame(columns=["account", "pnl"])
 
@@ -299,7 +266,6 @@ class SimDriver:
     def start(self, scenario_slug: str, rate_ms: int = 2000,
               *, seed_mode: str = "scripted",
               only_agent_ids: list[int] | None = None,
-              holdings_every_n_ticks: int | None = None,
               positions_every_n_ticks: int | None = None,
               inline_scenario: dict | None = None) -> dict:
         """
@@ -327,30 +293,22 @@ class SimDriver:
         self.started_at     = datetime.now()
         self.only_agent_ids = list(only_agent_ids) if only_agent_ids else None
 
-        # Cadence resolution — request override takes precedence, then
-        # scenario YAML, then module default. Clamped to >= 1 so nothing
-        # ever gets divided by zero or permanently silenced.
-        def _resolve(request_val, scen_key, default_val):
-            raw = request_val if request_val is not None else scen.get(scen_key, default_val)
-            try:
-                return max(1, int(raw))
-            except (TypeError, ValueError):
-                return default_val
-
-        self.holdings_every_n_ticks = _resolve(
-            holdings_every_n_ticks, "holdings_every_n_ticks",
-            _holdings_every_default(),
-        )
-        self.positions_every_n_ticks = _resolve(
-            positions_every_n_ticks, "positions_every_n_ticks",
-            _positions_every_default(),
-        )
+        # Positions cadence — request override > scenario YAML > DB default.
+        # Clamped to >= 1 so nothing ever gets divided by zero or silenced.
+        raw_pos = (positions_every_n_ticks
+                   if positions_every_n_ticks is not None
+                   else scen.get("positions_every_n_ticks", _positions_every_default()))
+        try:
+            self.positions_every_n_ticks = max(1, int(raw_pos))
+        except (TypeError, ValueError):
+            self.positions_every_n_ticks = _positions_every_default()
 
         # Seed the running state — either from scenario.initial, the live-book
         # snapshot, or both stacked. For the live modes, auto-snapshot if the
-        # operator hasn't pressed "Load live book" yet — there's no reason to
-        # gate Start on a separate button click; the expected behaviour is
-        # "just fetch a fresh book and go."
+        # operator hasn't pressed "Load live book" yet. Holdings is a no-op
+        # here (positions-only sim) — we ignore any `initial.holdings` the
+        # scenario might still carry.
+        self._holdings_rows = []   # always empty — positions-only sim
         if seed_mode in ("live", "live+scenario"):
             if not self._live_snapshot:
                 try:
@@ -361,36 +319,28 @@ class SimDriver:
                         f"Try POST /api/simulator/seed-live manually to surface "
                         f"the broker error."
                     )
-            self._holdings_rows  = copy.deepcopy(self._live_snapshot["holdings"])
             self._positions_rows = copy.deepcopy(self._live_snapshot["positions"])
             self._margins_rows   = copy.deepcopy(self._live_snapshot["margins"])
 
         if seed_mode in ("scripted", "live+scenario"):
             initial = scen.get("initial") or {}
             if seed_mode == "scripted":
-                self._holdings_rows  = copy.deepcopy(initial.get("holdings", []))
                 self._positions_rows = copy.deepcopy(initial.get("positions", []))
                 self._margins_rows   = copy.deepcopy(initial.get("margins", []))
             else:
                 # live+scenario — scripted initial rows are layered on top of
                 # the live snapshot (useful for injecting a specific symbol).
-                self._holdings_rows.extend(copy.deepcopy(initial.get("holdings", [])))
                 self._positions_rows.extend(copy.deepcopy(initial.get("positions", [])))
                 self._margins_rows.extend(copy.deepcopy(initial.get("margins", [])))
 
-        # Recompute derived fields on every row so scripted YAML authors
-        # can just specify quantity + average_price + last_price + close_price.
-        for r in self._holdings_rows:
-            _recompute_holding_row(r)
         for r in self._positions_rows:
             _recompute_position_row(r)
 
         # Fail loudly when the seeded state is empty. Without any rows the
         # scope globs in the scenario will match nothing, the tick log fills
         # with "(no changes)" entries, and operators spend minutes wondering
-        # why nothing is moving. Seen in the wild on generic-crash +
-        # seed_mode=scripted (that scenario has no `initial` block by design).
-        if not (self._holdings_rows or self._positions_rows or self._margins_rows):
+        # why nothing is moving.
+        if not (self._positions_rows or self._margins_rows):
             self.scenario = None
             self.active   = False
             raise SimGuardError(
@@ -533,13 +483,10 @@ class SimDriver:
     def _apply_moves(self, moves: list[dict]) -> list[dict]:
         """Apply a list of price moves and return change diffs for the tick log."""
         changes: list[dict] = []
-        # Per-section tick cadence — each section refreshes every Nth tick.
-        # Defaults shipped are positions=1 (every tick) and holdings=30 (once
-        # every 30 ticks) to match real-market asymmetry, but both are
-        # overridable via the Start request or scenario YAML. The modulo
-        # check uses the pre-increment tick_index so tick 0 always refreshes
-        # both sections (matches how a live session feels at market open).
-        holdings_tick  = (self.tick_index % self.holdings_every_n_ticks)  == 0
+        # Positions-only sim: positions refresh every Nth tick per the
+        # cadence setting; holdings scope globs are silently skipped (we
+        # don't carry holdings state). Tick 0 always refreshes so market
+        # open feels right.
         positions_tick = (self.tick_index % self.positions_every_n_ticks) == 0
         for move in moves:
             mtype = (move.get("type") or "").lower()
@@ -547,7 +494,8 @@ class SimDriver:
             if mtype == "set_margin":
                 changes.extend(self._apply_set_margin(scope, move))
                 continue
-            if scope.startswith("holdings.") and not holdings_tick:
+            if scope.startswith("holdings."):
+                logger.debug(f"[SIMULATOR] ignoring holdings scope '{scope}' (positions-only sim)")
                 continue
             if scope.startswith("positions.") and not positions_tick:
                 continue
@@ -675,9 +623,9 @@ class SimDriver:
         return changes
 
     def _refresh(self, section: str, row: dict) -> None:
-        if section == "holdings":
-            _recompute_holding_row(row)
-        elif section == "positions":
+        # holdings is never populated — positions-only sim. Any future
+        # section gets silently ignored here.
+        if section == "positions":
             _recompute_position_row(row)
 
     def _change(self, section: str, row: dict, prev: float, new: float,
@@ -735,56 +683,45 @@ class SimDriver:
 
     def seed_live(self) -> dict:
         """
-        Snapshot the real book (fresh broker fetch, bypass cache) into the
-        driver's `_live_snapshot` field so a subsequent start(..., seed_mode=
-        'live'|'live+scenario') can use it as the initial state. Returns a
-        small manifest (counts + timestamp) for the UI preview.
+        Snapshot positions + margins from the real book into the driver's
+        `_live_snapshot` field. Holdings are NOT fetched — positions-only
+        sim. Returns a small manifest for the UI preview.
         """
         assert_enabled()
         from backend.shared.helpers import broker_apis
         from backend.shared.helpers.utils import mask_column
 
         try:
-            df_h = pd.concat(broker_apis.fetch_holdings(),  ignore_index=True)
             df_p = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
             df_m = pd.concat(broker_apis.fetch_margins(),   ignore_index=True)
         except Exception as e:
             raise SimGuardError(f"Live-book fetch failed: {e}")
 
-        for df in (df_h, df_p, df_m):
+        for df in (df_p, df_m):
             if not df.empty and "account" in df.columns:
                 df["account"] = mask_column(df["account"])
 
-        holdings  = df_h.fillna(0).to_dict(orient="records")  if not df_h.empty else []
         positions = df_p.fillna(0).to_dict(orient="records") if not df_p.empty else []
         margins   = df_m.fillna(0).to_dict(orient="records") if not df_m.empty else []
 
-        # Holdings / positions rely on `last_price`, `average_price`,
-        # `close_price`, `opening_quantity` or `quantity`. Coerce missing
-        # numeric fields to zero so recompute_* doesn't blow up.
-        for row in holdings:
-            row.setdefault("opening_quantity", row.get("quantity") or 0)
-            row.setdefault("close_price", row.get("last_price") or 0)
-            _recompute_holding_row(row)
         for row in positions:
             _recompute_position_row(row)
 
         self._live_snapshot = {
-            "holdings":    holdings,
+            "holdings":    [],   # kept key for shape compatibility
             "positions":   positions,
             "margins":     margins,
             "snapshot_at": datetime.now().isoformat(timespec="seconds"),
         }
         logger.info(
-            f"[SIMULATOR] seed-live: {len(holdings)} holdings / "
-            f"{len(positions)} positions / {len(margins)} margins snapshotted"
+            f"[SIMULATOR] seed-live: {len(positions)} positions / "
+            f"{len(margins)} margins snapshotted (holdings skipped — positions-only sim)"
         )
         return {
             "snapshot_at":     self._live_snapshot["snapshot_at"],
-            "holdings_count":  len(holdings),
             "positions_count": len(positions),
             "margins_count":   len(margins),
-            "accounts":        sorted({str(r.get("account", "")) for r in holdings + positions + margins if r.get("account")}),
+            "accounts":        sorted({str(r.get("account", "")) for r in positions + margins if r.get("account")}),
         }
 
     # ── Tick log ─────────────────────────────────────────────────────

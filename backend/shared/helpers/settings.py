@@ -78,12 +78,12 @@ SEEDS: list[tuple] = [
      "min", {"min": 0, "max": 60, "step": 1}),
 
     # ── Simulator defaults ──────────────────────────────────────────────
+    # Positions-only sim — no holdings cadence. Holdings agents are
+    # untestable in the simulator by design; they evaluate only against
+    # live production data.
     ("simulator", "simulator.positions_every_n_ticks", "int", 1,
-     "Default: positions refresh every N ticks (1 = every tick).",
+     "Positions refresh every N ticks (1 = every tick).",
      "ticks", {"min": 1, "max": 100, "step": 1}),
-    ("simulator", "simulator.holdings_every_n_ticks",  "int", 30,
-     "Default: holdings refresh every N ticks (realistic asymmetry vs positions).",
-     "ticks", {"min": 1, "max": 600, "step": 1}),
     ("simulator", "simulator.auto_stop_minutes",       "int", 30,
      "Auto-stop a sim after this many wall-clock minutes so a forgotten "
      "run can't bleed forever.", "min", {"min": 1, "max": 240, "step": 1}),
@@ -131,6 +131,9 @@ async def seed_settings() -> None:
     from backend.api.database import async_session
     from backend.api.models import Setting
 
+    from sqlalchemy import delete as sql_delete
+    seed_keys = {s[1] for s in SEEDS}
+
     async with async_session() as session:
         existing = (await session.execute(select(Setting))).scalars().all()
         existing_by_key = {s.key: s for s in existing}
@@ -161,12 +164,24 @@ async def seed_settings() -> None:
                         changed = True
                 if changed:
                     updated_defaults += 1
+
+        # Prune rows whose keys are no longer in the SEEDS list — the code
+        # is the source of truth for what settings exist. Custom tokens on
+        # the Tokens page have their own lifecycle; this is specifically
+        # for retired system-seeded keys.
+        retired_keys = [k for k in existing_by_key if k not in seed_keys]
+        removed = 0
+        if retired_keys:
+            await session.execute(sql_delete(Setting).where(Setting.key.in_(retired_keys)))
+            removed = len(retired_keys)
+
         await session.commit()
 
-    if inserted or updated_defaults:
+    if inserted or updated_defaults or removed:
         logger.info(
             f"Settings: seeded {inserted} new rows, refreshed "
-            f"{updated_defaults} existing defaults/metadata"
+            f"{updated_defaults} existing, pruned {removed} retired"
+            + (f" ({', '.join(retired_keys)})" if retired_keys else "")
         )
 
     await reload_cache()
