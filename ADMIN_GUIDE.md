@@ -5,9 +5,15 @@ A walkthrough of the four things an admin cares about on this site:
 1. **Agents** — rules that watch the portfolio and fire when something worth knowing happens.
 2. **Tokens** — the vocabulary agents are written in.
 3. **The Simulator** — lets you safely test what an agent would do under a hypothetical market.
-4. **How it all fits together** — what happens at runtime when your book moves.
+4. **Settings** — runtime-editable thresholds and toggles you tune from the UI.
 
 No code reading required. If you can use a dropdown and a form, you can use all of this.
+
+> **TL;DR for the impatient:** want to see a loss-threshold rule auto-close your positions safely before you turn it on?
+> 1. `/agents` → find `loss-pos-total-auto-close` → expand it. Condition is `pnl ≤ −₹50k on positions.total`; action is `chase_close_positions`; ships **inactive**.
+> 2. Click **Run in Simulator** on that row. The sim synthesises a scenario that trips exactly this condition, auto-loads your live book, and dry-fires the agent.
+> 3. Watch the bottom **Log** panel. The **Simulator** tab streams per-symbol price ticks; the **Order** tab shows the paper-traded `SELL N <symbol> @₹price · acct=…` lines for each position the action would have closed, one per position, all tagged `SIM`.
+> 4. When you're confident the thresholds and actions match your risk tolerance, flip the agent **ON** from the row — it will do the real thing next time conditions fire.
 
 ---
 
@@ -360,6 +366,20 @@ So real alerts and simulated alerts are never in the same bucket.
 1. `/admin/simulator` → Scenario `generic-crash` → Load live book → Seed `Live + scenario` → Start.
 2. Watch the Simulator log tab for price moves; watch the events table for which agents would fire.
 3. Stop when you've seen enough. Hit **Clear sim** to wipe the test rows.
+
+**D) "Auto-close on severe loss — but safely"**
+1. `/agents` → `loss-pos-total-auto-close`. Ships inactive with a `chase_close_positions` action on `pnl ≤ −₹50k`.
+2. Open the row → "Actions" section shows the action type + params (scope=total, timeout 10 min, adjust_pct 0.1).
+3. Click **Run in Simulator** — the synthesizer targets this agent's condition; the sim seeds your live book automatically.
+4. Flip the bottom panel to the **Order** tab. You'll see one `SIM ◆ SELL N <symbol> @₹price · acct=…` line per open position the chase engine would try to close.
+5. Flip to **Simulator** tab — the same lines appear interleaved with price ticks, so you can see the sequence: price move → threshold cross → orders placed.
+6. When the output matches your risk tolerance, flip the agent **ON**. Next time conditions fire for real, the chase engine runs against the broker.
+
+**E) "Add a close-position action to an existing loss agent"**
+1. `/agents` → pick a loss agent → **Edit**.
+2. Next to the **Actions (JSON)** textarea, click the `+ close_position` pill — a skeleton action lands in the textarea.
+3. Tune the params: set `account`, `symbol`, `quantity`. (For scope-level auto-close on any matching position, use `+ chase_close` instead — it doesn't need a specific symbol.)
+4. **Validate** → **Save** → **Run in Simulator** to confirm → flip **ON**.
 
 ---
 

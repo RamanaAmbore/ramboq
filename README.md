@@ -4,6 +4,17 @@ A production web application for **RamboQuant Analytics LLP** at [ramboq.com](ht
 
 > **New admin?** Read [ADMIN_GUIDE.md](ADMIN_GUIDE.md) — a plain-English walkthrough of Agents, Tokens, and the Simulator, aimed at someone using the site for the first time.
 
+## 🏁 Headline feature — Simulator-backed Agent framework
+
+RamboQuant ships a production risk / alerting / auto-action engine (**Agents**) paired with a **Market Simulator** that exercises the same engine against fabricated prices. The two together form the core of the admin platform:
+
+- **Declarative agents.** Every loss / risk / auto-close rule is a row in the `agents` table: a condition tree of `metric / scope / operator / value` leaves combined via `all / any / not`, plus notify channels (Telegram / email / log / ws) and actions (place_order, close_position, chase_close_positions, cancel_all_orders, …). Inline editor + live graphical tree preview at [/agents](https://dev.ramboq.com/agents).
+- **Auto-synthesized sim scenarios.** Press **Run in Simulator** on any agent row — the simulator builds a targeted scenario directly from that agent's condition tree (no hand-written YAML) and dry-fires it. Works for every supported metric (`pnl`, `pnl_pct`, `pnl_rate_abs`, `pnl_rate_pct`, `cash`, `avail_margin`). Holdings-metric agents (`day_pct`, `day_rate_*`) are deliberately skipped — those validate only against live data.
+- **Per-symbol price-driven simulator.** Positions-only by design. Ships 5 book-wide stress scenarios (`generic-crash`, `generic-euphoria`, `extreme-crash`, `extreme-euphoria`, `random-walk`) + 7 market-state presets (`pre_open`, `at_open`, `mid_session`, `pre_close`, `at_close`, `post_close`, `expiry_day`) so time-aware agents fire realistically. [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md) walks the whole flow.
+- **Same agent engine in sim and live.** No code branches in the hot path — the engine reads a `sim_mode` flag off context and tags every downstream artefact (`[SIM]` in logs, `SIM` pill in UI, `AlgoOrder.mode='sim'`, `agent_events.sim_mode=TRUE`, `SIMULATOR` in Telegram / email subjects + red banner). Real and simulated fires can't be confused.
+- **Paper-trade order log.** Sim actions record an `AlgoOrder` row with `initial_price = LTP at trigger time`. The LogPanel's Order tab shows every paper + live order with side / qty / symbol / price / account / mode pill — operators see exactly what the broker call would have been.
+- **DB-backed Settings.** Alert thresholds, cadences, baseline gates, notification toggles, etc. live in a `settings` table and can be tuned at runtime from [/admin/settings](https://dev.ramboq.com/admin/settings) without a deploy. Seeder auto-prunes retired keys across deploys.
+
 ## Architecture
 
 **Litestar API + SvelteKit frontend.**

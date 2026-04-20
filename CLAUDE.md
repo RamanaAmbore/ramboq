@@ -435,6 +435,37 @@ All gated by `admin_guard`. Every mutating endpoint calls `REGISTRY.reload()` au
 
 ---
 
+## Settings — DB-backed tunables
+
+`/admin/settings` exposes every parameter that changes more often than a deploy cycle. Values live in the `settings` table (`category / key / value_type / value / default_value / description / schema / units`). The reader chain is **DB cache → YAML fallback → in-code default**, so migrating a knob from YAML to DB is a one-line code change and zero-downtime.
+
+Key files:
+
+| Path | Purpose |
+|---|---|
+| `backend/api/models.py::Setting` | SQLAlchemy row |
+| `backend/shared/helpers/settings.py` | `SEEDS` list + `get_int/get_float/get_bool/get_string` readers + `seed_settings()` seeder |
+| `backend/api/routes/settings.py` | `/api/admin/settings/*` CRUD |
+| `frontend/src/routes/(algo)/admin/settings/+page.svelte` | Grouped page (Alerts · Performance · Simulator · Notifications · Logging) |
+
+Seeded buckets + sample keys:
+
+- **alerts** — `alerts.cooldown_minutes`, `alerts.rate_window_min`, `alerts.baseline_offset_min`, `alerts.suppress_delta_abs`, `alerts.suppress_delta_pct`
+- **performance** — `performance.refresh_interval`, `performance.open_summary_offset_min`, `performance.close_summary_offset_min`
+- **simulator** — `simulator.positions_every_n_ticks`, `simulator.auto_stop_minutes`, `simulator.default_rate_ms`
+- **notifications** — `notifications.telegram_enabled`, `notifications.email_enabled`, `notifications.notify_on_deploy`
+- **logging** — `logging.file_log_level`, `logging.console_log_level`, `logging.error_log_level`
+
+Seeder behaviour across deploys:
+- Insert missing rows (from `SEEDS`) with the shipped `default_value`.
+- Refresh `category / description / schema / units / default_value / value_type` on existing rows (code changes land through).
+- **Preserve `value`** (the operator's live override).
+- **Auto-prune** rows whose keys are no longer in `SEEDS` — retiring a knob requires no manual DB cleanup.
+
+Per-PATCH, the in-process cache invalidates and reloads, so edits take effect on the next agent tick / sim run without a service restart.
+
+---
+
 ## Simulator
 
 The simulator feeds fabricated per-symbol **positions** + margins into
@@ -519,6 +550,56 @@ simulated.
 ### Shipped scenarios
 
 `generic-crash` (−3% over 3 ticks), `generic-euphoria` (+3%), `extreme-crash` (−19% over 3 ticks), `extreme-euphoria` (+19%), `random-walk` (seeded GBM). All work against any seeded book. The synthesizer covers per-agent tests; scenarios.yaml holds only these 5 book-wide stress tests.
+
+### Run-in-Simulator + the synthesizer
+
+Per-agent tests don't touch `scenarios.yaml` — they're built on demand from the agent's own condition tree by [`backend/api/algo/sim/synthesize.py`](backend/api/algo/sim/synthesize.py). The button on each `/agents` row hits `POST /api/simulator/start-for-agent/<id>`; the handler calls `synthesize_for_agent(agent)` which:
+
+1. Walks the agent's condition tree, picks the "nearest-to-fire" leaf (`all` → tightest threshold; `any` → loosest; `not` logs a warning and targets the inner leaf).
+2. Maps the leaf's metric to a canned ticks-shape:
+   | metric | technique |
+   |---|---|
+   | `pnl` | `target_pnl` on positions scoped to match |
+   | `pnl_pct` | `target_pnl` sized to cross `value% × util_margin` |
+   | `pnl_rate_abs` | scheduled `target_pnl` decay over the rate window |
+   | `pnl_rate_pct` | same, scaled to `value% × util_margin` |
+   | `cash` | `set_margin` driving `avail opening_balance < 0` |
+   | `avail_margin` | `set_margin` driving `net < 0` |
+3. Holdings metrics (`day_pct`, `day_rate_abs`, `day_rate_pct`) are NOT synthesizable — the handler returns 400 with a message pointing operators at live data validation instead.
+4. Returns an inline scenario dict (same shape as yaml entries). `SimDriver.start(inline_scenario=…)` accepts it without touching the yaml catalog.
+
+Result: adding a new agent adds its own test for free. Adding a new metric is one grammar token + one synthesizer entry.
+
+### Market-state presets
+
+Agents that reference time (rate metrics with baseline gates, `minutes_until_close`, expiry rules) need a simulated clock — wall-clock time at 3 AM IST has every segment closed. Each scenario + each Start request can declare a `market_state` block:
+
+```yaml
+market_state: {preset: pre_close}
+# — or —
+market_state: {preset: expiry_day, is_expiry_day: true}
+# — or explicit overrides —
+market_state:
+  nse_open: true
+  mcx_open: false
+  minutes_since_nse_open: 360
+```
+
+Seven presets shipped (see `MARKET_STATE_PRESETS` in `sim/driver.py`): `pre_open` / `at_open` / `mid_session` (default) / `pre_close` / `at_close` / `post_close` / `expiry_day`. `run_cycle` calls `_build_context(now, sim_overrides=…)` which merges overrides on top of the computed live values. Real path passes `None` and behaviour is unchanged.
+
+### Paper-trade action expansion
+
+When an agent fires in sim mode, `actions.execute()` routes to `_sim_paper_trade`. The writer now branches:
+
+- **`close_position` / `place_order`** — params already specify `account + symbol`. Write ONE `AlgoOrder` with `initial_price = sim LTP for that symbol`.
+- **`chase_close_positions` / `chase_close`** — scope-level actions. Look up every open position matching `scope ∈ {total, account}` in `SimDriver._positions_rows`, write ONE `AlgoOrder` per position, each with the real `account / symbol / qty / LTP`. So a total-scope chase on a 4-position book fires 4 paper trades — visible individually in Order + Sim logs.
+- **Non-order actions** (`emit_log`, `set_flag`, `monitor_order`, `deactivate_agent`, `cancel_*`, `send_summary`) don't get a paper row — just the `action_success` agent event that `execute()` already writes.
+
+Each paper row carries the same print-style `detail` string in all three surfaces (logger, `AlgoOrder.detail`, tick_log `note`):
+
+```
+[SIM] loss-pos-total-auto-close → close_position: SELL 50 NIFTY25APRPE22000 @₹180.00 · acct=ZG####
+```
 
 ### Seeding modes
 
