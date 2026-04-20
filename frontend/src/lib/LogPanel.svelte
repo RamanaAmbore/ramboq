@@ -219,27 +219,30 @@
 }).join('\n')}{:else}<span class="log-debug">No log entries.</span>{/if}{/if}</pre>
 
 <style>
-  /* "log" label — three letters stacked vertically. No CSS rotation /
-     writing-mode (both failed to render in earlier attempts); just a
-     flex-column container with one <span> per letter. Bullet-proof. */
+  /* "log" label — three letters stacked vertically in a flex column.
+     Sized up + given a faint amber background so it's genuinely visible
+     on a dark theme; prior attempts were too small / too subtle to
+     catch on a bright monitor. */
   .log-section-wrap {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.1rem 0.3rem;
-    margin-right: 0.25rem;
-    border-right: 1px solid rgba(251,191,36,0.3);
+    gap: 0.05rem;
+    padding: 0.25rem 0.4rem;
+    margin-right: 0.3rem;
+    background: rgba(251,191,36,0.1);
+    border-right: 2px solid rgba(251,191,36,0.55);
+    border-radius: 3px 0 0 3px;
     align-self: stretch;
     font-family: ui-monospace, monospace;
-    font-size: 0.55rem;
-    font-weight: 700;
+    font-size: 0.75rem;
+    font-weight: 800;
     letter-spacing: 0;
-    line-height: 1.15;
+    line-height: 1;
     color: #fbbf24;
+    text-transform: uppercase;
     user-select: none;
   }
-  @media (max-width: 520px) {
-    .log-section-wrap { display: none; }
-  }
+  .log-section-wrap > span { display: block; }
 </style>
