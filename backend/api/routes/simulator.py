@@ -94,6 +94,10 @@ class SimScenarioInfo(msgspec.Struct):
     # Start. Entries are None for ticks that aren't pct-shaped
     # (target_pnl / random_walk / set_margin).
     tick_pcts: list[float | None]
+    # Distinct tradingsymbols from the scenario's scripted initial
+    # positions. Used by the Symbol picker when the operator hasn't
+    # loaded a live-book snapshot yet.
+    initial_symbols: list[str]
 
 
 class SimEventInfo(msgspec.Struct):
@@ -138,6 +142,7 @@ class SimulatorController(Controller):
                 description=s["description"], mode=s["mode"], ticks=s["ticks"],
                 has_initial=s["has_initial"],
                 tick_pcts=s.get("tick_pcts") or [],
+                initial_symbols=s.get("initial_symbols") or [],
             ))
         return out
 

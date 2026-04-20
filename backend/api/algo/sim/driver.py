@@ -895,6 +895,10 @@ class SimDriver:
             "positions_count": len(positions),
             "margins_count":   len(margins),
             "accounts":        sorted({str(r.get("account", "")) for r in positions + margins if r.get("account")}),
+            # Distinct tradingsymbols in the snapshot — populates the
+            # Symbol picker on /admin/simulator.
+            "symbols":         sorted({str(r.get("tradingsymbol", ""))
+                                       for r in positions if r.get("tradingsymbol")}),
         }
 
     # ── Tick log ─────────────────────────────────────────────────────
@@ -938,14 +942,23 @@ class SimDriver:
                             pass
                         break
                 tick_pcts.append(pct)
+            # Distinct symbols from the scenario's scripted initial
+            # positions — lets the Symbol picker show picker options
+            # even when the operator hasn't loaded the live book yet.
+            init_syms = sorted({
+                str(p.get("tradingsymbol", ""))
+                for p in (initial.get("positions") or [])
+                if p.get("tradingsymbol")
+            })
             out.append({
-                "slug":        s.get("slug"),
-                "name":        s.get("name") or s.get("slug"),
-                "description": s.get("description", ""),
-                "mode":        s.get("mode") or ("symbol" if s.get("ticks", [{}])[0].get("moves") else "aggregate"),
-                "ticks":       len(s.get("ticks", []) or []),
-                "has_initial": has_initial,
-                "tick_pcts":   tick_pcts,
+                "slug":            s.get("slug"),
+                "name":            s.get("name") or s.get("slug"),
+                "description":     s.get("description", ""),
+                "mode":            s.get("mode") or ("symbol" if s.get("ticks", [{}])[0].get("moves") else "aggregate"),
+                "ticks":           len(s.get("ticks", []) or []),
+                "has_initial":     has_initial,
+                "tick_pcts":       tick_pcts,
+                "initial_symbols": init_syms,
             })
         return out
 
