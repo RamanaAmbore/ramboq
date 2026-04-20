@@ -170,13 +170,21 @@ export const fetchSimStatus       = () => _get('/simulator/status', { auth: true
 //   market_state_preset: one of pre_open | at_open | mid_session |
 //       pre_close | at_close | post_close | expiry_day, or null to use
 //       the scenario's YAML value.
+//   pct_overrides: array of per-tick decimal pct values (0.05 = 5%).
+//       Replaces each pct-typed move's `value` in that tick; null entries
+//       keep the scenario YAML default.
+//   symbols: array of tradingsymbols to restrict the sim to. After
+//       seeding, positions whose symbol isn't in this list are dropped.
+//       Empty / null = all positions.
 export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
   _post('/simulator/start',
         { scenario, rate_ms,
           seed_mode:               opts.seed_mode || 'scripted',
           agent_ids:               opts.agent_ids || null,
           positions_every_n_ticks: opts.positions_every_n_ticks ?? null,
-          market_state_preset:     opts.market_state_preset || null },
+          market_state_preset:     opts.market_state_preset || null,
+          pct_overrides:           opts.pct_overrides           || null,
+          symbols:                 opts.symbols                 || null },
         { auth: true });
 export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
 export const stepSim              = () => _post('/simulator/step', {}, { auth: true });

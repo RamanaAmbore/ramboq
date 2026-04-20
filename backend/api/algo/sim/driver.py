@@ -282,6 +282,29 @@ class SimDriver:
 
     # ── Public state snapshot ─────────────────────────────────────────
 
+    def _tick_pcts_for_ui(self) -> list[float | None]:
+        """
+        Extract per-tick pct values from the currently-loaded scenario so
+        the /admin/simulator page can render them as editable defaults.
+        Returns a list the length of scenario.ticks; each entry is the
+        first `pct`-move's value in that tick, or None when the tick has
+        no pct move (e.g. the tick is target_pnl / set_margin).
+        """
+        if not self.scenario:
+            return []
+        out: list[float | None] = []
+        for t in (self.scenario.get("ticks") or []):
+            pct = None
+            for m in (t.get("moves") or []):
+                if (m.get("type") or "").lower() == "pct":
+                    try:
+                        pct = float(m.get("value"))
+                    except (TypeError, ValueError):
+                        pct = None
+                    break
+            out.append(pct)
+        return out
+
     def snapshot(self) -> dict:
         return {
             "active":           self.active,
@@ -299,6 +322,12 @@ class SimDriver:
             "positions_every_n_ticks": self.positions_every_n_ticks,
             "market_state_preset":     self.market_state_preset,
             "market_state":            dict(self.market_state),
+            # Tick pct values actually running (after overrides applied) —
+            # lets the UI reflect "what's active" even if the operator
+            # changes the inputs after Start.
+            "tick_pcts":               self._tick_pcts_for_ui(),
+            "symbol_filter":           [r.get("tradingsymbol") for r in self._positions_rows]
+                                        if self.scenario else [],
         }
 
     # ── DataFrame builder the agent engine consumes ───────────────────
@@ -341,7 +370,9 @@ class SimDriver:
               only_agent_ids: list[int] | None = None,
               positions_every_n_ticks: int | None = None,
               market_state_override: dict | None = None,
-              inline_scenario: dict | None = None) -> dict:
+              inline_scenario: dict | None = None,
+              pct_overrides: list[float] | None = None,
+              symbol_filter: list[str] | None = None) -> dict:
         """
         Start the sim against a named scenario from scenarios.yaml, or an
         `inline_scenario` dict (same shape) built at call time by the
@@ -358,6 +389,26 @@ class SimDriver:
             scen = get_scenario(scenario_slug)
             if not scen:
                 raise SimGuardError(f"Unknown scenario '{scenario_slug}'")
+
+        # Apply pct_overrides into the scenario's ticks before we store
+        # it. The shape we handle cleanly: every override slot [i] replaces
+        # the `value` of every `pct`-typed move in ticks[i].moves. Scenarios
+        # that don't match this shape (random_walk, target_pnl, set_margin)
+        # are unaffected by pct_overrides — those moves are left alone.
+        if pct_overrides:
+            scen = copy.deepcopy(scen)
+            for i, pct in enumerate(pct_overrides):
+                if pct is None:
+                    continue
+                ticks = scen.get("ticks") or []
+                if i >= len(ticks):
+                    break
+                for move in (ticks[i].get("moves") or []):
+                    if (move.get("type") or "").lower() == "pct":
+                        try:
+                            move["value"] = float(pct)
+                        except (TypeError, ValueError):
+                            pass
 
         self.scenario_slug  = scenario_slug
         self.scenario       = scen
@@ -419,6 +470,19 @@ class SimDriver:
 
         for r in self._positions_rows:
             _recompute_position_row(r)
+
+        # Symbol filter — drop positions whose tradingsymbol isn't in the
+        # requested allow-list. Operators use this to target a single
+        # instrument (e.g. "simulate only my NIFTY short"). Empty / None
+        # means no filter. Applied AFTER recompute so the filtered set
+        # still has derived fields intact.
+        if symbol_filter:
+            allow = {str(s) for s in symbol_filter if s}
+            if allow:
+                self._positions_rows = [
+                    r for r in self._positions_rows
+                    if str(r.get("tradingsymbol", "")) in allow
+                ]
 
         # When scripted seeding leaves the state empty (a scenario without
         # an `initial:` block — all 5 shipped ones + every synthesized
@@ -861,6 +925,19 @@ class SimDriver:
             has_initial = bool(
                 initial.get("holdings") or initial.get("positions") or initial.get("margins")
             )
+            # Default tick pct values — same shape as _tick_pcts_for_ui
+            # above. Lets the UI show editable defaults before Start.
+            tick_pcts: list[float | None] = []
+            for t in (s.get("ticks") or []):
+                pct = None
+                for m in (t.get("moves") or []):
+                    if (m.get("type") or "").lower() == "pct":
+                        try:
+                            pct = float(m.get("value"))
+                        except (TypeError, ValueError):
+                            pass
+                        break
+                tick_pcts.append(pct)
             out.append({
                 "slug":        s.get("slug"),
                 "name":        s.get("name") or s.get("slug"),
@@ -868,6 +945,7 @@ class SimDriver:
                 "mode":        s.get("mode") or ("symbol" if s.get("ticks", [{}])[0].get("moves") else "aggregate"),
                 "ticks":       len(s.get("ticks", []) or []),
                 "has_initial": has_initial,
+                "tick_pcts":   tick_pcts,
             })
         return out
 

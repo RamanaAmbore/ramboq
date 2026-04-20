@@ -31,6 +31,13 @@
   // Simulated market state — overrides the scenario's YAML preset. Blank
   // = use whatever the scenario declares (defaulting to mid_session).
   let marketStatePreset = $state(/** @type {''|'pre_open'|'at_open'|'mid_session'|'pre_close'|'at_close'|'post_close'|'expiry_day'} */(''));
+  // Editable per-tick pct overrides. Populated when the operator picks
+  // a scenario that has pct-shaped ticks (crash / euphoria / extreme /
+  // wild-swings). Values are shown to the operator as % (5 not 0.05).
+  let pctOverrides = $state(/** @type {Array<number | ''>} */([]));
+  // Tradingsymbol to restrict the sim to. Empty = all positions from
+  // the loaded live book. Populated from liveSnap when available.
+  let symbolFilter = $state(/** @type {string} */(''));
   // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
@@ -119,6 +126,14 @@
       // Blank input = use scenario / DB default; a number = override.
       if (positionsEveryN !== '' && positionsEveryN != null) opts.positions_every_n_ticks = Number(positionsEveryN);
       if (marketStatePreset) opts.market_state_preset = marketStatePreset;
+      // Per-tick pct overrides — send as decimal fractions (0.05 for 5%).
+      // Null slots = leave scenario default. Only send the array if the
+      // operator has actually touched at least one value.
+      if (pctOverrides.some(v => v !== '' && v != null)) {
+        opts.pct_overrides = pctOverrides.map(v =>
+          v === '' || v == null ? null : Number(v) / 100);
+      }
+      if (symbolFilter) opts.symbols = [symbolFilter];
       status = await startSim(pickedSlug, rateMs, opts);
       const tag = agentId ? ` (agent #${agentId} only)` : '';
       const cadTag = ` · P:${status.positions_every_n_ticks}`;
@@ -166,6 +181,17 @@
     if (!agentId) return null;
     return agents.find(a => String(a.id) === String(agentId)) || null;
   });
+
+  // Whenever the scenario picker changes, refresh the pct-override inputs
+  // with the new scenario's YAML defaults. Each tick becomes one editable
+  // input showing the default as a % (5 not 0.05). Null entries (ticks
+  // whose moves aren't pct-shaped) are rendered as disabled placeholders.
+  $effect(() => {
+    const picked = scenarios.find(s => s.slug === pickedSlug);
+    const pcts = picked?.tick_pcts || [];
+    pctOverrides = pcts.map(v => v == null ? '' : Number((v * 100).toFixed(2)));
+  });
+
 
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
@@ -266,6 +292,28 @@
     </div>
   </div>
 
+  {#if pctOverrides.length > 0}
+    <!-- Tick-pct overrides — one editable % per tick that has a pct
+         move. Values are shown as percent (e.g. 5 not 0.05); sent back
+         as decimal fractions. Null slots (ticks without pct moves) show
+         a disabled placeholder. -->
+    <div class="sim-pct-row">
+      <span class="field-label sim-pct-label">Tick %</span>
+      {#each pctOverrides as _pct, i}
+        <div class="sim-pct-cell">
+          <input type="number" step="0.5"
+            class="field-input sim-pct-input"
+            placeholder={String(scenarios.find(s => s.slug === pickedSlug)?.tick_pcts?.[i] != null
+              ? (scenarios.find(s => s.slug === pickedSlug).tick_pcts[i] * 100).toFixed(2)
+              : '—')}
+            disabled={scenarios.find(s => s.slug === pickedSlug)?.tick_pcts?.[i] == null}
+            bind:value={pctOverrides[i]} />
+          <span class="sim-pct-unit">%</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
   <!-- Row 2 — Seed / Rate / Pos / Market — four compact fields in
        the same row. Smaller font + tighter padding so all four fit
        without wrapping on a normal desktop. -->
@@ -301,6 +349,12 @@
           { value: 'post_close',  label: 'Post-close' },
           { value: 'expiry_day',  label: 'Expiry day' },
         ]} />
+    </div>
+    <div class="sim-field">
+      <label for="sim-symbol" class="field-label" title="Restrict sim to one tradingsymbol (e.g. NIFTY25APRFUT). Blank = all positions.">Symbol</label>
+      <input id="sim-symbol" type="text"
+             placeholder="(all positions)"
+             bind:value={symbolFilter} class="field-input" />
     </div>
   </div>
   <!-- Buttons row — all uniform width so the block reads as one action
@@ -372,6 +426,44 @@
   .sim-field { min-width: 0; flex: 1 1 100px; }
   .sim-field-scenario-full { flex: 1 1 100%; }
 
+  /* Tick-pct overrides row — sits between the Scenario picker and the
+     compact fields row. One narrow % input per tick, label on the left
+     to identify the row. Wraps to additional lines if the scenario has
+     many ticks (rare — all shipped scenarios are 3 ticks). */
+  .sim-pct-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.4rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.6rem;
+  }
+  .sim-pct-label {
+    color: #fbbf24;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 0.25rem;
+  }
+  .sim-pct-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+  :global(.sim-pct-input) {
+    width: 3.8rem;
+    font-size: 0.6rem !important;
+    padding: 0.2rem 0.3rem !important;
+    min-height: 1.4rem !important;
+    text-align: right;
+  }
+  .sim-pct-unit {
+    color: rgba(200,216,240,0.55);
+    font-family: ui-monospace, monospace;
+    font-size: 0.55rem;
+  }
+
   /* Compact row = tighter field-input paddings so all 4 fit on one line
      at normal desktop widths. */
   :global(.sim-fields-compact .field-input) {
@@ -415,17 +507,23 @@
     background: #d97706; color: #0a1020; border-color: #d97706;
   }
   :global(.sim-btn-primary:hover:not(:disabled)) { background: #fbbf24; border-color: #fbbf24; }
-  /* Stop button — muted red halt-state background so it's visually
-     distinct from Start (amber primary) and Clear (danger). Not the
-     bright red of Clear because Stop isn't destructive — it just halts.
-     The duller pink-red separates the semantics cleanly. */
+  /* Stop button — solid rose-red so it's unmistakable as the halt
+     control; distinct from the darker full-red used by Clear (.danger)
+     and the amber Start (.primary). No more faint look. */
   :global(.sim-btn-secondary) {
-    background: rgba(248,113,113,0.15);
-    color: #fca5a5;
-    border-color: rgba(248,113,113,0.45);
+    background: #f43f5e;
+    color: #fff1f2;
+    border-color: #f43f5e;
+    font-weight: 700;
   }
   :global(.sim-btn-secondary:hover:not(:disabled)) {
-    background: rgba(248,113,113,0.25); border-color: #f87171; color: #fecaca;
+    background: #e11d48;
+    border-color: #e11d48;
+  }
+  :global(.sim-btn-secondary:disabled) {
+    background: rgba(244,63,94,0.25);
+    color: rgba(255,241,242,0.6);
+    border-color: rgba(244,63,94,0.45);
   }
   :global(.sim-btn-load) {
     background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.5);

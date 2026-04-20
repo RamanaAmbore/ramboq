@@ -71,6 +71,15 @@ class SimStartRequest(msgspec.Struct):
     # mid_session / pre_close / at_close / post_close / expiry_day.
     # None = use scenario YAML's market_state block (or default mid_session).
     market_state_preset: Optional[str] = None
+    # Per-tick % overrides — when the scenario is of "3 pct moves" shape
+    # (crash / euphoria / extreme / wild-swings), each entry in this list
+    # replaces the corresponding tick's pct value. Units: decimal
+    # fraction (0.05 = 5%). Missing / None = keep YAML default.
+    pct_overrides: Optional[list[float]] = None
+    # Restrict the sim to a subset of tradingsymbols — after seeding,
+    # positions whose tradingsymbol isn't in this list are dropped.
+    # Empty / None = all positions. Useful for "what if only NIFTY…?"
+    symbols: Optional[list[str]] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
@@ -80,6 +89,11 @@ class SimScenarioInfo(msgspec.Struct):
     mode: str
     ticks: int
     has_initial: bool
+    # Per-tick pct defaults extracted from the scenario's YAML. UI renders
+    # these as editable fields so operators can tweak the magnitude before
+    # Start. Entries are None for ticks that aren't pct-shaped
+    # (target_pnl / random_walk / set_margin).
+    tick_pcts: list[float | None]
 
 
 class SimEventInfo(msgspec.Struct):
@@ -123,6 +137,7 @@ class SimulatorController(Controller):
                 slug=s["slug"], name=s["name"],
                 description=s["description"], mode=s["mode"], ticks=s["ticks"],
                 has_initial=s["has_initial"],
+                tick_pcts=s.get("tick_pcts") or [],
             ))
         return out
 
@@ -171,6 +186,8 @@ class SimulatorController(Controller):
                 only_agent_ids=data.agent_ids,
                 positions_every_n_ticks=data.positions_every_n_ticks,
                 market_state_override=market_state_override,
+                pct_overrides=data.pct_overrides,
+                symbol_filter=data.symbols,
             )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))

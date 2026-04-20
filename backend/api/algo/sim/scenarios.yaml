@@ -116,6 +116,31 @@
         - {type: pct, scope: "positions.**", value: 0.10}
 
 # ─────────────────────────────────────────────────────────────────────────
+# Wild swings — high volatility with alternating direction. Stresses
+# positions in BOTH directions in quick succession, catching rules that
+# rely on consistent drift plus catching risky short-gamma exposures.
+# ─────────────────────────────────────────────────────────────────────────
+- slug: wild-swings
+  name: Wild swings (+5% / -8% / +12% — editable)
+  mode: symbol
+  market_state: {preset: mid_session}
+  description: >-
+    Alternating-direction volatility over three ticks. Default swings
+    are +5% / -8% / +12%; override any of the three from the
+    simulator page before Start. Long and short positions both take
+    hits somewhere in the sequence.
+  ticks:
+    - at: 0
+      moves:
+        - {type: pct, scope: "positions.**", value:  0.05}
+    - at: 1
+      moves:
+        - {type: pct, scope: "positions.**", value: -0.08}
+    - at: 2
+      moves:
+        - {type: pct, scope: "positions.**", value:  0.12}
+
+# ─────────────────────────────────────────────────────────────────────────
 # Random walk — drift-with-vol stress on positions. Useful for
 # "does anything fire that I didn't expect?" over 30+ ticks.
 # ─────────────────────────────────────────────────────────────────────────
