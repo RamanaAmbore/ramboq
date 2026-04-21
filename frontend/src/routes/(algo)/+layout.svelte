@@ -554,6 +554,35 @@
   }
   :global(.algo-content .field-input:focus) { border-color: #fbbf24 !important; }
 
+  /* .field-input sets border-color shorthand which overwrites the amber
+     left rule shipped with .cmd-input — restore it inside algo pages so
+     the Terminal textarea and any other cmd-input surface keep the
+     Bloomberg-style amber accent that the Orders command bar uses. */
+  :global(.algo-content .cmd-input) {
+    border-left: 3px solid #fbbf24 !important;
+  }
+  :global(.algo-content .cmd-input:focus) {
+    border-left-color: #fbbf24 !important;
+  }
+
+  /* .cmd-surface: mirrors the Orders command-bar amber left accent onto
+     any entry/form card so the user knows at a glance "this is where
+     input goes". Applied to the Simulator's control card; can be added
+     to future form surfaces as-is. */
+  :global(.algo-content .cmd-surface) {
+    border-left: 3px solid #fbbf24 !important;
+  }
+
+  /* .sim-btn-order: compact modifier for places where the sim-btn
+     palette is reused outside the Simulator's grow-to-fill row. Drops
+     the flex grow/basis so the button sizes to its content (e.g. the
+     Submit/BUY/SELL/Clear cluster on the Orders page). */
+  :global(.sim-btn.sim-btn-order) {
+    flex: 0 0 auto;
+    max-width: none;
+    padding: 0.3rem 0.9rem;
+  }
+
   /* <select> element + dropdown popup — matches the OrderPopup modal's
      palette (linear-gradient(#273552 → #1d2a44) + amber accent border).
      Native browsers render the option list as OS chrome, but setting

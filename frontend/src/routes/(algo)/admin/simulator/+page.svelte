@@ -320,7 +320,7 @@
 </div>
 
 <!-- Controls card — no header label (the fields + buttons speak for themselves) -->
-<div class="algo-status-card p-3 mb-3" data-status="inactive">
+<div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
   <!-- Row 1 — Scenario + Symbol + Tick % overrides together on one row.
        Scenario is given most of the width (long names), Symbol is a
        dropdown sourced from the live snapshot / scenario initial, and

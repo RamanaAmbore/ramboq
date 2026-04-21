@@ -194,13 +194,19 @@
     disabled={running}
   />
   <div class="absolute bottom-1 right-2 flex gap-1 z-10">
+    <!-- Submit / BUY / SELL — reuses the simulator button palette so
+         order entry reads like the rest of the algo console. BUY is
+         emerald (sim Start), SELL is the deeper sim Clear red, generic
+         Submit borrows the cycle amber. -->
     <button onclick={() => cmdBar?.submit()} disabled={running}
-      class="text-[0.6rem] py-0.5 px-3 rounded-sm font-semibold disabled:opacity-50 border
-        {cmdVerb === 'BUY' ? 'border-green-500/60 bg-green-500/20 text-green-300 hover:bg-green-500/30'
-        : cmdVerb === 'SELL' ? 'border-red-500/60 bg-red-500/20 text-red-300 hover:bg-red-500/30'
-        : 'border-emerald-500/60 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'}">{cmdVerb === 'BUY' ? 'BUY' : cmdVerb === 'SELL' ? 'SELL' : 'Submit'}</button>
+      class="sim-btn sim-btn-order
+        {cmdVerb === 'BUY'  ? 'sim-btn-primary'
+       : cmdVerb === 'SELL' ? 'sim-btn-danger'
+       :                       'sim-btn-cycle'} disabled:opacity-40">
+       {cmdVerb === 'BUY' ? 'BUY' : cmdVerb === 'SELL' ? 'SELL' : 'Submit'}
+    </button>
     <button onclick={() => { cmdBar?.clear(); cmdVerb = ''; }}
-      class="text-[0.6rem] py-0.5 px-2.5 rounded-sm border border-slate-500/40 bg-slate-700/40 text-slate-300 hover:bg-slate-700/60 font-medium">Clear</button>
+      class="sim-btn sim-btn-order sim-btn-secondary">Clear</button>
   </div>
 </div>
 
