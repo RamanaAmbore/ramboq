@@ -184,7 +184,8 @@ export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
           positions_every_n_ticks: opts.positions_every_n_ticks ?? null,
           market_state_preset:     opts.market_state_preset || null,
           pct_overrides:           opts.pct_overrides           || null,
-          symbols:                 opts.symbols                 || null },
+          symbols:                 opts.symbols                 || null,
+          spread_pct:              opts.spread_pct              ?? null },
         { auth: true });
 export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
 export const stepSim              = () => _post('/simulator/step', {}, { auth: true });

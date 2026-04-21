@@ -69,6 +69,12 @@
   onDestroy(() => { if (simIv) clearInterval(simIv); });
 </script>
 
+<!-- Algo-side favicon — a circled "algo" mark so the browser tab visually
+     separates the trading-console tabs from the public marketing site. -->
+<svelte:head>
+  <link rel="icon" type="image/svg+xml" href="/algo-favicon.svg" />
+</svelte:head>
+
 <div class="algo-viewport">
   <div class="algo-card">
     <!-- Top bar -->
@@ -78,6 +84,14 @@
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" style="height:1.2rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          <span class="algo-brand-mark" aria-label="algo console">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="4"/>
+              <text x="32" y="41" text-anchor="middle" font-size="22" font-weight="700"
+                    font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+                    fill="currentColor" letter-spacing="-0.5">algo</text>
+            </svg>
+          </span>
         </button>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -102,6 +116,14 @@
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" style="height:1.0rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          <span class="algo-brand-mark" aria-label="algo console">
+            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="4"/>
+              <text x="32" y="41" text-anchor="middle" font-size="22" font-weight="700"
+                    font-family="ui-monospace, 'SF Mono', Menlo, monospace"
+                    fill="currentColor" letter-spacing="-0.5">algo</text>
+            </svg>
+          </span>
         </button>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
@@ -229,6 +251,22 @@
     letter-spacing: 0.08em;
     font-family: ui-monospace, monospace;
     line-height: 1;
+  }
+  /* Circled "algo" badge sitting next to the company name — makes it
+     obvious at a glance that this tab is the trading console, not the
+     public site. Uses currentColor so it inherits the amber brand tone. */
+  .algo-brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fbbf24;
+    width: 1.5rem;
+    height: 1.5rem;
+    filter: drop-shadow(0 0 3px rgba(251,191,36,0.55));
+  }
+  .algo-brand-mark svg { width: 100%; height: 100%; display: block; }
+  @media (max-width: 767px) {
+    .algo-brand-mark { width: 1.25rem; height: 1.25rem; }
   }
 
   /* Nav buttons */

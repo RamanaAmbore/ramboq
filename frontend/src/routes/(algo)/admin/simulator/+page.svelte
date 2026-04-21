@@ -14,8 +14,9 @@
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
     fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
   } from '$lib/api';
-  import LogPanel from '$lib/LogPanel.svelte';
-  import Select   from '$lib/Select.svelte';
+  import LogPanel    from '$lib/LogPanel.svelte';
+  import Select      from '$lib/Select.svelte';
+  import MultiSelect from '$lib/MultiSelect.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
@@ -35,9 +36,14 @@
   // a scenario that has pct-shaped ticks (crash / euphoria / extreme /
   // wild-swings). Values are shown to the operator as % (5 not 0.05).
   let pctOverrides = $state(/** @type {Array<number | ''>} */([]));
-  // Tradingsymbol to restrict the sim to. Empty = all positions from
-  // the loaded live book. Populated from liveSnap when available.
-  let symbolFilter = $state(/** @type {string} */(''));
+  // Tradingsymbols to restrict the sim to. Empty array = all positions.
+  // Options are sourced from live snapshot, current sim state, and the
+  // scenario's scripted initial so the list is never stale. Multi-select
+  // so the operator can tag several symbols at once.
+  let symbolFilter = $state(/** @type {string[]} */([]));
+  // Bid/ask spread in percent (0.10 = 10 bps). Drives side-aware limit
+  // prices in the sim's paper-trade chase engine.
+  let spreadPct    = $state(/** @type {number | ''} */(0.10));
   // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
@@ -133,7 +139,8 @@
         opts.pct_overrides = pctOverrides.map(v =>
           v === '' || v == null ? null : Number(v) / 100);
       }
-      if (symbolFilter) opts.symbols = [symbolFilter];
+      if (symbolFilter && symbolFilter.length) opts.symbols = [...symbolFilter];
+      if (spreadPct !== '' && spreadPct != null) opts.spread_pct = Number(spreadPct);
       status = await startSim(pickedSlug, rateMs, opts);
       const tag = agentId ? ` (agent #${agentId} only)` : '';
       const cadTag = ` · P:${status.positions_every_n_ticks}`;
@@ -184,14 +191,31 @@
 
   // Reactive helpers used by the Scenario / Symbol / Tick-% row.
   const pickedScenario = $derived(scenarios.find(s => s.slug === pickedSlug));
+  // Union of every known symbol source so the picker stays fresh whether
+  // the operator loaded a live book, started a sim, or just picked a
+  // scripted scenario. Deduped and sorted.
   const symbolOptions  = $derived.by(() => {
-    const opts = [{ value: '', label: '(all positions)' }];
-    const src  = (liveSnap?.symbols && liveSnap.symbols.length)
-      ? liveSnap.symbols
-      : (pickedScenario?.initial_symbols || []);
-    for (const s of src) opts.push({ value: s, label: s });
-    return opts;
+    /** @type {Set<string>} */
+    const pool = new Set();
+    for (const s of (liveSnap?.symbols         || [])) if (s) pool.add(s);
+    for (const s of (status?.symbols           || [])) if (s) pool.add(s);
+    for (const s of (pickedScenario?.initial_symbols || [])) if (s) pool.add(s);
+    return [...pool].sort().map(s => ({ value: s, label: s }));
   });
+
+  // Clean-up the scenario name for the dropdown label — the YAML stores
+  // long names like "Extreme euphoria (+3% / +6% / +10% positions)"; we
+  // keep the brief headline ("Extreme euphoria") in the trigger and push
+  // the bracketed detail into the option's hint line.
+  /** @param {string} name */
+  function shortName(name) {
+    return (name || '').replace(/\s*\([^)]*\)\s*/g, '').trim();
+  }
+  /** @param {string} name */
+  function bracketHint(name) {
+    const m = (name || '').match(/\(([^)]*)\)/);
+    return m ? m[1].trim() : '';
+  }
 
   // Whenever the scenario picker changes, refresh the pct-override inputs
   // with the new scenario's YAML defaults. Each tick becomes one editable
@@ -299,15 +323,24 @@
       <Select id="sim-scenario" bind:value={pickedSlug}
         options={scenarios.map(s => ({
           value: s.slug,
-          label: s.name,
-          hint:  `${s.mode} · ${s.ticks} ticks`,
+          label: shortName(s.name),
+          hint:  bracketHint(s.name) || `${s.mode} · ${s.ticks} ticks`,
         }))} />
     </div>
     <div class="sim-field sim-field-symbol">
-      <label for="sim-symbol" class="field-label" title="Restrict sim to one tradingsymbol (e.g. NIFTY25APRFUT). Default: all positions.">Symbol</label>
-      <Select id="sim-symbol" bind:value={symbolFilter}
+      <label for="sim-symbol" class="field-label" title="Restrict sim to one or more tradingsymbols. Default: all positions.">Symbol</label>
+      <MultiSelect id="sim-symbol" bind:value={symbolFilter}
         options={symbolOptions}
         placeholder="(all positions)" />
+    </div>
+    <div class="sim-field sim-field-spread">
+      <label for="sim-spread" class="field-label" title="Bid/ask spread applied to every position. SELL orders quote the bid, BUY orders quote the ask. Drives the paper-trade chase engine.">Spread %</label>
+      <div class="sim-pct-cell">
+        <input id="sim-spread" type="number" min="0" step="0.01"
+               class="field-input sim-pct-input"
+               bind:value={spreadPct} />
+        <span class="sim-pct-unit">%</span>
+      </div>
     </div>
     {#if pctOverrides.length > 0}
       <div class="sim-field sim-field-pcts">
@@ -439,8 +472,9 @@
   /* Scenario takes most of the first row; Symbol is a compact picker;
      the tick-pct inputs cling to the right edge. Together they fit on
      one line on desktop and wrap gracefully on narrower screens. */
-  .sim-field-scenario { flex: 4 1 240px; }
-  .sim-field-symbol   { flex: 2 1 140px; }
+  .sim-field-scenario { flex: 4 1 220px; }
+  .sim-field-symbol   { flex: 3 1 180px; }
+  .sim-field-spread   { flex: 0 0 5rem;  }
   .sim-field-pcts     { flex: 3 1 200px; }
 
   .sim-pct-inline {
@@ -520,23 +554,22 @@
     color: rgba(2,44,30,0.7);
     border-color: rgba(16,185,129,0.45);
   }
-  /* Stop button — solid rose-red so it's unmistakable as the halt
-     control; distinct from the darker full-red used by Clear (.danger)
-     and the amber Start (.primary). No more faint look. */
+  /* Stop button — pure red so the halt control reads as "hard stop" and
+     sits opposite the emerald Start. Hovers to the deeper red-700. */
   :global(.sim-btn-secondary) {
-    background: #f43f5e;
+    background: #dc2626;
     color: #fff1f2;
-    border-color: #f43f5e;
+    border-color: #dc2626;
     font-weight: 700;
   }
   :global(.sim-btn-secondary:hover:not(:disabled)) {
-    background: #e11d48;
-    border-color: #e11d48;
+    background: #b91c1c;
+    border-color: #b91c1c;
   }
   :global(.sim-btn-secondary:disabled) {
-    background: rgba(244,63,94,0.25);
+    background: rgba(220,38,38,0.25);
     color: rgba(255,241,242,0.6);
-    border-color: rgba(244,63,94,0.45);
+    border-color: rgba(220,38,38,0.45);
   }
   :global(.sim-btn-load) {
     background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.5);

@@ -184,17 +184,23 @@ def get_scenario(slug: str) -> Optional[dict]:
 #  Per-row math — LTP changes drive every derived field.
 # ═════════════════════════════════════════════════════════════════════════
 
-def _recompute_position_row(row: dict) -> None:
+def _recompute_position_row(row: dict, spread_pct: float = 0.0) -> None:
     """
-    Mutate a positions row in-place: keep `pnl` consistent with the current
-    `last_price`. Real Kite `pnl` includes realised + m2m; for the simulator
-    we use the simple model `(last_price - average_price) × quantity` because
-    that's what the loss-* agents read.
+    Mutate a positions row in-place: keep `pnl` / `bid` / `ask` consistent
+    with the current `last_price`. Real Kite `pnl` includes realised + m2m;
+    for the simulator we use the simple model
+    `(last_price - average_price) × quantity` because that's what the
+    loss-* agents read. `bid` / `ask` are derived from `spread_pct` (a
+    decimal fraction — 0.001 = 0.10% spread) so paper-trade limit prices
+    can pick the correct side of the market.
     """
     qty = float(row.get("quantity")       or 0)
     avg = float(row.get("average_price")  or 0)
     lp  = float(row.get("last_price")     or 0)
     row["pnl"] = (lp - avg) * qty
+    half = max(0.0, float(spread_pct)) / 2.0
+    row["bid"] = lp * (1.0 - half) if lp else 0.0
+    row["ask"] = lp * (1.0 + half) if lp else 0.0
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -274,6 +280,23 @@ class SimDriver:
         # Rolling buffer of recent ticks surfaced via /api/simulator/ticks/recent.
         self._tick_log: deque[dict] = deque(maxlen=TICK_LOG_LIMIT)
 
+        # Bid/ask spread (decimal fraction — 0.001 = 0.10%). Applied on
+        # every _recompute_position_row so every position carries per-side
+        # prices. Resolved at start() from the request override or the DB
+        # setting `simulator.default_spread_pct`.
+        self.spread_pct: float = 0.0
+
+        # Simulated limit-order book. One dict per open paper-trade order
+        # placed by an agent fire. The chase loop (`_chase_open_orders`)
+        # runs once per tick and tries to fill / modify each entry:
+        #   - fill when bid ≥ limit (SELL) or ask ≤ limit (BUY)
+        #   - otherwise bump the limit toward the other side (chases)
+        #   - give up after simulator.chase_max_attempts; marks unfilled
+        # Each entry: {algo_order_id, account, symbol, side, qty, limit_price,
+        #              initial_price, attempts, status, agent_slug, action_type,
+        #              placed_at, exchange}
+        self._sim_open_orders: list[dict] = []
+
     @classmethod
     def instance(cls) -> "SimDriver":
         if cls._instance is None:
@@ -328,6 +351,17 @@ class SimDriver:
             "tick_pcts":               self._tick_pcts_for_ui(),
             "symbol_filter":           [r.get("tradingsymbol") for r in self._positions_rows]
                                         if self.scenario else [],
+            # Distinct tradingsymbols currently loaded. Lets the UI keep the
+            # Symbol picker fresh even when the operator started without
+            # pressing "Load live book" first.
+            "symbols":                 sorted({
+                                           str(r.get("tradingsymbol", ""))
+                                           for r in self._positions_rows
+                                           if r.get("tradingsymbol")
+                                       }),
+            "spread_pct":              self.spread_pct,
+            "open_orders":             len([o for o in self._sim_open_orders
+                                            if o.get("status") == "OPEN"]),
         }
 
     # ── DataFrame builder the agent engine consumes ───────────────────
@@ -372,7 +406,8 @@ class SimDriver:
               market_state_override: dict | None = None,
               inline_scenario: dict | None = None,
               pct_overrides: list[float] | None = None,
-              symbol_filter: list[str] | None = None) -> dict:
+              symbol_filter: list[str] | None = None,
+              spread_pct: float | None = None) -> dict:
         """
         Start the sim against a named scenario from scenarios.yaml, or an
         `inline_scenario` dict (same shape) built at call time by the
@@ -417,6 +452,20 @@ class SimDriver:
         self.tick_index     = 0
         self.started_at     = datetime.now()
         self.only_agent_ids = list(only_agent_ids) if only_agent_ids else None
+        self._sim_open_orders = []
+
+        # Spread — request override > scenario YAML > DB setting. Stored as
+        # a decimal fraction internally (0.001 = 0.10%). The UI submits a
+        # percent (0.10) which the route layer converts before calling us.
+        from backend.shared.helpers.settings import get_float
+        raw_sp = (spread_pct
+                  if spread_pct is not None
+                  else scen.get("spread_pct",
+                                get_float("simulator.default_spread_pct", 0.10) / 100.0))
+        try:
+            self.spread_pct = max(0.0, float(raw_sp))
+        except (TypeError, ValueError):
+            self.spread_pct = 0.0
 
         # Positions cadence — request override > scenario YAML > DB default.
         # Clamped to >= 1 so nothing ever gets divided by zero or silenced.
@@ -469,7 +518,7 @@ class SimDriver:
                 self._margins_rows.extend(copy.deepcopy(initial.get("margins", [])))
 
         for r in self._positions_rows:
-            _recompute_position_row(r)
+            _recompute_position_row(r, self.spread_pct)
 
         # Symbol filter — drop positions whose tradingsymbol isn't in the
         # requested allow-list. Operators use this to target a single
@@ -642,6 +691,15 @@ class SimDriver:
 
         self.tick_index += 1
         self._record_tick(kind="tick", moves=moves, changes=changes)
+        # Run the chase engine against the new bid/ask state: fill any
+        # orders whose limit crossed, otherwise re-quote them one step
+        # closer to the opposite side.
+        self._chase_open_orders()
+        # If every position has closed out (either via fills or because the
+        # operator scoped the sim to an empty symbol list), there's nothing
+        # left to simulate — halt cleanly with a terminal log entry so the
+        # operator knows why the loop exited.
+        self._check_auto_complete()
 
     def _iter_rows(self, section: str):
         """Yield (row, section) pairs for a given section name."""
@@ -799,7 +857,185 @@ class SimDriver:
         # holdings is never populated — positions-only sim. Any future
         # section gets silently ignored here.
         if section == "positions":
-            _recompute_position_row(row)
+            _recompute_position_row(row, self.spread_pct)
+
+    # ── Paper-trade chase engine ─────────────────────────────────────
+
+    def register_open_order(self, order: dict) -> None:
+        """
+        Called by _sim_paper_trade once the initial AlgoOrder row is
+        persisted. `order` fields:
+          algo_order_id  — DB row id
+          account / symbol / side / qty / limit_price / exchange
+          initial_price  — the LTP we quoted against at placement
+          agent_slug / action_type — for log attribution
+        The chase loop owns the lifecycle from here.
+        """
+        order.setdefault("status",   "OPEN")
+        order.setdefault("attempts", 0)
+        order.setdefault("placed_at", datetime.now().isoformat(timespec="seconds"))
+        self._sim_open_orders.append(order)
+
+    def _chase_open_orders(self) -> None:
+        """
+        Per-tick: try to fill each open order against the current bid/ask.
+        If not fillable, modify the limit toward the opposite side. Give
+        up after `simulator.chase_max_attempts` modifications. On fill,
+        the matched position is zero'd out and removed — the book is
+        genuinely smaller afterwards.
+        """
+        if not self._sim_open_orders:
+            return
+        from backend.shared.helpers.settings import get_int
+        max_attempts = max(0, get_int("simulator.chase_max_attempts", 5))
+
+        # Index positions by (account, symbol) for quick bid/ask lookup.
+        pos_index = {}
+        for r in self._positions_rows:
+            key = (str(r.get("account", "")), str(r.get("tradingsymbol", "")))
+            pos_index[key] = r
+
+        for order in self._sim_open_orders:
+            if order.get("status") != "OPEN":
+                continue
+            key = (str(order.get("account", "")), str(order.get("symbol", "")))
+            pos = pos_index.get(key)
+            if not pos:
+                # Underlying position vanished (already closed by another
+                # chase cycle, or symbol_filter cleared it) — mark the
+                # order done and move on.
+                order["status"] = "FILLED"
+                self._record_order_event(order, kind="fill",
+                                         note="underlying position absent — auto-closed")
+                continue
+
+            side  = str(order.get("side") or "SELL").upper()
+            limit = float(order.get("limit_price") or 0)
+            bid   = float(pos.get("bid") or 0)
+            ask   = float(pos.get("ask") or 0)
+
+            fillable = (side == "SELL" and bid >= limit) or \
+                       (side == "BUY"  and ask <= limit)
+            if fillable:
+                fill_price = bid if side == "SELL" else ask
+                order["status"]       = "FILLED"
+                order["fill_price"]   = fill_price
+                order["filled_at"]    = datetime.now().isoformat(timespec="seconds")
+                self._record_order_event(order, kind="fill",
+                                         note=f"filled @₹{fill_price:,.2f}")
+                # Close out the position in the sim book — remove the row
+                # so downstream ticks no longer see it. This means repeated
+                # Run cycle / Start actions on the same scenario won't keep
+                # re-firing the same agent over a phantom position.
+                self._positions_rows = [
+                    r for r in self._positions_rows
+                    if (str(r.get("account", "")),
+                        str(r.get("tradingsymbol", ""))) != key
+                ]
+                continue
+
+            # Not fillable — chase by re-quoting at the current opposite
+            # side. Give up after N attempts.
+            if order.get("attempts", 0) >= max_attempts:
+                order["status"] = "UNFILLED"
+                self._record_order_event(order, kind="unfilled",
+                                         note=f"gave up after {max_attempts} chase attempts")
+                continue
+            new_limit = bid if side == "SELL" else ask
+            prev_limit = limit
+            order["limit_price"] = new_limit
+            order["attempts"]    = int(order.get("attempts", 0)) + 1
+            self._record_order_event(
+                order, kind="modify",
+                note=(f"chase #{order['attempts']} {side} "
+                      f"₹{prev_limit:,.2f} → ₹{new_limit:,.2f}"),
+            )
+
+    def _record_order_event(self, order: dict, *, kind: str, note: str) -> None:
+        """Append an order lifecycle event to the rolling tick log."""
+        self._tick_log.append({
+            "ts":         datetime.now().isoformat(timespec="seconds"),
+            "tick_index": self.tick_index,
+            "scenario":   self.scenario_slug,
+            "kind":       kind,
+            "moves":      [],
+            "changes":    [],
+            "note":       f"[SIM] {order.get('agent_slug','?')} · "
+                          f"{order.get('action_type','?')}: "
+                          f"{order.get('side')} {order.get('qty')} "
+                          f"{order.get('symbol')} · {note}",
+            "order": {
+                "account":     order.get("account"),
+                "symbol":      order.get("symbol"),
+                "side":        order.get("side"),
+                "qty":         order.get("qty"),
+                "limit_price": order.get("limit_price"),
+                "status":      order.get("status"),
+                "attempts":    order.get("attempts"),
+            },
+        })
+        logger.warning(
+            f"[SIM] order {kind} · {order.get('agent_slug','?')} · "
+            f"{order.get('symbol')} {order.get('side')} "
+            f"{order.get('qty')} · {note}"
+        )
+        # Mirror fill/unfilled to the DB row if we have its id — lets the
+        # Orders page see the terminal state without another lookup.
+        if kind in ("fill", "unfilled") and order.get("algo_order_id"):
+            try:
+                import asyncio as _asyncio
+                _asyncio.create_task(self._update_algo_order(order, kind))
+            except RuntimeError:
+                # No running event loop (Step button in a sync context) —
+                # skip the DB update; tick_log already has the outcome.
+                pass
+
+    async def _update_algo_order(self, order: dict, kind: str) -> None:
+        try:
+            from backend.api.database import async_session
+            from backend.api.models import AlgoOrder
+            from sqlalchemy import select as _select
+            async with async_session() as s:
+                row = (await s.execute(
+                    _select(AlgoOrder).where(AlgoOrder.id == order["algo_order_id"])
+                )).scalar_one_or_none()
+                if not row:
+                    return
+                row.status = "FILLED" if kind == "fill" else "UNFILLED"
+                row.attempts = int(order.get("attempts", 0))
+                if kind == "fill" and order.get("fill_price") is not None:
+                    row.fill_price = float(order["fill_price"])
+                    initial = row.initial_price or 0
+                    if initial:
+                        row.slippage = float(order["fill_price"]) - float(initial)
+                    row.filled_at = datetime.now()
+                await s.commit()
+        except Exception as e:
+            logger.debug(f"[SIM] could not update AlgoOrder: {e}")
+
+    def _check_auto_complete(self) -> None:
+        """
+        Halt the sim when there's nothing left to simulate. Two triggers:
+          - _positions_rows is empty (every position closed out — either
+            via chase fills or a symbol filter that matched nothing), AND
+          - no OPEN sim orders remain (so we're not mid-chase)
+        Records a 'completed' entry in the tick log before stopping so the
+        operator sees why the loop exited.
+        """
+        if not self.active:
+            return
+        has_open = any(o.get("status") == "OPEN" for o in self._sim_open_orders)
+        if self._positions_rows or has_open:
+            return
+        self._record_tick(
+            kind="completed", moves=[], changes=[],
+            note="Simulation complete — no positions left to simulate.",
+        )
+        logger.warning("[SIM] Auto-completed — no positions remaining")
+        self.active = False
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = None
 
     def _change(self, section: str, row: dict, prev: float, new: float,
                 *, reason: str) -> dict:
@@ -812,6 +1048,10 @@ class SimDriver:
             "next":    new,
             "delta":   new - prev,
             "reason":  reason,
+            # Derived bid/ask included so the tick log panel can show the
+            # spread that each position currently quotes.
+            "bid":     row.get("bid"),
+            "ask":     row.get("ask"),
         }
 
     # ── Legacy aggregate patch (kept so older scenarios still work) ───

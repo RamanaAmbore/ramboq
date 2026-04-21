@@ -90,6 +90,14 @@ SEEDS: list[tuple] = [
     ("simulator", "simulator.default_rate_ms",         "int", 2000,
      "Default tick rate (ms) when the UI opens.", "ms",
      {"min": 200, "max": 60000, "step": 100}),
+    ("simulator", "simulator.default_spread_pct",      "float", 0.10,
+     "Default bid/ask spread (% of LTP) applied to every position. Drives "
+     "side-aware limit prices and the paper-trade chase engine.",
+     "%", {"min": 0.0, "max": 5.0, "step": 0.01}),
+    ("simulator", "simulator.chase_max_attempts",      "int", 5,
+     "Maximum price-modify attempts a sim paper-trade will make before the "
+     "order is marked as unfilled. Zero disables chasing.",
+     None, {"min": 0, "max": 50, "step": 1}),
 
     # ── Notifications (per-branch capability toggles) ───────────────────
     # NOTE: these MIRROR the cap_in_<branch>.<feature> YAML flags; the

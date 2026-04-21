@@ -65,15 +65,17 @@ async def execute(agent, actions: list, context: dict):
                             params, sim_mode=sim_mode)
 
 
-def _sim_ltp_for(account: str, symbol: str) -> tuple[float | None, int | None]:
+def _sim_prices_for(account: str, symbol: str) -> tuple[float | None, float | None, float | None, int | None]:
     """
-    Look up the current simulated last_price + signed quantity for
-    (account, symbol) from the SimDriver's per-symbol state. Used by
-    paper-trade writers so the AlgoOrder row carries the LIMIT price the
-    sim would have submitted to the broker.
+    Look up simulated (last_price, bid, ask, signed quantity) for
+    (account, symbol) from the SimDriver's per-symbol state. Paper-trade
+    writers use `bid` / `ask` to pick the correct side of the book for
+    the initial limit price (SELL@bid, BUY@ask), which is exactly what
+    the live chase engine does against real broker quotes.
 
-    Returns (None, None) when the symbol isn't in the sim state — the
-    writer then falls back to the price param or leaves the column null.
+    Returns (None, None, None, None) when the symbol isn't in the sim
+    state — the writer then falls back to the price param or leaves
+    the price column null.
     """
     try:
         from backend.api.algo.sim.driver import get_driver
@@ -81,13 +83,23 @@ def _sim_ltp_for(account: str, symbol: str) -> tuple[float | None, int | None]:
         for row in getattr(drv, "_positions_rows", []):
             if str(row.get("account")) == str(account) and \
                str(row.get("tradingsymbol")) == str(symbol):
-                lp = row.get("last_price")
+                lp  = row.get("last_price")
+                bid = row.get("bid")
+                ask = row.get("ask")
                 qty = row.get("quantity")
-                return (float(lp) if lp is not None else None,
-                        int(qty)  if qty is not None else None)
+                return (float(lp)  if lp  is not None else None,
+                        float(bid) if bid is not None else None,
+                        float(ask) if ask is not None else None,
+                        int(qty)   if qty is not None else None)
     except Exception:
         pass
-    return None, None
+    return None, None, None, None
+
+
+def _sim_ltp_for(account: str, symbol: str) -> tuple[float | None, int | None]:
+    """Back-compat shim — existing call sites want (LTP, qty) only."""
+    lp, _bid, _ask, qty = _sim_prices_for(account, symbol)
+    return lp, qty
 
 
 def _sim_positions_in_scope(params: dict) -> list[dict]:
@@ -116,12 +128,16 @@ def _sim_positions_in_scope(params: dict) -> list[dict]:
 
 async def _write_sim_order(agent, action_type: str, resolved: dict):
     """
-    Write ONE AlgoOrder row (mode='sim') + push a 'kind=order' entry to
-    the sim driver's tick log so the Order + Simulator tabs both show
-    the full order details. `resolved` must contain real
-    account / symbol / side / qty / price — callers resolve these from
-    either the action params (close_position, place_order) or from the
-    sim's per-symbol state (chase_close_positions expands per-position).
+    Write ONE AlgoOrder row (mode='sim'), push a 'kind=order' entry to
+    the sim driver's tick log, AND register the order with the sim
+    driver's chase engine. The driver's chase loop (`_chase_open_orders`)
+    then adjusts the limit price on each subsequent tick and marks the
+    order FILLED once the bid/ask crosses.
+
+    `resolved` must contain real account / symbol / side / qty / price
+    — callers resolve these from either the action params
+    (close_position, place_order) or from the sim's per-symbol state
+    (chase_close_positions expands per-position).
     """
     from backend.api.database import async_session
     from backend.api.models import AlgoOrder
@@ -141,16 +157,19 @@ async def _write_sim_order(agent, action_type: str, resolved: dict):
               f"{symbol} {price_str} · acct={account}")
     logger.warning(pretty)
 
+    algo_order_id = None
     try:
         async with async_session() as s:
-            s.add(AlgoOrder(
+            row = AlgoOrder(
                 account=account, symbol=symbol, exchange=exchange,
                 transaction_type=side, quantity=qty,
                 initial_price=(float(price) if price is not None else None),
-                status="simulated", engine="sim", mode="sim",
+                status="OPEN", engine="sim", mode="sim",
                 detail=pretty,
-            ))
+            )
+            s.add(row)
             await s.commit()
+            algo_order_id = row.id
     except Exception as e:
         logger.error(f"[SIM] paper-trade write failed: {e}")
         return
@@ -170,8 +189,25 @@ async def _write_sim_order(agent, action_type: str, resolved: dict):
                 "account": account, "symbol": symbol, "side": side, "qty": qty,
                 "price":   (float(price) if price is not None else None),
                 "agent":   agent.slug, "action": action_type,
+                "algo_order_id": algo_order_id,
             },
         })
+        # Hand the order to the driver's chase engine. If qty is zero (no
+        # position to close — scope matched nothing) skip registration so
+        # the chase loop doesn't carry an empty entry.
+        if qty > 0 and price is not None:
+            drv.register_open_order({
+                "algo_order_id": algo_order_id,
+                "account":       account,
+                "symbol":        symbol,
+                "side":          side,
+                "qty":           qty,
+                "limit_price":   float(price),
+                "initial_price": float(price),
+                "exchange":      exchange,
+                "agent_slug":    agent.slug,
+                "action_type":   action_type,
+            })
     except Exception as e:
         logger.debug(f"[SIM] could not record order in tick_log: {e}")
 
@@ -207,12 +243,18 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
             return
         for p in positions:
             qty_held = int(p.get("quantity") or 0)
+            side = "SELL" if qty_held > 0 else "BUY"
+            # SELL hits the bid, BUY lifts the ask — matches what the live
+            # chase engine does on Kite. Fall back to LTP when the spread
+            # helper isn't populated yet.
+            price = (p.get("bid") if side == "SELL" else p.get("ask")) \
+                    or p.get("last_price")
             await _write_sim_order(agent, action_type, {
                 "account":  str(p.get("account", "SIM")),
                 "symbol":   str(p.get("tradingsymbol", "")),
-                "side":     "SELL" if qty_held > 0 else "BUY",
+                "side":     side,
                 "qty":      abs(qty_held),
-                "price":    p.get("last_price"),
+                "price":    price,
                 "exchange": str(p.get("exchange") or "NFO"),
             })
         return
@@ -220,7 +262,7 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
     if action_type in {"place_order", "close_position"}:
         account = str(params.get("account") or "SIM")
         symbol  = str(params.get("symbol")  or f"{agent.slug}-{action_type}")
-        ltp, qty_held = _sim_ltp_for(account, symbol)
+        ltp, bid, ask, qty_held = _sim_prices_for(account, symbol)
         if params.get("side") in ("BUY", "SELL"):
             side = params.get("side")
         elif params.get("transaction_type") in ("BUY", "SELL"):
@@ -235,7 +277,10 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
             qty = abs(int(qty_held))
         else:
             qty = 0
-        price = ltp if ltp is not None else params.get("price")
+        side_price = bid if side == "SELL" else ask
+        price = side_price if side_price is not None else (
+            ltp if ltp is not None else params.get("price")
+        )
         await _write_sim_order(agent, action_type, {
             "account":  account,
             "symbol":   symbol,

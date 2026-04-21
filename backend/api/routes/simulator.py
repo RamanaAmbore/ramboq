@@ -80,6 +80,9 @@ class SimStartRequest(msgspec.Struct):
     # positions whose tradingsymbol isn't in this list are dropped.
     # Empty / None = all positions. Useful for "what if only NIFTY…?"
     symbols: Optional[list[str]] = None
+    # Bid/ask spread sent as a percent (0.10 = 10 bps = 0.10% spread).
+    # None = fall back to DB setting `simulator.default_spread_pct`.
+    spread_pct: Optional[float] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
@@ -185,6 +188,11 @@ class SimulatorController(Controller):
                 {"preset": data.market_state_preset}
                 if data.market_state_preset else None
             )
+            # Convert percent (UI surface) to decimal fraction (internal).
+            spread_fraction = (
+                max(0.0, float(data.spread_pct)) / 100.0
+                if data.spread_pct is not None else None
+            )
             return get_driver().start(
                 data.scenario, data.rate_ms,
                 seed_mode=data.seed_mode,
@@ -193,6 +201,7 @@ class SimulatorController(Controller):
                 market_state_override=market_state_override,
                 pct_overrides=data.pct_overrides,
                 symbol_filter=data.symbols,
+                spread_pct=spread_fraction,
             )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))
