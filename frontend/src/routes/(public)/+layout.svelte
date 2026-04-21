@@ -239,16 +239,18 @@
   }
 
   /* ── Navbar ─────────────────────────────────────────────────────────────── */
-  /* Flat navy + amber border — mirrors the algo console navbar so the
-     public and algo sides feel like one family. Previous version kept
-     the nav_image.png texture + gold border; if the public site needs
-     its own look back, swap this block for the revert commented below. */
   .pub-navbar {
     position: sticky;
     top: 4px;
     z-index: 50;
-    background-color: #0a1020;
-    border-bottom: 2px solid #d97706;
+    background-color: #0c1830;
+    background-image:
+      linear-gradient(rgba(8,14,30,0.78), rgba(8,14,30,0.78)),
+      url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-bottom: 2px solid #c8a84b;
     overflow: visible;
   }
 
@@ -460,13 +462,18 @@
     padding: 1rem 1rem 1.5rem;
   }
 
-  /* Flat navy + amber border — same palette as the algo footer. */
   .pub-footer {
     position: sticky;
     bottom: 4px;
     z-index: 40;
-    background-color: #0a1020;
-    border-top: 1px solid rgba(251,191,36,0.2);
+    background-color: #0c1830;
+    background-image:
+      linear-gradient(rgba(8,14,30,0.78), rgba(8,14,30,0.78)),
+      url('/nav_image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-top: 1px solid rgba(200,168,75,0.45);
     height: 1.4rem;
     display: flex;
     align-items: center;
