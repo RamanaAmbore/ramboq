@@ -235,21 +235,26 @@
 
   function applyAccountFilter() {
     if (!holdingsAllGrid) return;
-    const hRows = selectedAccount === 'all' ? rawHoldings : rawHoldings.filter(r => r.account === selectedAccount);
-    const pRows = selectedAccount === 'all' ? rawPositions : rawPositions.filter(r => r.account === selectedAccount);
-    const hTotals = makeHoldingsTotals(hRows);
-    const pTotals = makePositionsTotals(pRows);
-    updateGrid(holdingsSummaryGrid, rawHoldingsSummary);
-    updateGrid(positionsSummaryGrid, rawPositionsSummary);
+    // Match a row against the selected account filter. In "all" mode we
+    // keep everything; for a specific account we drop other accounts AND
+    // the TOTAL aggregate — summary + funds should show exactly one row
+    // for the account the operator drilled into.
+    const keep = (r) => selectedAccount === 'all'
+      ? true
+      : (r.account === selectedAccount);
+    const hRows     = rawHoldings.filter(keep);
+    const pRows     = rawPositions.filter(keep);
+    const hSummary  = rawHoldingsSummary.filter(keep);
+    const pSummary  = rawPositionsSummary.filter(keep);
+    const fRows     = rawFunds.filter(keep);
+    const hTotals   = makeHoldingsTotals(hRows);
+    const pTotals   = makePositionsTotals(pRows);
+    updateGrid(holdingsSummaryGrid, hSummary);
+    updateGrid(positionsSummaryGrid, pSummary);
     updateGrid(holdingsAllGrid, hRows);
     holdingsAllGrid.setGridOption('pinnedBottomRowData', hTotals ? [hTotals] : []);
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
-    // Funds rows scope to the selected account too. TOTAL is only useful
-    // in the "all" view; for a single account it duplicates the row.
-    const fRows = selectedAccount === 'all'
-      ? rawFunds
-      : rawFunds.filter(r => r.account === selectedAccount);
     updateGrid(fundsGrid, fRows);
     // When a single account is picked, the Account column is redundant —
     // every visible row carries the same value. Hide it across the three
