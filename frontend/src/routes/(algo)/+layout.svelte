@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount, onDestroy } from 'svelte';
-  import { authStore } from '$lib/stores';
+  import { authStore, visibleInterval } from '$lib/stores';
   import { fetchSimStatus } from '$lib/api';
 
   const { children } = $props();
@@ -57,16 +57,16 @@
   // every algo page without each page having to track status on its own.
   // Errors silently no-op — the capability flag may be off.
   let simStatus = $state(/** @type {any} */ ({ active: false }));
-  let simIv;
+  let simTeardown;
   async function pollSim() {
     try { simStatus = await fetchSimStatus(); }
     catch (_) { /* cap flag off or auth gone — treat as idle */ }
   }
   onMount(() => {
     pollSim();
-    simIv = setInterval(pollSim, 4000);
+    simTeardown = visibleInterval(pollSim, 4000);
   });
-  onDestroy(() => { if (simIv) clearInterval(simIv); });
+  onDestroy(() => { simTeardown?.(); });
 </script>
 
 <!-- Algo-side favicon — a circled "algo" mark so the browser tab visually

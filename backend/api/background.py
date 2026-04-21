@@ -63,20 +63,23 @@ def _default_seg_state() -> dict:
 # ---------------------------------------------------------------------------
 
 def _fetch_margins_direct() -> pd.DataFrame:
-    """Returns pandas DataFrame (alert utils expect pandas)."""
+    """
+    Returns pandas DataFrame with REAL (unmasked) account codes. Feeds the
+    agent engine + Telegram/email dispatch — both of which go to the owner,
+    so masking is unnecessary here. Public `/api/funds` re-applies masking
+    on its own output for the marketing site.
+    """
     from backend.shared.helpers import broker_apis
     df = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
-    df['account'] = mask_column(df['account'])
     total_row = df.select_dtypes(include='number').sum()
     total_row['account'] = 'TOTAL'
     return pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
 
 
 def _fetch_holdings_direct() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Returns (row_df, summary_df) as plain pandas (alert utils expect pandas)."""
+    """Returns (row_df, summary_df) with real account codes (see _fetch_margins_direct)."""
     from backend.shared.helpers import broker_apis
     raw = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
-    raw['account'] = mask_column(raw['account'])
 
     sum_cols = [c for c in ['inv_val', 'cur_val', 'pnl', 'day_change_val'] if c in raw.columns]
     grouped = raw.groupby('account')[sum_cols].sum().reset_index()
@@ -99,7 +102,6 @@ def _fetch_holdings_direct() -> tuple[pd.DataFrame, pd.DataFrame]:
 def _fetch_positions_direct() -> tuple[pd.DataFrame, pd.DataFrame]:
     from backend.shared.helpers import broker_apis
     raw = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
-    raw['account'] = mask_column(raw['account'])
     grouped = raw.groupby('account')[['pnl']].sum().reset_index() if 'pnl' in raw.columns \
               else pd.DataFrame(columns=['account', 'pnl'])
     total   = pd.DataFrame([{'account': 'TOTAL', 'pnl': grouped['pnl'].sum()}])
@@ -226,7 +228,7 @@ async def _task_performance(state: dict) -> None:
     from backend.shared.helpers.broker_apis import fetch_holidays
     from backend.shared.helpers.alert_utils import send_summary
     from backend.shared.helpers.summarise import summarise_holdings as _summarise_holdings, summarise_positions as _summarise_positions
-    from backend.api.cache import invalidate_all
+    from backend.api.cache import invalidate
     from backend.api.routes.ws import broadcast
     import json
 
@@ -281,10 +283,15 @@ async def _task_performance(state: dict) -> None:
             pass
 
         try:
-            (df_holdings, sum_holdings), (df_positions, sum_positions) = \
-                await _run(lambda: (_fetch_holdings_direct(), _fetch_positions_direct()))
-
-            df_margins  = await _run(_fetch_margins_direct)
+            # Parallelise the three broker fetches across executor threads
+            # instead of serialising them in one lambda — shaves the refresh
+            # cycle by ~(holdings + positions + margins) / 3 RTT.
+            (df_holdings, sum_holdings), (df_positions, sum_positions), df_margins = \
+                await asyncio.gather(
+                    _run(_fetch_holdings_direct),
+                    _run(_fetch_positions_direct),
+                    _run(_fetch_margins_direct),
+                )
             ist_display = timestamp_display()
             perf_key    = get_nearest_time(interval=interval)
 
@@ -346,8 +353,12 @@ async def _task_performance(state: dict) -> None:
                 except Exception as ae:
                     logger.error(f"Background: agent engine failed: {ae}")
 
-            # Invalidate in-process cache and push to WebSocket clients
-            invalidate_all()
+            # Invalidate only the caches this refresh actually renewed.
+            # News / market / instruments have their own longer TTLs (days)
+            # and don't change per tick — evicting them here used to force
+            # a cold refetch on the next request for no benefit.
+            for _k in ("holdings", "positions", "funds", "orders"):
+                invalidate(_k)
             broadcast(json.dumps({
                 "event":        "performance_updated",
                 "refreshed_at": ist_display,
@@ -485,6 +496,10 @@ async def _task_instruments() -> None:
 async def on_startup(app) -> None:
     """Start all background tasks. Called by Litestar on startup."""
     state: dict = {}
+    # Kick the batched WebSocket-event persist loop — collapses bursts of
+    # agent fires into one-commit-per-second instead of one-task-per-event.
+    from backend.api.routes.algo import start_persist_flush
+    start_persist_flush()
     app.state.bg_tasks = [
         asyncio.create_task(_task_market(state),      name="bg-market"),
         asyncio.create_task(_task_performance(state), name="bg-performance"),

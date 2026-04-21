@@ -82,6 +82,38 @@ export const dataCache = {
  * Both date halves repeated so IST/EST day-boundary cases stay
  * unambiguous. Auto-resolves EST/EDT by season.
  */
+/**
+ * setInterval variant that pauses its callback while the browser tab is
+ * backgrounded. Use this for every algo-page polling interval — it cuts
+ * the per-tab HTTP noise on Dashboard / Agents / Orders / Simulator /
+ * Terminal to zero when the user switches away.
+ *
+ * Returns a teardown function: call it from onDestroy (no separate
+ * clearInterval needed).
+ *
+ * @param {() => void} fn   callback to run on each tick
+ * @param {number}      ms  interval in milliseconds
+ * @returns {() => void}    teardown; clears the interval + removes the listener
+ */
+export function visibleInterval(fn, ms) {
+  let id = null;
+  const start = () => { if (id == null) id = setInterval(fn, ms); };
+  const stop  = () => { if (id != null) { clearInterval(id); id = null; } };
+  const onVis = () => { document.hidden ? stop() : start(); };
+  if (typeof document !== 'undefined') {
+    if (!document.hidden) start();
+    document.addEventListener('visibilitychange', onVis);
+  } else {
+    start();
+  }
+  return () => {
+    stop();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onVis);
+    }
+  };
+}
+
 export function clientTimestamp() {
   const now = new Date();
   const fmt = (tz) => {

@@ -2,11 +2,12 @@
 retry_count: 3
 conn_reset_hours: 23
 
-# Log file paths (relative to app working directory — works uniformly for prod and dev)
+# Log file paths (relative to app working directory — works uniformly for prod and dev).
+# The earlier short_* tail files were removed: they were rewritten in full on every line,
+# which burned dozens of sync I/O ops per minute during alert bursts. /api/admin/logs now
+# tails log_file directly.
 file_log_file: .log/log_file
 error_log_file: .log/error_file
-short_file_log_file: .log/short_log_file
-short_error_log_file: .log/short_error_file
 
 # Log levels (Python logging: 10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
 file_log_level: 10

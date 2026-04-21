@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp } from '$lib/stores';
+  import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchAgents, activateAgent, deactivateAgent, updateAgent,
     fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
@@ -30,8 +30,8 @@
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
   let ws;
-  let refreshInterval;
-  let simStatusIv;
+  let refreshTeardown;
+  let simStatusTeardown;
 
   function authHeaders() {
     const token = $authStore.token;
@@ -328,14 +328,14 @@
     loadAll();
     connectWS();
     pollSimStatus();
-    refreshInterval = setInterval(loadAll, 30000);
-    simStatusIv     = setInterval(pollSimStatus, 4000);
+    refreshTeardown   = visibleInterval(loadAll, 30000);
+    simStatusTeardown = visibleInterval(pollSimStatus, 4000);
   });
 
   onDestroy(() => {
     if (ws) ws.close();
-    if (refreshInterval) clearInterval(refreshInterval);
-    if (simStatusIv)     clearInterval(simStatusIv);
+    refreshTeardown?.();
+    simStatusTeardown?.();
   });
 </script>
 

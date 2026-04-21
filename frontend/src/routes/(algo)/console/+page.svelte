@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { authStore, clientTimestamp } from '$lib/stores';
+  import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import { goto } from '$app/navigation';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -11,7 +11,7 @@
   let orderLog     = $state([]);
   let logTab       = $state('terminal');
   let running      = $state(false);
-  let logInterval;
+  let logTeardown;
 
   function authHeaders() {
     const token = $authStore.token;
@@ -119,10 +119,10 @@
   onMount(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadCurrentLog();
-    logInterval = setInterval(loadCurrentLog, 30000);
+    logTeardown = visibleInterval(loadCurrentLog, 30000);
   });
 
-  onDestroy(() => { if (logInterval) clearInterval(logInterval); });
+  onDestroy(() => { logTeardown?.(); });
 </script>
 
 <svelte:head><title>Terminal | RamboQuant Analytics</title></svelte:head>

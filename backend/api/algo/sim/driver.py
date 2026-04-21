@@ -296,6 +296,10 @@ class SimDriver:
         #              initial_price, attempts, status, agent_slug, action_type,
         #              placed_at, exchange}
         self._sim_open_orders: list[dict] = []
+        # Tracks fire-and-forget DB update tasks so `stop()` can await
+        # in-flight writes and nothing gets silently garbage-collected
+        # mid-commit.
+        self._pending_updates: set = set()
 
     @classmethod
     def instance(cls) -> "SimDriver":
@@ -980,15 +984,31 @@ class SimDriver:
             f"{order.get('qty')} · {note}"
         )
         # Mirror fill/unfilled to the DB row if we have its id — lets the
-        # Orders page see the terminal state without another lookup.
+        # Orders page see the terminal state without another lookup. The
+        # task is tracked on the driver so `stop()` can await in-flight
+        # writes and surface any DB failures that would otherwise vanish
+        # into an unobserved task.
         if kind in ("fill", "unfilled") and order.get("algo_order_id"):
             try:
                 import asyncio as _asyncio
-                _asyncio.create_task(self._update_algo_order(order, kind))
+                coro = self._safe_update_algo_order(order, kind)
+                task = _asyncio.create_task(coro)
+                self._pending_updates.add(task)
+                task.add_done_callback(self._pending_updates.discard)
             except RuntimeError:
                 # No running event loop (Step button in a sync context) —
                 # skip the DB update; tick_log already has the outcome.
                 pass
+
+    async def _safe_update_algo_order(self, order: dict, kind: str) -> None:
+        """Log-and-swallow wrapper so a DB hiccup can't silently strand the task."""
+        try:
+            await self._update_algo_order(order, kind)
+        except Exception as e:
+            logger.warning(
+                f"[SIM] _update_algo_order failed "
+                f"(kind={kind}, id={order.get('algo_order_id')}): {e}"
+            )
 
     async def _update_algo_order(self, order: dict, kind: str) -> None:
         try:
@@ -1102,7 +1122,6 @@ class SimDriver:
         """
         assert_enabled()
         from backend.shared.helpers import broker_apis
-        from backend.shared.helpers.utils import mask_column
 
         try:
             df_p = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
@@ -1110,9 +1129,10 @@ class SimDriver:
         except Exception as e:
             raise SimGuardError(f"Live-book fetch failed: {e}")
 
-        for df in (df_p, df_m):
-            if not df.empty and "account" in df.columns:
-                df["account"] = mask_column(df["account"])
+        # Keep real account codes in the sim book — Telegram + email sim
+        # alerts go to the owner and reading `ZG####` everywhere made it
+        # impossible to tell which account fired. Public sim endpoints
+        # are admin-guarded, so there's no leak path.
 
         positions = df_p.fillna(0).to_dict(orient="records") if not df_p.empty else []
         margins   = df_m.fillna(0).to_dict(orient="records") if not df_m.empty else []

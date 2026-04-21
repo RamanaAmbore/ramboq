@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, logTime } from '$lib/stores';
+  import { authStore, clientTimestamp, logTime, visibleInterval } from '$lib/stores';
   import { fetchOrders, cancelOrder, modifyOrder } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
   import CommandBar from '$lib/CommandBar.svelte';
@@ -26,7 +26,7 @@
   let selectedOrder = $state(/** @type {any|null} */(null));
   let cmdBar;
   let unsub;
-  let logInterval;
+  let logTeardown;
 
   // context for CommandBar — keeps openOrderIds fresh so cancel/modify suggest them
   const cmdContext = $derived({
@@ -162,9 +162,9 @@
         loadOrders();
       }
     });
-    logInterval = setInterval(loadCurrentLog, 30000);
+    logTeardown = visibleInterval(loadCurrentLog, 30000);
   });
-  onDestroy(() => { unsub?.(); if (logInterval) clearInterval(logInterval); });
+  onDestroy(() => { unsub?.(); logTeardown?.(); });
 </script>
 
 <svelte:head><title>Orders | RamboQuant Analytics</title></svelte:head>

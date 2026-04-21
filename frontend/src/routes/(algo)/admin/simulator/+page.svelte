@@ -8,7 +8,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { authStore, clientTimestamp } from '$lib/stores';
+  import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
@@ -48,7 +48,7 @@
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
   let liveSnap  = $state(/** @type {any} */ (null));
-  let refreshIv;
+  let refreshTeardown;
 
   // ── Log panel feeds ──────────────────────────────────────────────────
   // Mirror the feeds shown on /agents, but every list is SIMULATOR-scoped
@@ -248,9 +248,9 @@
     })();
     // Hot loop: status + events + algo orders + current-tab log every 3s.
     // Static data (scenarios, agents) fetched once above; not re-polled.
-    refreshIv = setInterval(() => { loadHot(); loadOrderRows(); loadCurrentLog(); }, 3000);
+    refreshTeardown = visibleInterval(() => { loadHot(); loadOrderRows(); loadCurrentLog(); }, 3000);
   });
-  onDestroy(() => { if (refreshIv) clearInterval(refreshIv); });
+  onDestroy(() => { refreshTeardown?.(); });
 </script>
 
 <svelte:head><title>Market Simulator | RamboQuant Analytics</title></svelte:head>
