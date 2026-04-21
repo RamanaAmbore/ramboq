@@ -484,18 +484,22 @@
      grow and shrink with available space (flex-grow + flex-shrink);
      min-widths keep each cell legible and trigger a wrap once the
      card gets too narrow. */
+  /* Row proportions: Scenario + Symbol together take two-thirds of the
+     row; Spread + Tick share the remaining one-third, with Spread at a
+     1:3 ratio to Tick. In raw flex-grow units: 4 : 4 : 1 : 3 (total 12,
+     so scenario+symbol = 8/12 = 2/3, spread+tick = 4/12 = 1/3). */
   .sim-field-scenario,
   .sim-field-symbol {
-    flex: 1 1 0;
+    flex: 4 1 0;
     min-width: 120px;
   }
   .sim-field-spread {
     flex: 1 1 0;
-    min-width: 80px;
+    min-width: 70px;
   }
   .sim-field-pcts {
     flex: 3 1 0;
-    min-width: 180px;
+    min-width: 160px;
   }
 
   .sim-pct-inline {

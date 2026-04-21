@@ -1,13 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Matches the composite algo brand mark in the top nav: navy disc,
+       amber ring, stylised bull-horn silhouette in the upper half, and
+       "algo" text below. Scales cleanly to 16px / 32px favicons. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#273552"/>
-      <stop offset="1" stop-color="#0a1020"/>
-    </linearGradient>
+    <radialGradient id="algo-bg" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0"   stop-color="#273552"/>
+      <stop offset="1"   stop-color="#0a1020"/>
+    </radialGradient>
+    <filter id="algo-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  <circle cx="32" cy="32" r="30" fill="url(#bg)" stroke="#fbbf24" stroke-width="3"/>
-  <text x="32" y="41" text-anchor="middle"
+  <!-- Ring + background -->
+  <circle cx="32" cy="32" r="28.5"
+          fill="url(#algo-bg)"
+          stroke="#fbbf24" stroke-width="3" filter="url(#algo-glow)"/>
+  <!-- Stylised bull horns: two upward curls springing from a central
+       forehead medallion. Rendered as two mirrored cubic arcs so the
+       shape reads as a bull even at 16x16. -->
+  <g stroke="#fbbf24" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M22 29 C 17 22, 16 17, 19 14"/>
+    <path d="M42 29 C 47 22, 48 17, 45 14"/>
+    <path d="M22 29 Q 32 33, 42 29" stroke-width="2.5"/>
+  </g>
+  <circle cx="32" cy="29" r="1.8" fill="#fbbf24"/>
+  <!-- algo wordmark -->
+  <text x="32" y="48"
+        text-anchor="middle"
         font-family="ui-monospace, 'SF Mono', Menlo, monospace"
-        font-size="22" font-weight="700" fill="#fbbf24"
-        letter-spacing="-0.5">algo</text>
+        font-size="11" font-weight="700"
+        fill="#fbbf24" letter-spacing="0.4">algo</text>
 </svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Public-site favicon for RamboQuant Analytics. Motif: the "RQ"
+       monogram on a dark shield, with a subtle bull-horn flourish
+       above and a three-step growth bar beneath (a nod to the tagline
+       INVEST · GROW · COMPOUND). Distinct from the algo-console
+       circled bull so the browser tab clearly signals which side of
+       the site is open. -->
+  <defs>
+    <linearGradient id="pub-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#2a3558"/>
+      <stop offset="1"   stop-color="#0a1020"/>
+    </linearGradient>
+    <linearGradient id="pub-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#fde68a"/>
+      <stop offset="0.5" stop-color="#fbbf24"/>
+      <stop offset="1"   stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield / rounded square background — softer corners than the
+       algo favicon's strict circle. -->
+  <rect x="4" y="4" width="56" height="56" rx="12" ry="12"
+        fill="url(#pub-bg)" stroke="#e8c86a" stroke-width="1.5"/>
+  <!-- Bull-horn flourish tucked against the top edge. -->
+  <g stroke="url(#pub-gold)" stroke-width="2.2" stroke-linecap="round" fill="none">
+    <path d="M22 16 C 18 11, 17 9, 19 7"/>
+    <path d="M42 16 C 46 11, 47 9, 45 7"/>
+  </g>
+  <!-- RQ monogram — RamboQuant's initials stacked compactly. -->
+  <text x="32" y="42"
+        text-anchor="middle"
+        font-family="'Georgia', 'Times New Roman', serif"
+        font-weight="700" font-size="26"
+        fill="url(#pub-gold)" letter-spacing="-1">RQ</text>
+  <!-- Three-step growth ladder at the base (INVEST · GROW · COMPOUND). -->
+  <g fill="#fbbf24">
+    <rect x="20" y="52" width="6" height="4"  rx="1"/>
+    <rect x="29" y="50" width="6" height="6"  rx="1"/>
+    <rect x="38" y="47" width="6" height="9"  rx="1"/>
+  </g>
+</svg>
