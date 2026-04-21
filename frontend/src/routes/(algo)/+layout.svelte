@@ -523,6 +523,14 @@
     flex-wrap: wrap;
     margin-bottom: 0.5rem;
   }
+  /* Every algo page gets the full-width amber underline that dashboard
+     already had — keeps the headline visually separated from the
+     content cards below without crowding the title chip itself. */
+  :global(.algo-content .page-header) {
+    border-bottom: 1px solid rgba(251,191,36,0.25);
+    padding-bottom: 0.35rem;
+    margin-bottom: 1rem;
+  }
 
   /* Page-level timestamp (cyan, matches log timestamps). Works inline
      inside .page-header OR stand-alone when a page renders it on its
