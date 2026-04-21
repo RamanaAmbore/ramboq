@@ -595,12 +595,9 @@
     gap: 0.35rem;
   }
 
-  /* Compact button — uniform width so all six buttons read as one row.
-     flex:1 1 110px lets them grow equally to fill the buttons row on wide
-     screens and collapse to a readable minimum on mobile. */
+  /* Base look shared by every .sim-btn — colours, font, border radius. */
   :global(.sim-btn) {
-    flex: 1 1 110px;
-    max-width: 160px;
+    flex: 0 0 auto;
     font-size: 0.6rem;
     line-height: 1;
     padding: 0.35rem 0.5rem;
@@ -615,6 +612,16 @@
     transition: background-color 0.08s, border-color 0.08s, color 0.08s;
   }
   :global(.sim-btn:disabled) { cursor: not-allowed; }
+
+  /* Inside the Simulator's action strip, every button splits the row
+     equally. `flex: 1 1 0` drops the fixed basis so all six grow in
+     lock-step; min-width floors them so the labels stay readable;
+     max-width is released so they fill the card at any width. */
+  :global(.sim-buttons-row .sim-btn) {
+    flex: 1 1 0;
+    min-width: 90px;
+    max-width: none;
+  }
 
   /* Start = solid emerald green so the "go" action reads as affirmative
      next to the rose-red Stop button. Matches the Buy-side emerald in
