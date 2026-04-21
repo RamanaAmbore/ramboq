@@ -82,16 +82,11 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:1.2rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
-          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
           <span class="algo-brand-mark" aria-label="algo console">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="4"/>
-              <text x="32" y="41" text-anchor="middle" font-size="22" font-weight="700"
-                    font-family="ui-monospace, 'SF Mono', Menlo, monospace"
-                    fill="currentColor" letter-spacing="-0.5">algo</text>
-            </svg>
+            <img src={bullSrc} alt="" class="algo-brand-mark-bull" />
+            <span class="algo-brand-mark-text">algo</span>
           </span>
+          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
         </button>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -114,16 +109,11 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" style="height:1.0rem;width:auto;display:block;filter:drop-shadow(0 0 3px rgba(251,191,36,0.75)) drop-shadow(0 0 6px rgba(251,191,36,0.45));" />
-          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
-          <span class="algo-brand-mark" aria-label="algo console">
-            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="4"/>
-              <text x="32" y="41" text-anchor="middle" font-size="22" font-weight="700"
-                    font-family="ui-monospace, 'SF Mono', Menlo, monospace"
-                    fill="currentColor" letter-spacing="-0.5">algo</text>
-            </svg>
+          <span class="algo-brand-mark algo-brand-mark-sm" aria-label="algo console">
+            <img src={bullSrc} alt="" class="algo-brand-mark-bull" />
+            <span class="algo-brand-mark-text">algo</span>
           </span>
+          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
         </button>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
@@ -252,22 +242,50 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Circled "algo" badge sitting next to the company name — makes it
-     obvious at a glance that this tab is the trading console, not the
-     public site. Uses currentColor so it inherits the amber brand tone. */
+  /* Composite brand mark: the bull sits centered in an amber-ringed
+     navy circle with a tiny "algo" label along the bottom arc. Reads as
+     one visual — the company bull ringed as the trading console. */
   .algo-brand-mark {
+    position: relative;
     display: inline-flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1.5px solid #fbbf24;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #1d2a44 0%, #0a1020 100%);
+    box-shadow: 0 0 4px rgba(251,191,36,0.35), inset 0 0 4px rgba(251,191,36,0.15);
+    overflow: hidden;
+    padding-top: 0.15rem;
+  }
+  .algo-brand-mark-bull {
+    height: 0.95rem;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 0 2px rgba(251,191,36,0.8));
+  }
+  .algo-brand-mark-text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.12rem;
+    text-align: center;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.46rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
     color: #fbbf24;
-    width: 1.5rem;
-    height: 1.5rem;
-    filter: drop-shadow(0 0 3px rgba(251,191,36,0.55));
+    line-height: 1;
+    text-transform: lowercase;
   }
-  .algo-brand-mark svg { width: 100%; height: 100%; display: block; }
-  @media (max-width: 767px) {
-    .algo-brand-mark { width: 1.25rem; height: 1.25rem; }
+  /* Mobile variant — smaller so it doesn't crowd the hamburger row. */
+  .algo-brand-mark-sm {
+    width: 1.65rem;
+    height: 1.65rem;
   }
+  .algo-brand-mark-sm .algo-brand-mark-bull { height: 0.75rem; }
+  .algo-brand-mark-sm .algo-brand-mark-text { font-size: 0.4rem; bottom: 0.08rem; }
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
