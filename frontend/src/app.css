@@ -121,7 +121,7 @@
 }
 .ag-theme-ramboq .ag-row.totals-row .ag-cell { border-right: 1px solid rgba(255,255,255,0.12) !important; }
 .ag-theme-algo .ag-row.totals-row {
-  background-color: #1f2c46 !important;
+  background-color: rgba(251,191,36,0.15) !important;
   color: #fbbf24 !important;
   border-top: 1px solid rgba(251,191,36,0.55) !important;
   border-bottom: 1px solid rgba(251,191,36,0.55) !important;
@@ -132,9 +132,12 @@
 .ag-theme-ramboq .pnl-loss { color: #c0392b; background-color: rgba(192,57,43,0.06); }
 .ag-theme-ramboq .pnl-gain { color: #27ae60; background-color: rgba(39,174,96,0.06); }
 .ag-theme-ramboq .pnl-zero { color: #3c4660; }
-.ag-theme-algo .pnl-loss { color: #b91c1c !important; background-color: rgba(192,57,43,0.08); }
-.ag-theme-algo .pnl-gain { color: #15803d !important; background-color: rgba(21,128,61,0.08); }
-.ag-theme-algo .pnl-zero { color: #3c4660 !important; }
+/* Brighter red/green tuned for the dark navy body — 500-range colours
+   read as "black text" on the old light theme, so switched to 400-range
+   which has enough luminance to pop on #1d2a44. */
+.ag-theme-algo .pnl-loss { color: #f87171 !important; background-color: rgba(248,113,113,0.08) !important; }
+.ag-theme-algo .pnl-gain { color: #4ade80 !important; background-color: rgba(74,222,128,0.08) !important; }
+.ag-theme-algo .pnl-zero { color: #94a3b8 !important; }
 /* Totals row cells inherit the header color regardless of +/-/0 */
 .ag-theme-ramboq .ag-row.totals-row .pnl-loss,
 .ag-theme-ramboq .ag-row.totals-row .pnl-gain,
@@ -166,26 +169,36 @@
 }
 
 /* ── AG Grid — Algo theme (dark amber terminal) ───────────────────────────── */
+/*
+ * AG Grid theme for the algo console. Mirrors the Tokens / algo-status-card
+ * palette: navy gradient body, amber headers + totals, muted-slate text,
+ * amber-tinted borders. Stops the grid from looking like a transplanted
+ * light-mode widget inside the dark algo layout.
+ */
 .ag-theme-algo {
   --ag-header-background-color: #0a1020;
   --ag-header-foreground-color: #fbbf24;
   --ag-header-font-weight: 700;
   --ag-header-font-size: 0.6875rem;
-  --ag-foreground-color: #0c1830;
-  --ag-background-color: #f0f4f8;
-  --ag-odd-row-background-color: #e6ecf3;
-  --ag-row-hover-color: rgba(251,191,36,0.18);
-  --ag-selected-row-background-color: rgba(251,191,36,0.3);
-  --ag-border-color: #c0ccdc;
+  --ag-foreground-color: #c8d8f0;
+  --ag-background-color: #1d2a44;
+  --ag-odd-row-background-color: #273552;
+  --ag-row-hover-color: rgba(251,191,36,0.14);
+  --ag-selected-row-background-color: rgba(251,191,36,0.25);
+  --ag-border-color: rgba(255,255,255,0.08);
   --ag-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   --ag-font-size: 0.72rem;
   --ag-row-height: 24px;
   --ag-header-height: 28px;
-  --ag-wrapper-border-radius: 3px;
-  border-radius: 3px;
+  --ag-wrapper-border-radius: 4px;
+  --ag-input-background-color: #152033;
+  --ag-input-foreground-color: #e2e8f0;
+  --ag-input-focus-border-color: #fbbf24;
+  --ag-control-panel-background-color: #1d2a44;
+  border-radius: 4px;
   overflow: hidden;
-  border: 1px solid rgba(251,191,36,0.3);
-  box-shadow: none !important;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 /* autoHeight: only remove min-height that pads small tables */
 .ag-theme-algo .ag-layout-auto-height .ag-center-cols-viewport,
@@ -193,18 +206,21 @@
   min-height: 0 !important;
 }
 .ag-theme-algo .ag-root-wrapper {
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
-  background-color: #f0f4f8 !important;
+  background: linear-gradient(180deg, #273552 0%, #1d2a44 100%) !important;
   box-shadow: none !important;
 }
 .ag-theme-algo .ag-header {
   background-color: #0a1020 !important;
   color: #fbbf24 !important;
-  border-bottom: 1px solid rgba(217,119,6,0.4) !important;
+  border-bottom: 1px solid rgba(251,191,36,0.35) !important;
 }
-.ag-theme-algo .ag-body {
-  background-color: #f0f4f8 !important;
+.ag-theme-algo .ag-body,
+.ag-theme-algo .ag-body-viewport,
+.ag-theme-algo .ag-center-cols-viewport,
+.ag-theme-algo .ag-center-cols-container {
+  background-color: transparent !important;
 }
 .ag-theme-algo .ag-header-cell {
   letter-spacing: 0.05em;
@@ -213,9 +229,9 @@
   font-weight: 700;
   color: #fbbf24 !important;
   background-color: transparent !important;
-  padding-left: 4px !important;
-  padding-right: 4px !important;
-  border-right: 1px solid rgba(217,119,6,0.2) !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  border-right: 1px solid rgba(251,191,36,0.18) !important;
 }
 .ag-theme-algo .ag-header-cell-menu-button,
 .ag-theme-algo .ag-header-cell-filter-button,
@@ -223,17 +239,24 @@
   display: none !important;
 }
 .ag-theme-algo .ag-cell {
-  padding-left: 4px !important;
-  padding-right: 4px !important;
-  color: #0c1830 !important;
-  border-right: 1px solid #c0ccdc !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  color: #c8d8f0 !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
 }
 .ag-theme-algo .ag-row {
   font-size: 0.72rem !important;
   font-weight: 500;
-  color: #0c1830 !important;
+  color: #c8d8f0 !important;
   letter-spacing: 0.01em;
-  border-bottom: 1px solid #c0ccdc !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  background-color: transparent !important;
+}
+.ag-theme-algo .ag-row-odd {
+  background-color: rgba(13,22,42,0.45) !important;
+}
+.ag-theme-algo .ag-row-hover {
+  background-color: rgba(251,191,36,0.08) !important;
 }
 .ag-theme-algo .ag-cell.ag-col-fill {
   background-color: rgba(251,191,36,0.08) !important;
@@ -241,8 +264,19 @@
 .ag-theme-algo .ag-header-cell.ag-col-fill {
   background-color: rgba(251,191,36,0.14) !important;
 }
+/* Pagination / status bar footer if AG Grid renders one — keep it
+   aligned with the dark theme instead of the default white chrome. */
+.ag-theme-algo .ag-paging-panel,
+.ag-theme-algo .ag-status-bar {
+  background-color: #0a1020 !important;
+  color: #c8d8f0 !important;
+  border-top: 1px solid rgba(251,191,36,0.25) !important;
+}
 .ag-theme-algo .ag-overlay-no-rows-wrapper { padding: 8px; }
-.ag-theme-algo .ag-overlay-no-rows-center { font-size: 0.7rem; color: #7e97b8; }
+.ag-theme-algo .ag-overlay-no-rows-center {
+  font-size: 0.7rem;
+  color: #7e97b8;
+}
 
 /* ── Log panel styles ────────────────────────────────────────────────────── */
 .log-panel {
