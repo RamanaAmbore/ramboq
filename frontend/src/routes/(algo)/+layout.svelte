@@ -578,7 +578,11 @@
     color: #fbbf24;
   }
   :global(.algo-content .section-heading) { color: #fbbf24; }
-  :global(.algo-content .page-title-chip) { color: #fbbf24; border-color: rgba(251,191,36,0.25); }
+  :global(.algo-content .page-title-chip) {
+    color: #fbbf24;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
   :global(.algo-content .btn-secondary) {
     color: #c8d8f0;
     border-color: rgba(255,255,255,0.2);
