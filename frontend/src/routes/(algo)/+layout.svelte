@@ -80,6 +80,9 @@
     <!-- Top bar -->
     <header class="algo-navbar">
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
+        <!-- Vertical ALGO label, flush at the left edge. Bare text —
+             no chip, no background, no border. -->
+        <span class="algo-vert" aria-hidden="true">ALGO</span>
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull" />
@@ -105,10 +108,13 @@
 
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
-        <button onclick={() => goto('/about')} class="algo-brand">
-          <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
-          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
-        </button>
+        <div class="flex items-center">
+          <span class="algo-vert algo-vert-sm" aria-hidden="true">ALGO</span>
+          <button onclick={() => goto('/about')} class="algo-brand">
+            <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
+            <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          </button>
+        </div>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
           <span class="algo-user-role">admin</span>
@@ -237,14 +243,46 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Plain bull logo — no circle, no wordmark, no halo. Sits alongside
-     the company name as the sole brand element. */
+  /* Bull logo with an amber glow so it reads as "lit" against the
+     dark navbar without needing a surrounding badge. */
   .algo-brand-bull {
     height: 1.3rem;
     width: auto;
     display: block;
+    filter: drop-shadow(0 0 3px rgba(251,191,36,0.75))
+            drop-shadow(0 0 6px rgba(251,191,36,0.45));
   }
   .algo-brand-bull-sm { height: 1.05rem; }
+
+  /* Vertical ALGO text on the far left of the navbar. Bare — no chip,
+     no background, no border. Negative left margin eats the 0.5rem
+     container padding so the text sits flush against the viewport
+     edge. writing-mode + rotate(180deg) mirrors the LogPanel "log"
+     stamp so the two site-wide vertical labels read the same way. */
+  .algo-vert {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #fbbf24;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-left: -0.5rem;
+    margin-right: 0.35rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+  }
+  .algo-vert-sm {
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+    margin-right: 0.3rem;
+  }
 
 
   /* Nav buttons */
