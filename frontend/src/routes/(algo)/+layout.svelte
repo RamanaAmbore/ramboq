@@ -80,11 +80,15 @@
     <!-- Top bar -->
     <header class="algo-navbar">
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
+        <!-- Vertical ALGO strip — mirrors the rotated "log" stamp on the
+             LogPanel so the whole trading console is visually tagged. -->
+        <span class="algo-strip" aria-hidden="true">
+          <span class="algo-strip-text">ALGO</span>
+        </span>
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
-          <span class="algo-brand-tag" aria-label="algo console">Algo</span>
         </button>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -106,10 +110,12 @@
 
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
+        <span class="algo-strip algo-strip-sm" aria-hidden="true">
+          <span class="algo-strip-text">ALGO</span>
+        </span>
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
-          <span class="algo-brand-tag algo-brand-tag-sm" aria-label="algo console">Algo</span>
         </button>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
@@ -249,30 +255,37 @@
   }
   .algo-brand-bull-sm { height: 1rem; }
 
-  /* Log-style "Algo" tag sitting next to the company name — mirrors
-     the .log-chip aesthetic (monospace, faint amber fill, thin border)
-     so the trading console is tagged without pulling attention away
-     from the page content. */
-  .algo-brand-tag {
+  /* Vertical ALGO strip — same two-layer technique as LogPanel's "log"
+     stamp. Wrapper reserves the column width (stretched to the navbar
+     height) while the inner span rotates via writing-mode: vertical-lr
+     + rotate(180deg). Reads as a subtle section label on the navbar's
+     left edge. */
+  .algo-strip {
     display: inline-flex;
     align-items: center;
-    padding: 0.1rem 0.45rem;
-    margin-left: 0.25rem;
+    justify-content: center;
+    min-width: 0.95rem;
+    padding: 0.1rem 0.2rem;
+    margin-right: 0.5rem;
+    align-self: stretch;
+    background: rgba(251,191,36,0.12);
+    border-right: 1px solid rgba(251,191,36,0.4);
+    border-radius: 2px 0 0 2px;
+  }
+  .algo-strip-text {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 0.55rem;
+    font-size: 0.52rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #fbbf24;
-    background: rgba(251,191,36,0.1);
-    border: 1px solid rgba(251,191,36,0.45);
-    border-radius: 2px;
     line-height: 1;
+    letter-spacing: 0.12em;
+    color: #fbbf24;
+    text-transform: uppercase;
   }
-  .algo-brand-tag-sm {
-    font-size: 0.5rem;
-    padding: 0.08rem 0.35rem;
-  }
+  /* Mobile variant — thinner strip so the hamburger row stays tight. */
+  .algo-strip-sm { min-width: 0.85rem; padding: 0.08rem 0.15rem; margin-right: 0.4rem; }
+  .algo-strip-sm .algo-strip-text { font-size: 0.45rem; letter-spacing: 0.1em; }
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
