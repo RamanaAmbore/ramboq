@@ -352,7 +352,6 @@
         <input id="sim-spread" type="number" min="0" step="0.01"
                class="field-input sim-pct-input"
                bind:value={spreadPct} />
-        <span class="sim-pct-unit">%</span>
       </div>
     </div>
     {#if pctOverrides.length > 0}
@@ -368,7 +367,6 @@
                   : '—')}
                 disabled={pickedScenario?.tick_pcts?.[i] == null}
                 bind:value={pctOverrides[i]} />
-              <span class="sim-pct-unit">%</span>
             </div>
           {/each}
         </div>
@@ -565,11 +563,6 @@
     height: 1.55rem;
     text-align: right;
     box-sizing: border-box;
-  }
-  .sim-pct-unit {
-    color: rgba(200,216,240,0.55);
-    font-family: ui-monospace, monospace;
-    font-size: 0.55rem;
   }
 
   /* Compact row = tighter field-input paddings so all 4 fit on one line
