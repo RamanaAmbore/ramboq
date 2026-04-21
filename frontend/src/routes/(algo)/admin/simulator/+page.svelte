@@ -238,6 +238,15 @@
     loadSimLog();
     loadSystemLog();
     loadOrderRows();
+    // Auto-snapshot the live book on page load so the Symbol picker has
+    // options before the operator clicks the dropdown. Skips silently if
+    // the cap flag is off or the broker call fails — the picker just
+    // stays empty in that case.
+    (async () => {
+      try {
+        liveSnap = await seedSimLive();
+      } catch (_) { /* ignore — picker will fall back to scenario initial */ }
+    })();
     // Hot loop: status + events + algo orders + current-tab log every 3s.
     // Static data (scenarios, agents) fetched once above; not re-polled.
     refreshIv = setInterval(() => { loadHot(); loadOrderRows(); loadCurrentLog(); }, 3000);
@@ -554,22 +563,18 @@
     color: rgba(2,44,30,0.7);
     border-color: rgba(16,185,129,0.45);
   }
-  /* Stop button — pure red so the halt control reads as "hard stop" and
-     sits opposite the emerald Start. Hovers to the deeper red-700. */
+  /* Stop — reverted to the default neutral button style. Distinct from
+     the red Clear button so the two can't be confused: Stop is a routine
+     halt, Clear is destructive. Matches the slate/tonal aesthetic of the
+     other utility buttons. */
   :global(.sim-btn-secondary) {
-    background: #dc2626;
-    color: #fff1f2;
-    border-color: #dc2626;
-    font-weight: 700;
+    background: rgba(148,163,184,0.12);
+    color: #e2e8f0;
+    border-color: rgba(148,163,184,0.45);
   }
   :global(.sim-btn-secondary:hover:not(:disabled)) {
-    background: #b91c1c;
-    border-color: #b91c1c;
-  }
-  :global(.sim-btn-secondary:disabled) {
-    background: rgba(220,38,38,0.25);
-    color: rgba(255,241,242,0.6);
-    border-color: rgba(220,38,38,0.45);
+    background: rgba(148,163,184,0.22);
+    border-color: #94a3b8;
   }
   :global(.sim-btn-load) {
     background: rgba(16,185,129,0.15); color: #6ee7b7; border-color: rgba(16,185,129,0.5);
