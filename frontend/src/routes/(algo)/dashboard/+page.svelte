@@ -11,7 +11,7 @@
   <h1 class="algo-page-title">Dashboard</h1>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
-<PerformancePage theme="ag-theme-algo" allowOrders={true} maskAccounts={false} />
+<PerformancePage theme="ag-theme-algo" allowOrders={true} maskAccounts={false} compactHeader={true} />
 
 <style>
   .algo-page-title {

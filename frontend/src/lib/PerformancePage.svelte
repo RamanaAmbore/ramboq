@@ -10,7 +10,16 @@
 
   ModuleRegistry.registerModules([AllCommunityModule]);
 
-  const { theme = 'ag-theme-ramboq', allowOrders = false, maskAccounts = true } = $props();
+  const {
+    theme         = 'ag-theme-ramboq',
+    allowOrders   = false,
+    maskAccounts  = true,
+    // When true, drop the top timestamp+Refresh row and move the refresh
+    // timestamp into the tabs row as the last element. Used by the
+    // admin /dashboard page; default keeps the public /performance
+    // layout unchanged.
+    compactHeader = false,
+  } = $props();
   const isDark = $derived(theme === 'ag-theme-algo');
 
   // Read tab from URL ?tab= param; default to 'positions'
@@ -302,19 +311,26 @@
   <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
 {/if}
 
-<div class="flex items-center justify-between mb-2">
-  <div class="text-[0.65rem] text-muted perf-ts">
-    {#if loading && !lastRefresh}
-      <span class="animate-pulse">Loading…</span>
-    {:else if lastRefresh}
-      <span>{lastRefresh}</span>
-    {/if}
+{#if !compactHeader}
+  <!-- Default layout: timestamp + Refresh button on their own line, tabs
+       below. The public /performance page uses this. -->
+  <div class="flex items-center justify-between mb-2">
+    <div class="text-[0.65rem] text-muted perf-ts">
+      {#if loading && !lastRefresh}
+        <span class="animate-pulse">Loading…</span>
+      {:else if lastRefresh}
+        <span>{lastRefresh}</span>
+      {/if}
+    </div>
+    <button onclick={loadAll} disabled={loading} class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50">
+      {loading ? 'Refreshing…' : 'Refresh'}
+    </button>
   </div>
-  <button onclick={loadAll} disabled={loading} class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50">
-    {loading ? 'Refreshing…' : 'Refresh'}
-  </button>
-</div>
+{/if}
 
+<!-- Tabs + account selector. With `compactHeader`, the refresh timestamp
+     joins this row as the last element (no Refresh button — the
+     performance WebSocket already handles auto-refresh). -->
 <div class="tabs-row mb-3">
   <div class="flex gap-0.5">
     {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
@@ -332,6 +348,15 @@
         <option value={acct}>{maskAccounts ? acct.replace(/\d/g, '#') : acct}</option>
       {/each}
     </select>
+  {/if}
+  {#if compactHeader}
+    <span class="perf-ts tabs-row-ts">
+      {#if loading && !lastRefresh}
+        <span class="animate-pulse">Loading…</span>
+      {:else if lastRefresh}
+        {lastRefresh}
+      {/if}
+    </span>
   {/if}
 </div>
 
@@ -386,6 +411,11 @@
     outline: none;
     cursor: pointer;
     margin-left: 0;
+  }
+  /* Refresh timestamp pinned to the far right of the tabs row. */
+  .tabs-row-ts {
+    margin-left: auto;
+    white-space: nowrap;
   }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */

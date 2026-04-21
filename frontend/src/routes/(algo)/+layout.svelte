@@ -237,16 +237,14 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Plain bull — no circle / wordmark decoration. The amber drop-shadow
-     keeps it matching the public-site brand. */
+  /* Plain bull logo — no circle, no wordmark, no halo. Sits alongside
+     the company name as the sole brand element. */
   .algo-brand-bull {
-    height: 1.2rem;
+    height: 1.3rem;
     width: auto;
     display: block;
-    filter: drop-shadow(0 0 3px rgba(251,191,36,0.75))
-            drop-shadow(0 0 6px rgba(251,191,36,0.45));
   }
-  .algo-brand-bull-sm { height: 1rem; }
+  .algo-brand-bull-sm { height: 1.05rem; }
 
 
   /* Nav buttons */
