@@ -82,11 +82,9 @@
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
-          <span class="algo-brand-mark" aria-label="algo console">
-            <img src={bullSrc} alt="" class="algo-brand-mark-bull" />
-            <span class="algo-brand-mark-text">algo</span>
-          </span>
+          <img src={bullSrc} alt="" class="algo-brand-bull" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          <span class="algo-brand-tag" aria-label="algo console">Algo</span>
         </button>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -109,11 +107,9 @@
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
         <button onclick={() => goto('/about')} class="algo-brand">
-          <span class="algo-brand-mark algo-brand-mark-sm" aria-label="algo console">
-            <img src={bullSrc} alt="" class="algo-brand-mark-bull" />
-            <span class="algo-brand-mark-text">algo</span>
-          </span>
+          <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          <span class="algo-brand-tag algo-brand-tag-sm" aria-label="algo console">Algo</span>
         </button>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
@@ -242,55 +238,41 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Composite brand mark: bull sits centered in a prominent amber-ringed
-     navy circle; "algo" label floats along the bottom arc with a clear
-     breathing-room margin from the edge. Bull + algo sit close to each
-     other in the vertical centre so they read as one paired mark. */
-  .algo-brand-mark {
-    position: relative;
-    display: inline-flex;
-    align-items: flex-start;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border: 1.5px solid rgba(251,191,36,0.7);
-    border-radius: 50%;
-    background: rgba(13,22,42,0.55);
-    /* Tiny amber halo — two layers for a soft falloff; keeps the mark
-       looking "lit" against the dark navbar without drawing too much
-       attention. */
-    box-shadow: 0 0 3px rgba(251,191,36,0.5),
-                0 0 7px rgba(251,191,36,0.18);
-    overflow: hidden;
-    padding-top: 0.2rem;
-  }
-  .algo-brand-mark-bull {
-    height: 0.9rem;
+  /* Plain bull — no circle / wordmark decoration. The amber drop-shadow
+     keeps it matching the public-site brand. */
+  .algo-brand-bull {
+    height: 1.2rem;
     width: auto;
     display: block;
+    filter: drop-shadow(0 0 3px rgba(251,191,36,0.75))
+            drop-shadow(0 0 6px rgba(251,191,36,0.45));
   }
-  .algo-brand-mark-text {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0.3rem;
-    text-align: center;
+  .algo-brand-bull-sm { height: 1rem; }
+
+  /* Log-style "Algo" tag sitting next to the company name — mirrors
+     the .log-chip aesthetic (monospace, faint amber fill, thin border)
+     so the trading console is tagged without pulling attention away
+     from the page content. */
+  .algo-brand-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    margin-left: 0.25rem;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 0.42rem;
+    font-size: 0.55rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    color: rgba(251,191,36,0.85);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #fbbf24;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.45);
+    border-radius: 2px;
     line-height: 1;
-    text-transform: lowercase;
   }
-  /* Mobile variant — smaller so it doesn't crowd the hamburger row. */
-  .algo-brand-mark-sm {
-    width: 1.65rem;
-    height: 1.65rem;
-    padding-top: 0.16rem;
+  .algo-brand-tag-sm {
+    font-size: 0.5rem;
+    padding: 0.08rem 0.35rem;
   }
-  .algo-brand-mark-sm .algo-brand-mark-bull { height: 0.72rem; }
-  .algo-brand-mark-sm .algo-brand-mark-text { font-size: 0.38rem; bottom: 0.24rem; }
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
