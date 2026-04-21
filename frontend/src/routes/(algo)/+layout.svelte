@@ -80,11 +80,6 @@
     <!-- Top bar -->
     <header class="algo-navbar">
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
-        <!-- Vertical ALGO strip — mirrors the rotated "log" stamp on the
-             LogPanel so the whole trading console is visually tagged. -->
-        <span class="algo-strip" aria-hidden="true">
-          <span class="algo-strip-text">ALGO</span>
-        </span>
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull" />
@@ -110,9 +105,6 @@
 
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
-        <span class="algo-strip algo-strip-sm" aria-hidden="true">
-          <span class="algo-strip-text">ALGO</span>
-        </span>
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
@@ -255,41 +247,6 @@
   }
   .algo-brand-bull-sm { height: 1rem; }
 
-  /* Vertical ALGO strip — same two-layer technique as LogPanel's "log"
-     stamp. Wrapper reserves the column width (stretched to the navbar
-     height) while the inner span rotates via writing-mode: vertical-lr
-     + rotate(180deg). Reads as a subtle section label on the navbar's
-     left edge. */
-  .algo-strip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 0.95rem;
-    padding: 0.1rem 0.2rem;
-    /* Negative left margin eats the 1rem container padding so the strip
-       hugs the navbar's left edge. border-radius is dropped to 0 on the
-       left for the same reason — nothing to round against. */
-    margin-left: -1rem;
-    margin-right: 0.5rem;
-    align-self: stretch;
-    background: rgba(251,191,36,0.12);
-    border-right: 1px solid rgba(251,191,36,0.4);
-    border-radius: 0;
-  }
-  .algo-strip-text {
-    writing-mode: vertical-lr;
-    transform: rotate(180deg);
-    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 0.52rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0.12em;
-    color: #fbbf24;
-    text-transform: uppercase;
-  }
-  /* Mobile variant — thinner strip so the hamburger row stays tight. */
-  .algo-strip-sm { min-width: 0.85rem; padding: 0.08rem 0.15rem; margin-right: 0.4rem; }
-  .algo-strip-sm .algo-strip-text { font-size: 0.45rem; letter-spacing: 0.1em; }
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
