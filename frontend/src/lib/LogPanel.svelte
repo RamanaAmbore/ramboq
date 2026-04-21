@@ -172,15 +172,30 @@
   function _orderRowHtml(o) {
     const t    = _shortTime(o.created_at);
     const tag  = o.mode === 'sim' ? SIM_PILL : LIVE_PILL;
-    // BUY = green, SELL = neutral info. Red/pink reserved for rejected /
-    // failed orders so the scanning cue stays honest.
-    const sideCls = o.transaction_type === 'BUY' ? 'log-agent-success' : 'log-info';
-    const price = (o.initial_price != null)
+    // Colour by terminal state first, then by side. FILLED = green,
+    // UNFILLED = red, OPEN (still chasing) = amber, everything else
+    // falls back to the old side-based cue.
+    const status = (o.status || '').toUpperCase();
+    let rowCls = 'log-info';
+    if      (status === 'FILLED')   rowCls = 'log-agent-success';
+    else if (status === 'UNFILLED') rowCls = 'log-agent-failed';
+    else if (status === 'OPEN')     rowCls = 'log-agent-alert';
+    else if (o.transaction_type === 'BUY') rowCls = 'log-agent-success';
+    const fillPrice = (o.fill_price != null)
+      ? '@₹' + Number(o.fill_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+      : null;
+    const initPrice = (o.initial_price != null)
       ? '@₹' + Number(o.initial_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
       : '';
-    const status = o.status ? ` <span class="log-chip"><span class="log-chip-key">status:</span>${o.status}</span>` : '';
+    // Prefer fill_price once the chase landed; otherwise show the initial
+    // limit price the operator submitted.
+    const price     = fillPrice || initPrice;
+    const statusChip  = o.status   ? ` <span class="log-chip"><span class="log-chip-key">status:</span>${o.status}</span>` : '';
+    const attemptChip = (o.attempts != null && o.attempts > 0)
+      ? ` <span class="log-chip"><span class="log-chip-key">chase:</span>#${o.attempts}</span>`
+      : '';
     const engine = o.engine ? ` <span class="log-chip"><span class="log-chip-key">engine:</span>${o.engine}</span>` : '';
-    return `<span class="${sideCls}"><span class="log-ts">${t}</span> ${tag}◆ ${o.transaction_type} ${o.quantity} ${o.symbol} ${price} · ${o.account}${status}${engine}</span>`;
+    return `<span class="${rowCls}"><span class="log-ts">${t}</span> ${tag}◆ ${o.transaction_type} ${o.quantity} ${o.symbol} ${price} · ${o.account}${statusChip}${attemptChip}${engine}</span>`;
   }
 
   function _orderLogHtml() {

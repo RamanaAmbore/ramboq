@@ -129,6 +129,11 @@ class AlgoOrderInfo(msgspec.Struct):
     quantity: int
     initial_price: float | None
     fill_price: float | None
+    # How many times the chase engine re-quoted this order before a
+    # terminal state. Bumped live on every `modify` event so the
+    # Order tab can show "chase #3" as it's happening, not just
+    # after fill/unfilled.
+    attempts: int
     status: str
     engine: str
     mode: str
@@ -180,6 +185,7 @@ class OrdersController(Controller):
                 transaction_type=r.transaction_type, quantity=r.quantity,
                 initial_price=(float(r.initial_price) if r.initial_price is not None else None),
                 fill_price=(float(r.fill_price) if r.fill_price is not None else None),
+                attempts=int(r.attempts or 0),
                 status=r.status, engine=r.engine, mode=r.mode,
                 detail=r.detail,
                 created_at=r.created_at.isoformat() if r.created_at else "",

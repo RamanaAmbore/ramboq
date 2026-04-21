@@ -319,6 +319,44 @@
       · accounts=[{liveSnap.accounts.join(', ')}]
     </div>
   {/if}
+
+  <!-- Live sim book — shrinks as chase fills close positions. One pill
+       per row, colour-coded by side. Empty when the sim has closed
+       every position (or hasn't started). -->
+  {#if status?.positions?.length}
+    <div class="sim-pills mt-2">
+      <span class="sim-pills-label">Positions ({status.positions.length}):</span>
+      {#each status.positions as p}
+        <span class="sim-pill sim-pill-{p.quantity >= 0 ? 'long' : 'short'}"
+              title={`LTP ₹${p.last_price?.toFixed?.(2) ?? '—'} · bid ₹${p.bid?.toFixed?.(2) ?? '—'} · ask ₹${p.ask?.toFixed?.(2) ?? '—'}`}>
+          <span class="sim-pill-side">{p.quantity >= 0 ? 'LONG' : 'SHORT'}</span>
+          <span class="sim-pill-sym">{p.symbol}</span>
+          <span class="sim-pill-qty">{Math.abs(p.quantity ?? 0)}</span>
+          <span class="sim-pill-pnl {(p.pnl ?? 0) < 0 ? 'neg' : (p.pnl ?? 0) > 0 ? 'pos' : ''}">
+            ₹{(p.pnl ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          </span>
+        </span>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- Open chase orders — one pill each showing attempt count + current
+       limit price. Lets the operator actually see the chase engine at
+       work instead of guessing from the order table's status column. -->
+  {#if status?.open_order_details?.length}
+    <div class="sim-pills mt-1">
+      <span class="sim-pills-label">Chasing ({status.open_order_details.length}):</span>
+      {#each status.open_order_details as o}
+        <span class="sim-pill sim-pill-chase">
+          <span class="sim-pill-side sim-pill-side-{o.side === 'BUY' ? 'buy' : 'sell'}">{o.side}</span>
+          <span class="sim-pill-sym">{o.symbol}</span>
+          <span class="sim-pill-qty">{o.qty}</span>
+          <span class="sim-pill-limit">@₹{o.limit_price?.toFixed?.(2) ?? '—'}</span>
+          <span class="sim-pill-attempts">#{o.attempts}</span>
+        </span>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <!-- Controls card — no header label (the fields + buttons speak for themselves) -->
@@ -689,6 +727,66 @@
   :global(.sim-btn-danger:hover) {
     background: rgba(239,68,68,0.2); border-color: #ef4444;
   }
+
+  /* Sim status pills — one row per position / chase. Compact enough to
+     fit a dozen on one line without dominating the status card. */
+  .sim-pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.4rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.58rem;
+  }
+  .sim-pills-label {
+    color: rgba(200,216,240,0.55);
+    font-size: 0.52rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sim-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(13,22,42,0.55);
+    color: #e2e8f0;
+    white-space: nowrap;
+  }
+  .sim-pill-side {
+    font-weight: 700;
+    font-size: 0.5rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0 0.25rem;
+    border-radius: 2px;
+  }
+  /* Long positions = cyan accent; short = warm orange. Matches the
+     position-row styling on the performance / dashboard grids. */
+  .sim-pill-long  { border-color: rgba(56,189,248,0.45); }
+  .sim-pill-long  .sim-pill-side { background: rgba(56,189,248,0.22); color: #38bdf8; }
+  .sim-pill-short { border-color: rgba(251,146,60,0.45); }
+  .sim-pill-short .sim-pill-side { background: rgba(251,146,60,0.22); color: #fb923c; }
+  /* Chase pills use the Buy (emerald) / Sell (rose) accents that order
+     entry uses everywhere else. */
+  .sim-pill-chase { border-color: rgba(251,191,36,0.45); background: rgba(251,191,36,0.06); }
+  .sim-pill-side-buy  { background: rgba(110,231,183,0.22); color: #6ee7b7; }
+  .sim-pill-side-sell { background: rgba(244,63,94,0.22);  color: #fda4af; }
+  .sim-pill-sym { color: #fde68a; font-weight: 600; }
+  .sim-pill-qty { color: #c8d8f0; }
+  .sim-pill-limit { color: #7dd3fc; }
+  .sim-pill-attempts {
+    color: #fbbf24;
+    font-weight: 700;
+    border-left: 1px solid rgba(251,191,36,0.35);
+    padding-left: 0.35rem;
+    margin-left: 0.1rem;
+  }
+  .sim-pill-pnl.neg { color: #f87171; }
+  .sim-pill-pnl.pos { color: #4ade80; }
 
   /* Tighten the inputs to match button height so the row doesn't wobble. */
   :global(.sim-fields-row .field-input) {

@@ -363,6 +363,39 @@ class SimDriver:
                                            for r in self._positions_rows
                                            if r.get("tradingsymbol")
                                        }),
+            # Compact per-position snapshot — the Simulator page renders
+            # this as a small pill list so operators see fills actually
+            # remove rows from the book (not just a shrinking counter).
+            "positions":               [
+                {
+                    "account":   r.get("account"),
+                    "symbol":    r.get("tradingsymbol"),
+                    "quantity":  r.get("quantity"),
+                    "last_price": r.get("last_price"),
+                    "bid":       r.get("bid"),
+                    "ask":       r.get("ask"),
+                    "pnl":       r.get("pnl"),
+                }
+                for r in self._positions_rows
+            ],
+            # Open-order snapshots — one per in-flight chase. Mirrors the
+            # chase engine's internal state so the Simulator page can show
+            # "NIFTY BUY 50 @ ₹21,800 · attempt 2/5" live.
+            "open_order_details":      [
+                {
+                    "account":     o.get("account"),
+                    "symbol":      o.get("symbol"),
+                    "side":        o.get("side"),
+                    "qty":         o.get("qty"),
+                    "limit_price": o.get("limit_price"),
+                    "initial_price": o.get("initial_price"),
+                    "attempts":    o.get("attempts", 0),
+                    "status":      o.get("status"),
+                    "algo_order_id": o.get("algo_order_id"),
+                }
+                for o in self._sim_open_orders
+                if o.get("status") == "OPEN"
+            ],
             "spread_pct":              self.spread_pct,
             "open_orders":             len([o for o in self._sim_open_orders
                                             if o.get("status") == "OPEN"]),
@@ -983,12 +1016,12 @@ class SimDriver:
             f"{order.get('symbol')} {order.get('side')} "
             f"{order.get('qty')} · {note}"
         )
-        # Mirror fill/unfilled to the DB row if we have its id — lets the
-        # Orders page see the terminal state without another lookup. The
-        # task is tracked on the driver so `stop()` can await in-flight
-        # writes and surface any DB failures that would otherwise vanish
-        # into an unobserved task.
-        if kind in ("fill", "unfilled") and order.get("algo_order_id"):
+        # Mirror every chase event to the DB row if we have its id — lets
+        # the Orders page see attempts tick up live, not just the final
+        # terminal state. Tasks are tracked on the driver so `stop()` can
+        # await in-flight writes and surface any DB failures that would
+        # otherwise vanish into an unobserved task.
+        if kind in ("fill", "unfilled", "modify") and order.get("algo_order_id"):
             try:
                 import asyncio as _asyncio
                 coro = self._safe_update_algo_order(order, kind)
@@ -1021,14 +1054,46 @@ class SimDriver:
                 )).scalar_one_or_none()
                 if not row:
                     return
-                row.status = "FILLED" if kind == "fill" else "UNFILLED"
+                # Status transitions per event kind:
+                #   modify   → stays OPEN (but attempts + detail refresh)
+                #   fill     → FILLED, fill_price + slippage + filled_at
+                #   unfilled → UNFILLED, attempts frozen at the cap
+                if kind == "fill":
+                    row.status = "FILLED"
+                elif kind == "unfilled":
+                    row.status = "UNFILLED"
+                # (modify leaves row.status alone — keeps showing OPEN)
                 row.attempts = int(order.get("attempts", 0))
-                if kind == "fill" and order.get("fill_price") is not None:
+                # Keep the detail column mirrored to the latest chase line
+                # so the Orders table "Detail" cell tells the story without
+                # cross-referencing the tick log.
+                side   = order.get("side") or "?"
+                qty    = order.get("qty") or 0
+                symbol = order.get("symbol") or "?"
+                limit  = order.get("limit_price")
+                if kind == "modify":
+                    row.detail = (
+                        f"[SIM] {order.get('agent_slug','?')} {side} {qty} "
+                        f"{symbol} · chase #{row.attempts} "
+                        f"limit=₹{limit:,.2f}" if limit is not None else
+                        f"[SIM] {order.get('agent_slug','?')} {side} {qty} {symbol} · chase #{row.attempts}"
+                    )
+                elif kind == "fill" and order.get("fill_price") is not None:
                     row.fill_price = float(order["fill_price"])
                     initial = row.initial_price or 0
                     if initial:
                         row.slippage = float(order["fill_price"]) - float(initial)
                     row.filled_at = datetime.now()
+                    row.detail = (
+                        f"[SIM] {order.get('agent_slug','?')} {side} {qty} "
+                        f"{symbol} · FILLED @₹{row.fill_price:,.2f} "
+                        f"after {row.attempts} chase(s)"
+                    )
+                elif kind == "unfilled":
+                    row.detail = (
+                        f"[SIM] {order.get('agent_slug','?')} {side} {qty} "
+                        f"{symbol} · UNFILLED — gave up after {row.attempts} chase(s)"
+                    )
                 await s.commit()
         except Exception as e:
             logger.debug(f"[SIM] could not update AlgoOrder: {e}")
