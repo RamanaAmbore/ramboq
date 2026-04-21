@@ -161,6 +161,25 @@
 .ag-theme-algo .ag-row.pos-short.ag-row-hover {
   background-color: rgba(251,191,36,0.1) !important;
 }
+
+/* Same long/short cues for the light-theme ramboq grid on the public
+   /performance page. Deeper tints so the tint reads on a white body;
+   Qty cell text darkened from the 400-range so it doesn't wash out. */
+.ag-theme-ramboq .qty-long  { color: #0369a1 !important; font-weight: 700 !important; }
+.ag-theme-ramboq .qty-short { color: #c2410c !important; font-weight: 700 !important; }
+.ag-theme-ramboq .qty-flat  { color: #64748b !important; }
+.ag-theme-ramboq .ag-row.pos-long {
+  background-color: rgba(14,165,233,0.07) !important;
+  box-shadow: inset 3px 0 0 #0284c7;
+}
+.ag-theme-ramboq .ag-row.pos-short {
+  background-color: rgba(234,88,12,0.08) !important;
+  box-shadow: inset 3px 0 0 #ea580c;
+}
+.ag-theme-ramboq .ag-row.pos-long.ag-row-hover,
+.ag-theme-ramboq .ag-row.pos-short.ag-row-hover {
+  background-color: rgba(200,168,75,0.15) !important;
+}
 /* Totals row cells inherit the header color regardless of +/-/0 */
 .ag-theme-ramboq .ag-row.totals-row .pnl-loss,
 .ag-theme-ramboq .ag-row.totals-row .pnl-gain,
