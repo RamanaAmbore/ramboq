@@ -623,18 +623,21 @@
     max-width: none;
   }
 
-  /* Start = solid emerald green so the "go" action reads as affirmative
-     next to the rose-red Stop button. Matches the Buy-side emerald in
-     OrderPopup. */
+  /* sim-btn-primary is the shared "go" look — used by Simulator Start,
+     Terminal Run, Orders Submit, and Orders BUY. Light mint green so
+     it reads as affirmative without being loud; dark-navy text keeps
+     contrast high. */
   :global(.sim-btn-primary) {
-    background: #10b981; color: #022c1e; border-color: #10b981;
+    background: #6ee7b7; color: #022c1e; border-color: #6ee7b7;
     font-weight: 700;
   }
-  :global(.sim-btn-primary:hover:not(:disabled)) { background: #34d399; border-color: #34d399; }
+  :global(.sim-btn-primary:hover:not(:disabled)) {
+    background: #a7f3d0; border-color: #a7f3d0;
+  }
   :global(.sim-btn-primary:disabled) {
-    background: rgba(16,185,129,0.25);
+    background: rgba(110,231,183,0.3);
     color: rgba(2,44,30,0.7);
-    border-color: rgba(16,185,129,0.45);
+    border-color: rgba(110,231,183,0.5);
   }
   /* Stop — reverted to the default neutral button style. Distinct from
      the red Clear button so the two can't be confused: Stop is a routine

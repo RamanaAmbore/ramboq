@@ -195,14 +195,14 @@
   />
   <div class="absolute bottom-1 right-2 flex gap-1 z-10">
     <!-- Submit / BUY / SELL — reuses the simulator button palette so
-         order entry reads like the rest of the algo console. BUY is
-         emerald (sim Start), SELL is the deeper sim Clear red, generic
-         Submit borrows the cycle amber. -->
+         order entry reads like the rest of the algo console. BUY and
+         the generic Submit both use the shared light-green "go" tone
+         (sim-btn-primary) — matching Terminal Run and Simulator Start.
+         SELL keeps the red sim-btn-danger. -->
     <button onclick={() => cmdBar?.submit()} disabled={running}
       class="sim-btn sim-btn-order
-        {cmdVerb === 'BUY'  ? 'sim-btn-primary'
-       : cmdVerb === 'SELL' ? 'sim-btn-danger'
-       :                       'sim-btn-cycle'} disabled:opacity-40">
+        {cmdVerb === 'SELL' ? 'sim-btn-danger' : 'sim-btn-primary'}
+        disabled:opacity-40">
        {cmdVerb === 'BUY' ? 'BUY' : cmdVerb === 'SELL' ? 'SELL' : 'Submit'}
     </button>
     <button onclick={() => { cmdBar?.clear(); cmdVerb = ''; }}
