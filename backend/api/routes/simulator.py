@@ -151,7 +151,18 @@ class SimulatorController(Controller):
 
     @get("/status")
     async def status(self) -> dict:
-        return get_driver().snapshot()
+        """
+        Snapshot + per-branch capability flag. The `enabled` key lets the
+        frontend pre-disable the simulator form on branches where
+        `cap_in_<branch>.simulator` is off (default: False on prod), so
+        buttons grey out with an explanatory banner instead of the
+        operator having to press Start to discover the gate.
+        """
+        from backend.shared.helpers.utils import config, is_enabled
+        snap = get_driver().snapshot()
+        snap["enabled"] = is_enabled("simulator")
+        snap["branch"]  = config.get("deploy_branch", "dev")
+        return snap
 
     @post("/start-for-agent/{agent_id:int}")
     async def start_for_agent(self, agent_id: int, rate_ms: int = 2000) -> dict:

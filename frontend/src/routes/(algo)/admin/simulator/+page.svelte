@@ -191,6 +191,9 @@
 
   // Reactive helpers used by the Scenario / Symbol / Tick-% row.
   const pickedScenario = $derived(scenarios.find(s => s.slug === pickedSlug));
+  // True when cap_in_<branch>.simulator is off — the form greys out
+  // and a banner explains why. Default: on in dev, off in prod.
+  const simOff = $derived(status?.enabled === false);
   // Union of every known symbol source so the picker stays fresh whether
   // the operator loaded a live book, started a sim, or just picked a
   // scripted scenario. Deduped and sorted.
@@ -406,23 +409,39 @@
     </div>
   </div>
   <!-- Buttons row — all uniform width so the block reads as one action
-       bar. Wraps on narrow widths; on mobile each row fits 2-3 buttons. -->
+       bar. Wraps on narrow widths; on mobile each row fits 2-3 buttons.
+       Every button is disabled when the simulator capability is off for
+       this branch (cap_in_<branch>.simulator=false, e.g. prod default).
+       A banner below surfaces the reason. -->
   <div class="sim-buttons-row">
     <button type="button" onclick={doSeedLive}
-      class="sim-btn sim-btn-load">Load live book</button>
+      disabled={simOff}
+      class="sim-btn sim-btn-load disabled:opacity-40">Load live book</button>
     <button type="button" onclick={doStart}
-      disabled={status.active}
+      disabled={simOff || status.active}
       class="sim-btn sim-btn-primary disabled:opacity-40">Start</button>
     <button type="button" onclick={doStop}
-      disabled={!status.active}
+      disabled={simOff || !status.active}
       class="sim-btn sim-btn-secondary disabled:opacity-40">Stop</button>
     <button type="button" onclick={doStep}
-      class="sim-btn sim-btn-step">Step</button>
+      disabled={simOff}
+      class="sim-btn sim-btn-step disabled:opacity-40">Step</button>
     <button type="button" onclick={doRunCycle}
-      class="sim-btn sim-btn-cycle">Run cycle</button>
+      disabled={simOff}
+      class="sim-btn sim-btn-cycle disabled:opacity-40">Run cycle</button>
     <button type="button" onclick={doClear}
-      class="sim-btn sim-btn-danger">Clear sim</button>
+      disabled={simOff}
+      class="sim-btn sim-btn-danger disabled:opacity-40">Clear sim</button>
   </div>
+  {#if simOff}
+    <div class="mt-2 p-2 rounded text-[0.65rem] text-amber-200
+                bg-amber-500/10 border border-amber-500/40">
+      Simulator is disabled on the <b>{status?.branch ?? 'current'}</b>
+      branch (cap_in_<b>{status?.branch ?? 'branch'}</b>.simulator is
+      off). Toggle it in <code>backend_config.yaml</code> or from the
+      Settings page to re-enable.
+    </div>
+  {/if}
   {#if pickedSlug}
     {@const picked = scenarios.find(s => s.slug === pickedSlug)}
     {#if picked}
