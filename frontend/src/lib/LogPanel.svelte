@@ -292,9 +292,12 @@
     transform: rotate(180deg);
     font-family: ui-monospace, monospace;
     font-size: 0.5rem;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1;
-    color: #fbbf24;
+    /* Matches the algo navbar's vertical ALGO text — 40% amber at a
+       medium weight so the stamp reads as decoration, not a label
+       competing with the tab content. */
+    color: rgba(251,191,36,0.4);
     text-transform: none;
     letter-spacing: 0.05em;
     user-select: none;
