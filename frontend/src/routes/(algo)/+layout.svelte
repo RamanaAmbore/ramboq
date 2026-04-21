@@ -223,7 +223,10 @@
     padding: 0 0.5rem;
   }
 
-  /* Brand mark */
+  /* Brand mark — vertical-centered by both the parent flex's
+     items-center AND the button's own align-items: center. Symmetric
+     padding + line-height matched to the bull's height keeps the text
+     baseline aligned to the image centre. */
   .algo-brand {
     display: flex;
     align-items: center;
@@ -231,9 +234,10 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.1rem 0.5rem 0.1rem 0;
+    padding: 0;
     margin-right: 0.75rem;
     outline: none !important;
+    height: 100%;
   }
   .algo-brand-name {
     font-size: 0.72rem;
@@ -241,7 +245,12 @@
     color: #fbbf24;
     letter-spacing: 0.08em;
     font-family: ui-monospace, monospace;
-    line-height: 1;
+    /* Match the bull's box height so the text's line-box and the
+       image's box have the same height — items-center then lands on
+       the same visual centre for both. */
+    line-height: 1.3rem;
+    display: flex;
+    align-items: center;
   }
   /* Bull logo with an amber glow so it reads as "lit" against the
      dark navbar without needing a surrounding badge. */
