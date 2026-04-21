@@ -7,6 +7,8 @@
 
   const { children } = $props();
 
+  const bullSrc = "/bull.png";
+
   // All algo pages require admin
   $effect(() => {
     if (!$authStore.user || $authStore.user.role !== 'admin') {
@@ -78,11 +80,9 @@
     <!-- Top bar -->
     <header class="algo-navbar">
       <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
-        <!-- Vertical logo flush at the left edge — no border, no bg,
-             no decoration. Stretches the navbar's full height. -->
-        <img src="/logo5.png" alt="RamboQuant" class="algo-logo" />
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
+          <img src={bullSrc} alt="" class="algo-brand-bull" />
           <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
         </button>
 
@@ -105,12 +105,10 @@
 
       <!-- Mobile -->
       <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
-        <div class="flex items-center">
-          <img src="/logo5.png" alt="RamboQuant" class="algo-logo" />
-          <button onclick={() => goto('/about')} class="algo-brand">
-            <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
-          </button>
-        </div>
+        <button onclick={() => goto('/about')} class="algo-brand">
+          <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
+          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+        </button>
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
           <span class="algo-user-role">admin</span>
@@ -239,20 +237,14 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Logo image flush at the navbar's left edge. No border, no bg, no
-     margin — just the image stretched to the navbar height. Negative
-     left margin eats the 0.5rem container padding so the image butts
-     directly against the viewport edge. */
-  .algo-logo {
-    height: 100%;
+  /* Plain bull logo — no circle, no wordmark, no halo. Sits alongside
+     the company name as the sole brand element. */
+  .algo-brand-bull {
+    height: 1.3rem;
     width: auto;
     display: block;
-    margin: 0;
-    margin-left: -0.5rem;
-    padding: 0;
-    border: 0;
-    background: none;
   }
+  .algo-brand-bull-sm { height: 1.05rem; }
 
 
   /* Nav buttons */
