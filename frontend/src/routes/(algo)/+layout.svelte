@@ -256,6 +256,11 @@
     border: 1.5px solid rgba(251,191,36,0.7);
     border-radius: 50%;
     background: rgba(13,22,42,0.55);
+    /* Tiny amber halo — two layers for a soft falloff; keeps the mark
+       looking "lit" against the dark navbar without drawing too much
+       attention. */
+    box-shadow: 0 0 3px rgba(251,191,36,0.5),
+                0 0 7px rgba(251,191,36,0.18);
     overflow: hidden;
     padding-top: 0.2rem;
   }
