@@ -322,7 +322,7 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
 - **`+layout.svelte`** — algo-site top nav: Dashboard · Terminal · Agents · Orders · Users · Tokens · Simulator; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
-- **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component) — timestamp + Refresh · account dropdown + Positions/Holdings tabs in one row · Fund Balances · active-tab Summary + table. Performance page **always** shows real Kite data; the background refresh keeps going even while the simulator is active.
+- **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
 - **`admin/`** — User management with full partner fields
@@ -591,8 +591,8 @@ Seven presets shipped (see `MARKET_STATE_PRESETS` in `sim/driver.py`): `pre_open
 
 When an agent fires in sim mode, `actions.execute()` routes to `_sim_paper_trade`. The writer now branches:
 
-- **`close_position` / `place_order`** — params already specify `account + symbol`. Write ONE `AlgoOrder` with `initial_price = sim LTP for that symbol`.
-- **`chase_close_positions` / `chase_close`** — scope-level actions. Look up every open position matching `scope ∈ {total, account}` in `SimDriver._positions_rows`, write ONE `AlgoOrder` per position, each with the real `account / symbol / qty / LTP`. So a total-scope chase on a 4-position book fires 4 paper trades — visible individually in Order + Sim logs.
+- **`close_position` / `place_order`** — params already specify `account + symbol`. Write ONE `AlgoOrder` with `initial_price = sim bid/ask (side-aware) for that symbol`.
+- **`chase_close_positions` / `chase_close`** — scope-level actions. Look up every open position matching `scope ∈ {total, account}` in `SimDriver._positions_rows`, write ONE `AlgoOrder` per position, each with the real `account / symbol / qty` and side-appropriate price (SELL→bid, BUY→ask).
 - **Non-order actions** (`emit_log`, `set_flag`, `monitor_order`, `deactivate_agent`, `cancel_*`, `send_summary`) don't get a paper row — just the `action_success` agent event that `execute()` already writes.
 
 Each paper row carries the same print-style `detail` string in all three surfaces (logger, `AlgoOrder.detail`, tick_log `note`):
@@ -600,6 +600,20 @@ Each paper row carries the same print-style `detail` string in all three surface
 ```
 [SIM] loss-pos-total-auto-close → close_position: SELL 50 NIFTY25APRPE22000 @₹180.00 · acct=ZG####
 ```
+
+### Chase engine (spread-aware)
+
+Every position derives `bid` / `ask` from the simulator's `spread_pct` (default 0.10 %, tunable per Start). When an agent fires, the paper-trade writer persists the `AlgoOrder` with `status='OPEN'` and registers it with the driver's chase engine. Each subsequent tick, `_chase_open_orders`:
+
+- **Fills** the order when the bid/ask crosses the limit (SELL fills if `bid ≥ limit`; BUY fills if `ask ≤ limit`). The position is removed from `_positions_rows`, the `AlgoOrder` row flips to `FILLED` with `fill_price` + `slippage` + `filled_at`, and the detail string is rewritten as `FILLED @₹X after N chase(s)`.
+- **Modifies** the limit otherwise — re-quotes at the current opposite side, bumps `attempts` on the DB row, rewrites `detail` to `chase #N limit=₹X`. Capped at `simulator.chase_max_attempts` (default 5); after the cap the row flips to `UNFILLED`.
+- **Auto-completes** the sim when `_positions_rows` is empty and no orders remain `OPEN`. A terminal `completed` entry lands in the tick log.
+
+The status snapshot carries `positions` (per-row `{account, symbol, quantity, last_price, bid, ask, pnl}`) and `open_order_details` (per in-flight chase — `{symbol, side, qty, limit_price, attempts, status}`). The simulator page renders both as compact pill strips so operators watch the book shrink and the chase re-quote live.
+
+### Order lifecycle status
+
+`AlgoOrder.status` progression in sim mode: `OPEN` → (per tick) `OPEN` with `attempts++` → `FILLED` (or `UNFILLED` after cap). `AlgoOrderInfo` now exposes `attempts` + `fill_price`; the LogPanel Order tab colours each row by terminal state (FILLED green / UNFILLED red / OPEN amber) and adds a `chase: #N` chip.
 
 ### Seeding modes
 
@@ -644,8 +658,9 @@ The simulator owns its own `_sim_alert_state` dict, so rate history and suppress
 | Route | Purpose |
 |---|---|
 | `GET /scenarios` | List available scenarios (slug / name / mode / has_initial / tick count) |
-| `GET /status` | Driver snapshot (active, scenario, seed_mode, tick_index, counts, only_agent_ids) |
-| `POST /start` | Body: `{scenario, rate_ms, seed_mode, agent_ids?}` |
+| `GET /status` | Driver snapshot (active, scenario, seed_mode, tick_index, counts, only_agent_ids, `positions`, `open_order_details`, `spread_pct`, `enabled`, `branch`) |
+| `POST /start` | Body: `{scenario, rate_ms, seed_mode, agent_ids?, positions_every_n_ticks?, market_state_preset?, pct_overrides?, symbols?, spread_pct?}` |
+| `POST /start-for-agent/{id}` | Build a scenario from one agent's condition tree and start (no `scenarios.yaml` entry required) |
 | `POST /stop` | Halt |
 | `POST /step` | Apply one tick (deterministic debug) |
 | `POST /seed-live` | Snapshot live positions + margins into `_live_snapshot` (holdings skipped — positions-only sim) |
@@ -655,7 +670,7 @@ The simulator owns its own `_sim_alert_state` dict, so rate history and suppress
 | `GET /orders/recent?limit=N` | Recent `mode='sim'` algo orders |
 | `GET /ticks/recent?limit=N` | Rolling driver tick log (oldest-first) with per-symbol diffs |
 
-Gated by `admin_guard` + the per-branch `cap_in_<branch>.simulator` flag in `backend_config.yaml` (dev default: on, prod default: off).
+Gated by `admin_guard` + the per-branch `cap_in_<branch>.simulator` flag in `backend_config.yaml` (dev default: on, prod default: off). `GET /status` returns `enabled: false` when the cap is off for the active branch — the `/admin/simulator` page reads this and disables every form button with a banner explaining which branch is gated, so operators don't have to press Start to discover the gate.
 
 ### Running the simulator
 
@@ -688,9 +703,9 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 | `hook.log` | `ramboq_hook.service` | All webhook listener output (stdout+stderr combined) |
 | `incoming_requests.log` | `log-request.sh` | Raw webhook requests |
 | `api_error_file` | `ramboq_api.service` tee | All API stdout+stderr |
-| `api_short_error_file` | `ramboq_logger.py` | Last 50 Python error lines |
-| `api_log_file` | `ramboq_logger.py` | Full API app log (5MB rotating) |
-| `api_short_log_file` | `ramboq_logger.py` | Last 50 API app log lines |
+| `api_log_file` | `ramboq_logger.py` | Full API app log (5MB rotating × 5) |
+
+The earlier `api_short_*` tail files were retired — the handler rewrote them in full on every single record, which burned 50+ sync I/O ops per minute during alert bursts. `/api/admin/logs` tails `api_log_file` directly now.
 
 **Dev `/opt/ramboq_dev/.log/`**
 
@@ -698,9 +713,7 @@ Prod and dev logs are fully separated. The webhook listener is a shared service 
 |---|---|---|
 | `hook_debug.log` | `deploy.sh dev` | Dev deploy output (non-main branches) |
 | `api_error_file` | `ramboq_dev_api.service` tee | All API stdout+stderr |
-| `api_short_error_file` | `ramboq_logger.py` | Last 50 Python error lines |
-| `api_log_file` | `ramboq_logger.py` | Full API app log (5MB rotating) |
-| `api_short_log_file` | `ramboq_logger.py` | Last 50 API app log lines |
+| `api_log_file` | `ramboq_logger.py` | Full API app log (5MB rotating × 5) |
 
 > Both environments use the same relative `.log/` paths — no per-environment config changes needed. `notify_on_startup` differs per environment (`True` on dev, `False` on prod) and is preserved across deploys.
 
