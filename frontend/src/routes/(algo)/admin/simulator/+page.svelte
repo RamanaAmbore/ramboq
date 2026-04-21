@@ -478,13 +478,17 @@
     margin-bottom: 0.5rem;
   }
   .sim-field { min-width: 0; flex: 1 1 100px; }
-  /* Scenario takes most of the first row; Symbol is a compact picker;
-     the tick-pct inputs cling to the right edge. Together they fit on
-     one line on desktop and wrap gracefully on narrower screens. */
-  .sim-field-scenario { flex: 4 1 220px; }
-  .sim-field-symbol   { flex: 3 1 180px; }
-  .sim-field-spread   { flex: 0 0 5rem;  }
-  .sim-field-pcts     { flex: 3 1 200px; }
+  /* Scenario row: every entry splits the width equally so the row fills
+     the full card. `flex: 1 1 0` forces equal distribution regardless of
+     content length; min-width keeps it readable on mobile and triggers
+     a wrap once the basis can't fit. */
+  .sim-field-scenario,
+  .sim-field-symbol,
+  .sim-field-spread,
+  .sim-field-pcts {
+    flex: 1 1 0;
+    min-width: 120px;
+  }
 
   .sim-pct-inline {
     display: flex;
