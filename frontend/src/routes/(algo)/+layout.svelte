@@ -266,11 +266,15 @@
     justify-content: center;
     min-width: 0.95rem;
     padding: 0.1rem 0.2rem;
+    /* Negative left margin eats the 1rem container padding so the strip
+       hugs the navbar's left edge. border-radius is dropped to 0 on the
+       left for the same reason — nothing to round against. */
+    margin-left: -1rem;
     margin-right: 0.5rem;
     align-self: stretch;
     background: rgba(251,191,36,0.12);
     border-right: 1px solid rgba(251,191,36,0.4);
-    border-radius: 2px 0 0 2px;
+    border-radius: 0;
   }
   .algo-strip-text {
     writing-mode: vertical-lr;
