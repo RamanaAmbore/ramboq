@@ -68,7 +68,11 @@
   // class AG Grid adds via type: 'numericColumn'.
   const pnlCls = ({ value }) =>
     ['ag-right-aligned-cell', value < 0 ? 'pnl-loss' : value > 0 ? 'pnl-gain' : 'pnl-zero'];
-  const qtyCls = pnlCls;
+  // Qty cell: classify by direction, not P&L. A short can be profitable,
+  // a long can be losing — what the eye needs here is "which side of the
+  // book am I on". Colours live in app.css (qty-short / qty-long).
+  const qtyCls = ({ value }) =>
+    ['ag-right-aligned-cell', value < 0 ? 'qty-short' : value > 0 ? 'qty-long' : 'qty-flat'];
   const avgVsLtpCls = (params) => {
     const avg = params.data?.average_price;
     const ltp = params.data?.close_price;
@@ -78,8 +82,17 @@
 
   const defaultCol = { resizable: true, sortable: true, filter: true, suppressHeaderMenuButton: true, flex: 1, minWidth: 65 };
 
-  const getRowClass = (params) =>
-    (params.data?.tradingsymbol === 'TOTAL' || params.data?.account === 'TOTAL') ? 'totals-row' : '';
+  const getRowClass = (params) => {
+    const d = params.data || {};
+    if (d.tradingsymbol === 'TOTAL' || d.account === 'TOTAL') return 'totals-row';
+    // Tag position rows so the operator can tell longs from shorts at a
+    // glance. Only applied when `quantity` is present (positions grid);
+    // holdings rows never carry a sign.
+    const q = d.quantity;
+    if (typeof q === 'number' && q < 0) return 'pos-short';
+    if (typeof q === 'number' && q > 0) return 'pos-long';
+    return '';
+  };
 
   const acctFill = 'ag-col-fill';
   const symFill  = 'ag-col-fill';

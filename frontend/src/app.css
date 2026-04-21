@@ -138,6 +138,29 @@
 .ag-theme-algo .pnl-loss { color: #f87171 !important; background-color: rgba(248,113,113,0.08) !important; }
 .ag-theme-algo .pnl-gain { color: #4ade80 !important; background-color: rgba(74,222,128,0.08) !important; }
 .ag-theme-algo .pnl-zero { color: #94a3b8 !important; }
+
+/* Long vs short positions — distinct colour family from loss/gain so
+   the operator doesn't conflate "side of the book" with "in profit".
+   LONG  = cyan/sky  (#38bdf8) with a faint sky-blue row background and
+           matching left border.
+   SHORT = orange    (#fb923c) with a warm row background and matching
+           left border. Both borders are 3px on the left edge so the
+           direction reads from across the screen. */
+.ag-theme-algo .qty-long  { color: #38bdf8 !important; font-weight: 700 !important; }
+.ag-theme-algo .qty-short { color: #fb923c !important; font-weight: 700 !important; }
+.ag-theme-algo .qty-flat  { color: #94a3b8 !important; }
+.ag-theme-algo .ag-row.pos-long {
+  background-color: rgba(56,189,248,0.06) !important;
+  box-shadow: inset 3px 0 0 rgba(56,189,248,0.7);
+}
+.ag-theme-algo .ag-row.pos-short {
+  background-color: rgba(251,146,60,0.07) !important;
+  box-shadow: inset 3px 0 0 rgba(251,146,60,0.7);
+}
+.ag-theme-algo .ag-row.pos-long.ag-row-hover,
+.ag-theme-algo .ag-row.pos-short.ag-row-hover {
+  background-color: rgba(251,191,36,0.1) !important;
+}
 /* Totals row cells inherit the header color regardless of +/-/0 */
 .ag-theme-ramboq .ag-row.totals-row .pnl-loss,
 .ag-theme-ramboq .ag-row.totals-row .pnl-gain,
