@@ -114,10 +114,18 @@ _SCRIPTED_ACCOUNTS = ["ZG####", "ZJ####"]
 
 
 def _rate_window_min(ctx: dict) -> float:
-    """Read alert_rate_window_min from backend_config — matches the evaluator."""
+    """
+    Read alerts.rate_window_min from the DB settings cache, falling back
+    to the legacy YAML key and the in-code default. Matches the
+    evaluator's source of truth so synthesised scenarios size their
+    decay windows to the same number operators tune from
+    /admin/settings.
+    """
     try:
+        from backend.shared.helpers.settings import get_float
         from backend.shared.helpers.utils import config
-        return float(config.get("alert_rate_window_min", 10))
+        return get_float("alerts.rate_window_min",
+                         float(config.get("alert_rate_window_min", 10)))
     except Exception:
         return 10.0
 

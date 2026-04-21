@@ -28,6 +28,48 @@ logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Live-effect dispatch — settings whose runtime state must be re-applied
+# on change land here. Most settings are already re-read from the cache
+# on use (background tasks, agent engine), so those need nothing extra;
+# the ones below are exceptions because they were captured into
+# long-lived objects at import time (e.g. logging handlers).
+# ---------------------------------------------------------------------------
+
+def _apply_live_effects(key: str, value: str) -> None:
+    """Re-apply the new value to any long-lived object that cached it."""
+    try:
+        if key.startswith("logging."):
+            _apply_log_level(key, value)
+    except Exception as e:
+        # Never break a PATCH just because live-reapply hiccuped —
+        # the cache has the new value, next process restart gets it.
+        logger.warning(f"Settings: live-reapply of {key!r} failed: {e}")
+
+
+def _apply_log_level(key: str, value: str) -> None:
+    """
+    logging.file_log_level / .console_log_level / .error_log_level take
+    effect on the matching handler immediately, so no restart is needed
+    to raise/lower verbosity.
+    """
+    import logging
+    from backend.shared.helpers import ramboq_logger as rl
+    level = getattr(logging, str(value).strip().upper(), None)
+    if level is None:
+        # Numeric level as string, e.g. "20"
+        try: level = int(value)
+        except Exception: return
+    target = {
+        "logging.file_log_level":    rl.log_file_handler,
+        "logging.console_log_level": rl.console_handler,
+        "logging.error_log_level":   rl.error_file_handler,
+    }.get(key)
+    if target is not None:
+        target.setLevel(level)
+        logger.info(f"Settings: log handler for {key} now {value!r}")
+
+
+# ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
 
@@ -142,6 +184,7 @@ class SettingsController(Controller):
             await s.commit()
             await s.refresh(row)
         invalidate_cache()
+        _apply_live_effects(key, row.value)
         logger.info(f"Settings: {key} updated to {row.value!r}")
         return _to_info(row)
 
@@ -157,5 +200,6 @@ class SettingsController(Controller):
             await s.commit()
             await s.refresh(row)
         invalidate_cache()
+        _apply_live_effects(key, row.value)
         logger.info(f"Settings: {key} reset to default {row.value!r}")
         return _to_info(row)

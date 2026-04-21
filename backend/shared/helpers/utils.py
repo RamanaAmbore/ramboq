@@ -53,15 +53,30 @@ def is_enabled(cap: str) -> bool:
     Is capability `cap` (e.g., 'genai', 'telegram', 'mail', 'notify_on_deploy',
     'market_feed', 'simulator') enabled in this environment?
 
-    The capability lives under the section that matches the current branch:
-      - main  → cap_in_prod.<cap>  (missing key ⇒ True: prod stays fully-on by
-                default so existing caps don't silently regress)
-      - other → cap_in_dev.<cap>   (missing key ⇒ False: dev is opt-in)
+    Precedence:
+      1. DB setting at `notifications.<cap>_enabled` (or
+         `notifications.<cap>`) — lets the operator toggle live from
+         /admin/settings without a redeploy.
+      2. `cap_in_prod.<cap>` (on main) or `cap_in_dev.<cap>` (on any
+         other branch) from backend_config.yaml. main defaults to True
+         when the key is missing; dev defaults to False (opt-in).
 
-    To turn a capability off in prod, add it to cap_in_prod with value False
-    (e.g. `simulator: False`). deploy.sh preserves both cap_in_* dicts verbatim
-    across deploys so operator tweaks survive.
+    To turn a capability off live, flip its DB toggle; to persist
+    across container rebuilds set it in the cap_in_* YAML block.
     """
+    # DB override takes precedence for the caps that ship with a
+    # matching DB toggle (telegram / email / notify_on_deploy etc).
+    try:
+        from backend.shared.helpers import settings as _settings
+        db_raw = _settings._lookup_raw(f"notifications.{cap}_enabled")
+        if db_raw is None:
+            db_raw = _settings._lookup_raw(f"notifications.{cap}")
+        if db_raw is not None:
+            return str(db_raw).strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        # Settings module not ready at import time; fall through to YAML.
+        pass
+
     branch = config.get('deploy_branch')
     section = 'cap_in_prod' if branch == 'main' else 'cap_in_dev'
     caps = config.get(section) or {}
