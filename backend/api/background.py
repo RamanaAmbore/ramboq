@@ -232,14 +232,30 @@ async def _task_performance(state: dict) -> None:
     from backend.api.routes.ws import broadcast
     import json
 
-    interval   = config.get('performance_refresh_interval', 5)
-    open_offset = config.get('open_summary_offset_minutes', 15)
+    # These used to read only from YAML; now pull live from the DB
+    # settings cache (which reloads on every PATCH via /admin/settings),
+    # falling back to YAML, then to the in-code default. That lets the
+    # operator retune the performance cadence at runtime without a
+    # redeploy. `interval` is picked up here once per task start; the
+    # re-read happens each iteration so a settings change lands on the
+    # next tick instead of after a service restart.
+    from backend.shared.helpers.settings import get_int
+    def _interval():
+        return get_int("performance.refresh_interval",
+                       config.get("performance_refresh_interval", 5))
+    def _open_offset():
+        return get_int("performance.open_summary_offset_min",
+                       config.get("open_summary_offset_minutes", 15))
 
     seg_state   = _default_seg_state()
     alert_state = {}
     holiday_cache: dict = {}
 
     while True:
+        # Re-read each iteration so a /admin/settings tweak lands on the
+        # next cycle instead of after a service restart.
+        interval    = _interval()
+        open_offset = _open_offset()
         await asyncio.sleep(interval * 60)
 
         now   = timestamp_indian()
@@ -376,13 +392,20 @@ async def _task_close(state: dict) -> None:
     from backend.shared.helpers.alert_utils import send_summary
     from backend.shared.helpers.summarise import summarise_holdings as _summarise_holdings, summarise_positions as _summarise_positions
 
-    interval     = config.get('performance_refresh_interval', 5)
-    close_offset = config.get('close_summary_offset_minutes', 15)
+    from backend.shared.helpers.settings import get_int
+    def _interval_close():
+        return get_int("performance.refresh_interval",
+                       config.get("performance_refresh_interval", 5))
+    def _close_offset():
+        return get_int("performance.close_summary_offset_min",
+                       config.get("close_summary_offset_minutes", 15))
 
     seg_state     = state.setdefault('close_seg_state', _default_seg_state())
     holiday_cache: dict = {}
 
     while True:
+        interval     = _interval_close()
+        close_offset = _close_offset()
         await asyncio.sleep(interval * 60)
 
         now   = timestamp_indian()
