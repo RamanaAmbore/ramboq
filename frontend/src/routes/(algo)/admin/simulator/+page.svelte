@@ -478,16 +478,24 @@
     margin-bottom: 0.5rem;
   }
   .sim-field { min-width: 0; flex: 1 1 100px; }
-  /* Scenario row: every entry splits the width equally so the row fills
-     the full card. `flex: 1 1 0` forces equal distribution regardless of
-     content length; min-width keeps it readable on mobile and triggers
-     a wrap once the basis can't fit. */
+  /* Scenario row sizing. Scenario and Symbol take equal base units;
+     Spread : Tick % run at a 1 : 3 ratio because Tick % hosts three
+     inline inputs while Spread is a single narrow field. All four
+     grow and shrink with available space (flex-grow + flex-shrink);
+     min-widths keep each cell legible and trigger a wrap once the
+     card gets too narrow. */
   .sim-field-scenario,
-  .sim-field-symbol,
-  .sim-field-spread,
-  .sim-field-pcts {
+  .sim-field-symbol {
     flex: 1 1 0;
     min-width: 120px;
+  }
+  .sim-field-spread {
+    flex: 1 1 0;
+    min-width: 80px;
+  }
+  .sim-field-pcts {
+    flex: 3 1 0;
+    min-width: 180px;
   }
 
   .sim-pct-inline {
