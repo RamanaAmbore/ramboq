@@ -238,13 +238,17 @@
     loadSimLog();
     loadSystemLog();
     loadOrderRows();
-    // Auto-snapshot the live book on page load so the Symbol picker has
-    // options before the operator clicks the dropdown. Skips silently if
-    // the cap flag is off or the broker call fails — the picker just
-    // stays empty in that case.
+    // Auto-snapshot the live book on page load and switch to Live seed
+    // mode. Every shipped scenario runs without an `initial:` block, so
+    // Scripted seeding would force the operator to press "Load live
+    // book" manually before Start — this sidesteps that: symbols
+    // populate in the dropdown, Seed flips to Live, and the "no
+    // scripted initial state" warning never fires. Silent-failure if
+    // the cap flag is off or the broker call is down.
     (async () => {
       try {
         liveSnap = await seedSimLive();
+        if (seedMode === 'scripted') seedMode = 'live';
       } catch (_) { /* ignore — picker will fall back to scenario initial */ }
     })();
     // Hot loop: status + events + algo orders + current-tab log every 3s.
