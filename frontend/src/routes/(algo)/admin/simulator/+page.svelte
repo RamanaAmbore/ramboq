@@ -481,7 +481,35 @@
     font-size: 0.6rem;
     margin-bottom: 0.5rem;
   }
-  .sim-field { min-width: 0; flex: 1 1 100px; }
+  .sim-field {
+    min-width: 0;
+    flex: 1 1 100px;
+    /* column layout so the label sits cleanly above the control, and
+       every cell reports the same gap between label and input regardless
+       of whether the control is a Select, MultiSelect or one of the
+       pct inputs. */
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  /* Normalise the label row on the Scenario row so Spread / Tick
+     labels align with the Scenario / Symbol labels — same font-size,
+     same baseline, no extra bottom margin fighting the column gap. */
+  :global(.sim-scenario-row .field-label) {
+    font-size: 0.5rem;
+    margin-bottom: 0;
+  }
+  /* Normalise every control height on the Scenario row. Select trigger,
+     MultiSelect trigger, Spread input and every Tick % input all collapse
+     to the same 1.7rem box so the row reads as one horizontal strip. */
+  :global(.sim-scenario-row .rbq-select-trigger),
+  :global(.sim-scenario-row .rbq-multi-trigger),
+  :global(.sim-scenario-row input.sim-pct-input) {
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    box-sizing: border-box;
+    font-size: 0.62rem !important;
+  }
   /* Scenario row sizing. Scenario and Symbol take equal base units;
      Spread : Tick % run at a 1 : 3 ratio because Tick % hosts three
      inline inputs while Spread is a single narrow field. All four
@@ -515,11 +543,12 @@
   }
   /* Each pct cell takes an equal share of its parent container — so the
      three Tick % inputs split the Tick field width evenly, and the single
-     Spread input fills its cell completely. Both grow/shrink with the
-     row's overall width. */
+     Spread input fills its cell completely. `align-items: stretch` so
+     the input grows to the cell's full height and matches the Select
+     triggers in the same row. */
   .sim-pct-cell {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 0.15rem;
     flex: 1 1 0;
     min-width: 0;
@@ -528,10 +557,14 @@
     flex: 1 1 0;
     min-width: 0;
     width: 100%;
-    font-size: 0.6rem !important;
-    padding: 0.2rem 0.3rem !important;
-    min-height: 1.4rem !important;
+    font-size: 0.62rem !important;
+    padding: 0.25rem 0.4rem !important;
+    /* Match .rbq-select-trigger / .rbq-multi-trigger so Scenario,
+       Symbol, Spread and Tick inputs line up at identical heights. */
+    min-height: 1.55rem !important;
+    height: 1.55rem;
     text-align: right;
+    box-sizing: border-box;
   }
   .sim-pct-unit {
     color: rgba(200,216,240,0.55);
