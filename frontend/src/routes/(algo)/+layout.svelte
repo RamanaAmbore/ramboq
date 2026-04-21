@@ -271,7 +271,9 @@
     color: rgba(251,191,36,0.4);
     text-transform: uppercase;
     line-height: 1;
-    margin-left: -0.5rem;
+    /* Container padding is 0.5rem (8px); -3px leaves a 5px gap between
+       the text and the viewport's left edge. */
+    margin-left: -3px;
     margin-right: 0.35rem;
     padding: 0;
     background: none;
