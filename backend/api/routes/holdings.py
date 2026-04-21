@@ -8,7 +8,7 @@ from litestar.exceptions import HTTPException
 from litestar import Request
 
 from backend.api.auth_guard import is_admin_request
-from backend.api.cache import get_or_fetch
+from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import HoldingsResponse, HoldingRow, HoldingsSummaryRow
 from backend.shared.helpers import broker_apis
 from backend.shared.helpers.date_time_utils import timestamp_display
@@ -69,8 +69,14 @@ class HoldingsController(Controller):
     path = "/api/holdings"
 
     @get("/")
-    async def get_holdings(self, request: Request) -> HoldingsResponse:
+    async def get_holdings(self, request: Request, fresh: bool = False) -> HoldingsResponse:
         try:
+            # `?fresh=1` — Refresh button bypasses the TTL cache and
+            # forces a live broker fetch. The cache's per-key lock still
+            # coalesces multiple simultaneous refresh clicks into one
+            # broker call.
+            if fresh:
+                invalidate("holdings")
             resp = await get_or_fetch("holdings", _fetch, ttl_seconds=_TTL)
             if not is_admin_request(request):
                 for r in resp.rows:

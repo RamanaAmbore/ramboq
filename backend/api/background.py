@@ -299,15 +299,16 @@ async def _task_performance(state: dict) -> None:
             pass
 
         try:
-            # Parallelise the three broker fetches across executor threads
-            # instead of serialising them in one lambda — shaves the refresh
-            # cycle by ~(holdings + positions + margins) / 3 RTT.
-            (df_holdings, sum_holdings), (df_positions, sum_positions), df_margins = \
-                await asyncio.gather(
-                    _run(_fetch_holdings_direct),
-                    _run(_fetch_positions_direct),
-                    _run(_fetch_margins_direct),
-                )
+            # Serial fetches by design: parallelising them raced the daily
+            # Kite token-refresh. Three concurrent broker calls would each
+            # kick off their own `login()` + 2FA at the 23h boundary, and
+            # Kite invalidates tokens issued in parallel for the same app
+            # — same failure mode the "1 uvicorn worker" rule in CLAUDE.md
+            # prevents. The ~300 ms shaved per cycle wasn't worth locking
+            # the website around the refresh window.
+            (df_holdings, sum_holdings) = await _run(_fetch_holdings_direct)
+            (df_positions, sum_positions) = await _run(_fetch_positions_direct)
+            df_margins = await _run(_fetch_margins_direct)
             ist_display = timestamp_display()
             perf_key    = get_nearest_time(interval=interval)
 

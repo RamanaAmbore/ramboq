@@ -283,10 +283,14 @@
     applyAccountFilter();
   });
 
-  async function loadAll() {
+  async function loadAll({ fresh = false } = {}) {
     loading = true; error = '';
     try {
-      const [h, p, f] = await Promise.all([fetchHoldings(), fetchPositions(), fetchFunds()]);
+      const [h, p, f] = await Promise.all([
+        fetchHoldings({ fresh }),
+        fetchPositions({ fresh }),
+        fetchFunds({ fresh }),
+      ]);
       dataCache.holdings  = h;
       dataCache.positions = p;
       dataCache.funds     = f;
@@ -342,7 +346,7 @@
         <span>{lastRefresh}</span>
       {/if}
     </div>
-    <button onclick={loadAll} disabled={loading} class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50">
+    <button onclick={() => loadAll({ fresh: true })} disabled={loading} class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50">
       {loading ? 'Refreshing…' : 'Refresh'}
     </button>
   </div>
@@ -370,7 +374,7 @@
     </select>
   {/if}
   {#if compactHeader}
-    <button onclick={loadAll} disabled={loading}
+    <button onclick={() => loadAll({ fresh: true })} disabled={loading}
       class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 tabs-row-refresh">
       {loading ? 'Refreshing…' : 'Refresh'}
     </button>

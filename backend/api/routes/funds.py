@@ -6,7 +6,7 @@ from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
 from backend.api.auth_guard import is_admin_request
-from backend.api.cache import get_or_fetch
+from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import FundsResponse, FundsRow
 from backend.shared.helpers import broker_apis
 from backend.shared.helpers.date_time_utils import timestamp_display
@@ -52,8 +52,10 @@ class FundsController(Controller):
     path = "/api/funds"
 
     @get("/")
-    async def get_funds(self, request: Request) -> FundsResponse:
+    async def get_funds(self, request: Request, fresh: bool = False) -> FundsResponse:
         try:
+            if fresh:
+                invalidate("funds")
             resp = await get_or_fetch("funds", _fetch, ttl_seconds=_TTL)
             if not is_admin_request(request):
                 for r in resp.rows:

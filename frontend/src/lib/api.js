@@ -79,9 +79,15 @@ async function _post(path, payload, { auth = false } = {}) {
 
 // ── Public data endpoints (read-only — no JWT required) ──────────────────────
 // Pass auth header if available — backend masks accounts for non-admin
-export const fetchHoldings  = () => _get('/holdings/', { auth: _hasToken() });
-export const fetchPositions = () => _get('/positions/', { auth: _hasToken() });
-export const fetchFunds     = () => _get('/funds/', { auth: _hasToken() });
+// Pass `fresh=true` to make the server bypass its 30-second cache and
+// pull a live broker snapshot. The Refresh button uses it; page mount
+// + WebSocket-driven auto-refresh rely on the cached value.
+export const fetchHoldings  = ({ fresh = false } = {}) =>
+  _get(`/holdings/${fresh ? '?fresh=1' : ''}`, { auth: _hasToken() });
+export const fetchPositions = ({ fresh = false } = {}) =>
+  _get(`/positions/${fresh ? '?fresh=1' : ''}`, { auth: _hasToken() });
+export const fetchFunds     = ({ fresh = false } = {}) =>
+  _get(`/funds/${fresh ? '?fresh=1' : ''}`, { auth: _hasToken() });
 
 // ── Protected endpoints (require JWT — order mutations) ───────────────────────
 export const fetchOrders    = () => _get('/orders/',    { auth: true });

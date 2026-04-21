@@ -6,7 +6,7 @@ from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
 from backend.api.auth_guard import is_admin_request
-from backend.api.cache import get_or_fetch
+from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import PositionsResponse, PositionRow, PositionsSummaryRow
 from backend.shared.helpers import broker_apis
 from backend.shared.helpers.date_time_utils import timestamp_display
@@ -55,8 +55,10 @@ class PositionsController(Controller):
     path = "/api/positions"
 
     @get("/")
-    async def get_positions(self, request: Request) -> PositionsResponse:
+    async def get_positions(self, request: Request, fresh: bool = False) -> PositionsResponse:
         try:
+            if fresh:
+                invalidate("positions")
             resp = await get_or_fetch("positions", _fetch, ttl_seconds=_TTL)
             if not is_admin_request(request):
                 for r in resp.rows:
