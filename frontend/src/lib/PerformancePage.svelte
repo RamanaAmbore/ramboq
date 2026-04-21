@@ -50,6 +50,7 @@
   let accounts        = $state([]);
   let rawHoldings     = $state([]);
   let rawPositions    = $state([]);
+  let rawFunds        = $state([]);
   let rawHoldingsSummary  = $state([]);
   let rawPositionsSummary = $state([]);
 
@@ -244,6 +245,20 @@
     holdingsAllGrid.setGridOption('pinnedBottomRowData', hTotals ? [hTotals] : []);
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
+    // Funds rows scope to the selected account too. TOTAL is only useful
+    // in the "all" view; for a single account it duplicates the row.
+    const fRows = selectedAccount === 'all'
+      ? rawFunds
+      : rawFunds.filter(r => r.account === selectedAccount);
+    updateGrid(fundsGrid, fRows);
+    // When a single account is picked, the Account column is redundant —
+    // every visible row carries the same value. Hide it across the three
+    // account-scoped grids (Holdings, Positions, Funds) so the rest of
+    // the columns expand into the freed space.
+    const showAcct = selectedAccount === 'all';
+    for (const g of [holdingsAllGrid, positionsAllGrid, fundsGrid, holdingsSummaryGrid, positionsSummaryGrid]) {
+      try { g?.setColumnsVisible?.(['account'], showAcct); } catch (_) { /* older AG API */ }
+    }
   }
 
   function applyData(h, p, f) {
@@ -251,9 +266,9 @@
     rawPositions        = p.rows ?? [];
     rawHoldingsSummary  = h.summary ?? [];
     rawPositionsSummary = p.summary ?? [];
+    rawFunds            = f.rows ?? [];
     const allAccts = [...new Set([...rawHoldings.map(r => r.account), ...rawPositions.map(r => r.account)])];
     accounts = allAccts;
-    updateGrid(fundsGrid, f.rows ?? []);
     lastRefresh = h.refreshed_at ?? '';
     applyAccountFilter();
   }
@@ -350,13 +365,10 @@
     </select>
   {/if}
   {#if compactHeader}
-    <span class="perf-ts tabs-row-ts">
-      {#if loading && !lastRefresh}
-        <span class="animate-pulse">Loading…</span>
-      {:else if lastRefresh}
-        {lastRefresh}
-      {/if}
-    </span>
+    <button onclick={loadAll} disabled={loading}
+      class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 tabs-row-refresh">
+      {loading ? 'Refreshing…' : 'Refresh'}
+    </button>
   {/if}
 </div>
 
@@ -417,6 +429,8 @@
     margin-left: auto;
     white-space: nowrap;
   }
+  /* Compact-header Refresh button sits after the account picker. */
+  .tabs-row-refresh { margin-left: auto; }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #fbbf24; }
