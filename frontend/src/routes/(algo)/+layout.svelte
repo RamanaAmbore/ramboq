@@ -242,10 +242,10 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Composite brand mark: the bull sits centered in a faint-ringed
-     navy circle with a tiny "algo" label along the bottom arc. Kept
-     understated so it's recognisable without drawing the eye away
-     from the page content. */
+  /* Composite brand mark: bull sits centered in a prominent amber-ringed
+     navy circle; "algo" label floats along the bottom arc with a clear
+     breathing-room margin from the edge. Bull + algo sit close to each
+     other in the vertical centre so they read as one paired mark. */
   .algo-brand-mark {
     position: relative;
     display: inline-flex;
@@ -253,15 +253,14 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border: 1px solid rgba(251,191,36,0.35);
+    border: 1.5px solid rgba(251,191,36,0.7);
     border-radius: 50%;
     background: rgba(13,22,42,0.55);
     overflow: hidden;
-    padding-top: 0.15rem;
-    opacity: 0.85;
+    padding-top: 0.2rem;
   }
   .algo-brand-mark-bull {
-    height: 0.95rem;
+    height: 0.9rem;
     width: auto;
     display: block;
   }
@@ -269,13 +268,13 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0.12rem;
+    bottom: 0.3rem;
     text-align: center;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 0.42rem;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.04em;
-    color: rgba(251,191,36,0.7);
+    color: rgba(251,191,36,0.85);
     line-height: 1;
     text-transform: lowercase;
   }
@@ -283,9 +282,10 @@
   .algo-brand-mark-sm {
     width: 1.65rem;
     height: 1.65rem;
+    padding-top: 0.16rem;
   }
-  .algo-brand-mark-sm .algo-brand-mark-bull { height: 0.75rem; }
-  .algo-brand-mark-sm .algo-brand-mark-text { font-size: 0.4rem; bottom: 0.08rem; }
+  .algo-brand-mark-sm .algo-brand-mark-bull { height: 0.72rem; }
+  .algo-brand-mark-sm .algo-brand-mark-text { font-size: 0.38rem; bottom: 0.24rem; }
 
   /* Nav buttons */
   :global(.algo-nav-btn) {
