@@ -263,10 +263,12 @@
     writing-mode: vertical-lr;
     transform: rotate(180deg);
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    color: #fbbf24;
+    font-size: 0.55rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    /* Faint amber — reads as a quiet section stamp against the navbar,
+       not a label competing with the brand. */
+    color: rgba(251,191,36,0.4);
     text-transform: uppercase;
     line-height: 1;
     margin-left: -0.5rem;
@@ -279,8 +281,8 @@
     align-items: center;
   }
   .algo-vert-sm {
-    font-size: 0.52rem;
-    letter-spacing: 0.1em;
+    font-size: 0.48rem;
+    letter-spacing: 0.14em;
     margin-right: 0.3rem;
   }
 
