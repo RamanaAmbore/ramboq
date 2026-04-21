@@ -73,8 +73,12 @@
 </svelte:head>
 
 
-<div class="flex items-center justify-between mb-3">
-  <div class="text-[0.65rem] text-muted">
+<!-- Same header row shape as PerformancePage: timestamp on the left with
+     the perf-ts class so every timestamp across the public site inherits
+     identical sizing / colour / spacing. Right side shows a refresh
+     status indicator when a silent background reload is in flight. -->
+<div class="flex items-center justify-between mb-2">
+  <div class="text-[0.65rem] text-muted perf-ts">
     {#if loading && !lastRefresh}
       <span class="animate-pulse">Loading…</span>
     {:else if lastRefresh}
@@ -82,7 +86,7 @@
     {/if}
   </div>
   {#if loading && lastRefresh}
-    <span class="text-xs text-muted animate-pulse">Refreshing…</span>
+    <span class="text-[0.65rem] text-muted animate-pulse">Refreshing…</span>
   {/if}
 </div>
 
