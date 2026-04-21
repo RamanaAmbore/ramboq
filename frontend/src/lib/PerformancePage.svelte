@@ -129,8 +129,6 @@
     { field: 'account',       headerName: 'Account',   width: 90, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },
     { field: 'tradingsymbol', headerName: 'Symbol',    width: 150, pinned: 'left', cellClass: symFill, headerClass: symFill },
     { field: 'pnl',           headerName: 'P&L',       width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
-    { field: 'unrealised',    headerName: 'Unrealised', width: 90, valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
-    { field: 'realised',      headerName: 'Realised',  width: 90,  valueFormatter: numFmt, cellClass: pnlCls, type: 'numericColumn' },
     { field: 'quantity',      headerName: 'Qty',       width: 60,  type: 'numericColumn', cellClass: qtyCls },
     { field: 'average_price', headerName: 'Avg Price', width: 90,  valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
     { field: 'close_price',   headerName: 'LTP',       width: 80,  valueFormatter: numFmt, type: 'numericColumn', cellClass: avgVsLtpCls },
