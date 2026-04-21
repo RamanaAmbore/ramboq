@@ -573,14 +573,26 @@
   }
 
   /* Compact row = tighter field-input paddings so all 4 fit on one line
-     at normal desktop widths. */
+     at normal desktop widths. Pin every control on this row to the
+     same 1.7rem box the Scenario row uses — Rate / Pos number inputs,
+     the Seed and Market Select triggers all align at identical heights. */
   :global(.sim-fields-compact .field-input) {
-    font-size: 0.6rem !important;
-    padding: 0.2rem 0.35rem !important;
-    min-height: 1.4rem !important;
+    font-size: 0.62rem !important;
+    padding: 0.25rem 0.4rem !important;
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    box-sizing: border-box;
+  }
+  :global(.sim-fields-compact .rbq-select-trigger),
+  :global(.sim-fields-compact .rbq-multi-trigger) {
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    box-sizing: border-box;
+    font-size: 0.62rem !important;
   }
   :global(.sim-fields-compact .field-label) {
-    font-size: 0.48rem !important;
+    font-size: 0.5rem !important;
+    margin-bottom: 0 !important;
   }
 
   .sim-buttons-row {
