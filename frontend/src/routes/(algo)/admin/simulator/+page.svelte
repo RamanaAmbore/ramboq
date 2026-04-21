@@ -505,13 +505,21 @@
     gap: 0.2rem 0.3rem;
     min-height: 1.55rem;
   }
+  /* Each pct cell takes an equal share of its parent container — so the
+     three Tick % inputs split the Tick field width evenly, and the single
+     Spread input fills its cell completely. Both grow/shrink with the
+     row's overall width. */
   .sim-pct-cell {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.15rem;
+    flex: 1 1 0;
+    min-width: 0;
   }
   :global(.sim-pct-input) {
-    width: 3.8rem;
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
     font-size: 0.6rem !important;
     padding: 0.2rem 0.3rem !important;
     min-height: 1.4rem !important;
