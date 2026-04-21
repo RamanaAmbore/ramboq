@@ -242,9 +242,10 @@
     font-family: ui-monospace, monospace;
     line-height: 1;
   }
-  /* Composite brand mark: the bull sits centered in an amber-ringed
-     navy circle with a tiny "algo" label along the bottom arc. Reads as
-     one visual — the company bull ringed as the trading console. */
+  /* Composite brand mark: the bull sits centered in a faint-ringed
+     navy circle with a tiny "algo" label along the bottom arc. Kept
+     understated so it's recognisable without drawing the eye away
+     from the page content. */
   .algo-brand-mark {
     position: relative;
     display: inline-flex;
@@ -252,18 +253,17 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border: 1.5px solid #fbbf24;
+    border: 1px solid rgba(251,191,36,0.35);
     border-radius: 50%;
-    background: radial-gradient(circle at 50% 40%, #1d2a44 0%, #0a1020 100%);
-    box-shadow: 0 0 4px rgba(251,191,36,0.35), inset 0 0 4px rgba(251,191,36,0.15);
+    background: rgba(13,22,42,0.55);
     overflow: hidden;
     padding-top: 0.15rem;
+    opacity: 0.85;
   }
   .algo-brand-mark-bull {
     height: 0.95rem;
     width: auto;
     display: block;
-    filter: drop-shadow(0 0 2px rgba(251,191,36,0.8));
   }
   .algo-brand-mark-text {
     position: absolute;
@@ -272,10 +272,10 @@
     bottom: 0.12rem;
     text-align: center;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 0.46rem;
-    font-weight: 800;
+    font-size: 0.42rem;
+    font-weight: 600;
     letter-spacing: 0.04em;
-    color: #fbbf24;
+    color: rgba(251,191,36,0.7);
     line-height: 1;
     text-transform: lowercase;
   }
