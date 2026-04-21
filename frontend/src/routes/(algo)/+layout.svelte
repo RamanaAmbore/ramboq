@@ -189,15 +189,16 @@
     align-items: center;
   }
 
+  /* No max-width: let the card consume the whole viewport so the
+     grids / log panel / simulator don't leave dead gutters on wide
+     monitors. Borders dropped because there's nothing to separate
+     from anymore. */
   .algo-card {
     width: 100%;
-    max-width: 1440px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     background-color: #0d1829;
-    border-left:  1px solid #1e2d45;
-    border-right: 1px solid #1e2d45;
   }
 
   /* ── Navbar ─────────────────────────────────────────────────────────────── */
@@ -211,9 +212,9 @@
   }
 
   .algo-nav-inner {
-    max-width: 1440px;
+    width: 100%;
     margin: 0 auto;
-    padding: 0 1rem;
+    padding: 0 0.5rem;
   }
 
   /* Brand mark */
@@ -416,7 +417,10 @@
   /* ── Content ─────────────────────────────────────────────────────────────── */
   .algo-content {
     flex: 1;
-    padding: 1rem 1rem 1.5rem;
+    /* Tighter side padding (0.5rem instead of 1rem) so the grids + log
+       panel have more horizontal room on narrow widths. Top / bottom
+       keep their previous rhythm. */
+    padding: 1rem 0.5rem 1.5rem;
     color: #c8d8f0;
   }
 
@@ -429,7 +433,7 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    padding: 0 1rem;
+    padding: 0 0.5rem;
   }
   .algo-footer-text { font-size: 0.6rem; color: rgba(160,185,220,0.7); font-family: ui-monospace, monospace; }
   .algo-footer-sep  { font-size: 0.6rem; color: rgba(251,191,36,0.6); margin: 0 0.4rem; }
