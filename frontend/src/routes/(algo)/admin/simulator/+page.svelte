@@ -211,11 +211,6 @@
   function shortName(name) {
     return (name || '').replace(/\s*\([^)]*\)\s*/g, '').trim();
   }
-  /** @param {string} name */
-  function bracketHint(name) {
-    const m = (name || '').match(/\(([^)]*)\)/);
-    return m ? m[1].trim() : '';
-  }
 
   // Whenever the scenario picker changes, refresh the pct-override inputs
   // with the new scenario's YAML defaults. Each tick becomes one editable
@@ -337,7 +332,6 @@
         options={scenarios.map(s => ({
           value: s.slug,
           label: shortName(s.name),
-          hint:  bracketHint(s.name) || `${s.mode} · ${s.ticks} ticks`,
         }))} />
     </div>
     <div class="sim-field sim-field-symbol">
