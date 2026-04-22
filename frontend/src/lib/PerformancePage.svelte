@@ -75,6 +75,15 @@
   let positionsSummaryGrid = null;
   let positionsAllGrid     = null;
 
+  // Strip from the first digit onward — Zerodha F&O tradingsymbols are
+  // "<UNDERLYING><expiry><strike><opt-type>" (NIFTY25APR22000CE,
+  // BANKNIFTY25MAYFUT, CRUDEOIL25MAYFUT, …). For plain equity symbols
+  // with no digits (RELIANCE, SBIN, …) this is a no-op, which is the
+  // right answer for holdings.
+  function underlyingOf(/** @type {string} */ sym) {
+    return (sym || '').replace(/\d.*$/, '');
+  }
+
   const numFmt  = ({ value }) =>
     value == null ? '' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const pctFmt  = ({ value }) =>
@@ -251,10 +260,16 @@
     const keepAcct = (r) => selectedAccount === 'all'
       ? true
       : (r.account === selectedAccount);
-    // Empty selection ⇒ "all". A non-empty array ⇒ keep rows whose
-    // symbol is in that set.
+    // Empty selection ⇒ "all". Otherwise a row matches when either its
+    // full tradingsymbol or its derived underlying is in the set. That
+    // dual match lets the Positions tab filter by underlying (NIFTY,
+    // BANKNIFTY, RELIANCE, …) while Holdings keeps matching on the
+    // straight equity symbol. Underlyings are never in the holdings
+    // list, and tradingsymbols are never in the positions list, so
+    // the double-check is safe.
     const keepSym  = (r) => !selectedSymbols.length
-      || selectedSymbols.includes(r.tradingsymbol);
+      || selectedSymbols.includes(r.tradingsymbol)
+      || selectedSymbols.includes(underlyingOf(r.tradingsymbol));
     const hRows     = rawHoldings.filter(r => keepAcct(r) && keepSym(r));
     const pRows     = rawPositions.filter(r => keepAcct(r) && keepSym(r));
     const hSummary  = rawHoldingsSummary.filter(keepAcct);
@@ -290,7 +305,12 @@
     // Two separate symbol lists — the dropdown narrows to just what the
     // active tab needs, so Positions never shows holding-only symbols
     // (and vice versa).
-    positionSymbols = [...new Set(rawPositions.map(r => r.tradingsymbol))]
+    // Positions dropdown lists UNDERLYINGS (NIFTY, BANKNIFTY, RELIANCE,
+    // …) so one pick scopes every option / future / cash-equity position
+    // on that underlying at once. Holdings keeps the full tradingsymbol
+    // since holdings are typically equities with no derived-from
+    // hierarchy to collapse.
+    positionSymbols = [...new Set(rawPositions.map(r => underlyingOf(r.tradingsymbol)))]
       .filter(Boolean).sort();
     holdingSymbols  = [...new Set(rawHoldings.map(r => r.tradingsymbol))]
       .filter(Boolean).sort();
