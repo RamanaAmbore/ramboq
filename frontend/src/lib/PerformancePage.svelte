@@ -492,16 +492,16 @@
     max-width: 8.5rem;
     text-overflow: ellipsis;
   }
-  /* Mobile — shrink tabs and dropdowns so the row fits without wrap.
-     The long "RAMBO QUANT" tab labels were already px-3; here the
-     padding drops further and the font ticks down. */
+  /* Push the Account + Symbol dropdowns against the right edge of
+     the tabs row. The first dropdown takes margin-left: auto so the
+     browser eats the remaining space between the Holdings tab and
+     the dropdowns. */
+  .tabs-row > select:first-of-type { margin-left: auto; }
+
+  /* Mobile — only the dropdowns tighten; tab font-size stays at the
+     default so Positions / Holdings look identical to desktop. */
   @media (max-width: 639px) {
     .tabs-row { gap: 0.3rem; }
-    .tabs-row :global(button) {
-      padding-left: 0.5rem !important;
-      padding-right: 0.5rem !important;
-      font-size: 0.65rem !important;
-    }
     .acct-select {
       font-size: 0.58rem;
       padding: 0.15rem 0.3rem;
