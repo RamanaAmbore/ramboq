@@ -264,7 +264,17 @@ class KiteConnection:
 
 class Connections(SingletonBase):
     def __init__(self):
-        self.conn = {account: KiteConnection(account, secrets) for account in secrets['kite_accounts'].keys()}
+        # SingletonBase.__new__ returns the same instance on every call,
+        # but Python always re-invokes __init__ after __new__. Without
+        # this guard we'd rebuild KiteConnection per account on every
+        # Connections() access — which re-does the token-cache restore
+        # (+2 Kite calls each) and was adding ~14 s of latency to every
+        # /api/holdings · /positions · /funds request.
+        if getattr(self, '_singleton_initialized', False):
+            return
+        self.conn = {account: KiteConnection(account, secrets)
+                     for account in secrets['kite_accounts'].keys()}
+        self._singleton_initialized = True
 
 
 if __name__ == "__main__":
