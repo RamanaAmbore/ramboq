@@ -21,6 +21,9 @@
     id = '',
     disabled = false,
     ariaLabel = '',
+    // 'dark'  — algo console (navy gradient + amber)
+    // 'light' — public site (cream + champagne gold)
+    theme = 'dark',
   } = $props();
 
   let open = $state(false);
@@ -77,7 +80,7 @@
   onDestroy(() => { document.removeEventListener('mousedown', onDocClick); });
 </script>
 
-<div class="rbq-select {open ? 'rbq-select-open' : ''}">
+<div class="rbq-select rbq-select-{theme} {open ? 'rbq-select-open' : ''}">
   <button type="button" bind:this={triggerEl}
     {id} {disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
     class="rbq-select-trigger"
@@ -203,4 +206,40 @@
     font-size: 0.55rem;
     color: rgba(180,200,230,0.55);
   }
+
+  /* ── Light theme (public palette — cream + champagne gold) ─────────── */
+  .rbq-select-light { color: #1a1e35; }
+  .rbq-select-light .rbq-select-trigger {
+    background-image: none;
+    background-color: #ffffff;
+    border: 1px solid #c0ccdc;
+    color: #1e3050;
+  }
+  .rbq-select-light .rbq-select-trigger:hover:not(:disabled) { border-color: #c8a84b; }
+  .rbq-select-light .rbq-select-trigger:focus                { border-color: #c8a84b; }
+  .rbq-select-light.rbq-select-open .rbq-select-trigger      { border-color: #c8a84b; }
+  .rbq-select-light .rbq-select-placeholder { color: #64748b; }
+  .rbq-select-light .rbq-select-caret       { color: #c8a84b; }
+
+  .rbq-select-light .rbq-select-panel {
+    background: #ffffff;
+    border: 1.5px solid #c8a84b;
+    box-shadow: 0 10px 24px rgba(12,24,48,0.18);
+    color: #1a1e35;
+  }
+  .rbq-select-light .rbq-select-option {
+    border-left-color: transparent;
+  }
+  .rbq-select-light .rbq-select-option-hl,
+  .rbq-select-light .rbq-select-option:hover {
+    background: rgba(200,168,75,0.18);
+    color: #0c1830;
+    border-left-color: #c8a84b;
+  }
+  .rbq-select-light .rbq-select-option-selected {
+    color: #0c1830;
+    font-weight: 700;
+  }
+  .rbq-select-light .rbq-select-option-selected::before { color: #15803d; }
+  .rbq-select-light .rbq-select-option-hint { color: #64748b; }
 </style>

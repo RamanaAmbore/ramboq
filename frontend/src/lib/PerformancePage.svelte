@@ -6,6 +6,7 @@
   import { dataCache, authStore } from '$lib/stores';
   import OrderPopup from '$lib/OrderPopup.svelte';
   import MultiSelect from '$lib/MultiSelect.svelte';
+  import Select      from '$lib/Select.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
@@ -408,18 +409,23 @@
     {/each}
   </div>
   {#if accounts.length > 0}
-    <select bind:value={selectedAccount} class="acct-select">
-      <option value="all">All Accounts</option>
-      {#each accounts as acct}
-        <option value={acct}>{maskAccounts ? acct.replace(/\d/g, '#') : acct}</option>
-      {/each}
-    </select>
+    <!-- Account picker uses the themed <Select> so it visually matches
+         the MultiSelect next to it. Single-select — account scope.
+         Theme mirrors the page (dark on the algo dashboard, light on
+         the public /performance). -->
+    <div class="acct-multi">
+      <Select
+        bind:value={selectedAccount}
+        options={[
+          { value: 'all', label: 'All Accounts' },
+          ...accounts.map(a => ({ value: a, label: maskAccounts ? a.replace(/\d/g, '#') : a })),
+        ]}
+        theme={compactHeader ? 'dark' : 'light'} />
+    </div>
   {/if}
   {#if symbols.length > 0}
     <!-- Multi-select: empty array ⇒ "all symbols"; any non-empty
-         selection ⇒ filter the active tab's detail grid to that set.
-         Theme follows the page — dark for the algo dashboard, light
-         (cream/gold) for the public /performance. -->
+         selection ⇒ filter the active tab's detail grid to that set. -->
     <div class="sym-multi">
       <MultiSelect
         bind:value={selectedSymbols}
@@ -485,43 +491,20 @@
     gap: 0.5rem;
     flex-wrap: nowrap;
   }
-  .acct-select {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    border: 1px solid #c0ccdc;
-    border-radius: 0.25rem;
-    background: white;
-    color: #1e3050;
-    outline: none;
-    cursor: pointer;
-    margin-left: 0;
-    min-width: 0;
-    max-width: 8.5rem;
-    text-overflow: ellipsis;
-  }
-  /* Symbol MultiSelect wrapper — same visual footprint as the Account
-     `<select>` next to it. Inner trigger sizing is handled by the
-     component's own CSS; this wrapper just reserves width in the row. */
+  /* Account + Symbol dropdown wrappers. Same width + min-width so the
+     two sit side-by-side as equal-footprint fields. Theme + colour are
+     handled inside Select / MultiSelect. Both live right after the
+     Holdings tab — no right-push. */
+  .acct-multi,
   .sym-multi {
     width: 8.5rem;
     min-width: 0;
   }
 
-  /* Push the Account + Symbol dropdowns against the right edge of
-     the tabs row. The first dropdown (Account `<select>`) takes
-     margin-left: auto so the browser eats the remaining space between
-     the Holdings tab and the dropdowns. */
-  .tabs-row > select:first-of-type { margin-left: auto; }
-
-  /* Mobile — only the dropdowns tighten; tab font-size stays at the
-     default so Positions / Holdings look identical to desktop. */
+  /* Mobile — the dropdowns tighten, tabs stay full size. */
   @media (max-width: 639px) {
     .tabs-row { gap: 0.3rem; }
-    .acct-select {
-      font-size: 0.58rem;
-      padding: 0.15rem 0.3rem;
-      max-width: 7.5rem;
-    }
+    .acct-multi,
     .sym-multi { width: 7.5rem; }
   }
   /* Refresh timestamp pinned to the far right of the tabs row. */
@@ -546,12 +529,6 @@
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #fbbf24; }
-
-  .perf-dark .acct-select {
-    background: #0d1829;
-    border-color: #2a4060;
-    color: #c8d8f0;
-  }
 
   /* Tabs */
   .perf-dark :global(button[class*="border-primary"])    { border-color: #d97706 !important; color: #fbbf24 !important; }
