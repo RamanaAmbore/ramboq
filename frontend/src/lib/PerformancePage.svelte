@@ -5,6 +5,7 @@
   import { createPerformanceSocket } from '$lib/ws';
   import { dataCache, authStore } from '$lib/stores';
   import OrderPopup from '$lib/OrderPopup.svelte';
+  import MultiSelect from '$lib/MultiSelect.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
@@ -47,15 +48,12 @@
   let error       = $state('');
 
   let selectedAccount = $state('all');
-  let selectedSymbol  = $state('all');
+  // Multi-select: empty array ⇒ "all symbols". Populated array ⇒ only
+  // those symbols show in the detail grid under the active tab.
+  let selectedSymbols = $state(/** @type {string[]} */([]));
   let accounts        = $state([]);
-  // Symbol lists kept separate by tab — Positions tab shows only
-  // position symbols, Holdings tab shows only holding symbols. The
-  // visible `symbols` list below is derived from whichever tab is
-  // active.
   let positionSymbols = $state(/** @type {string[]} */([]));
   let holdingSymbols  = $state(/** @type {string[]} */([]));
-  // The dropdown renders whichever list matches the active tab.
   const symbols = $derived(activeTab === 'holdings' ? holdingSymbols : positionSymbols);
   let rawHoldings     = $state([]);
   let rawPositions    = $state([]);
@@ -252,9 +250,10 @@
     const keepAcct = (r) => selectedAccount === 'all'
       ? true
       : (r.account === selectedAccount);
-    const keepSym  = (r) => selectedSymbol === 'all'
-      ? true
-      : (r.tradingsymbol === selectedSymbol);
+    // Empty selection ⇒ "all". A non-empty array ⇒ keep rows whose
+    // symbol is in that set.
+    const keepSym  = (r) => !selectedSymbols.length
+      || selectedSymbols.includes(r.tradingsymbol);
     const hRows     = rawHoldings.filter(r => keepAcct(r) && keepSym(r));
     const pRows     = rawPositions.filter(r => keepAcct(r) && keepSym(r));
     const hSummary  = rawHoldingsSummary.filter(keepAcct);
@@ -269,17 +268,13 @@
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
     updateGrid(fundsGrid, fRows);
-    // Hide redundant columns. Account column hides across every grid
-    // when a specific account is picked. Symbol column hides on the two
-    // detail tables when a specific symbol is picked (summary + funds
-    // don't have a symbol column to hide).
+    // Account column hides across every grid when a specific account
+    // is picked. Symbol column stays visible even when filtered —
+    // operators asked to keep it so they can read which symbol(s) each
+    // row belongs to at a glance.
     const showAcct = selectedAccount === 'all';
-    const showSym  = selectedSymbol  === 'all';
     for (const g of [holdingsAllGrid, positionsAllGrid, fundsGrid, holdingsSummaryGrid, positionsSummaryGrid]) {
       try { g?.setColumnsVisible?.(['account'], showAcct); } catch (_) { /* older AG API */ }
-    }
-    for (const g of [holdingsAllGrid, positionsAllGrid]) {
-      try { g?.setColumnsVisible?.(['tradingsymbol'], showSym); } catch (_) { /* older AG API */ }
     }
   }
 
@@ -298,34 +293,35 @@
       .filter(Boolean).sort();
     holdingSymbols  = [...new Set(rawHoldings.map(r => r.tradingsymbol))]
       .filter(Boolean).sort();
-    // If the previously-selected symbol no longer appears in the
-    // currently-visible list (tab-scoped), snap back to "all".
-    const visible = (activeTab === 'holdings' ? holdingSymbols : positionSymbols);
-    if (selectedSymbol !== 'all' && !visible.includes(selectedSymbol)) {
-      selectedSymbol = 'all';
-    }
+    // Drop any selected symbols that no longer exist in the currently-
+    // visible (tab-scoped) list — keeps the filter honest when symbols
+    // get closed out, renamed, or aren't in the active tab's book.
+    reconcileSymbols();
     lastRefresh = h.refreshed_at ?? '';
     applyAccountFilter();
   }
 
-  // Switching tabs changes which symbol list the dropdown shows. If the
-  // current selection isn't in the new list, reset to "all" so the
-  // detail grid doesn't render empty.
-  $effect(() => {
+  function reconcileSymbols() {
     const visible = (activeTab === 'holdings' ? holdingSymbols : positionSymbols);
-    if (selectedSymbol !== 'all' && !visible.includes(selectedSymbol)) {
-      selectedSymbol = 'all';
-    }
+    const kept = selectedSymbols.filter(s => visible.includes(s));
+    if (kept.length !== selectedSymbols.length) selectedSymbols = kept;
+  }
+
+  // Switching tabs changes which symbol list the picker shows; reconcile
+  // the selection so stale symbols don't hold the grid empty.
+  $effect(() => {
+    activeTab; holdingSymbols; positionSymbols;
+    reconcileSymbols();
   });
 
   $effect(() => {
-    // Track account + symbol filters. activeTab is also touched so the
-    // filter is re-applied when switching tabs (defensive — the grids
-    // already hold the right rows since applyAccountFilter runs on
-    // every data refresh, but re-running on tab-switch guards against
-    // any edge case where the tab-scoped symbol list changes and the
-    // selectedSymbol reset happens mid-flight).
-    selectedAccount; selectedSymbol; activeTab;
+    // Track account + symbol filters + active tab. activeTab is in here
+    // so the filter re-runs on tab switch (defensive — the grids already
+    // hold the right rows since applyAccountFilter runs on every data
+    // refresh, but re-running on tab-switch guards against any edge
+    // case where the tab-scoped symbol list reconciliation runs
+    // mid-flight).
+    selectedAccount; selectedSymbols; activeTab;
     applyAccountFilter();
   });
 
@@ -420,12 +416,17 @@
     </select>
   {/if}
   {#if symbols.length > 0}
-    <select bind:value={selectedSymbol} class="acct-select">
-      <option value="all">All Symbols</option>
-      {#each symbols as sym}
-        <option value={sym}>{sym}</option>
-      {/each}
-    </select>
+    <!-- Multi-select: empty array ⇒ "all symbols"; any non-empty
+         selection ⇒ filter the active tab's detail grid to that set.
+         Theme follows the page — dark for the algo dashboard, light
+         (cream/gold) for the public /performance. -->
+    <div class="sym-multi">
+      <MultiSelect
+        bind:value={selectedSymbols}
+        options={symbols.map(s => ({ value: s, label: s }))}
+        placeholder="All Symbols"
+        theme={compactHeader ? 'dark' : 'light'} />
+    </div>
   {/if}
 </div>
 
@@ -498,10 +499,18 @@
     max-width: 8.5rem;
     text-overflow: ellipsis;
   }
+  /* Symbol MultiSelect wrapper — same visual footprint as the Account
+     `<select>` next to it. Inner trigger sizing is handled by the
+     component's own CSS; this wrapper just reserves width in the row. */
+  .sym-multi {
+    width: 8.5rem;
+    min-width: 0;
+  }
+
   /* Push the Account + Symbol dropdowns against the right edge of
-     the tabs row. The first dropdown takes margin-left: auto so the
-     browser eats the remaining space between the Holdings tab and
-     the dropdowns. */
+     the tabs row. The first dropdown (Account `<select>`) takes
+     margin-left: auto so the browser eats the remaining space between
+     the Holdings tab and the dropdowns. */
   .tabs-row > select:first-of-type { margin-left: auto; }
 
   /* Mobile — only the dropdowns tighten; tab font-size stays at the
@@ -513,6 +522,7 @@
       padding: 0.15rem 0.3rem;
       max-width: 7.5rem;
     }
+    .sym-multi { width: 7.5rem; }
   }
   /* Refresh timestamp pinned to the far right of the tabs row. */
   .tabs-row-ts {

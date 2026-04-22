@@ -18,6 +18,9 @@
     id = '',
     disabled = false,
     ariaLabel = '',
+    // 'dark'  — algo console (navy gradient, amber accents)
+    // 'light' — public site (cream + champagne gold, navy text)
+    theme = 'dark',
   } = $props();
 
   let open = $state(false);
@@ -72,7 +75,7 @@
   onDestroy(() => { document.removeEventListener('mousedown', onDocClick); });
 </script>
 
-<div class="rbq-multi {open ? 'rbq-multi-open' : ''}">
+<div class="rbq-multi rbq-multi-{theme} {open ? 'rbq-multi-open' : ''}">
   <button type="button" bind:this={triggerEl}
     {id} {disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
     class="rbq-multi-trigger"
@@ -205,4 +208,41 @@
     font-size: 0.55rem;
     color: rgba(180,200,230,0.55);
   }
+
+  /* ── Light theme (public palette — cream body + champagne gold) ─────── */
+  .rbq-multi-light { color: #1a1e35; }
+  .rbq-multi-light .rbq-multi-trigger {
+    background-image: none;
+    background-color: #ffffff;
+    border: 1px solid #c0ccdc;
+    color: #1e3050;
+  }
+  .rbq-multi-light .rbq-multi-trigger:hover:not(:disabled) { border-color: #c8a84b; }
+  .rbq-multi-light .rbq-multi-trigger:focus { border-color: #c8a84b; }
+  .rbq-multi-light.rbq-multi-open .rbq-multi-trigger      { border-color: #c8a84b; }
+  .rbq-multi-light .rbq-multi-placeholder { color: #64748b; }
+  .rbq-multi-light .rbq-multi-clear       { color: rgba(200,168,75,0.8); }
+  .rbq-multi-light .rbq-multi-clear:hover { color: #c8a84b; }
+  .rbq-multi-light .rbq-multi-caret       { color: #c8a84b; }
+
+  .rbq-multi-light .rbq-multi-panel {
+    background: #ffffff;
+    border: 1.5px solid #c8a84b;
+    box-shadow: 0 10px 24px rgba(12,24,48,0.18);
+    color: #1a1e35;
+  }
+  .rbq-multi-light .rbq-multi-option {
+    border-left-color: transparent;
+  }
+  .rbq-multi-light .rbq-multi-option:hover {
+    background: rgba(200,168,75,0.18);
+    color: #0c1830;
+    border-left-color: #c8a84b;
+  }
+  .rbq-multi-light .rbq-multi-option-selected {
+    color: #0c1830;
+    font-weight: 700;
+  }
+  .rbq-multi-light .rbq-multi-check { color: #15803d; }
+  .rbq-multi-light .rbq-multi-option-hint { color: #64748b; }
 </style>
