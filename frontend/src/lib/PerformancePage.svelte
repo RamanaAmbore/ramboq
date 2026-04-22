@@ -319,7 +319,13 @@
   });
 
   $effect(() => {
-    selectedAccount; selectedSymbol; // track both filters
+    // Track account + symbol filters. activeTab is also touched so the
+    // filter is re-applied when switching tabs (defensive — the grids
+    // already hold the right rows since applyAccountFilter runs on
+    // every data refresh, but re-running on tab-switch guards against
+    // any edge case where the tab-scoped symbol list changes and the
+    // selectedSymbol reset happens mid-flight).
+    selectedAccount; selectedSymbol; activeTab;
     applyAccountFilter();
   });
 
