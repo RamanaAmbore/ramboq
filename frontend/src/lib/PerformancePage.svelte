@@ -47,9 +47,7 @@
   let error       = $state('');
 
   let selectedAccount = $state('all');
-  let selectedSymbol  = $state('all');
   let accounts        = $state([]);
-  let symbols         = $state(/** @type {string[]} */([]));
   let rawHoldings     = $state([]);
   let rawPositions    = $state([]);
   let rawFunds        = $state([]);
@@ -237,21 +235,18 @@
 
   function applyAccountFilter() {
     if (!holdingsAllGrid) return;
-    // ACCOUNT filter scopes every grid (detail + summary + funds).
-    // SYMBOL filter scopes only the detail tables (Holdings + Positions) —
-    // per-account summaries and fund balances don't reduce cleanly to a
-    // single symbol, so they keep showing the account-level aggregates.
-    const keepAcct = (r) => selectedAccount === 'all'
+    // Match a row against the selected account filter. In "all" mode we
+    // keep everything; for a specific account we drop other accounts AND
+    // the TOTAL aggregate — summary + funds should show exactly one row
+    // for the account the operator drilled into.
+    const keep = (r) => selectedAccount === 'all'
       ? true
       : (r.account === selectedAccount);
-    const keepSym  = (r) => selectedSymbol === 'all'
-      ? true
-      : (r.tradingsymbol === selectedSymbol);
-    const hRows     = rawHoldings.filter(r => keepAcct(r) && keepSym(r));
-    const pRows     = rawPositions.filter(r => keepAcct(r) && keepSym(r));
-    const hSummary  = rawHoldingsSummary.filter(keepAcct);
-    const pSummary  = rawPositionsSummary.filter(keepAcct);
-    const fRows     = rawFunds.filter(keepAcct);
+    const hRows     = rawHoldings.filter(keep);
+    const pRows     = rawPositions.filter(keep);
+    const hSummary  = rawHoldingsSummary.filter(keep);
+    const pSummary  = rawPositionsSummary.filter(keep);
+    const fRows     = rawFunds.filter(keep);
     const hTotals   = makeHoldingsTotals(hRows);
     const pTotals   = makePositionsTotals(pRows);
     updateGrid(holdingsSummaryGrid, hSummary);
@@ -261,18 +256,13 @@
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
     updateGrid(fundsGrid, fRows);
-    // Hide redundant columns when a single filter is in effect. Account
-    // column hides across every grid when a specific account is picked;
-    // Symbol column hides on the two detail tables when a specific
-    // symbol is picked (the summary + funds grids don't have a symbol
-    // column to hide).
+    // When a single account is picked, the Account column is redundant —
+    // every visible row carries the same value. Hide it across the three
+    // account-scoped grids (Holdings, Positions, Funds) so the rest of
+    // the columns expand into the freed space.
     const showAcct = selectedAccount === 'all';
-    const showSym  = selectedSymbol  === 'all';
     for (const g of [holdingsAllGrid, positionsAllGrid, fundsGrid, holdingsSummaryGrid, positionsSummaryGrid]) {
       try { g?.setColumnsVisible?.(['account'], showAcct); } catch (_) { /* older AG API */ }
-    }
-    for (const g of [holdingsAllGrid, positionsAllGrid]) {
-      try { g?.setColumnsVisible?.(['tradingsymbol'], showSym); } catch (_) { /* older AG API */ }
     }
   }
 
@@ -284,24 +274,12 @@
     rawFunds            = f.rows ?? [];
     const allAccts = [...new Set([...rawHoldings.map(r => r.account), ...rawPositions.map(r => r.account)])];
     accounts = allAccts;
-    // Symbol picker union = every tradingsymbol currently in holdings or
-    // positions, sorted so the dropdown is easy to scan.
-    const allSyms = [...new Set([
-      ...rawHoldings.map(r => r.tradingsymbol),
-      ...rawPositions.map(r => r.tradingsymbol),
-    ])].filter(Boolean).sort();
-    symbols = allSyms;
-    // If the currently-selected symbol disappeared from the book (closed
-    // out, renamed), fall back to "all" so the grids don't render empty.
-    if (selectedSymbol !== 'all' && !allSyms.includes(selectedSymbol)) {
-      selectedSymbol = 'all';
-    }
     lastRefresh = h.refreshed_at ?? '';
     applyAccountFilter();
   }
 
   $effect(() => {
-    selectedAccount; selectedSymbol; // track both filters
+    selectedAccount; // track
     applyAccountFilter();
   });
 
@@ -374,11 +352,9 @@
   </div>
 {/if}
 
-<!-- Tabs + account + symbol selectors. Account filter scopes every grid
-     (detail + summary + funds); Symbol filter scopes only the two
-     detail tables. Refresh button moved to the Fund Balances heading
-     row below on the compact (dashboard) layout so this row stays
-     reserved for filtering. -->
+<!-- Tabs + account selector. With `compactHeader`, the refresh timestamp
+     joins this row as the last element (no Refresh button — the
+     performance WebSocket already handles auto-refresh). -->
 <div class="tabs-row mb-3">
   <div class="flex gap-0.5">
     {#each [['positions','Positions'],['holdings','Holdings']] as [id, label]}
@@ -397,29 +373,15 @@
       {/each}
     </select>
   {/if}
-  {#if symbols.length > 0}
-    <select bind:value={selectedSymbol} class="acct-select">
-      <option value="all">All Symbols</option>
-      {#each symbols as sym}
-        <option value={sym}>{sym}</option>
-      {/each}
-    </select>
-  {/if}
-</div>
-
-<div class="funds-heading-row">
-  <h2 class="section-heading funds-heading-title">Fund Balances</h2>
   {#if compactHeader}
-    <!-- Dashboard layout: Refresh lives next to the Fund Balances
-         heading so the tabs row stays reserved for Account + Symbol
-         filters. Public /performance keeps its own Refresh button up
-         top. -->
     <button onclick={() => loadAll({ fresh: true })} disabled={loading}
-      class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 funds-heading-refresh">
+      class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 tabs-row-refresh">
       {loading ? 'Refreshing…' : 'Refresh'}
     </button>
   {/if}
 </div>
+
+<h2 class="section-heading">Fund Balances</h2>
 <div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
 <section class:hidden={activeTab !== 'positions'}>
@@ -478,17 +440,6 @@
   }
   /* Compact-header Refresh button sits after the account picker. */
   .tabs-row-refresh { margin-left: auto; }
-
-  /* Fund Balances heading row — title left, Refresh (on compactHeader
-     layouts) right. Keeps the tabs row reserved for filters. */
-  .funds-heading-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-  }
-  .funds-heading-refresh { margin-left: auto; }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #fbbf24; }
