@@ -49,7 +49,14 @@
   let selectedAccount = $state('all');
   let selectedSymbol  = $state('all');
   let accounts        = $state([]);
-  let symbols         = $state(/** @type {string[]} */([]));
+  // Symbol lists kept separate by tab — Positions tab shows only
+  // position symbols, Holdings tab shows only holding symbols. The
+  // visible `symbols` list below is derived from whichever tab is
+  // active.
+  let positionSymbols = $state(/** @type {string[]} */([]));
+  let holdingSymbols  = $state(/** @type {string[]} */([]));
+  // The dropdown renders whichever list matches the active tab.
+  const symbols = $derived(activeTab === 'holdings' ? holdingSymbols : positionSymbols);
   let rawHoldings     = $state([]);
   let rawPositions    = $state([]);
   let rawFunds        = $state([]);
@@ -284,22 +291,32 @@
     rawFunds            = f.rows ?? [];
     const allAccts = [...new Set([...rawHoldings.map(r => r.account), ...rawPositions.map(r => r.account)])];
     accounts = allAccts;
-    // Symbol dropdown options = union of tradingsymbols across holdings
-    // + positions, sorted for readability.
-    const allSyms = [...new Set([
-      ...rawHoldings.map(r => r.tradingsymbol),
-      ...rawPositions.map(r => r.tradingsymbol),
-    ])].filter(Boolean).sort();
-    symbols = allSyms;
-    // If the previously-selected symbol disappeared from the book
-    // (closed out, renamed), snap the filter back to "all" so the
-    // grid doesn't render empty.
-    if (selectedSymbol !== 'all' && !allSyms.includes(selectedSymbol)) {
+    // Two separate symbol lists — the dropdown narrows to just what the
+    // active tab needs, so Positions never shows holding-only symbols
+    // (and vice versa).
+    positionSymbols = [...new Set(rawPositions.map(r => r.tradingsymbol))]
+      .filter(Boolean).sort();
+    holdingSymbols  = [...new Set(rawHoldings.map(r => r.tradingsymbol))]
+      .filter(Boolean).sort();
+    // If the previously-selected symbol no longer appears in the
+    // currently-visible list (tab-scoped), snap back to "all".
+    const visible = (activeTab === 'holdings' ? holdingSymbols : positionSymbols);
+    if (selectedSymbol !== 'all' && !visible.includes(selectedSymbol)) {
       selectedSymbol = 'all';
     }
     lastRefresh = h.refreshed_at ?? '';
     applyAccountFilter();
   }
+
+  // Switching tabs changes which symbol list the dropdown shows. If the
+  // current selection isn't in the new list, reset to "all" so the
+  // detail grid doesn't render empty.
+  $effect(() => {
+    const visible = (activeTab === 'holdings' ? holdingSymbols : positionSymbols);
+    if (selectedSymbol !== 'all' && !visible.includes(selectedSymbol)) {
+      selectedSymbol = 'all';
+    }
+  });
 
   $effect(() => {
     selectedAccount; selectedSymbol; // track both filters
@@ -451,13 +468,15 @@
 <style>
   .hidden { display: none; }
 
-  /* Tabs + account selector on the same row. Tabs left, dropdown right
-     after the Holdings tab with a small gap so they don't crowd. */
+  /* Tabs + Account + Symbol on one row — keep them all visible on
+     narrow widths by setting `flex-wrap: nowrap` and tightening font
+     + padding on mobile. Deliberately NOT wrapping because the whole
+     point of putting filters on the tabs row is "always at a glance". */
   .tabs-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
   }
   .acct-select {
     font-size: 0.65rem;
@@ -469,6 +488,25 @@
     outline: none;
     cursor: pointer;
     margin-left: 0;
+    min-width: 0;
+    max-width: 8.5rem;
+    text-overflow: ellipsis;
+  }
+  /* Mobile — shrink tabs and dropdowns so the row fits without wrap.
+     The long "RAMBO QUANT" tab labels were already px-3; here the
+     padding drops further and the font ticks down. */
+  @media (max-width: 639px) {
+    .tabs-row { gap: 0.3rem; }
+    .tabs-row :global(button) {
+      padding-left: 0.5rem !important;
+      padding-right: 0.5rem !important;
+      font-size: 0.65rem !important;
+    }
+    .acct-select {
+      font-size: 0.58rem;
+      padding: 0.15rem 0.3rem;
+      max-width: 7.5rem;
+    }
   }
   /* Refresh timestamp pinned to the far right of the tabs row. */
   .tabs-row-ts {
