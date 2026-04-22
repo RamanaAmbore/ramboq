@@ -47,7 +47,9 @@
   let error       = $state('');
 
   let selectedAccount = $state('all');
+  let selectedSymbol  = $state('all');
   let accounts        = $state([]);
+  let symbols         = $state(/** @type {string[]} */([]));
   let rawHoldings     = $state([]);
   let rawPositions    = $state([]);
   let rawFunds        = $state([]);
@@ -235,18 +237,22 @@
 
   function applyAccountFilter() {
     if (!holdingsAllGrid) return;
-    // Match a row against the selected account filter. In "all" mode we
-    // keep everything; for a specific account we drop other accounts AND
-    // the TOTAL aggregate — summary + funds should show exactly one row
-    // for the account the operator drilled into.
-    const keep = (r) => selectedAccount === 'all'
+    // ACCOUNT filter scopes every grid (detail + summary + funds). With a
+    // specific account picked we drop other accounts AND the TOTAL row.
+    // SYMBOL filter scopes ONLY the last (detail) aggrid — summary and
+    // funds are per-account aggregates that don't reduce cleanly to a
+    // single symbol, so they stay on the account-level view.
+    const keepAcct = (r) => selectedAccount === 'all'
       ? true
       : (r.account === selectedAccount);
-    const hRows     = rawHoldings.filter(keep);
-    const pRows     = rawPositions.filter(keep);
-    const hSummary  = rawHoldingsSummary.filter(keep);
-    const pSummary  = rawPositionsSummary.filter(keep);
-    const fRows     = rawFunds.filter(keep);
+    const keepSym  = (r) => selectedSymbol === 'all'
+      ? true
+      : (r.tradingsymbol === selectedSymbol);
+    const hRows     = rawHoldings.filter(r => keepAcct(r) && keepSym(r));
+    const pRows     = rawPositions.filter(r => keepAcct(r) && keepSym(r));
+    const hSummary  = rawHoldingsSummary.filter(keepAcct);
+    const pSummary  = rawPositionsSummary.filter(keepAcct);
+    const fRows     = rawFunds.filter(keepAcct);
     const hTotals   = makeHoldingsTotals(hRows);
     const pTotals   = makePositionsTotals(pRows);
     updateGrid(holdingsSummaryGrid, hSummary);
@@ -256,13 +262,17 @@
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
     updateGrid(fundsGrid, fRows);
-    // When a single account is picked, the Account column is redundant —
-    // every visible row carries the same value. Hide it across the three
-    // account-scoped grids (Holdings, Positions, Funds) so the rest of
-    // the columns expand into the freed space.
+    // Hide redundant columns. Account column hides across every grid
+    // when a specific account is picked. Symbol column hides on the two
+    // detail tables when a specific symbol is picked (summary + funds
+    // don't have a symbol column to hide).
     const showAcct = selectedAccount === 'all';
+    const showSym  = selectedSymbol  === 'all';
     for (const g of [holdingsAllGrid, positionsAllGrid, fundsGrid, holdingsSummaryGrid, positionsSummaryGrid]) {
       try { g?.setColumnsVisible?.(['account'], showAcct); } catch (_) { /* older AG API */ }
+    }
+    for (const g of [holdingsAllGrid, positionsAllGrid]) {
+      try { g?.setColumnsVisible?.(['tradingsymbol'], showSym); } catch (_) { /* older AG API */ }
     }
   }
 
@@ -274,12 +284,25 @@
     rawFunds            = f.rows ?? [];
     const allAccts = [...new Set([...rawHoldings.map(r => r.account), ...rawPositions.map(r => r.account)])];
     accounts = allAccts;
+    // Symbol dropdown options = union of tradingsymbols across holdings
+    // + positions, sorted for readability.
+    const allSyms = [...new Set([
+      ...rawHoldings.map(r => r.tradingsymbol),
+      ...rawPositions.map(r => r.tradingsymbol),
+    ])].filter(Boolean).sort();
+    symbols = allSyms;
+    // If the previously-selected symbol disappeared from the book
+    // (closed out, renamed), snap the filter back to "all" so the
+    // grid doesn't render empty.
+    if (selectedSymbol !== 'all' && !allSyms.includes(selectedSymbol)) {
+      selectedSymbol = 'all';
+    }
     lastRefresh = h.refreshed_at ?? '';
     applyAccountFilter();
   }
 
   $effect(() => {
-    selectedAccount; // track
+    selectedAccount; selectedSymbol; // track both filters
     applyAccountFilter();
   });
 
@@ -373,15 +396,29 @@
       {/each}
     </select>
   {/if}
+  {#if symbols.length > 0}
+    <select bind:value={selectedSymbol} class="acct-select">
+      <option value="all">All Symbols</option>
+      {#each symbols as sym}
+        <option value={sym}>{sym}</option>
+      {/each}
+    </select>
+  {/if}
+</div>
+
+<!-- Fund Balances heading — on compactHeader layouts (the admin
+     dashboard) the Refresh button sits on this row instead of crowding
+     the tabs / filter row above. Public /performance keeps its
+     top-of-page Refresh button. -->
+<div class="funds-heading-row">
+  <h2 class="section-heading funds-heading-title">Fund Balances</h2>
   {#if compactHeader}
     <button onclick={() => loadAll({ fresh: true })} disabled={loading}
-      class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 tabs-row-refresh">
+      class="btn-secondary text-[0.65rem] py-0.5 px-2 disabled:opacity-50 funds-heading-refresh">
       {loading ? 'Refreshing…' : 'Refresh'}
     </button>
   {/if}
 </div>
-
-<h2 class="section-heading">Fund Balances</h2>
 <div bind:this={fundsEl} class="ag-theme-quartz {theme} mb-4 w-full"></div>
 
 <section class:hidden={activeTab !== 'positions'}>
@@ -440,6 +477,18 @@
   }
   /* Compact-header Refresh button sits after the account picker. */
   .tabs-row-refresh { margin-left: auto; }
+
+  /* Fund Balances heading — heading left, Refresh button (compactHeader
+     only) pinned to the right. Keeps the tabs / filter row focused on
+     Account + Symbol selection. */
+  .funds-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .funds-heading-refresh { margin-left: auto; }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
   .perf-dark :global(.section-heading) { color: #fbbf24; }
