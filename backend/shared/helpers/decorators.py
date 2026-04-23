@@ -129,16 +129,42 @@ def update_lock(method):
 
 
 def for_all_accounts(func):
+    """
+    Iterate over every configured broker account and invoke `func`
+    with the account-scoped handles injected as kwargs.
+
+    The wrapped function gets three kwargs to choose from:
+
+      * `broker` — a `backend.shared.brokers.Broker` adapter. Prefer
+        this in new code; it's vendor-agnostic and keeps callers
+        from importing KiteConnect SDK directly.
+      * `kite`   — the underlying KiteConnect SDK handle. Legacy,
+        kept for backwards compat with callers that still use
+        `kite.place_order(...)` etc. New code should reach for
+        `broker` instead.
+      * `account` — the RamboQuant account code (string).
+
+    Adding a new broker ⇒ implement `Broker` under
+    `backend/shared/brokers/<vendor>.py`, register it in
+    `registry.py`, and callers that use `broker=` keep working
+    without change.
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        result_dict = {}
-
         # Call once with defaults → this gives us connections object
         bound_func = func.__wrapped__ if hasattr(func, "__wrapped__") else func
 
         # Use inspect to get defaults but don’t override
         import inspect
         sig = inspect.signature(bound_func)
+        # Only pass `broker=...` into functions that accept it (either as
+        # a named param or via **kwargs). Existing functions that were
+        # written before the Broker abstraction landed accept only
+        # `kite=...` and would TypeError otherwise.
+        accepts_broker = (
+            "broker" in sig.parameters
+            or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        )
         bound = sig.bind_partial(*args, **kwargs)
         bound.apply_defaults()
 
@@ -147,10 +173,14 @@ def for_all_accounts(func):
         conn = bound.arguments.get("conn", None)
         results = []
 
+        from backend.shared.brokers import get_broker
+
         # Case 1: Single account
         if account:
             if not conn:
                 kwargs["kite"] = connections.conn[account].get_kite_conn(test_conn=True)
+                if accepts_broker:
+                    kwargs["broker"] = get_broker(account)
                 result = func(*args, **kwargs)
                 results.append(result)
             return results
@@ -160,7 +190,9 @@ def for_all_accounts(func):
             new_kwargs = kwargs.copy()
             new_kwargs["account"] = acc
             new_kwargs["kite"] = connections.conn[acc].get_kite_conn(test_conn=True)
-            result = func(*args, **new_kwargs)  # ✅ fix: use new_kwargs
+            if accepts_broker:
+                new_kwargs["broker"] = get_broker(acc)
+            result = func(*args, **new_kwargs)
             results.append(result)
         return results
 
