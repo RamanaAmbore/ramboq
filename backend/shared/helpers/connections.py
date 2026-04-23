@@ -1,5 +1,6 @@
 import json
 import socket
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -113,6 +114,13 @@ class KiteConnection:
 
         self._initialized = True
 
+        # Serialises re-auth so two threads that discover the cached
+        # token is invalid at the same moment don't race to log in —
+        # Kite rejects parallel login()s for the same app key and can
+        # invalidate BOTH tokens, which then forces a full re-auth
+        # cycle (~5 min per account) for every caller in the window.
+        self._login_lock = threading.Lock()
+
         self.kite = self._new_kite()
 
         # Login session uses plain requests (no source_ip binding).
@@ -190,14 +198,34 @@ class KiteConnection:
 
     @retry_kite_conn(RETRY_COUNT)
     def get_kite_conn(self, test_conn=False):
-        """Return kite connection, refreshing if older than CONN_RESET_HOURS."""
+        """Return kite connection, refreshing if older than CONN_RESET_HOURS.
+
+        Re-auth (cache-probe + full login) runs under `_login_lock` so
+        concurrent callers can't race two login() + 2FA flows at once.
+        Kite rejects parallel logins for the same app and invalidates
+        both tokens — the symptom was ~5 min of 401s on every request
+        until the retry loop cleared.
+        """
         now = timestamp_indian()
         expired = (
             self._conn_created_at is None
             or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
         )
 
-        if expired or test_conn:
+        if not (expired or test_conn):
+            return self.kite
+
+        with self._login_lock:
+            # Double-check under the lock — another thread may have
+            # just refreshed while we were waiting.
+            now = timestamp_indian()
+            expired = (
+                self._conn_created_at is None
+                or now - self._conn_created_at > timedelta(hours=CONN_RESET_HOURS)
+            )
+            if not (expired or test_conn):
+                return self.kite
+
             if expired:
                 self._conn_created_at = now
                 formatted = self._conn_created_at.strftime('%A, %B %d, %Y, %I:%M %p')
@@ -218,8 +246,7 @@ class KiteConnection:
 
             # No cached token — do full login
             self.init_kite_conn(test_conn=True)
-
-        return self.kite
+            return self.kite
 
     @retry_kite_conn(RETRY_COUNT)
     def login(self):
@@ -263,6 +290,13 @@ class KiteConnection:
 
 
 class Connections(SingletonBase):
+    # Serialises the one-time init — SingletonBase's own lock protects
+    # the _instances dict, not the body of this __init__. Two concurrent
+    # Connections() callers could otherwise both see `_singleton_initialized`
+    # as False and both run the KiteConnection dict build, which would
+    # kick off parallel logins and race Kite's session tracker.
+    _init_lock = threading.Lock()
+
     def __init__(self):
         # SingletonBase.__new__ returns the same instance on every call,
         # but Python always re-invokes __init__ after __new__. Without
@@ -272,9 +306,14 @@ class Connections(SingletonBase):
         # /api/holdings · /positions · /funds request.
         if getattr(self, '_singleton_initialized', False):
             return
-        self.conn = {account: KiteConnection(account, secrets)
-                     for account in secrets['kite_accounts'].keys()}
-        self._singleton_initialized = True
+        with Connections._init_lock:
+            # Double-check under the lock — another thread may have
+            # completed the init while we were waiting.
+            if getattr(self, '_singleton_initialized', False):
+                return
+            self.conn = {account: KiteConnection(account, secrets)
+                         for account in secrets['kite_accounts'].keys()}
+            self._singleton_initialized = True
 
 
 if __name__ == "__main__":
