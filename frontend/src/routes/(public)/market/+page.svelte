@@ -23,17 +23,19 @@
   // "log" / "feed" jargon). Refreshes every 10 minutes alongside the
   // market summary.
   /** @type {Array<{title:string, link:string, source:string, timestamp:string}>} */
-  let news        = $state([]);
-  let newsLoading = $state(false);
-  let newsError   = $state('');
+  let news         = $state([]);
+  let newsRefresh  = $state('');
+  let newsLoading  = $state(false);
+  let newsError    = $state('');
   let newsTimer;
 
   async function loadNews() {
     newsLoading = true;
     try {
       const r = await fetchNews();
-      news = r?.items || [];
-      newsError = '';
+      news        = r?.items || [];
+      newsRefresh = r?.refreshed_at || '';
+      newsError   = '';
     } catch (e) {
       newsError = e?.message || 'Failed to load news';
     } finally {
@@ -121,26 +123,11 @@
 </svelte:head>
 
 
-<!-- Same header row shape as PerformancePage: timestamp on the left with
-     the perf-ts class so every timestamp across the public site inherits
-     identical sizing / colour / spacing. Right side shows a refresh
-     status indicator when a silent background reload is in flight. -->
-<div class="flex items-center justify-between mb-2">
-  <div class="text-[0.65rem] text-muted perf-ts">
-    {#if loading && !lastRefresh}
-      <span class="animate-pulse">Loading…</span>
-    {:else if lastRefresh}
-      <span>{lastRefresh}</span>
-    {/if}
-  </div>
-  {#if loading && lastRefresh}
-    <span class="text-[0.65rem] text-muted animate-pulse">Refreshing…</span>
-  {/if}
-</div>
-
-<!-- Tabbed Market Summary | Market News card. Same UX as /performance:
-     only one panel visible at a time, both feeds loaded on mount so
-     flipping is a paint not a fetch. Public palette throughout. -->
+<!-- Tabbed Summary | News feed card. Same UX as /performance: only
+     one panel visible at a time, both feeds loaded on mount so
+     flipping is a paint not a fetch. Public palette throughout. The
+     page-level timestamp moved INSIDE the card as a per-tab
+     "Refreshed at" line so each panel's freshness is unambiguous. -->
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <div class="market-tabs-row">
     <div class="market-tabs">
@@ -159,12 +146,25 @@
     </div>
     <div class="market-tabs-meta">
       {#if tab === 'summary'}
-        {#if loading && !content}Loading…{/if}
+        {#if loading && !content}Loading…
+        {:else if loading}Refreshing…{/if}
       {:else if newsLoading && !news.length}
         Loading…
+      {:else if newsLoading}
+        Refreshing…
       {/if}
     </div>
   </div>
+
+  <!-- Refreshed-at line under the tabs — small, italic, beneath the
+       headline so the operator knows how stale the panel is without
+       crowding the heading itself. Only shown when the active tab has
+       a refresh-stamp; absent during the very first load. -->
+  {#if tab === 'summary' && lastRefresh}
+    <div class="market-refresh-line">Refreshed at {lastRefresh}</div>
+  {:else if tab === 'news' && newsRefresh}
+    <div class="market-refresh-line">Refreshed at {newsRefresh}</div>
+  {/if}
 
   {#if tab === 'summary'}
     {#if error}
@@ -233,15 +233,17 @@
 
   /* Tab row — public-palette tabs (cream + champagne accent). Each
      tab carries a left-border indicator (transparent → champagne when
-     active or hovered) — same affordance the algo navbar items use,
-     so the two surfaces feel like cousins. No bottom underline on the
-     active tab; no separator line under the row. */
+     active or hovered) — same affordance the algo navbar items use.
+     Bottom border on the row separates the tab strip from the panel
+     content, so the two regions read as distinct. */
   .market-tabs-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
     margin-bottom: 0.6rem;
+    border-bottom: 1px solid #e7e0cf;
+    padding-bottom: 0.25rem;
     flex-wrap: wrap;
   }
   .market-tabs {
@@ -274,6 +276,16 @@
     font-size: 0.7rem;
     color: #6b7894;
     font-family: ui-monospace, monospace;
+  }
+  /* Refreshed-at line — small monospace stamp beneath the tab strip,
+     so the operator can tell at a glance when each panel was last
+     updated. Doesn't compete with the tab labels for emphasis. */
+  .market-refresh-line {
+    font-family: ui-monospace, monospace;
+    font-size: 0.66rem;
+    color: #6b7894;
+    margin-bottom: 0.5rem;
+    margin-top: -0.15rem;
   }
 
   /* Market News — same palette as the rest of the public market page

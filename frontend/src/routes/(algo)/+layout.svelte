@@ -338,22 +338,28 @@
     border-left-color: #fbbf24;
   }
 
-  /* Back-to-site link */
+  /* Back-to-investor-site link — visible at the same weight as the
+     regular nav items, just with a thin border so the operator
+     recognises it as a context-switch (not another tab). NOT muted. */
   .algo-pub-link {
-    padding: 0.18rem 0.5rem;
+    padding: 0.18rem 0.55rem;
     font-size: 0.62rem;
     font-weight: 500;
     border-radius: 0.2rem;
     background: transparent;
-    color: rgba(150,170,200,0.5);
-    border: 1px solid rgba(150,170,200,0.15);
+    color: rgba(180, 200, 230, 0.85);
+    border: 1px solid rgba(180, 200, 230, 0.35);
     cursor: pointer;
     font-family: ui-monospace, monospace;
-    transition: color 0.06s, border-color 0.06s;
+    transition: color 0.06s, border-color 0.06s, background-color 0.06s;
     outline: none !important;
     margin-left: 0.5rem;
   }
-  .algo-pub-link:hover { color: rgba(150,170,200,0.85); border-color: rgba(150,170,200,0.35); }
+  .algo-pub-link:hover {
+    color: #fbbf24;
+    border-color: rgba(251,191,36,0.55);
+    background: rgba(251,191,36,0.08);
+  }
 
   /* User pill */
   .algo-user-pill {
@@ -425,7 +431,16 @@
   .algo-mobile-item:last-child { border-bottom: none; }
   .algo-mobile-item:hover { background: rgba(251,191,36,0.1); color: #fbbf24; }
   .algo-mobile-active { color: #fbbf24; background: rgba(251,191,36,0.1); }
-  .algo-mobile-site { color: rgba(150,170,200,0.5); font-size: 0.75rem; }
+  /* Investor-site cross-link inside the mobile menu — visible at the
+     same weight as other items, distinguished by a thin top border so
+     it reads as a section break rather than another nav row. */
+  .algo-mobile-site {
+    color: rgba(180, 200, 230, 0.85);
+    font-size: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 0.3rem;
+    padding-top: 0.5rem;
+  }
 
   /* ── Simulator banner — pinned under the nav when sim is active ──────────
      Opaque background (solid over a tinted overlay) so page content

@@ -349,27 +349,29 @@
     border-bottom-color: #c8a84b;
   }
 
-  /* Algo Site link — muted secondary, matches the algo navbar's
-     "Investor site" cross-link in tone. Both directions are
-     de-emphasized so neither side feels like the pre-eminent surface. */
+  /* Algo Site cross-link — visible at the same weight as the regular
+     public nav items, with a thin border so the operator recognises
+     it as a context-switch button (not just another link). Mirrors
+     the algo navbar's "Investor site" cross-link in role + visibility. */
   .pub-nav-algo-btn {
     padding: 0.2rem 0.55rem;
     font-size: 0.65rem;
     font-weight: 500;
     border-radius: 0.2rem;
     background: transparent;
-    color: rgba(106,124,164,0.7);
-    border: 1px solid rgba(106,124,164,0.25);
+    color: #1a2744;
+    border: 1px solid rgba(106,124,164,0.4);
     cursor: pointer;
     letter-spacing: 0.03em;
-    transition: color 0.06s, border-color 0.06s;
+    transition: color 0.08s, border-color 0.08s, background-color 0.08s;
     outline: none !important;
     white-space: nowrap;
     margin-right: 0.25rem;
   }
   .pub-nav-algo-btn:hover {
-    color: rgba(60,76,114,0.9);
-    border-color: rgba(106,124,164,0.5);
+    color: #b27908;
+    border-color: rgba(212,146,12,0.6);
+    background: rgba(212,146,12,0.08);
   }
 
   /* Sign-in button */
@@ -459,7 +461,17 @@
   .pub-mobile-item:last-child { border-bottom: none; }
   .pub-mobile-item:hover { background: rgba(200,168,75,0.09); color: #f0d070; border-left-color: rgba(240,208,112,0.5); }
   .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.14); border-left-color: #f0d070; font-weight: 600; }
-  .pub-mobile-algo   { color: #f0d070; font-weight: 600; letter-spacing: 0.02em; border-top: 1px solid rgba(200,168,75,0.15); margin-top: 0.1rem; }
+  /* Algo-site cross-link inside the mobile menu — same weight as
+     other items, with a thin top border to mark a section break.
+     Symmetric with the algo-side mobile menu's investor-site link. */
+  .pub-mobile-algo {
+    color: #1a2744;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border-top: 1px solid rgba(106,124,164,0.18);
+    margin-top: 0.3rem;
+    padding-top: 0.5rem;
+  }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
   .pub-content {

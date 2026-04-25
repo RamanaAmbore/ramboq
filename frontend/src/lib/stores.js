@@ -123,7 +123,7 @@ export function clientTimestamp() {
       timeZone: tz,
     }).formatToParts(now);
     const pick = (t) => (parts.find(p => p.type === t) || {}).value || '';
-    return `${pick('weekday')} ${pick('day')} ${pick('month')}  ${pick('hour')}:${pick('minute')}`;
+    return `${pick('weekday')} ${pick('day')} ${pick('month')} ${pick('hour')}:${pick('minute')}`;
   };
   const estTz = now.toLocaleTimeString('en-US', {
     timeZoneName: 'short', timeZone: 'America/New_York',

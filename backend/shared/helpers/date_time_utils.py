@@ -59,13 +59,13 @@ def timestamp_display() -> str:
     stores.js::clientTimestamp so client-generated banners and
     server-generated refreshed_at stamps look identical everywhere.
 
-    Example: "Mon 20 Apr  23:06 IST | Mon 20 Apr  13:36 EDT"
+    Example: "Sat 25 Apr 07:03 IST | Fri 24 Apr 21:33 EDT"
     %Z renders EST / EDT automatically by season.
     """
     now_ist = timestamp_indian()
     now_est = timestamp_est()
-    ist_str = now_ist.strftime('%a %d %b  %H:%M IST')
-    est_str = now_est.strftime('%a %d %b  %H:%M %Z')
+    ist_str = now_ist.strftime('%a %d %b %H:%M IST')
+    est_str = now_est.strftime('%a %d %b %H:%M %Z')
     return f"{ist_str} | {est_str}"
 
 

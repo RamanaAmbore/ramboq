@@ -67,17 +67,19 @@
 
   // ── Market News ─────────────────────────────────────────────────
   /** @type {Array<{title:string, link:string, source:string, timestamp:string}>} */
-  let news        = $state([]);
-  let newsLoading = $state(false);
-  let newsError   = $state('');
+  let news         = $state([]);
+  let newsRefresh  = $state('');
+  let newsLoading  = $state(false);
+  let newsError    = $state('');
   let newsTimer;
 
   async function loadNews() {
     newsLoading = true;
     try {
       const r = await fetchNews();
-      news = r?.items || [];
-      newsError = '';
+      news        = r?.items || [];
+      newsRefresh = r?.refreshed_at || '';
+      newsError   = '';
     } catch (e) {
       newsError = /** @type {any} */ (e)?.message || 'Failed to load news';
     } finally {
@@ -141,14 +143,25 @@
       {#if tab === 'summary'}
         {#if summaryLoading && !summaryRefresh}
           Loading…
-        {:else if summaryRefresh}
-          {summaryRefresh}
+        {:else if summaryLoading}
+          Refreshing…
         {/if}
       {:else if newsLoading && !news.length}
         Loading…
+      {:else if newsLoading}
+        Refreshing…
       {/if}
     </div>
   </div>
+
+  <!-- Refreshed-at line under the tabs — small, monospace, beneath
+       the tab strip so the operator knows when each panel was last
+       updated. Doesn't compete with the tab labels for emphasis. -->
+  {#if tab === 'summary' && summaryRefresh}
+    <div class="market-refresh-line">Refreshed at {summaryRefresh}</div>
+  {:else if tab === 'news' && newsRefresh}
+    <div class="market-refresh-line">Refreshed at {newsRefresh}</div>
+  {/if}
 
   {#if tab === 'summary'}
     {#if summaryError}
@@ -201,15 +214,17 @@
 
   /* Tab row — public-palette tabs (cream + champagne accent). Each
      tab carries a left-border indicator (transparent → champagne when
-     active or hovered) — same affordance the algo navbar items use,
-     so the public and algo surfaces feel like cousins. No bottom
-     underline on the active tab. */
+     active or hovered) — same affordance the algo navbar items use.
+     Bottom border on the row separates the tab strip from the panel
+     content, so the two regions read as distinct. */
   .market-tabs-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
     margin-bottom: 0.6rem;
+    border-bottom: 1px solid #e7e0cf;
+    padding-bottom: 0.25rem;
     flex-wrap: wrap;
   }
   .market-tabs {
@@ -242,6 +257,15 @@
     font-size: 0.7rem;
     color: #6b7894;
     font-family: ui-monospace, monospace;
+  }
+  /* Refreshed-at line — small monospace stamp beneath the tab strip,
+     mirroring the same line on /market so both pages read identically. */
+  .market-refresh-line {
+    font-family: ui-monospace, monospace;
+    font-size: 0.66rem;
+    color: #6b7894;
+    margin-bottom: 0.5rem;
+    margin-top: -0.15rem;
   }
 
   /* Market summary — match /market page's markdown styling. */
