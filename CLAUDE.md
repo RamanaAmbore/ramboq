@@ -896,6 +896,24 @@ Spot fallback chain mirrors this: override → sim → broker quote → `fallbac
 | `GET /api/options/historical?symbol=…&days=30&interval=day&exchange=NFO` | Kite OHLCV bars. Instrument-token lookup goes through the cached instruments dump. |
 | `POST /api/options/strategy-analytics` (body `{legs: [{symbol, qty, avg_cost?, ltp?, iv?}], spot?, span_pct?, points?}`) | Multi-leg aggregate analytics — vertical spreads, iron condors, butterflies, strangles. Each leg's `ltp` is optional: when present (e.g. legs sourced from the simulator) it's used directly; when absent, the broker is hit once for the whole batch. v1 enforces same-underlying + same-expiry across legs (calendar / diagonal spreads not yet supported). |
 
+**Expected value + risk:reward**
+
+Both endpoints surface position-level expected value and R:R alongside the existing POP / max-profit / max-loss block:
+
+- `expected_value(curve, S, T_years, sigma)` — trapezoidal integration of `expiry_value` against the risk-neutral lognormal pdf of the underlying:
+
+  ```
+  f(S_T) = (1 / (S_T σ √(2πT))) · exp(-(ln(S_T/S) − (r − σ²/2)T)² / (2σ²T))
+  ```
+
+  The curve typically spans ±2.5σ which captures ~99 % of the lognormal mass, so truncation error is sub-percent. The signed-qty payoff is already baked into the curve, so this is just one trapezoidal pass per request.
+
+- `risk_reward_ratio(max_profit, max_loss)` = `max_profit / |max_loss|`. Returns `None` for unbounded legs (long calls, short puts) where the ratio isn't meaningful — UI renders "—".
+
+**Response surface** — `OptionRisk` and `StrategyRisk` gain `ev` (₹), `ev_pct` (return-on-cost %, null when entry cost is 0), `rr_ratio` (null when unbounded). UI risk panel renders them as additional `kv-` rows alongside POP / breakeven / max-profit / max-loss.
+
+**Why this matters operationally** — POP alone is misleading. A 95 %-POP credit spread that risks ₹50k to make ₹500 has positive expectancy but a single loss takes 100 winners to recover; EV captures the magnitude side and tells you whether the trade is actually worth taking. R:R does the same for the asymmetric clip-size aspect.
+
 **Multi-leg math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
 
 - `multileg_payoff_curve(legs, S, ...)` — sums per-leg `today_value` + `expiry_value` at each spot. Each leg keeps its own (T_years, σ).
@@ -930,6 +948,20 @@ Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviou
 
 ---
 
+## Chart grid lines
+
+Both SVG chart components draw a faint cool-blue grid (`rgba(200,216,240,0.10)` for major lines, `0.07` for vertical x-axis lines) at 5 evenly-spaced y-positions and 4-5 x-positions across the visible domain. PriceChart x-grid lines carry HH:MM:SS labels along the bottom axis so the operator can correlate price moves with wall-clock seconds without dragging the hover crosshair. OptionsPayoff x-grid is unlabeled (the strike + breakeven + spot markers already carry the meaningful x-coordinates).
+
+The grid colors are deliberately low-saturation cool-blue rather than amber — this keeps the chart's amber LTP / payoff lines visually dominant. Solid amber strokes against a faint blue grid is a much more legible combination than amber on amber-tinted grid.
+
+---
+
+## Public-theme row indicators
+
+`.ag-theme-ramboq .ag-row.pos-long / .pos-short` carry a `box-shadow inset 4px` indicator on the row, but the public theme's `ag-col-fill` cells (Account / Symbol columns) use a *solid* `#e8e0d0` background which covered the row-level shadow on the leftmost cell — borders were invisible on the public performance page when no account filter was applied. Fix: cast the indicator onto `.ag-cell:first-child` directly so it sits above the cell's solid background. Algo theme already used a transparent (8 % alpha) `ag-col-fill` so the row-level shadow showed through; only the public theme needed the per-cell rule.
+
+---
+
 ## Chart zoom + pan (PriceChart, OptionsPayoff)
 
 Both SVG chart components ([`frontend/src/lib/PriceChart.svelte`](frontend/src/lib/PriceChart.svelte), [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte)) carry a wheel-zoom + drag-pan + reset toolbar implemented in pure SVG/maths — no chart library.
@@ -947,11 +979,15 @@ OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that t
 
 ---
 
-## Market News on `/market` (public)
+## Market News on `/market` + `/performance` (public)
 
-Public market page picks up the same `/api/news` feed the algo LogPanel consumes, but rendered in the public-site cream / navy / champagne palette as a separate "Market News" card under the AI summary. Auto-refreshes every 10 minutes (server caps the upstream feed at that cadence). No "log" terminology anywhere.
+Both public pages render a "Market News" card with headlines from `/api/news` (the same feed the algo LogPanel uses) in the public cream / navy / champagne palette. Auto-refreshes every 10 minutes; no "log" terminology anywhere.
 
-Layout: card title `Market News` + headlines count metadata; per-row `news-time` (HH:MM) · `news-title` (link) · `news-src` (source-pill, hidden on mobile). All anchors `target="_blank" rel="noopener"`. Implemented in [`frontend/src/routes/(public)/market/+page.svelte`](frontend/src/routes/(public)/market/+page.svelte).
+The card heading shows just `Market News` plus a "Loading…" indicator on first load — the headlines-count + refresh-meta line was dropped to keep the heading punchy. Per-row layout: `news-time` (HH:MM) · `news-title` (link) · `news-src` (source-pill, hidden on mobile). All anchors `target="_blank" rel="noopener"`.
+
+Implemented in [`frontend/src/routes/(public)/market/+page.svelte`](frontend/src/routes/(public)/market/+page.svelte) and [`frontend/src/routes/(public)/performance/+page.svelte`](frontend/src/routes/(public)/performance/+page.svelte). Same component shape in both, copied so the route file stays self-contained without forcing PerformancePage.svelte to know about news.
+
+The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp shown above the card. Now the prompt asks for just the dual-timezone timestamp without the title prefix, so both render the same format and the visual stack reads cleanly.
 
 ---
 

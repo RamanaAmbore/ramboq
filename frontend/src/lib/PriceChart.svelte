@@ -303,13 +303,30 @@
     catch { return ts; }
   }
 
-  // Y-axis labels (3 evenly spaced).
+  // Y-axis labels — 5 evenly spaced (was 3, but the chart was sparse;
+  // 5 lines reads as a proper grid without visual noise).
   const yTicks = $derived.by(() => {
     if (!prices.length) return [];
-    const n = 3;
+    const n = 5;
     return Array.from({ length: n }, (_, i) => {
       const v = yMin + (ySpan * i) / (n - 1);
       return { v, y: yOf(v) };
+    });
+  });
+
+  // X-axis grid + labels — 4 evenly spaced verticals across the visible
+  // time range. Each label shows HH:MM:SS so the operator can read off
+  // when a particular price excursion happened.
+  const xTicks = $derived.by(() => {
+    if (!ticks.length) return [];
+    const n = 4;
+    return Array.from({ length: n }, (_, i) => {
+      const t = tMin + (tSpan * i) / (n - 1);
+      const date = new Date(t);
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+      return { t, x: PAD_L + ((t - tMin) / tSpan) * innerW, label: `${hh}:${mm}:${ss}` };
     });
   });
 </script>
@@ -359,22 +376,30 @@
       <!-- Y-axis grid + labels -->
       {#each yTicks as t}
         <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y}
-              stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+              stroke="rgba(200,216,240,0.10)" stroke-width="1"/>
         <text x={PAD_L - 4} y={t.y + 3} text-anchor="end"
               fill="#7e97b8" font-size="9" font-family="monospace">
           {t.v.toFixed(2)}
         </text>
       {/each}
+      <!-- X-axis grid + labels — verticals at 4 evenly spaced times so
+           the operator can correlate price moves with wall-clock seconds
+           without the hover crosshair. Skip the leftmost vertical (it
+           overlaps the Y-axis already drawn by the labels). -->
+      {#each xTicks as xt, i}
+        {#if i > 0}
+          <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={xAxisY}
+                stroke="rgba(200,216,240,0.07)" stroke-width="1"/>
+        {/if}
+        <text x={xt.x} y={height - 6}
+              text-anchor={i === 0 ? 'start' : (i === xTicks.length - 1 ? 'end' : 'middle')}
+              fill="#7e97b8" font-size="9" font-family="monospace">
+          {xt.label}
+        </text>
+      {/each}
       <!-- X-axis baseline -->
       <line x1={PAD_L} x2={W - PAD_R} y1={xAxisY} y2={xAxisY}
-            stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
-      <text x={PAD_L} y={height - 6} fill="#7e97b8" font-size="9" font-family="monospace">
-        {fmtTime(ticks[0].ts)}
-      </text>
-      <text x={W - PAD_R} y={height - 6} text-anchor="end"
-            fill="#7e97b8" font-size="9" font-family="monospace">
-        {fmtTime(ticks[ticks.length - 1].ts)}
-      </text>
+            stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
 
       <!-- Bid/ask band -->
       {#if bandPath}

@@ -607,3 +607,57 @@ def multileg_extremes(curve: list[dict], *, key: str = "expiry_value"
         return (0.0, 0.0)
     vals = [p[key] for p in curve]
     return (round(max(vals), 2), round(min(vals), 2))
+
+
+# ── Expected value + position metrics ─────────────────────────────────
+
+def expected_value(curve: list[dict], *, S: float, T_years: float,
+                   sigma: float, r: float = DEFAULT_RISK_FREE,
+                   key: str = "expiry_value") -> float:
+    """
+    E[payoff at expiry] computed by integrating `curve[*][key]` against
+    the risk-neutral lognormal pdf of the underlying spot at expiry:
+
+        f(S_T) = (1 / (S_T σ √(2πT))) ·
+                 exp(-(ln(S_T/S) − (r − σ²/2)T)² / (2σ²T))
+
+    Trapezoidal rule across the curve's spot grid. The curve typically
+    spans ±2.5σ which captures ~99 % of the lognormal mass, so
+    truncation error is sub-percent for any reasonable strategy.
+    Returns the position-level ₹ expected value (signed-qty payoff
+    already baked into the curve via payoff_curve / multileg_payoff_curve).
+    """
+    if not curve or len(curve) < 2 or T_years <= 0 or sigma <= 0 or S <= 0:
+        return 0.0
+    sqrt_T = math.sqrt(T_years)
+    mu     = math.log(S) + (r - sigma * sigma / 2.0) * T_years
+    inv_2v = 1.0 / (2.0 * sigma * sigma * T_years)
+    norm_k = 1.0 / (sigma * sqrt_T * math.sqrt(2.0 * math.pi))
+
+    def pdf(s_t: float) -> float:
+        if s_t <= 0:
+            return 0.0
+        z = math.log(s_t) - mu
+        return (norm_k / s_t) * math.exp(-z * z * inv_2v)
+
+    integral = 0.0
+    for i in range(len(curve) - 1):
+        a, b   = curve[i], curve[i + 1]
+        ya, yb = a[key] * pdf(a["spot"]), b[key] * pdf(b["spot"])
+        integral += 0.5 * (ya + yb) * (b["spot"] - a["spot"])
+    return round(integral, 2)
+
+
+def risk_reward_ratio(max_profit: float | None,
+                      max_loss: float | None) -> float | None:
+    """
+    Risk-to-reward = max_profit / |max_loss|. Returns None for legs
+    where the ratio isn't meaningful (one side is unbounded, or
+    max_loss == 0). The route layer surfaces None as JSON null and the
+    UI renders "∞" or "—".
+    """
+    if max_profit is None or max_loss is None:
+        return None
+    if max_loss == 0:
+        return None
+    return round(max_profit / abs(max_loss), 3)

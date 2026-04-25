@@ -326,7 +326,9 @@
     font-size: 0.48rem;
     font-weight: 500;
     line-height: 1;
-    color: rgba(126, 151, 184, 0.55);
+    /* Subtle gold — same amber hue as the navbar accents but at low
+       saturation so it reads as a quiet section stamp, not a UI control. */
+    color: rgba(251, 191, 36, 0.45);
     text-transform: lowercase;
     letter-spacing: 0.08em;
     user-select: none;

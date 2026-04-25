@@ -155,15 +155,9 @@
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4 mt-4">
   <div class="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
     <h2 class="news-h">Market News</h2>
-    <span class="news-meta">
-      {#if newsLoading && !news.length}
-        Loading…
-      {:else if news.length}
-        {news.length} headlines · auto-refreshes every 10 min
-      {:else}
-        —
-      {/if}
-    </span>
+    {#if newsLoading && !news.length}
+      <span class="news-meta">Loading…</span>
+    {/if}
   </div>
 
   {#if newsError}

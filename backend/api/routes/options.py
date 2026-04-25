@@ -32,6 +32,7 @@ from backend.api.algo.derivatives import (
     DEFAULT_RISK_FREE,
     black_scholes,
     days_to_expiry,
+    expected_value,
     find_breakevens,
     greeks,
     implied_vol,
@@ -42,6 +43,7 @@ from backend.api.algo.derivatives import (
     parse_tradingsymbol,
     payoff_curve,
     risk_metrics,
+    risk_reward_ratio,
     underlying_ltp_key,
 )
 from backend.api.auth_guard import admin_guard
@@ -69,6 +71,17 @@ class OptionRisk(msgspec.Struct):
     breakeven:  float
     pop:        float             # 0..1
     long_short: str               # 'long' / 'short' / 'flat'
+    # Expected value of the position at expiry (₹), integrated against
+    # the lognormal pdf of the underlying using the calibrated σ. POP
+    # tells you "how often you win"; EV tells you "weighted by win/loss
+    # magnitudes, what the trade is worth on average".
+    ev:           float
+    # ev / |entry_cost| as a percentage — return-on-cost. Null when
+    # entry_cost is zero (operator hasn't taken the trade yet).
+    ev_pct:       float | None
+    # Risk:reward = max_profit / |max_loss|. None for unbounded legs
+    # (long calls, short puts) where the ratio isn't meaningful.
+    rr_ratio:     float | None
 
 
 class PayoffPoint(msgspec.Struct):
@@ -187,6 +200,13 @@ class StrategyRisk(msgspec.Struct):
     max_loss:    float
     breakevens:  list[float]
     pop:         float                   # 0..1
+    # EV: probability-weighted expiry value (lognormal pdf over the
+    # curve's spot grid). For credit strategies this is typically slightly
+    # positive; for paid-premium debit strategies it depends on whether
+    # the breakevens sit inside or outside the lognormal mass.
+    ev:          float
+    ev_pct:      float | None            # ev / |net_cost| — null when net_cost == 0
+    rr_ratio:    float | None            # max_profit / |max_loss| — null when unbounded
 
 
 class StrategyResponse(msgspec.Struct):
@@ -556,6 +576,18 @@ class OptionsController(Controller):
         def _finite_or_null(x: float) -> float | None:
             return None if x == float("inf") or x == float("-inf") else x
 
+        # Position-level expected value via lognormal integration over
+        # the payoff curve. Tells the operator "weighted by win/loss
+        # magnitudes, what's this trade worth on average?" — POP alone
+        # only answers "how often I win" without sizing.
+        ev = expected_value(curve, S=S, T_years=T_yrs, sigma=sigma)
+        # ev_pct: return on what it cost to enter, as a percentage. Null
+        # when entry is zero (operator typed a hypothetical with no cost).
+        cost_basis = abs(entry * qty_resolved)
+        ev_pct = round(ev / cost_basis * 100.0, 2) if cost_basis > 0 else None
+        rr = risk_reward_ratio(_finite_or_null(risk["max_profit"]),
+                               _finite_or_null(risk["max_loss"]))
+
         return OptionAnalyticsResponse(
             mode=mode,
             symbol=sym,
@@ -579,6 +611,9 @@ class OptionsController(Controller):
                 breakeven=risk["breakeven"],
                 pop=risk["pop"],
                 long_short=risk["long_short"],
+                ev=ev,
+                ev_pct=ev_pct,
+                rr_ratio=rr,
             ),
             payoff=[PayoffPoint(**p) for p in curve],
             ltp_source=ltp_src,
@@ -875,6 +910,15 @@ class OptionsController(Controller):
         pop = multileg_pop(curve, S=S, T_years=T_yrs_shared, sigma=sigma_proxy)
         net_cost = sum(l["entry_price"] * l["qty"] for l in resolved_legs)
 
+        # Aggregate EV — same lognormal integration as single-leg, but
+        # the curve already sums every leg's signed-qty payoff so this
+        # is just one trapezoidal pass.
+        agg_ev = expected_value(curve, S=S, T_years=T_yrs_shared,
+                                sigma=sigma_proxy)
+        agg_ev_pct = (round(agg_ev / abs(net_cost) * 100.0, 2)
+                      if abs(net_cost) > 0 else None)
+        agg_rr = risk_reward_ratio(max_p, max_l)
+
         return StrategyResponse(
             underlying=underlying,
             expiry=next(iter(expiries)),
@@ -887,6 +931,7 @@ class OptionsController(Controller):
             risk=StrategyRisk(
                 max_profit=max_p, max_loss=max_l,
                 breakevens=bes, pop=pop,
+                ev=agg_ev, ev_pct=agg_ev_pct, rr_ratio=agg_rr,
             ),
             payoff=[PayoffPoint(**p) for p in curve],
             legs=[LegDetail(

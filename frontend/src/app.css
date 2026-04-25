@@ -181,6 +181,18 @@
   background-color: rgba(180,83,9,0.15) !important;
   box-shadow: inset 4px 0 0 #b45309 !important;
 }
+/* The leftmost cell of every row carries the `ag-col-fill` solid beige
+   background (Account column), which covers the row's `box-shadow
+   inset` indicator. Add the indicator directly to the leftmost cell
+   for pos-long / pos-short rows so the orange/teal stripe is visible
+   even when the public theme's solid Account-column background sits
+   on top. AG Grid's `:first-child` is reliably the pinned-left column. */
+.ag-theme-ramboq .ag-row.pos-long .ag-cell:first-child {
+  box-shadow: inset 4px 0 0 #0f766e !important;
+}
+.ag-theme-ramboq .ag-row.pos-short .ag-cell:first-child {
+  box-shadow: inset 4px 0 0 #b45309 !important;
+}
 .ag-theme-ramboq .ag-row.pos-long.ag-row-hover,
 .ag-theme-ramboq .ag-row.pos-short.ag-row-hover {
   background-color: rgba(200,168,75,0.22) !important;

@@ -485,20 +485,32 @@
         </div>
 
         <div class="opt-block">
-          <div class="opt-block-h">Risk</div>
+          <div class="opt-block-h" title="Aggregate risk + expected value across all legs.">
+            Risk &amp; expected value
+          </div>
           <div class="opt-kv">
             <span class="kv-k">Max profit*</span>
             <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
             <span class="kv-k">Max loss*</span>
             <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
+            <span class="kv-k" title="max_profit / |max_loss|. — when one side is unbounded.">R:R</span>
+            <span class="kv-v">{strategy.risk.rr_ratio == null ? '—' : `1 : ${strategy.risk.rr_ratio.toFixed(2)}`}</span>
             <span class="kv-k">Breakevens</span>
             <span class="kv-v">
               {#if strategy.risk.breakevens.length}
                 {strategy.risk.breakevens.map(/** @param {number} b */ (b) => `₹${b.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`).join(' / ')}
               {:else}—{/if}
             </span>
-            <span class="kv-k">POP</span>
+            <span class="kv-k" title="Probability the strategy lands in any profitable region at expiry">POP</span>
             <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
+            <span class="kv-k" title="Expected value at expiry — POP × win-magnitude − (1−POP) × loss-magnitude, integrated against the lognormal pdf">EV</span>
+            <span class="kv-v {strategy.risk.ev > 0 ? 'kv-pos' : strategy.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(strategy.risk.ev)}</span>
+            {#if strategy.risk.ev_pct != null}
+              <span class="kv-k" title="EV as % of |net cost| — return-on-capital expectation">EV / cost</span>
+              <span class="kv-v {strategy.risk.ev_pct > 0 ? 'kv-pos' : strategy.risk.ev_pct < 0 ? 'kv-neg' : ''}">
+                {strategy.risk.ev_pct > 0 ? '+' : ''}{strategy.risk.ev_pct.toFixed(1)}%
+              </span>
+            {/if}
           </div>
           <div class="text-[0.5rem] text-[#7e97b8] mt-1 italic">
             * numerical max/min within
@@ -691,16 +703,28 @@
       </div>
 
       <div class="opt-block">
-        <div class="opt-block-h">Risk</div>
+        <div class="opt-block-h" title="Probability-weighted outcome metrics. POP × magnitudes, evaluated against the lognormal distribution of underlying spot at expiry.">
+          Risk &amp; expected value
+        </div>
         <div class="opt-kv">
           <span class="kv-k">Max profit</span>
           <span class="kv-v kv-pos">{analytics.risk.max_profit == null ? '∞' : fmtMoney(analytics.risk.max_profit, false)}</span>
           <span class="kv-k">Max loss</span>
           <span class="kv-v kv-neg">{analytics.risk.max_loss == null ? '∞' : fmtMoney(-analytics.risk.max_loss)}</span>
+          <span class="kv-k" title="max_profit / |max_loss|. — for legs with one side unbounded.">R:R</span>
+          <span class="kv-v">{analytics.risk.rr_ratio == null ? '—' : `1 : ${analytics.risk.rr_ratio.toFixed(2)}`}</span>
           <span class="kv-k">Breakeven</span>
           <span class="kv-v">₹{analytics.risk.breakeven.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          <span class="kv-k">POP</span>
+          <span class="kv-k" title="Probability the position lands profitable at expiry">POP</span>
           <span class="kv-v {analytics.risk.pop > 0.6 ? 'kv-pos' : analytics.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(analytics.risk.pop)}</span>
+          <span class="kv-k" title="Expected value at expiry (lognormal-weighted)">EV</span>
+          <span class="kv-v {analytics.risk.ev > 0 ? 'kv-pos' : analytics.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(analytics.risk.ev)}</span>
+          {#if analytics.risk.ev_pct != null}
+            <span class="kv-k" title="EV as a percentage of cost basis — return-on-cost expectation.">EV / cost</span>
+            <span class="kv-v {analytics.risk.ev_pct > 0 ? 'kv-pos' : analytics.risk.ev_pct < 0 ? 'kv-neg' : ''}">
+              {analytics.risk.ev_pct > 0 ? '+' : ''}{analytics.risk.ev_pct.toFixed(1)}%
+            </span>
+          {/if}
         </div>
       </div>
     </aside>

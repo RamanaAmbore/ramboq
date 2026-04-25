@@ -194,6 +194,18 @@
       return { v, y: yOf(v) };
     });
   });
+
+  // X-axis ticks — 5 evenly spaced spot prices across the visible range.
+  // These render as faint vertical grid lines + labels along the bottom,
+  // making it easier to read off "what spot would I need for ₹X profit?".
+  const xTicks = $derived.by(() => {
+    if (!payoff.length) return [];
+    const n = 5;
+    return Array.from({ length: n }, (_, i) => {
+      const s = sMin + (sSpan * i) / (n - 1);
+      return { s, x: xOf(s) };
+    });
+  });
 </script>
 
 <div class="payoff-chart" style="--chart-h: {height}px">
@@ -222,11 +234,21 @@
       <!-- Y-axis grid + labels -->
       {#each yTicks as t}
         <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y}
-              stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+              stroke="rgba(200,216,240,0.10)" stroke-width="1"/>
         <text x={PAD_L - 6} y={t.y + 3} text-anchor="end"
               fill="#7e97b8" font-size="9" font-family="monospace">
           {fmtMoney(t.v)}
         </text>
+      {/each}
+
+      <!-- X-axis grid + labels — faint verticals at 5 evenly spaced
+           spots so the operator can sight-read which spot price gives
+           which P&L without dragging the hover crosshair. -->
+      {#each xTicks as xt, i}
+        {#if i > 0 && i < xTicks.length - 1}
+          <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={height - PAD_B}
+                stroke="rgba(200,216,240,0.07)" stroke-width="1"/>
+        {/if}
       {/each}
 
       <!-- Zero line — solid, slightly stronger than the grid -->
