@@ -12,52 +12,102 @@ from backend.shared.helpers.ramboq_logger import get_logger
 logger = get_logger(__name__)
 
 
+# Broker-hitting actions — the three-way gate (sim / paper / live) only
+# applies to these. Non-broker actions (emit_log, set_flag,
+# monitor_order, deactivate_agent, send_summary) run uniformly regardless
+# of mode.
+BROKER_ACTIONS = {
+    "place_order", "modify_order",
+    "cancel_order", "cancel_all_orders",
+    "close_position",
+    "chase_close", "chase_close_positions",
+}
+
+
+def _resolve_mode(action_type: str, context: dict) -> str:
+    """
+    Decide how this action should be executed:
+      * 'sim'   — agent was fired by the simulator → route to the sim
+                  paper-trade writer (SimDriver owns the lifecycle)
+      * 'paper' — mode 2: real data, paper order. On non-main (dev) this
+                  is the only path for broker actions. On main (prod),
+                  it's the default when the per-action
+                  `execution.live.<action>` DB flag is still False
+      * 'live'  — mode 3: real data, real order. Only reachable on
+                  main AND the per-action flag is True
+      * 'noop'  — non-broker action (no gate); the existing handler
+                  (send_summary, emit_log, …) runs as-is
+    """
+    if context.get("sim_mode"):
+        return "sim"
+    if action_type not in BROKER_ACTIONS:
+        return "noop"
+    from backend.shared.helpers.utils    import is_prod_branch
+    from backend.shared.helpers.settings import get_bool
+    if not is_prod_branch():
+        return "paper"                         # dev never hits broker
+    if get_bool(f"execution.live.{action_type}", False):
+        return "live"
+    return "paper"
+
+
 async def execute(agent, actions: list, context: dict):
     """
-    Execute action chain sequentially.
+    Execute action chain sequentially. Every broker-hitting action
+    routes through `_resolve_mode` to pick sim / paper / live; the
+    non-broker actions (send_summary, emit_log, set_flag, …) run
+    as-is regardless of mode.
 
     Args:
         agent: Agent DB row
         actions: list of action dicts from agent.actions
-        context: market data context (contains `sim_mode` when fired by the
-                 simulator — used to route to the sim paper-trade writer
-                 instead of the real broker)
+        context: market data context (sim_mode flag routes to sim path;
+                 df_positions used by paper-mode chase expansion)
     """
     sim_mode = bool(context.get("sim_mode"))
     for action in actions:
         action_type = action.get("type", "")
         params = action.get("params", {})
+        mode = _resolve_mode(action_type, context)
+        tag  = {"sim": "[SIM] ", "paper": "[PAPER] ", "live": "", "noop": ""}[mode]
 
         try:
-            if sim_mode:
-                # Simulation: skip the real broker, write a mode='sim' row
-                # into algo_orders so the operator can see exactly what the
-                # real path would have done.
+            if mode == "sim":
                 await _sim_paper_trade(agent, action_type, params, context)
-            elif action_type == "chase_close":
-                await _action_chase_close(context, params)
-            elif action_type == "send_summary":
-                await _action_send_summary(context, params)
-            elif action_type == "place_order":
-                await _action_place_order(context, params)
-            elif action_type == "close_position":
-                # Live path: currently a stub — logs and returns. Real
-                # broker wiring lands with the action runner. Sim path
-                # never reaches here because sim_mode routes to
-                # _sim_paper_trade above.
-                await close_position(context, params)
-            else:
-                logger.warning(f"Agent [{agent.slug}]: unknown action type '{action_type}'")
-                continue
+            elif mode == "paper":
+                await _paper_trade(agent, action_type, params, context)
+            elif mode == "live":
+                # Real broker path. Only reached on main AND with the
+                # per-action flag flipped to True in /admin/settings.
+                if action_type == "chase_close":
+                    await _action_chase_close(context, params)
+                elif action_type == "place_order":
+                    await _action_place_order(context, params)
+                elif action_type == "close_position":
+                    await close_position(context, params)
+                # modify_order / cancel_order / cancel_all_orders /
+                # chase_close_positions land in the _log_invoke stubs at
+                # the bottom of this file for now — they'll hit the
+                # broker once their real wiring lands.
+                else:
+                    logger.warning(f"Agent [{agent.slug}]: live action '{action_type}' has no wired handler yet")
+            else:  # 'noop' — non-broker action
+                if action_type == "send_summary":
+                    await _action_send_summary(context, params)
+                elif action_type == "chase_close":
+                    # chase_close is in BROKER_ACTIONS so we'd only get
+                    # here if BROKER_ACTIONS is misconfigured — safety net
+                    await _action_chase_close(context, params)
+                else:
+                    logger.warning(f"Agent [{agent.slug}]: unknown action type '{action_type}'")
+                    continue
 
-            tag = "[SIM] " if sim_mode else ""
             logger.info(f"{tag}Agent [{agent.slug}]: action '{action_type}' completed")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_success", f"{tag}Action: {action_type}",
                             params, sim_mode=sim_mode)
 
         except Exception as e:
-            tag = "[SIM] " if sim_mode else ""
             logger.error(f"{tag}Agent [{agent.slug}]: action '{action_type}' failed: {e}")
             from backend.api.algo.events import log_event
             await log_event(agent, "action_failed",
@@ -293,6 +343,208 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
 
     # Non-order action — no paper row. The log_event call in execute()
     # already captures the action_success event.
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Mode-2 paper trade (real data + paper) — feeds the prod PaperTradeEngine
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _live_positions_in_scope(context: dict, params: dict) -> list[dict]:
+    """
+    Mirror of `_sim_positions_in_scope` for the real-data paper path.
+    Pulls rows from `context['df_positions']` (the live Kite snapshot
+    threaded through by `_task_performance`) filtered by scope.
+    """
+    scope = (params.get("scope") or "total").lower()
+    acct_filter = str(params.get("account") or "") if scope == "account" else None
+    df = context.get("df_positions")
+    if df is None or getattr(df, "empty", True):
+        return []
+    try:
+        rows = df.to_dict(orient="records")
+    except Exception:
+        return []
+    if acct_filter:
+        rows = [r for r in rows if str(r.get("account")) == acct_filter]
+    return rows
+
+
+async def _basket_margin_validate(broker, order: dict) -> tuple[bool, str]:
+    """
+    Ask Kite to dry-run the order via `basket_margin`. Returns
+    (ok, detail). On `ok=False` the detail is Kite's error message —
+    mirror of what `place_order` would have rejected with.
+    """
+    try:
+        basket_order = {
+            "exchange":         order.get("exchange", "NFO"),
+            "tradingsymbol":    order.get("symbol"),
+            "transaction_type": order.get("side"),
+            "quantity":         order.get("qty"),
+            "order_type":       "LIMIT",
+            "product":          order.get("product", "NRML"),
+            "price":            order.get("price"),
+            "variety":          order.get("variety", "regular"),
+        }
+        # KiteConnect exposes `basket_margin` which validates a list of
+        # orders without placing them. Raises on malformed parameters.
+        broker.kite.basket_margin([basket_order])
+        return True, "basket_margin OK"
+    except Exception as e:
+        return False, str(e)[:240]
+
+
+async def _write_paper_order(agent, action_type: str, resolved: dict, context: dict):
+    """
+    Write ONE AlgoOrder(mode='paper') row after a dry-run via Kite's
+    basket_margin. If the dry-run fails, the row is persisted as
+    REJECTED with Kite's error text — so the operator sees exactly the
+    same rejections they'd see from a real place_order.
+
+    On success, the order is registered with the prod PaperTradeEngine
+    so its fill / modify / unfilled lifecycle plays out against real
+    Kite quotes on the 5 s chase tick.
+    """
+    import uuid
+    from backend.api.database        import async_session
+    from backend.api.models          import AlgoOrder
+    from backend.shared.brokers      import get_broker
+    from backend.api.algo.paper      import get_prod_paper_engine
+
+    account  = str(resolved["account"])
+    symbol   = str(resolved["symbol"])
+    side     = str(resolved["side"])
+    qty      = int(resolved["qty"] or 0)
+    price    = resolved.get("price")
+    exchange = resolved.get("exchange") or "NFO"
+
+    # Basket-margin validation — Kite checks instrument / lot / tick /
+    # segment / circuit-limit rules and returns required margin. If it
+    # raises the error flows into the AlgoOrder.detail column so the
+    # operator can see exactly why a real placement would have been
+    # rejected.
+    broker = None
+    ok, reason = True, "paper"
+    try:
+        broker = get_broker(account)
+        if qty > 0 and price is not None and symbol and exchange:
+            ok, reason = await _basket_margin_validate(broker, {
+                "account": account, "symbol": symbol, "side": side,
+                "qty": qty, "price": price, "exchange": exchange,
+            })
+    except Exception as e:
+        ok, reason = False, f"broker lookup failed: {e}"
+
+    status = "OPEN" if ok else "REJECTED"
+    fake_order_id = "PAPER-" + uuid.uuid4().hex[:12]
+
+    price_str = f"@₹{price:,.2f}" if price is not None else "@MARKET"
+    pretty = (f"[PAPER] {agent.slug} → {action_type}: {side} {qty} "
+              f"{symbol} {price_str} · acct={account}"
+              + ("" if ok else f" · REJECTED ({reason})"))
+    logger.warning(pretty)
+
+    algo_order_id = None
+    try:
+        async with async_session() as s:
+            row = AlgoOrder(
+                account=account, symbol=symbol, exchange=exchange,
+                transaction_type=side, quantity=qty,
+                initial_price=(float(price) if price is not None else None),
+                status=status, engine="paper", mode="paper",
+                broker_order_id=fake_order_id,
+                detail=pretty,
+            )
+            s.add(row)
+            await s.commit()
+            algo_order_id = row.id
+    except Exception as e:
+        logger.error(f"[PAPER] write failed: {e}")
+        return
+
+    if not ok:
+        # Rejected by basket_margin — nothing to chase. The REJECTED
+        # row on the Orders log tells the story.
+        return
+
+    # Register with the prod paper engine. Its 5 s tick loop will ask
+    # LiveQuoteSource for real bid/ask and run the same fill / modify /
+    # unfilled lifecycle the simulator uses.
+    if qty > 0 and price is not None:
+        engine = get_prod_paper_engine()
+        engine.register_open_order({
+            "algo_order_id": algo_order_id,
+            "account":       account,
+            "symbol":        symbol,
+            "side":          side,
+            "qty":           qty,
+            "limit_price":   float(price),
+            "initial_price": float(price),
+            "exchange":      exchange,
+            "agent_slug":    agent.slug,
+            "action_type":   action_type,
+        })
+
+
+async def _paper_trade(agent, action_type: str, params: dict, context: dict):
+    """
+    Mode-2 dispatcher — mirrors `_sim_paper_trade` but:
+      - Writes AlgoOrder.mode='paper' instead of 'sim'
+      - Validates via Kite basket_margin before marking OPEN
+      - Registers with the prod PaperTradeEngine (LiveQuoteSource)
+    """
+    if action_type in {"chase_close", "chase_close_positions"}:
+        positions = _live_positions_in_scope(context, params)
+        if not positions:
+            logger.warning(f"[PAPER] {agent.slug} → {action_type}: scope matched 0 positions")
+            await _write_paper_order(agent, action_type, {
+                "account":  str(params.get("account") or "TOTAL"),
+                "symbol":   "(no positions in scope)",
+                "side":     "SELL", "qty": 0, "price": None,
+                "exchange": "NFO",
+            }, context)
+            return
+        for p in positions:
+            qty_held = int(p.get("quantity") or 0)
+            if qty_held == 0:
+                continue
+            side = "SELL" if qty_held > 0 else "BUY"
+            # For the initial limit: use LTP ± half spread so the mode-2
+            # path mirrors what the chase engine does on Kite. Real
+            # bid/ask will come from LiveQuoteSource on the first tick.
+            ltp = p.get("last_price") or p.get("close_price")
+            price = float(ltp) if ltp is not None else None
+            await _write_paper_order(agent, action_type, {
+                "account":  str(p.get("account", "")),
+                "symbol":   str(p.get("tradingsymbol", "")),
+                "side":     side,
+                "qty":      abs(qty_held),
+                "price":    price,
+                "exchange": str(p.get("exchange") or "NFO"),
+            }, context)
+        return
+
+    if action_type in {"place_order", "close_position", "modify_order",
+                       "cancel_order", "cancel_all_orders"}:
+        account = str(params.get("account") or "")
+        symbol  = str(params.get("symbol")  or f"{agent.slug}-{action_type}")
+        if params.get("side") in ("BUY", "SELL"):
+            side = params.get("side")
+        elif params.get("transaction_type") in ("BUY", "SELL"):
+            side = params.get("transaction_type")
+        else:
+            side = "SELL"
+        qty   = int(params.get("quantity") or 0)
+        price = params.get("price")
+        await _write_paper_order(agent, action_type, {
+            "account":  account,
+            "symbol":   symbol,
+            "side":     side,
+            "qty":      qty,
+            "price":    price,
+            "exchange": str(params.get("exchange") or "NFO"),
+        }, context)
+        return
 
 
 async def _action_chase_close(context: dict, params: dict):

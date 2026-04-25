@@ -355,8 +355,17 @@ async def _task_performance(state: dict) -> None:
             # while the simulator is active. The sim driver owns run_cycle
             # while it's running; mixing a live fire with a fabricated one
             # would corrupt rate history and spam the Telegram group.
+            from backend.shared.helpers.utils import is_prod_branch
             if sim_active:
                 logger.info("Background: simulator active — skipping real run_cycle (performance cache still fresh)")
+            elif not is_prod_branch():
+                # Mode 1 (dev) — the live agent engine only runs on main.
+                # Dev's agent testing happens through the simulator, which
+                # owns its own run_cycle invocation. Keeping the live
+                # engine off dev avoids cross-process Kite contention with
+                # prod AND makes "paper trade without fill simulation"
+                # impossible by construction.
+                pass
             else:
                 try:
                     from backend.api.algo.agent_engine import run_cycle
@@ -543,7 +552,25 @@ async def on_startup(app) -> None:
         asyncio.create_task(_task_expiry_check(),     name="bg-expiry"),
         asyncio.create_task(_task_instruments(),      name="bg-instruments"),
     ]
-    logger.info("Background: all tasks started (market, performance, close, expiry, instruments)")
+    # Mode 2 (real-data paper) runs only on main. The PaperTradeEngine
+    # singleton processes its open-order book against real Kite quotes
+    # every 5 s, so agent-fired paper orders follow a realistic chase
+    # lifecycle (fill / modify / unfilled) without ever hitting Kite's
+    # order endpoint. Dev never runs this because dev never runs the
+    # live agent engine (see _task_performance's is_prod_branch gate).
+    from backend.shared.helpers.utils import is_prod_branch
+    if is_prod_branch():
+        from backend.api.algo.paper import get_prod_paper_engine
+        paper_engine = get_prod_paper_engine()
+        app.state.bg_tasks.append(
+            asyncio.create_task(paper_engine.tick_loop(interval_seconds=5),
+                                name="bg-paper-chase")
+        )
+        logger.info("Background: all tasks started (market, performance, close, "
+                    "expiry, instruments, paper-chase)")
+    else:
+        logger.info("Background: all tasks started (market, performance, close, "
+                    "expiry, instruments) — live agent engine + paper engine OFF on non-main")
 
 
 async def on_shutdown(app) -> None:

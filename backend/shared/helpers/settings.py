@@ -162,6 +162,28 @@ SEEDS: list[tuple] = [
     ("algo",        "algo.expiry_rescan_minutes",   "int", 30,
      "Re-scan interval (min) on expiry day for new ITM positions.",
      "min", {"min": 1, "max": 120, "step": 1}),
+
+    # ── Execution (mode 2 / 3 per-action promotion) ──────────────────────
+    # Every broker-hitting action defaults to False → the handler writes an
+    # AlgoOrder.mode='paper' row and registers it with the PaperTradeEngine
+    # for fill simulation against live Kite quotes. Flip a flag to True and
+    # that specific action starts calling the broker for real
+    # (AlgoOrder.mode='live'). The branch is the hard outer gate — on
+    # non-main (dev) these flags are ignored and every action is paper.
+    ("execution",   "execution.live.cancel_order",  "bool", False,
+     "Allow `cancel_order` to hit the broker. Most reversible — typically "
+     "flipped to True first.", None, None),
+    ("execution",   "execution.live.cancel_all_orders","bool", False,
+     "Allow `cancel_all_orders` to hit the broker.", None, None),
+    ("execution",   "execution.live.modify_order",  "bool", False,
+     "Allow `modify_order` to hit the broker.", None, None),
+    ("execution",   "execution.live.place_order",   "bool", False,
+     "Allow `place_order` to hit the broker. Typically last to flip.",
+     None, None),
+    ("execution",   "execution.live.close_position","bool", False,
+     "Allow `close_position` to hit the broker.", None, None),
+    ("execution",   "execution.live.chase_close_positions","bool", False,
+     "Allow `chase_close_positions` to hit the broker.", None, None),
 ]
 
 

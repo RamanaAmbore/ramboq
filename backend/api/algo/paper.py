@@ -305,3 +305,32 @@ class PaperTradeEngine:
                     f"UNFILLED — gave up after {row.attempts} chase(s)"
                 )
             await s.commit()
+
+
+# ═════════════════════════════════════════════════════════════════════════
+#  Prod singleton — mode 2 (real-data paper on main branch)
+# ═════════════════════════════════════════════════════════════════════════
+
+_prod_paper_engine: Optional[PaperTradeEngine] = None
+
+
+def get_prod_paper_engine() -> PaperTradeEngine:
+    """
+    Lazily constructed PaperTradeEngine fed by LiveQuoteSource.
+    Used by the mode-2 action path: every broker-hitting handler that
+    isn't promoted to live writes an AlgoOrder(mode='paper') and
+    registers the order here. A background `tick_loop` runs the chase
+    against real Kite quotes.
+
+    On non-main branches this is unused — dev's paper trading is the
+    existing simulator (SimDriver owns its own engine fed by
+    SimQuoteSource).
+    """
+    global _prod_paper_engine
+    if _prod_paper_engine is None:
+        from backend.api.algo.quote import LiveQuoteSource
+        _prod_paper_engine = PaperTradeEngine(
+            quote_source=LiveQuoteSource(),
+            label="paper",
+        )
+    return _prod_paper_engine
