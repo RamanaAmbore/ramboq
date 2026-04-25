@@ -347,6 +347,98 @@ So real alerts and simulated alerts are never in the same bucket.
 
 ---
 
+## Settings — runtime tunables
+
+The Settings page (`/admin/settings`) is where you tune the knobs that change more often than a deploy cycle: alert thresholds, refresh cadences, simulator defaults, and the **execution mode** flags that decide whether an action hits the broker or stays in paper. Edits take effect on the **next agent tick / sim run** — no service restart, no redeploy.
+
+### Page layout
+
+Each parameter is a single row:
+
+```
+[i]   alerts.cooldown_minutes  [mod]      [   30   ] min   [ Save ]  [ Reset ]
+```
+
+- **(i)** — click the amber chip to expand a panel showing the description, default, range, and units. Click again to collapse. Use it when you don't recognise a key.
+- **`[mod]` badge** — appears when the live value differs from the code-shipped default.
+- **Value field** — input adapts to the type: text for strings, number with min/max for ints/floats, dropdown for booleans / enums.
+- **Save** — disabled until you change the value. Writes the new value and refreshes the row.
+- **Reset** — disabled until the row is modified. Restores the code-shipped default.
+
+A **filter box** at the top searches both keys and descriptions — useful when you know roughly what you want but not the exact key.
+
+Categories are rendered in deliberate order — **execution → alerts → algo → performance → simulator → notifications → logging → misc** — so the things you'll actually touch sit at the top of the page.
+
+### Settings vs YAML
+
+Settings are for runtime knobs an operator changes without thinking about a deploy. **Infrastructure parameters stay in YAML deliberately**:
+
+| In Settings (DB) | In `backend_config.yaml` |
+|---|---|
+| Alert thresholds, cooldowns | DB credentials |
+| Refresh cadences | Market hours |
+| Sim defaults | Kite URLs |
+| Execution mode flags | IPv6 source addresses |
+| Notification toggles | Capability flags (`cap_in_<branch>`) |
+| Log levels | Log file paths |
+
+The seeder behaves well across deploys: it inserts new keys, refreshes descriptions / schemas / defaults, **preserves your overrides**, and auto-prunes keys that have been retired in code.
+
+### Execution mode banner
+
+The first thing you see on the page is the execution mode banner:
+
+- **Green — `Every broker action is in PAPER mode`** — every fired agent that wants to hit Kite will instead write a paper `AlgoOrder` row. Real positions don't change. This is the prod default.
+- **Red — `⚠ N of 6 actions are LIVE`** — at least one `execution.live.<action>` flag is true; agents firing those actions will place real broker orders.
+
+Below the banner, the **execution** section lists six per-action flags (`execution.live.cancel_order`, `execution.live.cancel_all_orders`, `execution.live.modify_order`, `execution.live.place_order`, `execution.live.close_position`, `execution.live.chase_close_positions`). Flip them one by one — no all-or-nothing switch — to promote actions from paper to live.
+
+### The three execution modes
+
+Every agent fire that touches the broker gets routed by mode:
+
+| Mode | Where it runs | Quote source | Trade engine |
+|---|---|---|---|
+| **1 — Simulator** | Dev only | Fabricated (scenario-driven) | `PaperTradeEngine` against fabricated bid/ask |
+| **2 — Real-data + paper** | Prod default for every action | Real Kite quote API (batched) | `PaperTradeEngine` against live bid/ask, validated by Kite's `basket_margin` |
+| **3 — Real broker** | Prod, per-action opt-in | Real Kite | Real `place_order` / `modify_order` / `cancel_order` |
+
+The `main` branch is a **hard outer gate**: on dev (any non-main branch), every broker-hitting action is forced to paper regardless of these flags — the `execution.live.*` toggles only matter on prod.
+
+Every alert email + Telegram message gets a tag so you can tell at a glance what mode the actions ran in:
+
+| Tag | Meaning |
+|---|---|
+| (no tag) | Every broker action in this fire ran live |
+| `[PAPER]` | Every broker action in this fire was paper |
+| `[MIXED]` | Some live, some paper (you have a mix of `execution.live.*` flags on) |
+
+### Recommended promotion order
+
+When you finally trust the engine enough to go live, promote actions in this order — most reversible first:
+
+1. `execution.live.cancel_order` — cancelling a stale order can't lose money
+2. `execution.live.cancel_all_orders`
+3. `execution.live.modify_order` — modifying an existing order is bounded by your existing position
+4. `execution.live.close_position`
+5. `execution.live.chase_close_positions` — automatic loss-cut
+6. `execution.live.place_order` — opens new exposure; promote last
+
+After each flip, watch the next live agent fire end-to-end. If anything looks off, set the flag back to `false` — the next tick reverts that action to paper.
+
+### How edits take effect
+
+Most settings update on the next agent tick (5-minute cadence). A few are special-cased:
+
+- **`logging.*_log_level`** — handlers reapply the new level the moment you Save.
+- **`performance.refresh_interval`** / **`performance.market_refresh_time`** — picked up live by the background loop.
+- **`alerts.*`** — applied next time `run_cycle` fires.
+- **`execution.live.*`** — applied at the action handler the next time an agent fires.
+
+You don't have to memorise this — the **(i)** info chip on each row tells you what the setting governs.
+
+---
+
 ## Recipes
 
 **A) "Add a custom loss rule for one specific account"**
@@ -381,6 +473,20 @@ So real alerts and simulated alerts are never in the same bucket.
 3. Tune the params: set `account`, `symbol`, `quantity`. (For scope-level auto-close on any matching position, use `+ chase_close` instead — it doesn't need a specific symbol.)
 4. **Validate** → **Save** → **Run in Simulator** to confirm → flip **ON**.
 
+**F) "Tune a threshold without redeploying"**
+1. `/admin/settings` → type the keyword in the filter box (e.g. `cooldown`, `rate`, `baseline`).
+2. Click the **(i)** chip on the row to read what the setting does, its default, and its valid range.
+3. Edit the value → **Save**. The next agent tick (within 5 min) picks up the new value.
+4. If you change your mind, click **Reset** to restore the code default.
+
+**G) "Promote one action from paper to live"**
+1. `/admin/settings` → check the banner — green means everything is paper.
+2. Find the **execution** section. Pick the most reversible action that you trust (start with `execution.live.cancel_order`).
+3. Toggle the dropdown to `true` → **Save**. Banner flips to red `⚠ 1 of 6`.
+4. Wait for the next live agent fire that uses that action. The Telegram subject loses its `[PAPER]` tag (or shows `[MIXED]`) — that tells you the action went to the broker.
+5. Inspect `/orders` for the new live `AlgoOrder` row (mode = `live`).
+6. If something looks wrong, toggle the flag back to `false` — the next tick reverts to paper.
+
 ---
 
 ## Safety checklist before flipping a new agent to ON
@@ -402,6 +508,8 @@ So real alerts and simulated alerts are never in the same bucket.
 | Sim shows ticks but no price changes | You probably picked a scenario with no scripted initial in Scripted mode — switch to Live+scenario and Load live book first |
 | Custom token won't appear in the Agents editor | Did you press **Reload registry** after saving? Is the token's `is_active` on? |
 | Alerts not reaching Telegram/email | Check `cap_in_<branch>.telegram` and `cap_in_<branch>.mail` in `backend_config.yaml`; dev may have these off by default |
+| Settings change didn't take effect | Most apply on the next agent tick (≤ 5 min). `logging.*` apply at Save. If you flipped an `execution.live.*` flag on dev, note that the branch gate forces every action back to paper regardless. |
+| Live agent fired but no real broker order | Check `/admin/settings` → **execution** section. If the relevant `execution.live.<action>` is `false`, the action wrote a paper `AlgoOrder` row instead. Telegram subject would have shown `[PAPER]`. |
 | "Invalid username or password" on sign-in | Ask the server admin to reset your password — there's no forgot-password flow yet |
 
 ---
@@ -411,5 +519,6 @@ So real alerts and simulated alerts are never in the same bucket.
 - **Branch**: `main` = production (`ramboq.com`), everything else = dev (`dev.ramboq.com`). Agents, tokens, and sims on dev don't affect production.
 - **Capability flag**: `cap_in_dev.<feature>` / `cap_in_prod.<feature>` in `backend_config.yaml`. Toggles whether a capability (simulator, telegram, mail, genai, market_feed) is live on that branch.
 - **Dispatch registry**: The in-memory index that maps each token name to its implementation. Rebuilt from the Tokens table at startup and on **Reload registry**.
+- **Execution mode**: Sim / paper / live, decided per agent fire. Sim = fabricated quotes + paper trade engine (dev only). Paper = real quotes + paper trade engine, validated by Kite's `basket_margin`. Live = real broker order. Per-action flags in **Settings** decide paper-vs-live on prod.
 - **Masked account**: Accounts are rendered as `ZG####` / `ZJ####` in the UI and in alerts to avoid leaking numeric IDs. Internally the real IDs (`ZG0790`, `ZJ6294`) are used.
 - **Tick**: One step of the simulator. Each tick applies a set of price moves and then invokes the agent engine once.
