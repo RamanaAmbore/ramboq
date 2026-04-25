@@ -136,10 +136,25 @@
   const innerW = $derived(W - PAD_L - PAD_R);
   const innerH = $derived(height - PAD_T - PAD_B);
 
-  // Time domain: from first tick's ts to max(now, last tick).
-  const tMin = $derived(ticks.length ? +new Date(ticks[0].ts) : 0);
-  const tMax = $derived(ticks.length ? +new Date(ticks[ticks.length - 1].ts) : 1);
+  // ── Zoom + pan ─────────────────────────────────────────────────────
+  // `zoom` overrides the auto x-domain when non-null. Set by wheel /
+  // pinch / drag-pan, reset by the toolbar Reset button. Operator can
+  // zoom into one minute of an order's chase to inspect the bid/ask
+  // crawl, then pop back out with one click.
+  /** @type {{xMin: number, xMax: number} | null} */
+  let zoom = $state(null);
+  /** @type {{startClientX: number, startMin: number, startMax: number} | null} */
+  let pan = $state(null);
+
+  // Time domain — `zoom` wins when set; otherwise span the full tick
+  // history. Wheel zoom around the cursor narrows / widens this range
+  // without re-fetching anything.
+  const dataTMin = $derived(ticks.length ? +new Date(ticks[0].ts) : 0);
+  const dataTMax = $derived(ticks.length ? +new Date(ticks[ticks.length - 1].ts) : 1);
+  const tMin  = $derived(zoom ? zoom.xMin : dataTMin);
+  const tMax  = $derived(zoom ? zoom.xMax : dataTMax);
   const tSpan = $derived(Math.max(1, tMax - tMin));
+  const isZoomed = $derived(zoom !== null);
 
   // Price domain — pad ±2% so the line doesn't kiss the frame.
   const prices = $derived(
@@ -216,6 +231,60 @@
     chased:   '#7dd3fc',  // sky
   });
 
+  // ── Zoom + pan handlers ───────────────────────────────────────────
+
+  /** Map a client X (px) to a value in the current x-domain. */
+  function _xValueAt(/** @type {SVGSVGElement} */ svg,
+                     /** @type {number} */ clientX) {
+    const rect = svg.getBoundingClientRect();
+    const xPx  = (clientX - rect.left) * (W / rect.width);
+    return tMin + ((xPx - PAD_L) / innerW) * tSpan;
+  }
+
+  function onWheel(/** @type {WheelEvent} */ e) {
+    if (!ticks.length) return;
+    e.preventDefault();
+    const svg    = /** @type {SVGSVGElement} */ (e.currentTarget);
+    const xVal   = _xValueAt(svg, e.clientX);
+    const factor = e.deltaY > 0 ? 1.25 : 1 / 1.25;     // out / in
+    let newMin = xVal - (xVal - tMin) * factor;
+    let newMax = xVal + (tMax - xVal) * factor;
+    // Clamp: never zoom out past the full data range.
+    if (newMin <= dataTMin && newMax >= dataTMax) {
+      zoom = null;
+      return;
+    }
+    // Lower bound on width — 1 second — so users can't zoom into a
+    // zero-width window and freeze the chart.
+    if (newMax - newMin < 1000) return;
+    zoom = { xMin: Math.max(newMin, dataTMin - tSpan), xMax: Math.min(newMax, dataTMax + tSpan) };
+  }
+
+  function onPointerDown(/** @type {PointerEvent} */ e) {
+    if (!ticks.length || e.button !== 0) return;
+    /** @type {any} */ const tgt = e.currentTarget;
+    tgt.setPointerCapture?.(e.pointerId);
+    pan = { startClientX: e.clientX, startMin: tMin, startMax: tMax };
+  }
+  function onPointerUp(/** @type {PointerEvent} */ e) {
+    if (pan) {
+      /** @type {any} */ const tgt = e.currentTarget;
+      tgt.releasePointerCapture?.(e.pointerId);
+    }
+    pan = null;
+  }
+  function onPointerMoveSvg(/** @type {PointerEvent} */ e) {
+    if (pan) {
+      const rect = /** @type {SVGSVGElement} */ (e.currentTarget).getBoundingClientRect();
+      const dxPx = (e.clientX - pan.startClientX) * (W / rect.width);
+      const dxVal = (dxPx / innerW) * (pan.startMax - pan.startMin);
+      zoom = { xMin: pan.startMin - dxVal, xMax: pan.startMax - dxVal };
+      hover = null;   // suppress hover while dragging
+    }
+  }
+
+  function resetZoom() { zoom = null; pan = null; }
+
   function showHover(/** @type {any} */ e) {
     hover = {
       x: xOf(e.ts), y: yOf(e.price ?? ticks[ticks.length - 1]?.ltp ?? 0),
@@ -267,6 +336,11 @@
     {:else}
       <span class="chart-status">{ticks.length} ticks · {events.length} events</span>
     {/if}
+    {#if isZoomed}
+      <button type="button" class="chart-reset"
+              title="Reset zoom — show the full tick history"
+              onclick={resetZoom}>reset</button>
+    {/if}
   </div>
 
   {#if !loading && !ticks.length}
@@ -275,7 +349,13 @@
       Ticks are recorded once an order is open against the symbol{mode === 'sim' ? ' or the simulator is running' : ''}.
     </div>
   {:else if ticks.length}
-    <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none" class="chart-svg">
+    <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none"
+         class="chart-svg" class:chart-panning={pan !== null}
+         role="img" aria-label="Price chart — wheel to zoom, drag to pan"
+         onwheel={onWheel}
+         onpointerdown={onPointerDown}
+         onpointerup={onPointerUp}
+         onpointermove={onPointerMoveSvg}>
       <!-- Y-axis grid + labels -->
       {#each yTicks as t}
         <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y}
@@ -441,6 +521,32 @@
     font-family: monospace;
   }
   .chart-error { color: #ef4444; }
+  .chart-reset {
+    font-family: monospace;
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 2px;
+    border: 1px solid rgba(251,191,36,0.45);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+    cursor: pointer;
+    margin-left: 0.3rem;
+  }
+  .chart-reset:hover {
+    background: rgba(251,191,36,0.20);
+    border-color: rgba(251,191,36,0.65);
+  }
+  /* Wheel-zoom + drag-pan affordances. The crosshair cursor signals
+     "interactive" before the user notices the wheel works. */
+  .chart-svg {
+    cursor: crosshair;
+    touch-action: pan-y;
+  }
+  .chart-svg.chart-panning {
+    cursor: grabbing;
+  }
   .chart-empty {
     height: var(--chart-h, 180px);
     display: flex;

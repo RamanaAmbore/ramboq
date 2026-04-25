@@ -930,6 +930,45 @@ Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviou
 
 ---
 
+## Chart zoom + pan (PriceChart, OptionsPayoff)
+
+Both SVG chart components ([`frontend/src/lib/PriceChart.svelte`](frontend/src/lib/PriceChart.svelte), [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte)) carry a wheel-zoom + drag-pan + reset toolbar implemented in pure SVG/maths — no chart library.
+
+**State**: each chart owns a `zoom: {xMin, xMax} | null` and `pan: {startClientX, startMin, startMax} | null`. The existing `xOf()` / `tMin` / `sMin` derivations read from `zoom` when set, falling back to the auto-derived data range otherwise. All downstream paths (LTP line, payoff curves, markers, hover tooltip) re-derive automatically.
+
+**Handlers**:
+- `onWheel` — clamps to data range when zooming out fully (resets to null), refuses to zoom narrower than 1 second (PriceChart) / 2 % of full range (OptionsPayoff).
+- `onPointerDown` / `onPointerMoveSvg` / `onPointerUp` — pointer-captured drag-pan; suppresses hover tooltip while dragging.
+- `resetZoom` — toolbar button that snaps back to auto-range. Visible only when `isZoomed` is true.
+
+**CSS**: `cursor: crosshair` by default, `cursor: grabbing` when `.chart-panning` / `.payoff-panning` modifier is active. `touch-action: pan-y` so vertical scroll on mobile still works.
+
+OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that the API supplies — so post-reset the chart is consistent with the chart footnote ("±2.5σ (7.3%)").
+
+---
+
+## Market News on `/market` (public)
+
+Public market page picks up the same `/api/news` feed the algo LogPanel consumes, but rendered in the public-site cream / navy / champagne palette as a separate "Market News" card under the AI summary. Auto-refreshes every 10 minutes (server caps the upstream feed at that cadence). No "log" terminology anywhere.
+
+Layout: card title `Market News` + headlines count metadata; per-row `news-time` (HH:MM) · `news-title` (link) · `news-src` (source-pill, hidden on mobile). All anchors `target="_blank" rel="noopener"`. Implemented in [`frontend/src/routes/(public)/market/+page.svelte`](frontend/src/routes/(public)/market/+page.svelte).
+
+---
+
+## Documentation surfaces — three roles
+
+We ship three doc files; they target different audiences:
+
+| File | Audience | What's in it |
+|---|---|---|
+| [USER_GUIDE.md](USER_GUIDE.md) | Operator new to the platform | **Concepts in plain English.** What an agent is, what simulation does, what Greeks mean, what the chase engine does. No JSON, no code paths, no API endpoints. |
+| [ADMIN_GUIDE.md](ADMIN_GUIDE.md) | Day-to-day operator | **Operations reference.** Exact button labels, condition-tree JSON, API endpoints, config keys, troubleshooting tables. |
+| [CLAUDE.md](CLAUDE.md) (this file) | Engineers + AI assistants | **Architecture + design notes.** Code structure, data flow, design rationale, refactoring history. |
+
+Cross-link aggressively — every page on the platform should be findable via at least one of these (USER_GUIDE for the concept, ADMIN_GUIDE for the keystrokes).
+
+---
+
 ## InfoHint pattern
 
 Most algo admin pages used to ship a long descriptive paragraph at the top — fine for first-time onboarding but pure noise once the operator knows what the page does. [`frontend/src/lib/InfoHint.svelte`](frontend/src/lib/InfoHint.svelte) replaces those with a small amber `(i)` chip next to the page title; click to toggle an inline popover with the same gradient + amber accent the Settings row info uses. Implemented across `/admin/brokers`, `/admin/options`, `/admin/paper`, `/admin/simulator`, `/admin/settings`. ~30-40 vh saved per page; help text is one click away when needed.

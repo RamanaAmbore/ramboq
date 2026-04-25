@@ -2,7 +2,9 @@
 
 A production web application for **RamboQuant Analytics LLP** at [ramboq.com](https://ramboq.com). The app provides portfolio performance tracking, AI market updates, partner management, investment information, and real-time notifications.
 
-> **New admin?** Read [ADMIN_GUIDE.md](ADMIN_GUIDE.md) — a plain-English walkthrough of Agents, Tokens, and the Simulator, aimed at someone using the site for the first time.
+> **New here?** Two reading orders depending on what you're looking for:
+> - **[USER_GUIDE.md](USER_GUIDE.md)** — concepts in plain English. What an agent is, what simulation does, how the chase engine works, what Greeks mean. Start here if you've never used a rules-based trading platform.
+> - **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** — operations reference. Exact button labels, JSON shapes, API endpoints, config keys. Reach for this when you need step-by-step instructions on a specific task.
 
 ## 🏁 Headline feature — Simulator-backed Agent framework
 

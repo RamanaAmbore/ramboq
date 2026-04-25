@@ -1,5 +1,7 @@
 # RamboQuant Admin Guide
 
+> **First time here?** Read [USER_GUIDE.md](USER_GUIDE.md) first — it explains the *concepts* (what an agent is, why we have a simulator, what the chase engine does) in plain English. This file is the *operations reference*: exact button labels, JSON shapes, API endpoints, config keys. Read USER_GUIDE first; then come back here when you need step-by-step instructions on a specific task.
+
 A walkthrough of the four things an admin cares about on this site:
 
 1. **Agents** — rules that watch the portfolio and fire when something worth knowing happens.

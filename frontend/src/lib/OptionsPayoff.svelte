@@ -51,10 +51,22 @@
   const innerW = $derived(W - PAD_L - PAD_R);
   const innerH = $derived(height - PAD_T - PAD_B);
 
-  // X domain: spot range
-  const sMin = $derived(payoff.length ? payoff[0].spot : (spot - 1));
-  const sMax = $derived(payoff.length ? payoff[payoff.length - 1].spot : (spot + 1));
+  // ── Zoom + pan state ──────────────────────────────────────────────
+  // Operator can wheel-zoom into one strike or breakeven cluster, then
+  // drag-pan to scan along the spot axis. Reset button (visible when
+  // zoomed) snaps back to the auto ±2.5σ range supplied by the API.
+  /** @type {{xMin: number, xMax: number} | null} */
+  let zoom = $state(null);
+  /** @type {{startClientX: number, startMin: number, startMax: number} | null} */
+  let pan = $state(null);
+
+  // X domain — `zoom` overrides the auto-derived spot range.
+  const dataMin = $derived(payoff.length ? payoff[0].spot : (spot - 1));
+  const dataMax = $derived(payoff.length ? payoff[payoff.length - 1].spot : (spot + 1));
+  const sMin  = $derived(zoom ? zoom.xMin : dataMin);
+  const sMax  = $derived(zoom ? zoom.xMax : dataMax);
   const sSpan = $derived(Math.max(0.001, sMax - sMin));
+  const isZoomed = $derived(zoom !== null);
 
   // Y domain: union of both curves with a 10% pad. Force zero into the
   // domain so the loss/profit shading lands on the actual breakeven line.
@@ -122,6 +134,13 @@
     const rect = svg.getBoundingClientRect();
     const xPx  = (e.clientX - rect.left) * (W / rect.width);
     const xVal = sMin + ((xPx - PAD_L) / innerW) * sSpan;
+    if (pan) {
+      const dxPx = (e.clientX - pan.startClientX) * (W / rect.width);
+      const dxVal = (dxPx / innerW) * (pan.startMax - pan.startMin);
+      zoom = { xMin: pan.startMin - dxVal, xMax: pan.startMax - dxVal };
+      hover = null;
+      return;
+    }
     // Find nearest payoff point
     let best = payoff[0];
     let bestDiff = Math.abs(best.spot - xVal);
@@ -135,6 +154,35 @@
     };
   }
   function onPointerLeave() { hover = null; }
+
+  function onWheel(/** @type {WheelEvent} */ e) {
+    if (!payoff.length) return;
+    e.preventDefault();
+    const svg  = /** @type {SVGSVGElement} */ (e.currentTarget);
+    const rect = svg.getBoundingClientRect();
+    const xPx  = (e.clientX - rect.left) * (W / rect.width);
+    const xVal = sMin + ((xPx - PAD_L) / innerW) * sSpan;
+    const factor = e.deltaY > 0 ? 1.25 : 1 / 1.25;
+    const newMin = xVal - (xVal - sMin) * factor;
+    const newMax = xVal + (sMax - xVal) * factor;
+    if (newMin <= dataMin && newMax >= dataMax) { zoom = null; return; }
+    if (newMax - newMin < (dataMax - dataMin) * 0.02) return;   // floor at 2% of full range
+    zoom = { xMin: newMin, xMax: newMax };
+  }
+  function onPointerDown(/** @type {PointerEvent} */ e) {
+    if (!payoff.length || e.button !== 0) return;
+    /** @type {any} */ const tgt = e.currentTarget;
+    tgt.setPointerCapture?.(e.pointerId);
+    pan = { startClientX: e.clientX, startMin: sMin, startMax: sMax };
+  }
+  function onPointerUp(/** @type {PointerEvent} */ e) {
+    if (pan) {
+      /** @type {any} */ const tgt = e.currentTarget;
+      tgt.releasePointerCapture?.(e.pointerId);
+    }
+    pan = null;
+  }
+  function resetZoom() { zoom = null; pan = null; }
 
   // Y-axis ticks — 5 evenly spaced labels.
   const yTicks = $derived.by(() => {
@@ -154,9 +202,17 @@
       No payoff data.
     </div>
   {:else}
+    {#if isZoomed}
+      <button type="button" class="payoff-reset"
+              title="Reset zoom — return to the auto ±2.5σ range"
+              onclick={resetZoom}>reset zoom</button>
+    {/if}
     <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none"
-         class="payoff-svg"
-         role="img" aria-label="Option payoff diagram"
+         class="payoff-svg" class:payoff-panning={pan !== null}
+         role="img" aria-label="Option payoff diagram — wheel to zoom, drag to pan"
+         onwheel={onWheel}
+         onpointerdown={onPointerDown}
+         onpointerup={onPointerUp}
          onpointermove={onPointerMove}
          onpointerleave={onPointerLeave}>
       <!-- Profit / loss shading (under the curves so the lines pop) -->
@@ -279,12 +335,35 @@
     padding: 6px 8px 8px;
     width: 100%;
     box-sizing: border-box;
+    position: relative;
   }
   .payoff-svg {
     width: 100%;
     height: var(--chart-h, 280px);
     display: block;
     cursor: crosshair;
+    touch-action: pan-y;
+  }
+  .payoff-svg.payoff-panning { cursor: grabbing; }
+  .payoff-reset {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.6rem;
+    font-family: monospace;
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 2px;
+    border: 1px solid rgba(251,191,36,0.45);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .payoff-reset:hover {
+    background: rgba(251,191,36,0.20);
+    border-color: rgba(251,191,36,0.65);
   }
   .payoff-empty {
     height: var(--chart-h, 280px);
