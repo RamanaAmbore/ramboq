@@ -10,6 +10,14 @@
   let error       = $state('');
   let unsub;
 
+  // Tabbed surface for the two cards on this page — Market Summary
+  // (AI-generated) and Market News (Indian-news feed). Only one panel
+  // visible at a time so the page stays compact; both feeds load on
+  // mount so flipping is a paint, not a fetch. Same UX shape as
+  // /performance.
+  /** @type {'summary' | 'news'} */
+  let tab = $state('summary');
+
   // Market news — same /api/news feed the algo LogPanel consumes, but
   // styled in the public-site palette and labelled "Market News" (no
   // "log" / "feed" jargon). Refreshes every 10 minutes alongside the
@@ -130,58 +138,72 @@
   {/if}
 </div>
 
+<!-- Tabbed Market Summary | Market News card. Same UX as /performance:
+     only one panel visible at a time, both feeds loaded on mount so
+     flipping is a paint not a fetch. Public palette throughout. -->
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  {#if error}
-    <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
-  {/if}
-
-  {#if !content && loading}
-    <div class="text-center text-text/40 text-sm animate-pulse py-8">
-      Loading market report…
+  <div class="market-tabs-row">
+    <div class="market-tabs">
+      <button type="button"
+              class="market-tab"
+              class:market-tab-active={tab === 'summary'}
+              onclick={() => tab = 'summary'}>
+        Market Summary
+      </button>
+      <button type="button"
+              class="market-tab"
+              class:market-tab-active={tab === 'news'}
+              onclick={() => tab = 'news'}>
+        Market News
+      </button>
     </div>
-  {:else if content}
-    <div class="market-report w-full">
-      {@html renderMarkdown(content)}
+    <div class="market-tabs-meta">
+      {#if tab === 'summary'}
+        {#if loading && !content}Loading…{/if}
+      {:else if newsLoading && !news.length}
+        Loading…
+      {/if}
     </div>
-  {:else if !loading}
-    <p class="text-text/40 text-sm">No market update available.</p>
-  {/if}
-</div>
-
-<!-- Market News — separate card under the AI summary. Reads from the
-     same /api/news feed the algo console uses, but rendered in the
-     public-site palette so it looks of-a-piece with the rest of the
-     market page (cream background, navy text, champagne accent). -->
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4 mt-4">
-  <div class="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
-    <h2 class="news-h">Market News</h2>
-    {#if newsLoading && !news.length}
-      <span class="news-meta">Loading…</span>
-    {/if}
   </div>
 
-  {#if newsError}
-    <div class="p-2 rounded bg-red-50 text-red-700 text-xs mb-2 border border-red-200">
-      {newsError}
-    </div>
-  {/if}
-
-  {#if news.length}
-    <ul class="news-list">
-      {#each news as n}
-        <li class="news-row">
-          <span class="news-time">{newsTime(n.timestamp)}</span>
-          <a class="news-title" href={n.link} target="_blank" rel="noopener">
-            {n.title}
-          </a>
-          {#if n.source}
-            <span class="news-src" title={n.source}>{n.source}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {:else if !newsLoading}
-    <p class="text-text/40 text-sm">No headlines available right now.</p>
+  {#if tab === 'summary'}
+    {#if error}
+      <div class="p-3 rounded bg-red-50 text-red-700 text-sm mb-4 border border-red-200">{error}</div>
+    {/if}
+    {#if !content && loading}
+      <div class="text-center text-text/40 text-sm animate-pulse py-8">
+        Loading market report…
+      </div>
+    {:else if content}
+      <div class="market-report w-full">
+        {@html renderMarkdown(content)}
+      </div>
+    {:else if !loading}
+      <p class="text-text/40 text-sm">No market update available.</p>
+    {/if}
+  {:else}
+    {#if newsError}
+      <div class="p-2 rounded bg-red-50 text-red-700 text-xs mb-2 border border-red-200">
+        {newsError}
+      </div>
+    {/if}
+    {#if news.length}
+      <ul class="news-list">
+        {#each news as n}
+          <li class="news-row">
+            <span class="news-time">{newsTime(n.timestamp)}</span>
+            <a class="news-title" href={n.link} target="_blank" rel="noopener">
+              {n.title}
+            </a>
+            {#if n.source}
+              <span class="news-src" title={n.source}>{n.source}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {:else if !newsLoading}
+      <p class="text-text/40 text-sm">No headlines available right now.</p>
+    {/if}
   {/if}
 </div>
 
@@ -209,23 +231,49 @@
   :global(.market-report strong) { font-weight: 700; color: #1a2744; }
   :global(.market-report em)     { font-style: italic; color: #1e3050; }
 
-  /* Market News — same palette as the rest of the public market page
-     (cream + navy + champagne accent), so it reads as part of the
-     report rather than the dark-theme algo log it's sourced from. */
-  .news-h {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #1a2744;
-    border-left: 3px solid #d4920c;
-    padding-left: 0.5rem;
-    line-height: 1.2;
-    margin: 0;
+  /* Tab row — public-palette tabs (cream + champagne accent), same
+     shape as /performance so the two pages feel consistent. Active
+     tab carries a champagne underline + slightly darker text. */
+  .market-tabs-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+    border-bottom: 1px solid #e7e0cf;
+    padding-bottom: 0.25rem;
+    flex-wrap: wrap;
   }
-  .news-meta {
+  .market-tabs {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .market-tab {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #6b7894;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.35rem 0.75rem 0.4rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    margin-bottom: -1px;     /* overlap card border */
+  }
+  .market-tab:hover  { color: #1a2744; }
+  .market-tab-active {
+    color: #1a2744;
+    font-weight: 700;
+    border-bottom-color: #d4920c;
+  }
+  .market-tabs-meta {
     font-size: 0.7rem;
     color: #6b7894;
     font-family: ui-monospace, monospace;
   }
+
+  /* Market News — same palette as the rest of the public market page
+     (cream + navy + champagne accent). */
   .news-list {
     list-style: none;
     padding: 0;

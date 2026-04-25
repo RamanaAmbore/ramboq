@@ -1024,14 +1024,14 @@ OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that t
 
 ## Market Summary + Market News (public)
 
-`/market` shows the AI summary as the only card on the page (with the dual-timezone timestamp above) plus a separate "Market News" card below. `/performance` consolidates BOTH surfaces into a single tabbed card under the position grids: `[Market Summary | Market News]`. Only one panel is visible at a time so the page doesn't grow unbounded; flipping tabs is a paint, not a fetch (both feeds are loaded on mount).
+Both `/market` and `/performance` consolidate the AI summary and news feed into a single tabbed card with `[Market Summary | Market News]`. Only one panel is visible at a time so the page stays compact; flipping tabs is a paint, not a fetch (both feeds load on mount). Same UX shape on both surfaces — operators get the same affordance whether they're viewing the dedicated Market page or the Performance dashboard.
 
-Tab styling matches the public palette — navy text, champagne underline on the active tab, no extra chrome. Right side of the tab row carries the `lastRefresh` timestamp when on Summary, "Loading…" when news is still loading on first visit. Routes:
+Tab styling matches the public palette — navy text, champagne underline on the active tab, no extra chrome. Right side of the tab row carries a "Loading…" indicator on first visit. Routes:
 
-- [`/market`](frontend/src/routes/(public)/market/+page.svelte) — single AI-summary card + separate news card.
-- [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids + tabbed `[Summary | News]` card.
+- [`/market`](frontend/src/routes/(public)/market/+page.svelte) — page-level `lastRefresh` timestamp at the top, then a tabbed card.
+- [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids first, then the same tabbed card below.
 
-The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp shown above the card. Now the prompt asks for just the dual-timezone timestamp without the title prefix.
+The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp. Now the prompt asks for just the dual-timezone timestamp without the title prefix.
 
 ---
 
