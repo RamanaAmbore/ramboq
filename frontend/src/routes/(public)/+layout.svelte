@@ -358,22 +358,22 @@
   .pub-nav-algo-btn {
     padding: 0.2rem 0.6rem;
     font-size: 0.65rem;
-    font-weight: 600;
+    font-weight: 500;
     border-radius: 0.25rem;
-    background: rgba(200,168,75,0.18);
+    background: rgba(200,168,75,0.10);
     color: #b27908;
-    border: 1px solid rgba(200,168,75,0.5);
+    border: 1px solid rgba(200,168,75,0.32);
     cursor: pointer;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     transition: background-color 0.08s, border-color 0.08s, color 0.08s;
     outline: none !important;
     white-space: nowrap;
     margin-right: 0.25rem;
   }
   .pub-nav-algo-btn:hover {
-    background: rgba(200,168,75,0.32);
-    border-color: rgba(200,168,75,0.7);
-    color: #8c5e06;
+    background: rgba(200,168,75,0.20);
+    border-color: rgba(200,168,75,0.5);
+    color: #b27908;
   }
 
   /* Sign-in button */
@@ -469,11 +469,11 @@
      not another tab. Symmetric with the dark-side mobile menu's
      amber-pill investor-site link. */
   .pub-mobile-algo {
-    color: #f0d070;
-    font-weight: 600;
+    color: #b27908;
+    font-weight: 500;
     letter-spacing: 0.02em;
-    background: rgba(200,168,75,0.18);
-    border-top: 1px solid rgba(200,168,75,0.45);
+    background: rgba(200,168,75,0.10);
+    border-top: 1px solid rgba(200,168,75,0.30);
     margin-top: 0.3rem;
     padding-top: 0.55rem;
   }
