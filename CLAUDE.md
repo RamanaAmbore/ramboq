@@ -334,6 +334,49 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 
 ---
 
+## Execution modes (mode 1 / 2 / 3)
+
+The codebase distinguishes three orthogonal modes for an agent fire, and they're split between dev and prod:
+
+| Mode | Quote source | Trade engine | Where it runs | Default |
+|---|---|---|---|---|
+| **1 — Simulator** | `SimQuoteSource` (fabricated, scenario-driven via [`SimDriver`](backend/api/algo/sim/driver.py)) | `PaperTradeEngine` fed by sim quotes — fills against fabricated bid/ask, removes positions on fill | Dev only (capped off in prod via `cap_in_prod.simulator: False`) | `cap_in_dev.simulator: True` |
+| **2 — Real-data + paper** | `LiveQuoteSource` (broker.quote / broker.ltp via the `Broker` adapter, with bid/ask from depth or `simulator.default_spread_pct`) | `PaperTradeEngine` singleton (`get_prod_paper_engine()`), 5-second background tick. Validates each new order via Kite's `basket_margin` before marking OPEN; REJECTED rows carry Kite's exact error in `.detail`. Real positions are NOT updated; cooldown handles re-fire | Prod only (dev never runs the live agent engine) | All `execution.live.<action>` flags `False` ⇒ every broker-hitting action lands as paper |
+| **3 — Real-data + real (live)** | `LiveQuoteSource` (read paths) | Real broker via [`chase.py`](backend/api/algo/chase.py) — actual Kite `place_order` / `modify_order` / `cancel_order` | Prod only, per-action toggle | Promoted by flipping `execution.live.<action>` to `True` in `/admin/settings` |
+
+**The branch is the hard outer gate.** [`utils.is_prod_branch()`](backend/shared/helpers/utils.py) returns `True` only on `main`. On any other branch, every broker-hitting action is forced to paper regardless of the DB flags. On `main`, the per-action flag decides between paper and live for that specific action.
+
+**Architectural pieces** (after the modes refactor):
+
+- [`backend/api/algo/quote/`](backend/api/algo/quote/) — `QuoteSource` ABC + `SimQuoteSource` + `LiveQuoteSource`. Bid/ask supplier per open order. `on_fill` hook lets the source update its book on fill (sim drops the symbol; live is a no-op).
+- [`backend/api/algo/paper.py`](backend/api/algo/paper.py) — `PaperTradeEngine` owns the open-order book and the chase / fill / modify / unfilled lifecycle. Constructor takes a `QuoteSource`, a `label` ("sim" / "paper"), and an optional event callback. Used by both `SimDriver` (mode 1, fed by `SimQuoteSource`) and `get_prod_paper_engine()` (mode 2, fed by `LiveQuoteSource`).
+- [`actions.py::_resolve_mode`](backend/api/algo/actions.py) — single source of truth for "should this action go to sim, paper, or live?". Reads `context["sim_mode"]`, the branch, and the per-action `execution.live.<action>` flag.
+- [`agent_engine._agent_execution_mode_tag`](backend/api/algo/agent_engine.py) — inspects the firing agent's actions and tags the alert as `[PAPER]` (all broker actions paper), `[MIXED]` (split), or empty (all live). The tag flows through `alert_utils._dispatch` into Telegram subjects + email subject prefixes so an operator on Telegram can tell at a glance what an alert caused.
+
+**Per-action flags** (DB seeds, all default `False`):
+
+| Setting | Action |
+|---|---|
+| `execution.live.cancel_order` | Most reversible — typically promoted first |
+| `execution.live.cancel_all_orders` | |
+| `execution.live.modify_order` | |
+| `execution.live.place_order` | New-order placement — typically promoted last |
+| `execution.live.close_position` | |
+| `execution.live.chase_close_positions` | |
+
+`/admin/settings` renders these in their own "execution" section and shows a top-of-page banner: green when all are `False` ("every broker action is in PAPER mode"), red when any is `True` ("⚠ N of 6 actions are LIVE").
+
+**Order-log mode pills**: every `AlgoOrder` row carries `mode ∈ {sim, paper, live}`. The LogPanel Order tab shows three distinct pills:
+- `SIM` — amber, fabricated data
+- `PAPER` — sky-blue, real data + paper trade
+- `LIVE` — emerald, real broker order
+
+`/api/orders/algo/recent?mode=paper` filters the API to just paper rows; the UI surfaces it via the mode column on each row.
+
+**What this means for the operator on prod**: every broker-hitting agent fire writes a paper `AlgoOrder` row with Kite's `basket_margin` verdict in `.detail`. REJECTED rows tell you "Kite would have kicked this back anyway"; OPEN rows transition to FILLED / UNFILLED via the chase loop. Real positions stay unchanged until you flip a flag to live.
+
+---
+
 ## Agent Framework
 
 Ramboq's risk + automation engine is built around four words:

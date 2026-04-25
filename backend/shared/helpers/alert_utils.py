@@ -139,25 +139,32 @@ def _sim_banner_html() -> str:
 
 
 def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: str,
-              subject_detail: str, sim_mode: bool = False):
+              subject_detail: str, sim_mode: bool = False, mode_tag: str = ''):
     """
     Send Telegram + email with correct prefixes for the message type.
 
     When `sim_mode` is True every surface (subjects, Telegram preamble, email
-    banner, log lines) is tagged `SIMULATOR` so the operator — and anybody
-    else in the Telegram group — can distinguish a simulated fire from a real
-    one.
+    banner, log lines) is tagged `SIMULATOR` so the operator can distinguish
+    a simulated fire from a real one.
+
+    `mode_tag` is the additional execution-mode marker for prod alerts —
+    typically `[PAPER]` (when this agent's broker actions all wrote
+    paper rows) or `[MIXED]` (some paper, some live). Empty string for
+    "all live" (default real-mode alert) or for non-broker agents.
     """
     import logging
     _log = logging.getLogger('backend.api.background')
     sim_prefix = '[SIM] ' if sim_mode else ''
-    _log.info(f"_dispatch called: {sim_prefix}{msg_type} — {subject_detail}")
+    _log.info(f"_dispatch called: {sim_prefix}{mode_tag}{msg_type} — {subject_detail}")
     tg_prefix, email_prefix = _MSG_TYPES[msg_type]
     tg_prefix_full    = f"SIMULATOR {tg_prefix}"    if sim_mode else tg_prefix
     email_prefix_full = f"SIMULATOR {email_prefix}" if sim_mode else email_prefix
 
     branch = config.get('deploy_branch', 'main')
     branch_tag = f" [{branch}]" if branch != 'main' else ''
+    # mode_tag goes immediately after the message-type prefix so it's
+    # readable on Telegram + at the start of the email subject.
+    mode_pfx = f"{mode_tag} " if mode_tag else ''
 
     # Telegram: fixed-width monospace table; branch + simulator warning lines
     warning_lines = []
@@ -168,14 +175,15 @@ def _dispatch(msg_type: str, ist_display: str, tg_table: str, email_table_html: 
     warning_block = ("\n" + "\n".join(warning_lines)) if warning_lines else ''
 
     telegram_msg = (
-        f"<b>{tg_prefix_full}{branch_tag} — {ist_display}</b>{warning_block}\n\n"
+        f"<b>{tg_prefix_full}{branch_tag} {mode_pfx}— {ist_display}</b>{warning_block}\n\n"
         f"<code>{tg_table}</code>"
     )
     _send_telegram(telegram_msg)
 
     alert_emails = secrets.get('alert_emails', [])
     if alert_emails:
-        subject = f"{email_prefix_full}{branch_tag}{subject_detail}" if branch_tag else f"{email_prefix_full}{subject_detail}"
+        subj_pfx = f"{email_prefix_full}{branch_tag}{(' ' + mode_tag) if mode_tag else ''}"
+        subject = f"{subj_pfx}{subject_detail}" if (branch_tag or mode_tag) else f"{email_prefix_full}{subject_detail}"
         banners = ''
         if sim_mode:
             banners += _sim_banner_html()
