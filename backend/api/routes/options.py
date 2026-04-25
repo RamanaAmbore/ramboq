@@ -729,10 +729,10 @@ class OptionsController(Controller):
             if not sym:
                 raise HTTPException(status_code=400, detail="leg.symbol is required")
             parsed = parse_tradingsymbol(sym)
-            if not parsed or parsed.get("kind") != "opt":
+            if not parsed or parsed.get("kind") not in ("opt", "fut"):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"'{sym}' isn't a recognised option contract."
+                    detail=f"'{sym}' isn't a recognised option or futures contract."
                 )
             underlyings.add(parsed["underlying"])
             expiries.add(parsed["expiry"].isoformat())
@@ -794,6 +794,49 @@ class OptionsController(Controller):
             if qty == 0:
                 raise HTTPException(status_code=400,
                     detail=f"leg '{sym}' has qty=0")
+
+            # ── Futures branch ─────────────────────────────────────
+            # Linear payoff in spot, no IV, no Greeks beyond delta=1.
+            # Resolve LTP from operator override → broker quote → spot
+            # (futures track spot 1:1 over the sim window). Cost basis
+            # falls back to LTP for "what would buying NOW look like".
+            if parsed.get("kind") == "fut":
+                fut_ltp: Optional[float] = None
+                fut_src: str = "none"
+                if leg.ltp is not None and leg.ltp > 0:
+                    fut_ltp, fut_src = float(leg.ltp), "override"
+                else:
+                    q = quote_resp.get(f"NFO:{sym}") or {}
+                    fut_ltp, fut_src = _ltp_from_quote(q)
+                if fut_ltp is None and leg.avg_cost is not None and leg.avg_cost > 0:
+                    fut_ltp, fut_src = float(leg.avg_cost), "avg_cost"
+                if fut_ltp is None or fut_ltp <= 0:
+                    fut_ltp, fut_src = float(S), "estimated"
+                fut_entry = float(leg.avg_cost) if leg.avg_cost is not None else fut_ltp
+                resolved_legs.append({
+                    "kind":        "fut",
+                    "qty":         qty,
+                    "entry_price": fut_entry,
+                })
+                # Greeks for the leg detail row — futures contribute
+                # delta=±1 only; everything else is zero.
+                fut_g = {"delta": 1.0, "gamma": 0.0, "theta": 0.0,
+                         "vega": 0.0, "rho": 0.0}
+                leg_details.append({
+                    "symbol":      sym,
+                    "opt_type":    "FUT",
+                    "strike":      0.0,
+                    "qty":         qty,
+                    "avg_cost":    fut_entry,
+                    "ltp":         fut_ltp,
+                    "iv":          0.0,
+                    "theoretical": fut_ltp,    # futures are linear; no separate theo
+                    "discrepancy": 0.0,
+                    "greeks":      fut_g,
+                    "ltp_source":  fut_src,
+                    "iv_source":   "n/a",
+                })
+                continue
 
             # LTP fallback chain — return `(price, source)` so the UI can
             # flag stale legs. Order:

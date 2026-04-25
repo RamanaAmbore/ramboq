@@ -173,25 +173,25 @@
 .ag-theme-ramboq .qty-long  { color: #0f766e !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-short { color: #b45309 !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-flat  { color: #64748b !important; }
+/* LONG = sage-teal, SHORT = warm-terracotta — both desaturated so they
+   sit alongside the cream + champagne palette without shouting. The
+   row-level box-shadow is for legacy compatibility; the per-cell rule
+   below is the one that actually paints (the public theme's solid
+   ag-col-fill background covers the row-level shadow on the leftmost
+   cell, so we need the indicator at the cell level). */
 .ag-theme-ramboq .ag-row.pos-long {
-  background-color: rgba(15,118,110,0.15) !important;
-  box-shadow: inset 4px 0 0 #0f766e !important;
+  background-color: rgba(91,142,149,0.10) !important;
+  box-shadow: inset 4px 0 0 rgba(91,142,149,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-short {
-  background-color: rgba(180,83,9,0.15) !important;
-  box-shadow: inset 4px 0 0 #b45309 !important;
+  background-color: rgba(196,122,61,0.10) !important;
+  box-shadow: inset 4px 0 0 rgba(196,122,61,0.85) !important;
 }
-/* The leftmost cell of every row carries the `ag-col-fill` solid beige
-   background (Account column), which covers the row's `box-shadow
-   inset` indicator. Add the indicator directly to the leftmost cell
-   for pos-long / pos-short rows so the orange/teal stripe is visible
-   even when the public theme's solid Account-column background sits
-   on top. AG Grid's `:first-child` is reliably the pinned-left column. */
 .ag-theme-ramboq .ag-row.pos-long .ag-cell:first-child {
-  box-shadow: inset 4px 0 0 #0f766e !important;
+  box-shadow: inset 4px 0 0 rgba(91,142,149,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-short .ag-cell:first-child {
-  box-shadow: inset 4px 0 0 #b45309 !important;
+  box-shadow: inset 4px 0 0 rgba(196,122,61,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-long.ag-row-hover,
 .ag-theme-ramboq .ag-row.pos-short.ag-row-hover {

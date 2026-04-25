@@ -19,6 +19,7 @@
    *   maxWidth?: string,
    *   align?: 'left'|'right',
    *   defaultOpen?: boolean,
+   *   popup?: boolean,
    * }} */
   let {
     children,
@@ -26,20 +27,53 @@
     maxWidth = '36rem',
     align = 'left',
     defaultOpen = false,
+    // popup=false (default): inline expansion below the chip — best for
+    //   page-level hints where a sliding card doesn't disrupt layout.
+    // popup=true: floating absolute-positioned tooltip — best for compact
+    //   stats (Greeks tables, risk metrics) where pushing siblings down
+    //   would feel disruptive. Click chip to toggle, click outside to
+    //   close. Hovering also triggers a soft preview.
+    popup = false,
   } = $props();
 
   let open = $state(defaultOpen);
+  let hovered = $state(false);
+  /** @type {HTMLSpanElement | undefined} */
+  let wrap;
+
+  // Close on click-outside when in popup mode so the tooltip doesn't
+  // get stranded mid-page after the operator's attention has moved on.
+  $effect(() => {
+    if (!popup || !open) return;
+    function onDocClick(/** @type {MouseEvent} */ e) {
+      if (wrap && !wrap.contains(/** @type {Node} */ (e.target))) open = false;
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  });
 </script>
 
-<span class="info-wrap" class:align-right={align === 'right'}>
+<span class="info-wrap" class:align-right={align === 'right'}
+      class:info-wrap-popup={popup}
+      bind:this={wrap}>
   <button type="button"
           class="info-btn"
           class:open
           aria-expanded={open}
           aria-label={open ? 'Hide details' : 'Show details'}
           title={open ? 'Hide details' : 'Show details'}
-          onclick={() => open = !open}>{label}</button>
-  {#if open}
+          onclick={() => open = !open}
+          onmouseenter={() => hovered = true}
+          onmouseleave={() => hovered = false}>{label}</button>
+  {#if popup}
+    {#if open || hovered}
+      <span class="info-popout info-popout-popup"
+            class:info-popout-pinned={open}
+            style="max-width: {maxWidth}">
+        {#if children}{@render children()}{/if}
+      </span>
+    {/if}
+  {:else if open}
     <span class="info-popout" style="max-width: {maxWidth}">
       {#if children}{@render children()}{/if}
     </span>
@@ -54,6 +88,13 @@
     flex-wrap: wrap;
   }
   .align-right { justify-content: flex-end; }
+  /* Popup mode — wrap is positioned so the floating popout anchors to
+     it. No flex-wrap (popup floats absolutely so it can never push
+     siblings down into a new line). */
+  .info-wrap-popup {
+    position: relative;
+    flex-wrap: nowrap;
+  }
 
   .info-btn {
     width: 1.05rem;
@@ -98,6 +139,22 @@
     line-height: 1.5;
     flex: 1 1 100%;
   }
+  /* Popup variant — absolute-positioned so it floats above siblings
+     instead of pushing them. Drops a small drop-shadow so it reads as
+     a tooltip layer, not part of the content flow. */
+  .info-popout-popup {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: -0.3rem;
+    z-index: 30;
+    flex: none;
+    width: max-content;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    pointer-events: none;
+  }
+  /* When pinned (toggled open with click), allow pointer events so
+     the operator can copy text from the popup. */
+  .info-popout-pinned { pointer-events: auto; }
   /* Reset margin on common children so the popover content reads
      compactly without the operator wondering about padding. */
   :global(.info-popout p)  { margin: 0 0 0.4rem; }

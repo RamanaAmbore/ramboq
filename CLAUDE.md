@@ -914,7 +914,9 @@ Both endpoints surface position-level expected value and R:R alongside the exist
 
 **Why this matters operationally** — POP alone is misleading. A 95 %-POP credit spread that risks ₹50k to make ₹500 has positive expectancy but a single loss takes 100 winners to recover; EV captures the magnitude side and tells you whether the trade is actually worth taking. R:R does the same for the asymmetric clip-size aspect.
 
-**Option-chain picker** — `/admin/options` Strategy mode now has a third leg-input alongside "Add from book" and "+ Add row": an option-chain table that lets the operator browse strikes for any underlying / expiry and click `+ CE` / `+ PE` to drop a leg. Sourced from the existing instruments cache ([`frontend/src/lib/data/instruments.js`](frontend/src/lib/data/instruments.js); IndexedDB-backed, ~90k contracts) so no new API. Default qty = `lot_size` for the contract, side toggle (Long / Short) flips the sign. Particularly useful for spreads and strangles where the operator doesn't have any of the legs in their book yet.
+**Option-chain picker** — `/admin/options` Strategy mode now has a third leg-input alongside "Add from book" and "+ Add row": an option-chain table that lets the operator browse strikes for any underlying / expiry and click `+ CE` / `+ PE` to drop a leg. Sourced from the existing instruments cache ([`frontend/src/lib/data/instruments.js`](frontend/src/lib/data/instruments.js); IndexedDB-backed, ~90k contracts) so no new API. Default qty = `lot_size` for the contract, side toggle (Long / Short) flips the sign. A **Futures quick-add row** sits above the strike grid — clicking a futures pill drops the contract into the basket as a Long or Short leg per the side toggle, useful for delta-hedged options structures (covered call / collar / synthetic long) and pure futures plays.
+
+**Futures legs in strategy** — `multileg_payoff_curve` and `multileg_greeks` accept `kind: "fut"` legs. Futures are linear in spot (today's value tracks spot 1:1 over the sim window; expiry settles to spot), so they contribute pure delta (1 per share, signed by qty) and zero everywhere else. The strategy endpoint resolves a futures-leg LTP through the same broker.quote / avg_cost / spot fallback chain options use, but skips IV calibration entirely. Cost basis defaults to LTP for "what would buying this NOW look like" semantics. Smoke-tested on the canonical covered call (long fut + short ATM call): delta ≈ +29 (lot of 50 fut + short ATM call −21), positive theta, negative vega, max profit capped at strike+premium, max loss bounded by spot-floor.
 
 **Multi-leg math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
 
@@ -961,6 +963,45 @@ The grid colors are deliberately low-saturation cool-blue rather than amber — 
 ## Public-theme row indicators
 
 `.ag-theme-ramboq .ag-row.pos-long / .pos-short` carry a `box-shadow inset 4px` indicator on the row, but the public theme's `ag-col-fill` cells (Account / Symbol columns) use a *solid* `#e8e0d0` background which covered the row-level shadow on the leftmost cell — borders were invisible on the public performance page when no account filter was applied. Fix: cast the indicator onto `.ag-cell:first-child` directly so it sits above the cell's solid background. Algo theme already used a transparent (8 % alpha) `ag-col-fill` so the row-level shadow showed through; only the public theme needed the per-cell rule.
+
+---
+
+## InfoHint popup variant
+
+[`InfoHint.svelte`](frontend/src/lib/InfoHint.svelte) gained a `popup` prop. When `popup=true` the popout is absolutely-positioned (z-index 30, drop-shadow) instead of the default inline expansion — best for compact stats on the options page where pushing siblings down would feel disruptive. Click toggles "pinned" mode (allows text selection); hover shows a soft preview that disappears on mouse-leave. Click-outside closes the pinned popup.
+
+Used liberally on `/admin/options` to gloss every Greek (Δ Γ Θ V ρ) and every risk/EV metric (max profit, max loss, R:R, breakeven, POP, EV, EV/cost) — operators new to options analytics get the explanation one click away without giving up screen real estate to verbose helper text. The same `(i)` chip + amber-accent palette as the inline variant, so the affordance is consistent.
+
+---
+
+## Chart zoom y-range auto-fit
+
+When the operator zooms in on the x-axis, both `PriceChart` and `OptionsPayoff` now also re-derive their y-domain from only the **visible** data points. Without this, zooming into a 2-minute window during a chase would leave the y-axis spanned by an out-of-view price excursion, squashing the relevant bid/ask wiggle against the top or bottom of the chart.
+
+Implementation: `visibleTicks` / `visiblePayoff` is `$derived` filtering the input array by current `tMin`/`tMax` (or `sMin`/`sMax`); the existing `prices` / `yDomain` derivations read from this filtered set with a fallback to the full set when the visible window is empty (defensive). Adds zero overhead when not zoomed (the filter is essentially a passthrough).
+
+---
+
+## Chart grid + axis labels
+
+Both SVG charts draw a faint cool-blue grid (`rgba(200,216,240,0.10)` major / `0.07` vertical x-axis) at 5 evenly-spaced y-positions and 4–5 x-positions. Both now also label the grid lines:
+
+- `PriceChart` x-axis carries HH:MM:SS labels along the baseline so price moves can be read off without dragging the hover crosshair.
+- `OptionsPayoff` x-axis carries spot-price labels at `y = height - PAD_B + 10` (between the axis baseline and the spot/strike/breakeven marker labels at `+18`), so they don't collide with the existing markers.
+
+---
+
+## Public-theme row borders — palette-aligned
+
+[`app.css`](frontend/src/app.css) `.ag-theme-ramboq .ag-row.pos-long/short` previously used saturated teal-700 (`#0f766e`) and amber-700 (`#b45309`). Lightened to muted sage-teal `rgba(91,142,149,0.85)` and warm-terracotta `rgba(196,122,61,0.85)` — same direction-tint identity (cool/warm), but desaturated so they sit alongside the cream + champagne-gold palette without shouting. Background tint dropped from `0.15` to `0.10` alpha. The per-cell `.ag-cell:first-child` rule (the one that actually paints because the theme's solid `ag-col-fill` background covers the row-level box-shadow) carries the same color.
+
+---
+
+## Tabbed Market Summary + News on `/performance`
+
+`<svelte:head>` placement matters in SvelteKit pages — it must NOT come before `<script>` for Svelte 5 reactivity to bind cleanly to the script's `$state` runes. Tab-switch click handlers were silent on `/performance` because the original file had `<svelte:head>` first, then `<script>`. Reordered to script-first and the tabs work.
+
+Layout: single card with `[Market Summary | Market News]` tabs under the position grids, only one panel visible at a time. Both feeds load on mount; flipping is a paint, not a fetch. Public palette throughout — champagne underline on the active tab, navy text.
 
 ---
 

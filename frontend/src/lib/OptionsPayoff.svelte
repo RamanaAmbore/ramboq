@@ -68,11 +68,19 @@
   const sSpan = $derived(Math.max(0.001, sMax - sMin));
   const isZoomed = $derived(zoom !== null);
 
-  // Y domain: union of both curves with a 10% pad. Force zero into the
-  // domain so the loss/profit shading lands on the actual breakeven line.
+  // Y domain: union of both curves over the *visible* x-range. When
+  // the operator zooms into a narrow spot range, the y-axis tightens
+  // to the P&L excursion that's actually on screen — otherwise an
+  // out-of-view +∞ wing of a long call would dominate the y-axis even
+  // after zooming away from it. Force zero into the domain so the
+  // loss/profit shading lands on the actual breakeven line.
+  const visiblePayoff = $derived(
+    payoff.filter(p => p.spot >= sMin && p.spot <= sMax)
+  );
   const yDomain = $derived.by(() => {
+    const src = visiblePayoff.length ? visiblePayoff : payoff;
     let lo = 0, hi = 0;
-    for (const p of payoff) {
+    for (const p of src) {
       if (p.today_value < lo)  lo = p.today_value;
       if (p.expiry_value < lo) lo = p.expiry_value;
       if (p.today_value > hi)  hi = p.today_value;
@@ -242,12 +250,22 @@
       {/each}
 
       <!-- X-axis grid + labels — faint verticals at 5 evenly spaced
-           spots so the operator can sight-read which spot price gives
-           which P&L without dragging the hover crosshair. -->
+           spots PLUS spot-value labels in the bottom margin so the
+           operator can sight-read "what spot price would give me ₹X
+           profit" without dragging the hover crosshair. Sits between
+           the axis baseline (y = height-PAD_B) and the spot/strike/BE
+           marker labels (y = height-PAD_B+18) so nothing overlaps. -->
       {#each xTicks as xt, i}
         {#if i > 0 && i < xTicks.length - 1}
           <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(200,216,240,0.07)" stroke-width="1"/>
+        {/if}
+        {#if i > 0 && i < xTicks.length - 1}
+          <text x={xt.x} y={height - PAD_B + 10}
+                text-anchor="middle" fill="#7e97b8"
+                font-size="9" font-family="monospace">
+            {xt.s.toFixed(0)}
+          </text>
         {/if}
       {/each}
 

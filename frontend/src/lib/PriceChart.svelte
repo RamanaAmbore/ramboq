@@ -156,9 +156,20 @@
   const tSpan = $derived(Math.max(1, tMax - tMin));
   const isZoomed = $derived(zoom !== null);
 
-  // Price domain — pad ±2% so the line doesn't kiss the frame.
+  // Price domain — auto-fits to the *visible* x-range. When the
+  // operator zooms in on a 2-minute window during a chase, the y-axis
+  // tightens to the bid/ask the chase actually saw, so the wiggle uses
+  // the full vertical space instead of being squashed against the
+  // pre-zoom min/max. Pads ±5% so the line doesn't kiss the frame.
+  const visibleTicks = $derived(
+    ticks.filter(t => {
+      const ts = +new Date(t.ts);
+      return ts >= tMin && ts <= tMax;
+    })
+  );
   const prices = $derived(
-    ticks.flatMap(t => [t.ltp, t.bid, t.ask].filter(v => v != null))
+    (visibleTicks.length ? visibleTicks : ticks)
+      .flatMap(t => [t.ltp, t.bid, t.ask].filter(v => v != null))
   );
   const pMin = $derived(prices.length ? Math.min(...prices) : 0);
   const pMax = $derived(prices.length ? Math.max(...prices) : 1);

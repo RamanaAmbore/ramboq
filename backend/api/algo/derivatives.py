@@ -491,9 +491,18 @@ def multileg_payoff_curve(legs: list[dict], *, S: float,
         today_sum  = 0.0
         expiry_sum = 0.0
         for l in legs:
+            kind = l.get("kind") or "opt"
+            qty  = int(l["qty"])
+            if kind == "fut":
+                # Futures: linear in spot. Today's value tracks spot
+                # 1:1 (cost-of-carry over the sim window is sub-tick);
+                # expiry value is the same — futures settle to spot.
+                today_sum  += s_i * qty
+                expiry_sum += s_i * qty
+                continue
+            # Options
             K     = float(l["strike"])
             opt   = l["opt_type"]
-            qty   = int(l["qty"])
             T_yrs = float(l.get("T_years") or 0)
             sig   = float(l.get("sigma") or DEFAULT_IV)
             today_sum  += black_scholes(s_i, K, T_yrs, r, sig, opt) * qty
@@ -516,9 +525,16 @@ def multileg_greeks(legs: list[dict], *, S: float,
     """
     out = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
     for l in legs:
+        qty = int(l["qty"])
+        kind = l.get("kind") or "opt"
+        if kind == "fut":
+            # Futures contribute pure delta (1 per share, signed by qty).
+            # Gamma / Theta / Vega / Rho are zero — futures payoff is
+            # linear in spot.
+            out["delta"] += qty
+            continue
         K     = float(l["strike"])
         opt   = l["opt_type"]
-        qty   = int(l["qty"])
         T_yrs = float(l.get("T_years") or 0)
         sig   = float(l.get("sigma") or DEFAULT_IV)
         g = greeks(S, K, T_yrs, r, sig, opt)

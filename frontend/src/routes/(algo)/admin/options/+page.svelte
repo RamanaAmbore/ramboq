@@ -30,6 +30,7 @@
   import {
     loadInstruments, suggestUnderlyings,
     listExpiries, listStrikes, findOption,
+    listFutures,
   } from '$lib/data/instruments';
 
   /** @type {'live'|'sim'|'hypothetical'|'strategy'} */
@@ -85,6 +86,37 @@
     if (!instrumentsReady || !chainUnderlying || !chainExpiry) return [];
     return listStrikes(chainUnderlying.toUpperCase(), 'CE', chainExpiry);
   });
+
+  // Futures contracts on the same underlying — surfaced as a quick-add
+  // row above the strike grid. Filter to the selected expiry first; if
+  // none match (futures and option expiries can drift by a day in
+  // weekly cycles), show whichever future is closest. Futures aren't
+  // strikable, so they appear once per chain, not per row.
+  const chainFutures = $derived.by(() => {
+    if (!instrumentsReady || !chainUnderlying) return [];
+    const all = listFutures(chainUnderlying.toUpperCase()) || [];
+    if (chainExpiry) {
+      const exact = all.filter(f => f.x === chainExpiry);
+      if (exact.length) return exact;
+    }
+    // Return up to 3 nearest futures so the operator can see what's
+    // available without a separate "show all expiries" toggle.
+    return all.slice(0, 3);
+  });
+
+  function addFutureLeg(/** @type {string} */ symbol,
+                        /** @type {number} */ lotSize) {
+    if (!symbol) return;
+    const lot = Number(lotSize || 1);
+    const signedQty = chainSide === 'long' ? lot : -lot;
+    legs = [...legs, {
+      symbol,
+      qty:      signedQty,
+      avg_cost: '',
+      ltp:      '',
+      source:   'chain',
+    }];
+  }
 
   // Auto-pick first expiry when underlying changes.
   $effect(() => {
@@ -551,6 +583,24 @@
             ]} />
         </div>
       </div>
+      {#if chainFutures.length}
+        <!-- Futures quick-add row — clicking the contract pill drops it
+             into the basket as a Long or Short leg per the Side toggle.
+             Useful when building delta-hedged option positions or pure
+             futures strategies. -->
+        <div class="chain-futures">
+          <span class="chain-futures-label">Futures:</span>
+          {#each chainFutures as f (f.s)}
+            <button type="button"
+                    class="chain-fut-pill"
+                    title="Add {f.s} as a {chainSide} leg ({f.ls} lot)"
+                    onclick={() => addFutureLeg(f.s, f.ls)}>
+              + {f.s}
+              <span class="chain-fut-meta">lot {f.ls}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
       {#if chainStrikes.length}
         <div class="chain-grid-wrap">
           <table class="chain-grid">
@@ -632,41 +682,145 @@
         </div>
 
         <div class="opt-block">
-          <div class="opt-block-h">Greeks (position)</div>
+          <div class="opt-block-h">
+            Greeks (position)
+            <InfoHint popup>
+              Sum of every leg's signed-qty Greeks. Δ tells you the net
+              directional exposure; Θ shows the daily decay (positive
+              when you're net short premium); 𝒱 shows your sensitivity
+              to a 1 % IV move (positive = long volatility).
+            </InfoHint>
+          </div>
           <div class="opt-kv">
-            <span class="kv-k">Δ delta</span>     <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
-            <span class="kv-k">Γ gamma</span>     <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
-            <span class="kv-k">Θ theta /d</span>
+            <span class="kv-k">
+              Δ delta
+              <InfoHint popup>
+                Net directional exposure. +50 ≈ "₹50 gained per ₹1 spot
+                rise". 0 ≈ delta-neutral.
+              </InfoHint>
+            </span>
+            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
+            <span class="kv-k">
+              Γ gamma
+              <InfoHint popup>
+                How fast delta changes as spot moves. Positive = delta
+                helps you on big moves either way; negative = delta
+                hurts more as spot drifts.
+              </InfoHint>
+            </span>
+            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
+            <span class="kv-k">
+              Θ theta /d
+              <InfoHint popup>
+                Daily decay in rupees. Credit spreads / iron condors
+                show positive theta (you collect time value); debit
+                spreads / long premium show negative.
+              </InfoHint>
+            </span>
             <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
-            <span class="kv-k">𝒱 vega /1%IV</span>
+            <span class="kv-k">
+              𝒱 vega /1%IV
+              <InfoHint popup>
+                P&L change per 1 % IV move. Long volatility (long
+                straddles, calendar spreads) = positive vega; short
+                volatility (iron condors, naked shorts) = negative.
+              </InfoHint>
+            </span>
             <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
-            <span class="kv-k">ρ rho /1%r</span>  <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
+            <span class="kv-k">
+              ρ rho /1%r
+              <InfoHint popup>
+                Sensitivity to a 1 % rate change. Cosmetic for short-
+                dated index options; matters for long-dated singles.
+              </InfoHint>
+            </span>
+            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
           </div>
         </div>
 
         <div class="opt-block">
-          <div class="opt-block-h" title="Aggregate risk + expected value across all legs.">
+          <div class="opt-block-h">
             Risk &amp; expected value
+            <InfoHint popup>
+              Aggregate risk + expected value across all legs.
+              Probability-weighted outcomes integrated against the
+              lognormal pdf of the underlying using a qty-weighted IV
+              proxy. POP × magnitudes captures the asymmetry that POP
+              alone misses.
+            </InfoHint>
           </div>
           <div class="opt-kv">
-            <span class="kv-k">Max profit*</span>
+            <span class="kv-k">
+              Max profit*
+              <InfoHint popup>
+                Largest possible payoff at expiry, within the spot
+                range we charted (±2.5σ by default). Asterisk because
+                strategies with an unbounded leg (long calls, short
+                puts) clip at the chart edge.
+              </InfoHint>
+            </span>
             <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
-            <span class="kv-k">Max loss*</span>
+            <span class="kv-k">
+              Max loss*
+              <InfoHint popup>
+                Largest loss at expiry within the spot range charted.
+                Asterisk for the same reason as Max profit.
+              </InfoHint>
+            </span>
             <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
-            <span class="kv-k" title="max_profit / |max_loss|. — when one side is unbounded.">R:R</span>
+            <span class="kv-k">
+              R:R
+              <InfoHint popup>
+                <b>Risk-to-reward</b> = max_profit / |max_loss|.
+                "1 : 0.5" = risk ₹100 to make ₹50. "1 : 3" = risk ₹100
+                to make ₹300. <b>—</b> when one side is unbounded.
+              </InfoHint>
+            </span>
             <span class="kv-v">{strategy.risk.rr_ratio == null ? '—' : `1 : ${strategy.risk.rr_ratio.toFixed(2)}`}</span>
-            <span class="kv-k">Breakevens</span>
+            <span class="kv-k">
+              Breakevens
+              <InfoHint popup>
+                Spot prices at expiry where the strategy's P&L crosses
+                zero. Iron condors and butterflies have 2 (one upper,
+                one lower); verticals have 1; fully ITM/OTM 0.
+              </InfoHint>
+            </span>
             <span class="kv-v">
               {#if strategy.risk.breakevens.length}
                 {strategy.risk.breakevens.map(/** @param {number} b */ (b) => `₹${b.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`).join(' / ')}
               {:else}—{/if}
             </span>
-            <span class="kv-k" title="Probability the strategy lands in any profitable region at expiry">POP</span>
+            <span class="kv-k">
+              POP
+              <InfoHint popup>
+                <b>Probability of profit</b> at expiry — sum of
+                lognormal mass over every contiguous profitable region
+                of the payoff curve.
+                <br>For range strategies (iron condors), this measures
+                "P(spot ends inside the wings)".
+              </InfoHint>
+            </span>
             <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
-            <span class="kv-k" title="Expected value at expiry — POP × win-magnitude − (1−POP) × loss-magnitude, integrated against the lognormal pdf">EV</span>
+            <span class="kv-k">
+              EV
+              <InfoHint popup>
+                <b>Expected value</b> — POP × win-magnitude
+                − (1−POP) × loss-magnitude, integrated against the
+                lognormal pdf of the underlying.
+                <br>Positive EV = the strategy has edge in expectation;
+                negative EV = it doesn't, even if POP is high.
+              </InfoHint>
+            </span>
             <span class="kv-v {strategy.risk.ev > 0 ? 'kv-pos' : strategy.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(strategy.risk.ev)}</span>
             {#if strategy.risk.ev_pct != null}
-              <span class="kv-k" title="EV as % of |net cost| — return-on-capital expectation">EV / cost</span>
+              <span class="kv-k">
+                EV / cost
+                <InfoHint popup>
+                  EV expressed as a percentage of |net cost| — return
+                  on capital expectation. +5 % = "on average, my outlay
+                  returns 5 % of itself per cycle".
+                </InfoHint>
+              </span>
               <span class="kv-v {strategy.risk.ev_pct > 0 ? 'kv-pos' : strategy.risk.ev_pct < 0 ? 'kv-neg' : ''}">
                 {strategy.risk.ev_pct > 0 ? '+' : ''}{strategy.risk.ev_pct.toFixed(1)}%
               </span>
@@ -834,27 +988,75 @@
           </thead>
           <tbody>
             <tr>
-              <td>Δ delta</td>
+              <td>
+                Δ delta
+                <InfoHint popup>
+                  <b>Delta</b> — change in option value per ₹1 change in spot.
+                  <br>Long calls: 0 (deep OTM) → 1 (deep ITM).
+                  Long puts: 0 → −1.
+                  <br>Position-scaled = Δ × signed qty (a short call has
+                  negative position-delta).
+                  <br>Use it as a directional exposure proxy: position-delta
+                  +50 means the book gains ₹50 per ₹1 spot rise.
+                </InfoHint>
+              </td>
               <td class="num">{fmtNum(analytics.greeks_per_share.delta, 4)}</td>
               <td class="num">{fmtNum(analytics.greeks_position.delta, 1)}</td>
             </tr>
             <tr>
-              <td>Γ gamma</td>
+              <td>
+                Γ gamma
+                <InfoHint popup>
+                  <b>Gamma</b> — rate-of-change of delta per ₹1 spot move.
+                  <br>Long options have positive gamma (delta accelerates
+                  in your favour as spot moves); short options negative.
+                  <br>ATM near expiry has the highest gamma — small spot
+                  moves whip P&L.
+                </InfoHint>
+              </td>
               <td class="num">{fmtNum(analytics.greeks_per_share.gamma, 6)}</td>
               <td class="num">{fmtNum(analytics.greeks_position.gamma, 4)}</td>
             </tr>
             <tr>
-              <td>Θ theta /d</td>
+              <td>
+                Θ theta /d
+                <InfoHint popup>
+                  <b>Theta</b> — daily time-decay in rupees.
+                  <br>Long options: negative (you bleed premium each day).
+                  Short options: positive (you collect time value).
+                  <br>Position theta of −150 means "this position loses
+                  ₹150 per calendar day, holding spot + IV constant".
+                </InfoHint>
+              </td>
               <td class="num kv-neg">{fmtNum(analytics.greeks_per_share.theta, 2)}</td>
               <td class="num kv-neg">{fmtNum(analytics.greeks_position.theta, 0)}</td>
             </tr>
             <tr>
-              <td>𝒱 vega /1%IV</td>
+              <td>
+                𝒱 vega /1%IV
+                <InfoHint popup>
+                  <b>Vega</b> — change in option value per <b>1 percentage
+                  point</b> of IV.
+                  <br>Long options: positive vega (you benefit when IV
+                  expands). Short: negative.
+                  <br>Position vega of +200 means "if IV rises 1 % across
+                  the curve, this position gains ₹200".
+                </InfoHint>
+              </td>
               <td class="num">{fmtNum(analytics.greeks_per_share.vega, 2)}</td>
               <td class="num">{fmtNum(analytics.greeks_position.vega, 0)}</td>
             </tr>
             <tr>
-              <td>ρ rho /1%r</td>
+              <td>
+                ρ rho /1%r
+                <InfoHint popup>
+                  <b>Rho</b> — sensitivity to a 1 % change in the
+                  risk-free rate.
+                  <br>Mostly cosmetic for short-dated index options;
+                  matters for long-dated single-stock options where
+                  carry has time to compound.
+                </InfoHint>
+              </td>
               <td class="num">{fmtNum(analytics.greeks_per_share.rho, 2)}</td>
               <td class="num">{fmtNum(analytics.greeks_position.rho, 0)}</td>
             </tr>
@@ -863,24 +1065,85 @@
       </div>
 
       <div class="opt-block">
-        <div class="opt-block-h" title="Probability-weighted outcome metrics. POP × magnitudes, evaluated against the lognormal distribution of underlying spot at expiry.">
+        <div class="opt-block-h">
           Risk &amp; expected value
+          <InfoHint popup>
+            Probability-weighted outcome metrics. POP tells you how often
+            you win; EV captures the win/loss magnitudes; R:R is the
+            asymmetry. All evaluated against the lognormal distribution
+            of underlying spot at expiry, using the IV calibrated above.
+          </InfoHint>
         </div>
         <div class="opt-kv">
-          <span class="kv-k">Max profit</span>
+          <span class="kv-k">
+            Max profit
+            <InfoHint popup>
+              Largest possible payoff for this position at expiry. ∞ for
+              long calls and short puts (one side is unbounded).
+            </InfoHint>
+          </span>
           <span class="kv-v kv-pos">{analytics.risk.max_profit == null ? '∞' : fmtMoney(analytics.risk.max_profit, false)}</span>
-          <span class="kv-k">Max loss</span>
+          <span class="kv-k">
+            Max loss
+            <InfoHint popup>
+              Largest possible loss at expiry. ∞ for short calls and
+              long futures-like positions. Always shown as a negative
+              rupee figure.
+            </InfoHint>
+          </span>
           <span class="kv-v kv-neg">{analytics.risk.max_loss == null ? '∞' : fmtMoney(-analytics.risk.max_loss)}</span>
-          <span class="kv-k" title="max_profit / |max_loss|. — for legs with one side unbounded.">R:R</span>
+          <span class="kv-k">
+            R:R
+            <InfoHint popup>
+              <b>Risk-to-reward ratio</b> — max_profit / |max_loss|,
+              displayed as <code>1 : N</code>. "1 : 0.5" means you risk
+              ₹100 to make ₹50. "1 : 3" means risk ₹100 to make ₹300.
+              Shown as <b>—</b> when one side is unbounded.
+            </InfoHint>
+          </span>
           <span class="kv-v">{analytics.risk.rr_ratio == null ? '—' : `1 : ${analytics.risk.rr_ratio.toFixed(2)}`}</span>
-          <span class="kv-k">Breakeven</span>
+          <span class="kv-k">
+            Breakeven
+            <InfoHint popup>
+              Spot price at expiry where the position's P&L is zero.
+              Above (CE) or below (PE) breakeven, you're in profit.
+            </InfoHint>
+          </span>
           <span class="kv-v">₹{analytics.risk.breakeven.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          <span class="kv-k" title="Probability the position lands profitable at expiry">POP</span>
+          <span class="kv-k">
+            POP
+            <InfoHint popup>
+              <b>Probability of profit</b> — the chance the position
+              lands in the green at expiry, computed from the lognormal
+              distribution of spot using the calibrated IV.
+              <br>Green when &gt; 60 %, red when &lt; 40 %.
+              <br>POP alone is misleading without EV — a 95 % POP that
+              risks ₹50k to make ₹500 is worse than a 40 % POP that
+              risks ₹10k to make ₹50k.
+            </InfoHint>
+          </span>
           <span class="kv-v {analytics.risk.pop > 0.6 ? 'kv-pos' : analytics.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(analytics.risk.pop)}</span>
-          <span class="kv-k" title="Expected value at expiry (lognormal-weighted)">EV</span>
+          <span class="kv-k">
+            EV
+            <InfoHint popup>
+              <b>Expected value</b> — what the position is worth on
+              average, weighting every spot outcome at expiry by its
+              lognormal probability density. POP × win-magnitude − (1−POP)
+              × loss-magnitude, integrated over the curve.
+              <br>Positive EV = the trade has edge in expectation.
+              Negative EV = it doesn't, even if POP is high.
+            </InfoHint>
+          </span>
           <span class="kv-v {analytics.risk.ev > 0 ? 'kv-pos' : analytics.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(analytics.risk.ev)}</span>
           {#if analytics.risk.ev_pct != null}
-            <span class="kv-k" title="EV as a percentage of cost basis — return-on-cost expectation.">EV / cost</span>
+            <span class="kv-k">
+              EV / cost
+              <InfoHint popup>
+                EV expressed as a percentage of the absolute cost basis
+                — return-on-capital expectation. +5 % = "on average, my
+                ₹100 outlay returns ₹5".
+              </InfoHint>
+            </span>
             <span class="kv-v {analytics.risk.ev_pct > 0 ? 'kv-pos' : analytics.risk.ev_pct < 0 ? 'kv-neg' : ''}">
               {analytics.risk.ev_pct > 0 ? '+' : ''}{analytics.risk.ev_pct.toFixed(1)}%
             </span>
@@ -995,7 +1258,15 @@
     font-family: monospace;
     font-size: 0.65rem;
   }
-  .kv-k { color: #7e97b8; }
+  .kv-k {
+    color: #7e97b8;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    /* Narrow labels mean the popup info chip stays close to the
+       label text without inflating the column width. */
+    flex-wrap: nowrap;
+  }
   .kv-v { color: #c8d8f0; text-align: right; }
   .kv-pos { color: #4ade80; }
   .kv-neg { color: #f87171; }
@@ -1021,6 +1292,13 @@
   .opt-table td {
     padding: 0.18rem 0.25rem;
     color: #c8d8f0;
+  }
+  /* Allow popup InfoHint chips to sit inline next to Greek labels in
+     the per-share/position table without breaking the row baseline. */
+  .opt-table td:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
   }
   .opt-table td.num { text-align: right; }
   .opt-table tbody tr:not(:last-child) td {
@@ -1216,6 +1494,56 @@
     flex-direction: column;
     gap: 0.15rem;
   }
+  /* Futures quick-add row above the strike grid. Same general look as
+     the chain CE/PE buttons but tagged sky-blue so it's visually
+     distinct from the green/red option buttons below. */
+  .chain-futures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    margin-bottom: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    background: rgba(125,211,252,0.05);
+    border: 1px solid rgba(125,211,252,0.20);
+    border-radius: 3px;
+  }
+  .chain-futures-label {
+    font-family: monospace;
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7e97b8;
+    margin-right: 0.25rem;
+  }
+  .chain-fut-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid rgba(125,211,252,0.45);
+    background: rgba(125,211,252,0.08);
+    color: #7dd3fc;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: background 0.12s;
+  }
+  .chain-fut-pill:hover {
+    background: rgba(125,211,252,0.18);
+    border-color: rgba(125,211,252,0.65);
+  }
+  .chain-fut-meta {
+    color: #7e97b8;
+    font-weight: 400;
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   .chain-grid-wrap {
     max-height: 18rem;
     overflow-y: auto;
