@@ -188,8 +188,8 @@
                       title={expanded[s.key] ? 'Hide details' : 'Show details'}
                       onclick={() => toggleInfo(s.key)}>i</button>
 
-              <div class="flex items-baseline gap-2 min-w-0">
-                <span class="font-mono text-[#7dd3fc] truncate" title={s.key}>{s.key}</span>
+              <div class="flex items-baseline gap-2 flex-wrap">
+                <span class="font-mono text-[#7dd3fc] break-all">{s.key}</span>
                 {#if isModified(s)}
                   <span class="px-1 rounded bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/30 text-[0.55rem] shrink-0">mod</span>
                 {/if}
