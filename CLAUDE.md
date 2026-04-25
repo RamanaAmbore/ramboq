@@ -321,7 +321,7 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 **Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
-- **`+layout.svelte`** — algo-site top nav: Dashboard · Terminal · Agents · Orders · Users · Tokens · Simulator; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Tokens · Settings · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
 - **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
@@ -787,6 +787,39 @@ Options + futures re-price coherently off underlying spot moves so a single "−
 - A `chart-legend` chip identifies the dashed underlying line so the operator never confuses the two.
 
 **Built-in scenarios** — [`scenarios.yaml`](backend/api/algo/sim/scenarios.yaml) ships `nifty-down-3pct` and `nifty-up-3pct` (each: three `underlying_pct` ticks of ±1% on `underlying.NIFTY`). Pair with `seed_mode: live` / `live+scenario` so the BS re-pricing runs against real strikes + premiums.
+
+**Custom-positions seeding** — the `/admin/simulator` page exposes a "Custom positions" panel (account / symbol / qty / LTP rows) that the operator fills inline. `POST /api/simulator/start` accepts `custom_positions: list[dict]`; the driver appends them to whatever scripted/live seed produced via [`_normalise_custom_positions`](backend/api/algo/sim/driver.py) (uppercases the symbol, infers exchange `NFO` for parseable F&O / `NSE` otherwise, defaults `average_price = last_price`). Custom rows are layered BEFORE `_seed_derivatives` runs, so synthetic NIFTY/BANKNIFTY/etc. options pick up underlying spots + IV calibration the same way real positions do.
+
+**Performance — per-underlying index + cached parse**: `_seed_derivatives` walks positions once, stashes the parser result on each row as `row["_parsed"]`, and builds [`_positions_by_underlying: dict[str, list[dict]]`](backend/api/algo/sim/driver.py). All downstream consumers (`_reprice_derivatives_for`, IV calibration, futures-as-spot proxy) read from these cached structures — `_apply_underlying_move("underlying.NIFTY", …)` is now O(matched-rows) instead of O(positions). Hot-path regex calls dropped from 3-per-row-per-tick to 1-per-row-per-seed.
+
+---
+
+## Paper-trading dashboard (`/admin/paper`)
+
+Visual surface for the prod paper-trade engine, pairing with the simulator page so operators can monitor mode 2 the same way they monitor sims.
+
+**Page**: [`frontend/src/routes/(algo)/admin/paper/+page.svelte`](frontend/src/routes/(algo)/admin/paper/+page.svelte). Polls `/api/charts/paper-status` every 3 s. Layout:
+
+- Status banner — green/sky `CHASING` (orders in flight on main), amber `IDLE` (engine enabled, no orders), grey `DEV` (engine gated on this branch).
+- Open-order pills — same shape as the sim page's chase pills (side / qty / symbol / current limit / attempt count).
+- Chart grid — one mini chart per symbol with captured ticks; underlyings rendered first (sky-blue `SPOT` tag), derivatives grouped by underlying with the spot overlaid as a dashed line.
+- Embedded LogPanel with `chartMode='paper'` so the Chart tab inside the panel mirrors the page's main chart grid.
+
+**API**: [`/api/charts/paper-status`](backend/api/routes/charts.py) — admin-guarded. Returns `{enabled, branch, open_order_count, open_order_details, captured_symbols, captured_underlyings}`. `enabled = (deploy_branch == 'main')` — the engine still exists on dev branches but no `tick_loop` is running, so no orders register and the page banner explains the gate.
+
+---
+
+## Charts batch endpoint + per-chart polling
+
+The chart panel's per-symbol polling could blow up to N+M requests every 3 s (N = visible charts, M = underlying overlays). [`GET /api/charts/batch?mode=…&symbols=a,b,c`](backend/api/routes/charts.py) coalesces it to one round-trip.
+
+- One `IN`-clause `algo_orders` query for the whole batch (cap 50 symbols), grouped client-side by symbol.
+- Returns `{mode, charts: [ChartResponse, …]}` in the order of the input symbols.
+- Symbols with no captured ticks come back with empty `ticks` / `events` so clients don't have to special-case absent entries.
+
+**Frontend distribution**: [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) gained a `data` prop. When the parent feeds it (and `chartsBySymbol` for underlying-overlay lookup), the chart skips its own poll timer (`stopPolling()` in a `$effect` triggered when `externalData` flips on). The simulator, paper, and agents pages all poll once and distribute via `chartsBySymbol`.
+
+Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviour change for charts shown without a parent (Chart tab on /orders, /console where it falls back to per-chart polling).
 
 ---
 

@@ -191,7 +191,8 @@ export const startSim             = (scenario, rate_ms = 2000, opts = {}) =>
           market_state_preset:     opts.market_state_preset || null,
           pct_overrides:           opts.pct_overrides           || null,
           symbols:                 opts.symbols                 || null,
-          spread_pct:              opts.spread_pct              ?? null },
+          spread_pct:              opts.spread_pct              ?? null,
+          custom_positions:        opts.custom_positions        || null },
         { auth: true });
 export const stopSim              = () => _post('/simulator/stop', {}, { auth: true });
 export const stepSim              = () => _post('/simulator/step', {}, { auth: true });
@@ -323,4 +324,22 @@ export async function fetchChartPriceHistory(mode, symbol, since = null, limit =
   const p = new URLSearchParams({ mode, symbol, limit: String(limit) });
   if (since) p.set('since', since);
   return _get(`/charts/price-history?${p}`, { auth: true });
+}
+
+/** GET /api/charts/paper-status — prod paper engine snapshot for /admin/paper. */
+export async function fetchPaperStatus() {
+  return _get('/charts/paper-status', { auth: true });
+}
+
+/** GET /api/charts/batch — N charts in one round-trip. Returns
+ *  `{mode, charts: [ChartResponse, …]}` in the order of `symbols`. */
+export async function fetchChartBatch(mode, symbols, since = null, limit = 600) {
+  if (!symbols?.length) return { mode, charts: [] };
+  const p = new URLSearchParams({
+    mode,
+    symbols: symbols.join(','),
+    limit: String(limit),
+  });
+  if (since) p.set('since', since);
+  return _get(`/charts/batch?${p}`, { auth: true });
 }

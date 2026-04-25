@@ -209,6 +209,68 @@ def _recompute_position_row(row: dict, spread_pct: float = 0.0) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════
+#  Custom-positions input — operators add ad-hoc symbols via the sim UI
+# ═════════════════════════════════════════════════════════════════════════
+
+def _normalise_custom_positions(rows: list[dict]) -> list[dict]:
+    """
+    Validate + fill defaults for rows posted from the simulator's "Custom
+    positions" UI. Returns a list of position dicts in the same shape
+    `broker.fetch_positions` produces, ready to drop into `_positions_rows`.
+
+    Required fields: `tradingsymbol`, `quantity`, `last_price`.
+    Inferred defaults:
+      - `account`        → "ZG####" (a generic synthetic account; doesn't
+                           need to exist in secrets.yaml — the engine reads
+                           it as a string label only).
+      - `average_price`  → `last_price` (so pnl starts at 0; the operator
+                           can override if they want immediate P&L).
+      - `exchange`       → "NFO" for parseable F&O, "NSE" otherwise.
+      - `multiplier`     → 1 (Kite multiplier; only matters for legacy
+                           pnl computations).
+    Bad rows (missing tradingsymbol or quantity) are silently skipped so a
+    half-filled UI form doesn't blow up the sim.
+    """
+    from backend.api.algo.derivatives import parse_tradingsymbol
+
+    out: list[dict] = []
+    for raw in (rows or []):
+        sym = str((raw or {}).get("tradingsymbol") or "").strip().upper()
+        if not sym:
+            continue
+        try:
+            qty = int(raw.get("quantity"))
+        except (TypeError, ValueError):
+            continue
+        try:
+            ltp = float(raw.get("last_price"))
+        except (TypeError, ValueError):
+            continue
+        avg = raw.get("average_price")
+        try:
+            avg = float(avg) if avg is not None and str(avg) != "" else ltp
+        except (TypeError, ValueError):
+            avg = ltp
+        # Exchange inference — F&O symbols (parser hits) default to NFO,
+        # everything else to NSE. Operators can override by typing it
+        # explicitly into the row.
+        exch = str(raw.get("exchange") or "").strip().upper()
+        if not exch:
+            exch = "NFO" if parse_tradingsymbol(sym) else "NSE"
+        out.append({
+            "account":        str(raw.get("account") or "ZG####"),
+            "tradingsymbol":  sym,
+            "exchange":       exch,
+            "quantity":       qty,
+            "last_price":     ltp,
+            "average_price":  avg,
+            "multiplier":     int(raw.get("multiplier") or 1),
+            "product":        str(raw.get("product") or "MIS"),
+        })
+    return out
+
+
+# ═════════════════════════════════════════════════════════════════════════
 #  Glob scope matching — section.account.tradingsymbol
 # ═════════════════════════════════════════════════════════════════════════
 
@@ -299,6 +361,12 @@ class SimDriver:
         self._underlyings:        dict[str, float] = {}
         self._iv_cache:           dict[str, float] = {}
         self._underlying_history: dict[str, deque] = {}
+        # Index of positions by underlying so an `underlying_pct` move
+        # reaches its derivatives in O(1) instead of re-walking every
+        # position. Built once at seed time, kept in sync as positions are
+        # added (e.g. custom_positions) — fills don't remove from this
+        # index because the chase engine handles the fill state itself.
+        self._positions_by_underlying: dict[str, list[dict]] = {}
 
         # Bid/ask spread (decimal fraction — 0.001 = 0.10%). Applied on
         # every _recompute_position_row so every position carries per-side
@@ -448,7 +516,8 @@ class SimDriver:
               inline_scenario: dict | None = None,
               pct_overrides: list[float] | None = None,
               symbol_filter: list[str] | None = None,
-              spread_pct: float | None = None) -> dict:
+              spread_pct: float | None = None,
+              custom_positions: list[dict] | None = None) -> dict:
         """
         Start the sim against a named scenario from scenarios.yaml, or an
         `inline_scenario` dict (same shape) built at call time by the
@@ -557,6 +626,15 @@ class SimDriver:
                 # the live snapshot (useful for injecting a specific symbol).
                 self._positions_rows.extend(copy.deepcopy(initial.get("positions", [])))
                 self._margins_rows.extend(copy.deepcopy(initial.get("margins", [])))
+
+        # Custom positions submitted from the UI's "Custom positions" panel.
+        # These are layered ON TOP of whatever scripted/live seeding produced
+        # so an operator can stress-test a synthetic NIFTY24500CE without
+        # touching their real book. Each row needs at minimum tradingsymbol
+        # + quantity + last_price; account / exchange / multiplier defaults
+        # are inferred so a one-line entry is enough to start.
+        if custom_positions:
+            self._positions_rows.extend(_normalise_custom_positions(custom_positions))
 
         for r in self._positions_rows:
             _recompute_position_row(r, self.spread_pct)
@@ -831,6 +909,7 @@ class SimDriver:
 
         self._underlyings.clear()
         self._iv_cache.clear()
+        self._positions_by_underlying.clear()
 
         explicit = (scen.get("initial") or {}).get("underlyings") or {}
         explicit = {str(k).upper(): float(v) for k, v in explicit.items()}
@@ -839,21 +918,25 @@ class SimDriver:
         for name, spot in explicit.items():
             self._underlyings[name] = spot
 
-        # Walk positions to find more underlyings.
-        by_underlying: dict[str, list[dict]] = {}
+        # Walk positions ONCE — stash the parser result on each row and
+        # group by underlying. Both downstream loops (spot-resolution +
+        # IV calibration) reuse the cached parse, and `_reprice_…` reads
+        # from `_positions_by_underlying` for O(1) underlying lookup
+        # instead of re-walking every position per underlying move.
         for r in self._positions_rows:
             sym    = str(r.get("tradingsymbol") or "")
-            parsed = parse_tradingsymbol(sym)
+            parsed = parse_tradingsymbol(sym) if sym else None
+            r["_parsed"] = parsed
             if not parsed:
                 continue
-            by_underlying.setdefault(parsed["underlying"], []).append(r)
+            self._positions_by_underlying.setdefault(parsed["underlying"], []).append(r)
 
-        for name, rows in by_underlying.items():
+        for name, rows in self._positions_by_underlying.items():
             if name in self._underlyings:
                 continue
-            # 2. Futures last_price as spot proxy.
+            # 2. Futures last_price as spot proxy. Reuse the cached parse.
             fut = next((r for r in rows
-                        if (parse_tradingsymbol(str(r.get("tradingsymbol", ""))) or {}).get("kind") == "fut"
+                        if (r.get("_parsed") or {}).get("kind") == "fut"
                         and r.get("last_price")), None)
             if fut:
                 self._underlyings[name] = float(fut["last_price"])
@@ -861,20 +944,19 @@ class SimDriver:
             # 3. Crude ATM proxy: among options, find the strike nearest to
             #    the median strike (assumes the operator's book straddles
             #    the spot, which is the common case for hedged F&O).
-            strikes = []
-            for r in rows:
-                p = parse_tradingsymbol(str(r.get("tradingsymbol", "")))
-                if p and p.get("kind") == "opt":
-                    strikes.append(p["strike"])
+            strikes = [
+                (r["_parsed"] or {}).get("strike") for r in rows
+                if (r.get("_parsed") or {}).get("kind") == "opt"
+            ]
+            strikes = [s for s in strikes if s is not None]
             if strikes:
                 strikes.sort()
                 self._underlyings[name] = strikes[len(strikes) // 2]
 
-        # Calibrate IV per option position.
+        # Calibrate IV per option position. Reuses the same cached parse.
         ref_now = datetime.now()
         for r in self._positions_rows:
-            sym  = str(r.get("tradingsymbol") or "")
-            p    = parse_tradingsymbol(sym)
+            p = r.get("_parsed")
             if not p or p.get("kind") != "opt":
                 continue
             spot = self._underlyings.get(p["underlying"])
@@ -882,7 +964,7 @@ class SimDriver:
                 continue
             sigma = calibrate_iv_for_row(r, spot, ref_now=ref_now)
             if sigma is not None:
-                self._iv_cache[sym] = sigma
+                self._iv_cache[str(r.get("tradingsymbol") or "")] = sigma
 
         if self._underlyings:
             spots = ", ".join(f"{n}={v:,.2f}" for n, v in self._underlyings.items())
@@ -945,17 +1027,19 @@ class SimDriver:
         return changes
 
     def _reprice_derivatives_for(self, underlying: str, spot: float) -> list[dict]:
-        """Walk every position on `underlying` and re-price using BS (opts)
-        or 1:1 spot (futures). Returns the change rows so the tick log + UI
-        diff stays consistent with the rest of the move primitives."""
-        from backend.api.algo.derivatives import parse_tradingsymbol, reprice_row
+        """Re-price every position on `underlying` using BS (opts) or 1:1
+        spot (futures). Reads from the per-underlying index built at seed
+        so this is O(matched) instead of O(positions) — important when a
+        50-position book has a single 3-position NIFTY chain."""
+        from backend.api.algo.derivatives import reprice_row
         ref_now = datetime.now()
         changes: list[dict] = []
-        for row in self._positions_rows:
-            sym    = str(row.get("tradingsymbol") or "")
-            parsed = parse_tradingsymbol(sym)
-            if not parsed or parsed.get("underlying") != underlying:
+        rows = self._positions_by_underlying.get(underlying, [])
+        for row in rows:
+            parsed = row.get("_parsed")
+            if not parsed:
                 continue
+            sym   = str(row.get("tradingsymbol") or "")
             sigma = self._iv_cache.get(sym)
             new   = reprice_row(row, spot=spot, sigma=sigma, ref_now=ref_now)
             if new is None:

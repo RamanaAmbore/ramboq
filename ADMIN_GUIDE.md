@@ -348,6 +348,45 @@ For options + futures books, the simulator can move the **underlying spot** (NIF
 - IV is locked at sim start. Real-world IV expands during sell-offs; the sim doesn't model that. If you want to study IV-expansion effects, layer a per-option `pct` move on top of the underlying move.
 - Stock-option books need explicit underlyings in `scenario.initial.underlyings: {RELIANCE: 2800}` if no futures contract is in the book — the driver can't resolve a stock spot from an arbitrary option chain alone.
 
+### Adding custom positions to a sim run
+
+Don't have the position you want to test in your live book? Add it inline:
+
+1. `/admin/simulator` → scroll to the **Custom positions** panel below the controls.
+2. Click **+ Add row** → fill in the row:
+
+   | Field | Example | Notes |
+   |---|---|---|
+   | Symbol | `NIFTY25APR22000CE` | Any Kite-style F&O symbol or cash equity |
+   | Qty | `-50` | Negative = short, positive = long |
+   | LTP | `180` | Last-traded price; used as the seed |
+   | Account | (blank) | Defaults to `ZG####` if blank — the engine treats it as a label |
+
+3. Add as many rows as you want. Click the red **×** to remove a row.
+4. Press **Start** — your custom rows are layered on top of whatever scripted/live seeding produced. F&O symbols re-price coherently when an `underlying_*` move fires; cash equities track simple `pct/abs` moves.
+
+This is the right move for "what-if" testing before you take a real trade — you see exactly how the agent engine + chase + Black-Scholes pricing react to the position, without ever sending an order to the broker.
+
+---
+
+## Paper trading dashboard (`/admin/paper`)
+
+`/admin/paper` is the visual surface for what's actually happening in **mode 2** on prod — real Kite quotes feeding the paper trade engine. Same layout as the simulator page, but reading from the live engine instead of a sim driver.
+
+You'll see:
+
+- **Status banner** at the top:
+  - Green/sky **`CHASING`** when paper orders are in flight on main.
+  - Amber **`IDLE`** when the engine is enabled but no chase is running.
+  - Grey **`DEV`** when you're on a non-main branch (engine exists but no background tick — paper trading is prod-only by design).
+- **Chase pills** — one per in-flight paper order, showing side / qty / symbol / current limit / attempt count. Same shape as the simulator page so it reads as a sibling surface.
+- **Chart grid** — one mini chart per symbol with captured ticks. Underlyings come first (sky-blue `SPOT` tag), derivatives below grouped by underlying with the spot overlaid as a dashed line.
+- **LogPanel** at the bottom — Order tab shows recent `mode='paper'` `AlgoOrder` rows; the Chart tab mirrors the same chart grid so you can keep watching while you scroll the order log.
+
+**When the page is most useful**: during the soak phase, after you've flipped a single `execution.live.<action>` flag to `true` and want to watch the chase against the live market without the order touching the broker. Every paper fire shows up here, and you can compare it to what the agent's `[PAPER]` Telegram alert said would happen.
+
+
+
 ### Charts — see what the price did
 
 While a sim is running, the page renders one **mini chart per active symbol** directly under the position pills:

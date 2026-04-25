@@ -44,6 +44,7 @@
     { href: '/orders',           label: 'Orders'    },
     { href: '/console',          label: 'Terminal'  },
     { href: '/admin/simulator',  label: 'Simulator' },
+    { href: '/admin/paper',      label: 'Paper'     },
     { href: '/admin/tokens',     label: 'Tokens'    },
     { href: '/admin/settings',   label: 'Settings'  },
     { href: '/admin',            label: 'Users'     },

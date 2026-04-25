@@ -83,6 +83,12 @@ class SimStartRequest(msgspec.Struct):
     # Bid/ask spread sent as a percent (0.10 = 10 bps = 0.10% spread).
     # None = fall back to DB setting `simulator.default_spread_pct`.
     spread_pct: Optional[float] = None
+    # Custom positions added inline from the UI — each row is the minimal
+    # position dict {tradingsymbol, quantity, last_price, account?,
+    # average_price?, exchange?}. Layered on top of scripted/live seeding so
+    # an operator can stress-test a synthetic NIFTY24500CE without changing
+    # their real book or editing scenarios.yaml.
+    custom_positions: Optional[list[dict]] = None
 
 
 class SimScenarioInfo(msgspec.Struct):
@@ -213,6 +219,7 @@ class SimulatorController(Controller):
                 pct_overrides=data.pct_overrides,
                 symbol_filter=data.symbols,
                 spread_pct=spread_fraction,
+                custom_positions=data.custom_positions,
             )
         except SimGuardError as e:
             raise HTTPException(status_code=400, detail=str(e))

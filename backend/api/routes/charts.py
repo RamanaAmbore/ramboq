@@ -40,6 +40,18 @@ logger = get_logger(__name__)
 _VALID_MODES = ("sim", "paper", "live")
 
 
+class PaperStatus(msgspec.Struct):
+    """Snapshot of the prod paper engine for /admin/paper. Every field is
+    safe to expose — no broker credentials or order body bytes leak through
+    here, only the public lifecycle state."""
+    enabled:            bool
+    branch:             str
+    open_order_count:   int
+    open_order_details: list[dict]
+    captured_symbols:   list[str]
+    captured_underlyings: list[str]
+
+
 class PriceTick(msgspec.Struct):
     ts:  str
     ltp: float
@@ -162,6 +174,28 @@ class ChartsController(Controller):
     path   = "/api/charts"
     guards = [admin_guard]
 
+    @get("/paper-status")
+    async def paper_status(self) -> PaperStatus:
+        """Snapshot of the prod paper engine — used by /admin/paper to
+        render the status banner + open-order pills + chart grid. The
+        engine itself is a singleton constructed lazily; reading its state
+        is cheap (no broker round-trip)."""
+        from backend.shared.helpers.utils import config
+        eng    = get_prod_paper_engine()
+        branch = config.get("deploy_branch", "dev") or "dev"
+        # Paper engine is prod-only — on dev branches it exists in memory
+        # but background tick_loop never starts, so no orders register.
+        # Show enabled=false on dev so the UI banner explains the gate.
+        enabled = (branch == "main")
+        details = eng.open_order_details()
+        return PaperStatus(
+            enabled=enabled, branch=branch,
+            open_order_count=len(details),
+            open_order_details=details,
+            captured_symbols=sorted(eng._price_history.keys()),
+            captured_underlyings=sorted(eng._underlying_history.keys()),
+        )
+
     @get("/symbols")
     async def symbols(self, mode: str = "sim") -> dict:
         """List symbols with captured ticks, classified so the UI can
@@ -191,6 +225,64 @@ class ChartsController(Controller):
             "symbols": [i["symbol"] for i in items],   # back-compat
             "items":   items,
         }
+
+    @get("/batch")
+    async def batch(self, mode: str = "sim", symbols: str = "",
+                    since: Optional[str] = None, limit: int = 600) -> dict:
+        """
+        One round-trip for the chart panel: returns
+        `{charts: [ChartResponse, ChartResponse, …]}` for every symbol in
+        the comma-separated `symbols` list. Coalesces what would otherwise
+        be N independent `/price-history` polls into a single request,
+        which matters when a page renders ten charts on a 3 s polling
+        cadence (200 req/min → 20 req/min).
+
+        Order of charts in the response matches the order in `symbols`.
+        Symbols with no captured ticks come back with empty `ticks` /
+        `events` lists so the client can render the empty state without
+        special-casing an absent entry.
+        """
+        if mode not in _VALID_MODES:
+            raise HTTPException(status_code=400,
+                                detail=f"mode must be one of {_VALID_MODES}")
+        names = [s.strip() for s in (symbols or "").split(",") if s.strip()]
+        if not names:
+            return {"mode": mode, "charts": []}
+        if len(names) > 50:
+            # Defensive cap — a runaway client passing 1000 symbols
+            # shouldn't pin a worker on AlgoOrder lookups.
+            names = names[:50]
+
+        eng       = _engine_for_mode(mode)
+        cap       = max(1, min(int(limit or 600), 600))
+
+        # ONE algo_orders query for the whole batch — IN-clause vs N
+        # round-trips. Group results by symbol client-side.
+        async with async_session() as s:
+            rows = (await s.execute(
+                select(AlgoOrder)
+                .where(AlgoOrder.mode == mode)
+                .where(AlgoOrder.symbol.in_(names))
+                .order_by(desc(AlgoOrder.created_at))
+                .limit(50 * len(names))   # 50 rows per symbol cap
+            )).scalars().all()
+        rows_by_symbol: dict[str, list[AlgoOrder]] = {}
+        for r in rows:
+            rows_by_symbol.setdefault(r.symbol, []).append(r)
+
+        charts: list[ChartResponse] = []
+        for sym in names:
+            kind, underlying = _classify_symbol(eng, sym)
+            raw_ticks = eng.price_history(sym, since=since, limit=cap)
+            ticks = [PriceTick(ts=t["ts"], ltp=t["ltp"],
+                               bid=t.get("bid"), ask=t.get("ask"))
+                     for t in raw_ticks]
+            events = ([] if kind == "underlying"
+                      else _algo_order_events(rows_by_symbol.get(sym, [])))
+            charts.append(ChartResponse(
+                mode=mode, symbol=sym, kind=kind,
+                underlying=underlying, ticks=ticks, events=events))
+        return {"mode": mode, "charts": charts}
 
     @get("/price-history")
     async def price_history(self, mode: str = "sim", symbol: str = "",

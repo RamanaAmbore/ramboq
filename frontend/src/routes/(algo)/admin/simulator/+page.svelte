@@ -13,7 +13,7 @@
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
     fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
-    fetchChartSymbols,
+    fetchChartSymbols, fetchChartBatch,
   } from '$lib/api';
   import LogPanel    from '$lib/LogPanel.svelte';
   import Select      from '$lib/Select.svelte';
@@ -46,6 +46,18 @@
   // Bid/ask spread in percent (0.10 = 10 bps). Drives side-aware limit
   // prices in the sim's paper-trade chase engine.
   let spreadPct    = $state(/** @type {number | ''} */(0.10));
+  // Custom positions — operator-typed rows that get layered on top of
+  // the seeded book at Start time. Lets you stress-test a synthetic F&O
+  // book (NIFTY24500CE x −50 + NIFTY24500PE x +50, etc.) without touching
+  // your real positions or editing scenarios.yaml. Empty rows are dropped
+  // server-side via _normalise_custom_positions.
+  let customRows = $state(/** @type {Array<{tradingsymbol:string, quantity:string|number, last_price:string|number, account:string}>} */ ([]));
+  function addCustomRow() {
+    customRows = [...customRows, { tradingsymbol: '', quantity: '', last_price: '', account: '' }];
+  }
+  function removeCustomRow(/** @type {number} */ i) {
+    customRows = customRows.filter((_, idx) => idx !== i);
+  }
   // Pre-armed agent id (from `?agent_id=<id>` when the user clicked "Run in
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
@@ -55,6 +67,11 @@
   // after a fill removes the position from the book — the operator still
   // wants to see how the price moved leading up to the close.
   let chartSymbols = $state(/** @type {string[]} */ ([]));
+  // Batched chart payload — `chartsBySymbol[sym]` is the full
+  // `{ticks, events, kind, underlying}` blob the API returns. Distributed
+  // to each PriceChart via the `data` prop so 10 charts cost 1 round-trip
+  // (instead of 10 + 10 for the underlying overlays).
+  let chartsBySymbol = $state(/** @type {Record<string, any>} */ ({}));
   let refreshTeardown;
 
   // ── Log panel feeds ──────────────────────────────────────────────────
@@ -112,6 +129,19 @@
       status = stat;
       events = ev;
       chartSymbols = chartSyms?.symbols || [];
+      // Coalesce per-symbol fetches into one /charts/batch call. With 10
+      // open positions + 1 underlying that would otherwise be 11 polls
+      // every 3 s; this cuts it to 1.
+      if (chartSymbols.length) {
+        try {
+          const batch = await fetchChartBatch('sim', chartSymbols);
+          const map = /** @type {Record<string, any>} */ ({});
+          for (const c of (batch?.charts || [])) map[c.symbol] = c;
+          chartsBySymbol = map;
+        } catch (_) { /* ignore — charts fall back to self-poll */ }
+      } else {
+        chartsBySymbol = {};
+      }
     } catch (e) { error = e.message; }
   }
 
@@ -150,6 +180,17 @@
       }
       if (symbolFilter && symbolFilter.length) opts.symbols = [...symbolFilter];
       if (spreadPct !== '' && spreadPct != null) opts.spread_pct = Number(spreadPct);
+      // Custom positions — drop blank rows client-side so an empty form
+      // doesn't ship null fields the backend would have to filter anyway.
+      const customClean = customRows
+        .map(r => ({
+          tradingsymbol: String(r.tradingsymbol || '').trim().toUpperCase(),
+          quantity:      r.quantity === '' ? null : Number(r.quantity),
+          last_price:    r.last_price === '' ? null : Number(r.last_price),
+          account:       String(r.account || '').trim() || undefined,
+        }))
+        .filter(r => r.tradingsymbol && r.quantity != null && r.last_price != null);
+      if (customClean.length) opts.custom_positions = customClean;
       status = await startSim(pickedSlug, rateMs, opts);
       const tag = agentId ? ` (agent #${agentId} only)` : '';
       const cadTag = ` · P:${status.positions_every_n_ticks}`;
@@ -373,7 +414,9 @@
   {#if chartSymbols.length}
     <div class="sim-charts">
       {#each chartSymbols as sym (sym)}
-        <PriceChart mode="sim" symbol={sym} height={150} />
+        <PriceChart mode="sim" symbol={sym} height={150}
+                    data={chartsBySymbol[sym]}
+                    {chartsBySymbol} />
       {/each}
     </div>
   {/if}
@@ -518,6 +561,67 @@
     <div class="text-[0.6rem] text-amber-300 mt-2">
       Seed mode <b>{seedMode}</b> requires a live-book snapshot — press
       <b>Load live book</b> before Start.
+    </div>
+  {/if}
+</div>
+
+<!-- Custom positions panel — operator-typed rows that get layered onto
+     whatever scripted/live seeding produced. Useful for stress-testing a
+     synthetic NIFTY24500CE without changing the real book. The
+     backend's _normalise_custom_positions fills sensible defaults (account
+     ZG####, exchange NFO for F&O syms / NSE otherwise, average=last_price)
+     so you only have to type symbol / qty / price. -->
+<div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+  <div class="custom-pos-header">
+    <h3 class="text-[0.65rem] font-bold uppercase tracking-wider text-[#fbbf24]">
+      Custom positions
+      {#if customRows.length}<span class="opacity-60 font-normal ml-1">({customRows.length})</span>{/if}
+    </h3>
+    <button type="button" class="sim-btn sim-btn-order"
+            title="Add a synthetic position to layer on top of the seeded book."
+            onclick={addCustomRow}>+ Add row</button>
+  </div>
+  {#if !customRows.length}
+    <div class="text-[0.6rem] text-[#7e97b8] mt-1">
+      No custom positions. Click <b>+ Add row</b> to layer synthetic
+      positions on top of the seeded book — useful for testing a
+      hypothetical strike before you take the trade.
+    </div>
+  {:else}
+    <div class="custom-pos-grid">
+      <div class="custom-pos-headrow">
+        <span>Symbol</span>
+        <span>Qty</span>
+        <span>LTP</span>
+        <span>Account</span>
+        <span></span>
+      </div>
+      {#each customRows as _row, i (i)}
+        <div class="custom-pos-row">
+          <input type="text" class="field-input"
+            placeholder="NIFTY25APR22000CE"
+            bind:value={customRows[i].tradingsymbol} />
+          <input type="number" class="field-input"
+            placeholder="±qty"
+            bind:value={customRows[i].quantity} />
+          <input type="number" class="field-input"
+            placeholder="₹ last"
+            step="0.05"
+            bind:value={customRows[i].last_price} />
+          <input type="text" class="field-input"
+            placeholder="ZG####"
+            bind:value={customRows[i].account} />
+          <button type="button" class="custom-pos-del"
+                  title="Remove this row"
+                  aria-label="Remove row {i + 1}"
+                  onclick={() => removeCustomRow(i)}>×</button>
+        </div>
+      {/each}
+    </div>
+    <div class="text-[0.55rem] text-[#7e97b8] mt-1">
+      Negative qty = short. F&O symbols re-price coherently when an
+      <span class="font-mono">underlying_*</span> move fires (BS pricing
+      with calibrated IV); cash equities track simple pct/abs moves.
     </div>
   {/if}
 </div>
@@ -817,6 +921,57 @@
     gap: 0.5rem;
   }
 
+  /* Custom-positions table — compact monospace grid that mirrors the
+     LogPanel order rows (same gutter heights, same field-input theme). */
+  .custom-pos-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .custom-pos-grid {
+    margin-top: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .custom-pos-headrow,
+  .custom-pos-row {
+    display: grid;
+    grid-template-columns: minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .custom-pos-headrow {
+    font-family: monospace;
+    font-size: 0.55rem;
+    color: #7e97b8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-bottom: 0.15rem;
+    border-bottom: 1px solid rgba(251,191,36,0.18);
+  }
+  :global(.custom-pos-row .field-input) {
+    font-size: 0.62rem;
+    padding: 0.25rem 0.4rem;
+    font-family: monospace;
+  }
+  .custom-pos-del {
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 3px;
+    border: 1px solid rgba(248,113,113,0.4);
+    background: rgba(248,113,113,0.08);
+    color: #f87171;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .custom-pos-del:hover {
+    background: rgba(248,113,113,0.18);
+    border-color: rgba(248,113,113,0.65);
+  }
+
   /* Tighten the inputs to match button height so the row doesn't wobble. */
   :global(.sim-fields-row .field-input) {
     font-size: 0.62rem;
@@ -847,5 +1002,6 @@
   {simLog}
   chartMode="sim"
   {chartSymbols}
+  {chartsBySymbol}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

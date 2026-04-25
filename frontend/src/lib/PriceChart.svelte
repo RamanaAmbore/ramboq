@@ -14,6 +14,13 @@
     /** @type {number} */ height = 180,
     /** @type {number} */ pollMs = 3000,
     /** @type {boolean} */ autoPoll = true,
+    // Optional pre-fetched data — when the parent does a batched
+    // /charts/batch poll and distributes results, it passes the
+    // ChartResponse for this symbol through here. The component then
+    // skips its own polling. Pass `chartsBySymbol` for the underlying
+    // overlay lookup so we don't re-hit the API.
+    /** @type {any} */ data = null,
+    /** @type {Record<string, any>} */ chartsBySymbol = null,
   } = $props();
 
   /** @type {Array<{ts:string,ltp:number,bid:number|null,ask:number|null}>} */
@@ -39,36 +46,59 @@
   /** @type {{x:number,y:number,kind:string,side:string,price:number|null,ts:string,detail:string|null,order_id:number}|null} */
   let hover = $state(null);
 
+  // True when the parent is feeding pre-fetched data; we skip our own
+  // polling in that case so a page with N charts only does one round-trip
+  // per refresh instead of N + N (option + underlying overlay).
+  const externalData = $derived(data != null);
+
+  function applyData(/** @type {any} */ r) {
+    ticks      = r?.ticks  || [];
+    events     = r?.events || [];
+    kind       = r?.kind   || 'other';
+    underlying = r?.underlying || null;
+    error      = '';
+    loading    = false;
+  }
+
   async function load() {
     if (!mode || !symbol) { loading = false; return; }
+    if (externalData) {
+      applyData(data);
+      // Underlying overlay — read from the parent's batch response
+      // (chartsBySymbol[underlying]) instead of issuing a fresh fetch.
+      if (kind === 'derivative' && underlying && chartsBySymbol?.[underlying]) {
+        const u = chartsBySymbol[underlying];
+        underlyingTicks = (u.ticks || []).map(/** @param {any} t */ (t) => ({ ts: t.ts, ltp: t.ltp }));
+      } else {
+        underlyingTicks = [];
+      }
+      return;
+    }
     try {
       const r = await fetchChartPriceHistory(mode, symbol);
       if (!mounted) return;
-      ticks = r.ticks || [];
-      events = r.events || [];
-      kind = r.kind || 'other';
-      underlying = r.underlying || null;
+      applyData(r);
       // Fetch the underlying spot history when this is a derivative so the
       // chart can overlay it. Errors here are silent — the option chart
       // still renders without the overlay.
       if (kind === 'derivative' && underlying) {
         try {
           const u = await fetchChartPriceHistory(mode, underlying);
-          underlyingTicks = (u?.ticks || []).map(t => ({ ts: t.ts, ltp: t.ltp }));
+          underlyingTicks = (u?.ticks || []).map(/** @param {any} t */ (t) => ({ ts: t.ts, ltp: t.ltp }));
         } catch (_) { underlyingTicks = []; }
       } else {
         underlyingTicks = [];
       }
-      error = '';
     } catch (e) {
-      error = e.message || String(e);
-    } finally {
+      error = /** @type {any} */ (e).message || String(e);
       loading = false;
     }
   }
 
   function startPolling() {
-    if (!autoPoll || !pollMs) return;
+    // Skip polling when the parent feeds data — its own poll cadence
+    // will re-render us via the `data` prop changing.
+    if (externalData || !autoPoll || !pollMs) return;
     stopPolling();
     timer = setInterval(load, pollMs);
   }
@@ -81,10 +111,21 @@
 
   // Reload when props change.
   $effect(() => {
-    // Re-trigger when mode/symbol switch.
-    void mode; void symbol;
-    loading = true; ticks = []; events = []; error = '';
+    // Re-trigger when mode/symbol/data switch.
+    void mode; void symbol; void data;
+    if (!externalData) {
+      loading = true; ticks = []; events = []; error = '';
+    }
     load();
+  });
+
+  // Kill the self-poll timer the moment a parent starts feeding `data`,
+  // so a page that flips from per-chart polling to batched feeds doesn't
+  // accumulate a stale interval. Equally, restart polling if `data` ever
+  // goes back to null (e.g. parent's batch endpoint failed permanently).
+  $effect(() => {
+    if (externalData) stopPolling();
+    else if (autoPoll && pollMs && !timer) startPolling();
   });
 
   // ── Chart geometry ─────────────────────────────────────────────────

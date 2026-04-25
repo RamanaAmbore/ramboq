@@ -5,7 +5,7 @@
   import {
     fetchAgents, activateAgent, deactivateAgent, updateAgent,
     fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
-    startSimForAgent, fetchAlgoOrdersRecent, fetchChartSymbols,
+    startSimForAgent, fetchAlgoOrdersRecent, fetchChartSymbols, fetchChartBatch,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -31,6 +31,9 @@
   // tab can render one mini chart per symbol that's been touched.
   let chartMode    = $derived(/** @type {'sim'|'paper'|'live'} */ (simActive ? 'sim' : 'paper'));
   let chartSymbols = $state(/** @type {string[]} */([]));
+  // Batched chart payload — see /admin/simulator + /admin/paper for the
+  // same pattern. Cuts N polls (one per chart) to one /charts/batch call.
+  let chartsBySymbol = $state(/** @type {Record<string, any>} */({}));
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
@@ -82,7 +85,17 @@
     try {
       const r = await fetchChartSymbols(chartMode);
       chartSymbols = r?.symbols || [];
-    } catch (_) { chartSymbols = []; }
+      if (chartSymbols.length) {
+        try {
+          const batch = await fetchChartBatch(chartMode, chartSymbols);
+          const map = /** @type {Record<string, any>} */ ({});
+          for (const c of (batch?.charts || [])) map[c.symbol] = c;
+          chartsBySymbol = map;
+        } catch (_) { /* fall back to per-chart polling */ }
+      } else {
+        chartsBySymbol = {};
+      }
+    } catch (_) { chartSymbols = []; chartsBySymbol = {}; }
   }
 
   async function loadSystemLog() {
@@ -787,5 +800,6 @@
   {simLog}
   {chartMode}
   {chartSymbols}
+  {chartsBySymbol}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

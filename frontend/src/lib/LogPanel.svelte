@@ -16,6 +16,7 @@
    *   simLog?: Array<any>,
    *   chartMode?: 'sim'|'paper'|'live',
    *   chartSymbols?: string[],
+   *   chartsBySymbol?: Record<string, any>,
    *   initialTab?: string,
    *   onTabChange?: (tab: string) => void,
    * }} */
@@ -29,6 +30,7 @@
     simLog = [],
     chartMode = 'sim',
     chartSymbols = [],
+    chartsBySymbol = {},
     initialTab = 'order',
     onTabChange = () => {},
   } = $props();
@@ -262,7 +264,9 @@
     {#if chartSymbols.length}
       <div class="log-chart-grid">
         {#each chartSymbols as sym (sym)}
-          <PriceChart mode={chartMode} symbol={sym} height={170} />
+          <PriceChart mode={chartMode} symbol={sym} height={170}
+                      data={chartsBySymbol[sym]}
+                      {chartsBySymbol} />
         {/each}
       </div>
     {:else}
