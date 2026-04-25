@@ -1033,9 +1033,18 @@ Tab styling matches the algo navbar's idiom — each tab carries a **left-border
 - [`/market`](frontend/src/routes/(public)/market/+page.svelte) — page-level `lastRefresh` timestamp at the top, then a tabbed card.
 - [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids first, then the same tabbed card below.
 
-The Gemini market-summary prompt was simplified iteratively: drop the `**Daily Market Report — [date]**` heading, drop the date/timestamp line, drop the H3 report-title instruction. The "Refreshed at <ts>" line under the tabs is the canonical date-stamp; having the AI emit another one was redundant. The prompt now tells the AI to use H3 only for section names (Market Summary / Events / Derivatives / Portfolio Highlights / Insights & Outlook) and start directly with section 1.
+The Gemini market-summary prompt was simplified iteratively: drop the `**Daily Market Report — [date]**` heading, drop the date/timestamp line, drop the H3 report-title instruction, and finally hardened to "the very first line of your output MUST be `### Market Summary`" with the no-title rule lifted into the system prompt as well as the user prompt. The "Refreshed at <ts>" line under the tabs is the canonical date-stamp.
 
-Also tidied `timestamp_display()` (and its frontend twin `clientTimestamp()`) to use a single space between weekday/day/month/time so the rendered string reads `Sat 25 Apr 07:03 IST | Fri 24 Apr 21:33 EDT` instead of the previous double-spaced form. Both surfaces (banners, refreshed_at stamps, log timestamps) inherit the cleaner format.
+Tab labels: `Daily market summary` (was "Summary") + `News feed` — the qualifier moved INTO the tab label so the operator knows what they're flipping between, even when the page title isn't visible (e.g. on `/performance` where the tab card sits below the position grids).
+
+`timestamp_display()` (Python) and `clientTimestamp()` (JS) use single space between weekday/day/month/time → renders `Sat 25 Apr 07:03 IST | Fri 24 Apr 21:33 EDT`. Banners, refreshed_at stamps, log timestamps all inherit the format.
+
+**Refreshed-at semantics** — the timestamp shown on each tab is the actual content-update time, not the request-handler's wall clock:
+
+- **Market summary** — `_load_market_from_db()` formats `MarketReport.generated_at` (the persisted Postgres timestamp of when the AI wrote the row) via `format_dual_tz()`. Tying the rendered stamp to the SQL column makes "when this content was last updated" unambiguous; if a future code path ever needed to update the persisted `refreshed_at` string independently, the rendered stamp would still reflect the actual content write moment.
+- **News feed** — `refreshed_at` reflects the most recent persisted headline's `published_at`, not when we last polled. The operator sees "the freshest news event we have is from <X>" rather than "we polled the upstream feed at <Y>". Falls back to `timestamp_display()` only when no headlines have been persisted yet (cold-start).
+
+`format_dual_tz(dt)` (in `backend/shared/helpers/date_time_utils.py`) is the building block — same compact format as `timestamp_display()` but for an arbitrary datetime, with naive-datetime defensiveness (interpreted as UTC).
 
 ---
 

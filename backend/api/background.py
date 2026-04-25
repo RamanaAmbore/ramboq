@@ -123,11 +123,20 @@ async def _run(fn, *args):
 # ---------------------------------------------------------------------------
 
 async def _load_market_from_db():
-    """Return MarketResponse if a DB row exists and is <24h old, else None."""
+    """Return MarketResponse if a DB row exists and is <24h old, else None.
+    The `refreshed_at` field is derived FROM `generated_at` (the Postgres
+    timestamp of when the content was actually written to the DB), not
+    from the persisted `refreshed_at` string. Both values come from the
+    same write moment originally, but tying the rendered stamp to the
+    SQL column makes it unambiguous: the timestamp the operator sees
+    is exactly when this content was last updated, even if a future
+    code path (e.g. a background re-formatter) updates the string field
+    independently."""
     from datetime import datetime, timezone
     from backend.api.database import async_session
     from backend.api.models import MarketReport
     from backend.api.schemas import MarketResponse
+    from backend.shared.helpers.date_time_utils import format_dual_tz
 
     try:
         async with async_session() as s:
@@ -137,8 +146,11 @@ async def _load_market_from_db():
         age = (datetime.now(timezone.utc) - row.generated_at).total_seconds()
         if age >= 86400:
             return None
-        return MarketResponse(content=row.content, cycle_date=row.cycle_date,
-                              refreshed_at=row.refreshed_at)
+        return MarketResponse(
+            content=row.content,
+            cycle_date=row.cycle_date,
+            refreshed_at=format_dual_tz(row.generated_at),
+        )
     except Exception as e:
         logger.error(f"Background: market DB load failed: {e}")
         return None

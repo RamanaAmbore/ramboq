@@ -62,11 +62,27 @@ def timestamp_display() -> str:
     Example: "Sat 25 Apr 07:03 IST | Fri 24 Apr 21:33 EDT"
     %Z renders EST / EDT automatically by season.
     """
-    now_ist = timestamp_indian()
-    now_est = timestamp_est()
-    ist_str = now_ist.strftime('%a %d %b %H:%M IST')
-    est_str = now_est.strftime('%a %d %b %H:%M %Z')
-    return f"{ist_str} | {est_str}"
+    return format_dual_tz(datetime.now(tz=INDIAN_TIMEZONE))
+
+
+def format_dual_tz(dt) -> str:
+    """
+    Same compact dual-timezone format as `timestamp_display()`, but for an
+    arbitrary `datetime`. Used for "refreshed_at" stamps tied to a
+    persisted content-generation moment (DB columns) rather than the
+    current request handler's wall clock.
+
+    Naive datetimes are interpreted as UTC for safety — every persisted
+    `generated_at` column on the platform stores timezone-aware UTC.
+    """
+    from datetime import timezone as _tz
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_tz.utc)
+    ist = dt.astimezone(INDIAN_TIMEZONE)
+    est = dt.astimezone(EST_ZONE)
+    return f"{ist.strftime('%a %d %b %H:%M IST')} | {est.strftime('%a %d %b %H:%M %Z')}"
 
 
 def is_market_open(now, holiday_set: set, market_start: dtime = dtime(9, 15),

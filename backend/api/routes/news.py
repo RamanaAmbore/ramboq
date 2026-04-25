@@ -323,18 +323,30 @@ async def _fetch_and_accumulate() -> NewsResponse:
             rows = await s.execute(
                 select(NewsHeadline).order_by(NewsHeadline.published_at.desc())
             )
+            db_items = list(rows.scalars().all())
             items = [
                 NewsItem(
                     title=h.title, link=h.link,
                     source=h.source or "", timestamp=h.timestamp_display or "",
                 )
-                for h in rows.scalars().all()
+                for h in db_items
             ]
     except Exception as e:
         logger.error(f"News DB query failed: {e}")
         items = []
+        db_items = []
 
-    return NewsResponse(items=items, refreshed_at=timestamp_display())
+    # `refreshed_at` reflects the timestamp of the most recent headline
+    # — i.e., when the news content was actually last updated, not when
+    # this poll ran. Falls back to "now" only when no headlines have
+    # been persisted yet (cold-start before the first feed fetch).
+    from backend.shared.helpers.date_time_utils import format_dual_tz
+    if db_items:
+        refreshed = format_dual_tz(db_items[0].published_at)
+    else:
+        refreshed = timestamp_display()
+
+    return NewsResponse(items=items, refreshed_at=refreshed)
 
 
 class NewsController(Controller):
