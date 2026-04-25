@@ -321,7 +321,7 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 **Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
-- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Tokens · Settings · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Options · Tokens · Settings · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
 - **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
@@ -806,6 +806,34 @@ Visual surface for the prod paper-trade engine, pairing with the simulator page 
 - Embedded LogPanel with `chartMode='paper'` so the Chart tab inside the panel mirrors the page's main chart grid.
 
 **API**: [`/api/charts/paper-status`](backend/api/routes/charts.py) — admin-guarded. Returns `{enabled, branch, open_order_count, open_order_details, captured_symbols, captured_underlyings}`. `enabled = (deploy_branch == 'main')` — the engine still exists on dev branches but no `tick_loop` is running, so no orders register and the page banner explains the gate.
+
+---
+
+## Options analytics (`/admin/options`)
+
+Distinct workspace from the tick-chart pages — this is options *research*, not live monitoring. For any single-leg option (live position / sim position / hypothetical typed-in symbol), it computes Greeks, payoff curve, theoretical-vs-market discrepancy, max-profit / max-loss / breakeven / probability-of-profit, plus a 30-day historical price chart.
+
+**Math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
+
+- `greeks(S, K, T_years, r, sigma, opt_type)` — analytical Δ Γ Θ V ρ. Theta is per-day, Vega is per 1 % IV, Rho is per 1 % rate (trader-friendly units, not raw mathematical units).
+- `prob_above(S, K, T, r, sigma)` — P(S_T ≥ K) under the Black-Scholes log-normal assumption. Used as the building block for POP.
+- `risk_metrics(S, K, T, r, sigma, opt_type, qty, entry_price)` — single-leg max profit / max loss / breakeven / POP. Returns `inf` for unlimited-payoff legs (long calls, short puts); the API serializes those as `null` so the UI renders "∞".
+- `payoff_curve(S, K, T, r, sigma, opt_type, qty, entry_price, span_pct, points)` — list of `{spot, today_value, expiry_value}` spanning ±`span_pct` around current spot. Both values are **position P&L** (signed qty, net of entry cost) so they read as money the operator would make/lose.
+
+**Endpoints** ([`backend/api/routes/options.py`](backend/api/routes/options.py), admin-guarded):
+
+| Route | Purpose |
+|---|---|
+| `GET /api/options/analytics?mode=live\|sim\|hypothetical&symbol=…&[account, qty, avg_cost, spot, ltp, iv, span_pct, points]` | Full bundle — Greeks (per-share + position-scaled), pricing block, risk, payoff curve. One round-trip. Hypothetical mode lets the operator dry-analyse a strike before taking the trade. |
+| `GET /api/options/historical?symbol=…&days=30&interval=day&exchange=NFO` | Kite OHLCV bars. Instrument-token lookup goes through the cached instruments dump. |
+
+**Pricing-account setting** — `connections.price_account` (string, default blank) lets the operator pin which Kite account to use for shared market-data fetches (underlying spots in `PaperTradeEngine._capture_underlyings`, instrument lookup + LTP + historical for `/admin/options`). Implemented in [`backend/shared/brokers/registry.py::get_price_broker()`](backend/shared/brokers/registry.py); falls back to the first available account when the setting is blank.
+
+**UI** — [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte) is the payoff-chart SVG. Two curves (today amber solid, expiry sky dashed), profit/loss zone shading, vertical markers for spot (cyan) / strike (white dashed) / breakeven (amber dashed), hover crosshair with a 3-line tooltip. Hand-rolled SVG, no chart lib.
+
+[`frontend/src/routes/(algo)/admin/options/+page.svelte`](frontend/src/routes/(algo)/admin/options/+page.svelte) wires the picker (live + sim positions auto-discovered, hypothetical = symbol + qty input) above a two-column workspace: payoff chart on the left, side panel on the right with Pricing / Greeks table / Risk blocks. Historical chart sits full-width below, fed via the existing `PriceChart` component with `data` prop set to the historical bars (same SVG line, same theme).
+
+Polling: analytics every 5 s while a symbol is set; historical only on symbol change (daily candles don't move intra-day).
 
 ---
 

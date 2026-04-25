@@ -64,3 +64,28 @@ def get_broker(account: str) -> Broker:
 def all_brokers() -> list[Broker]:
     """Every configured broker adapter, one per account."""
     return [get_broker(acct) for acct in Connections().conn.keys()]
+
+
+def get_price_broker() -> Broker:
+    """
+    Adapter for shared market-data fetches (underlying spots, historical
+    candles, instrument lookups) where any account works because the data
+    isn't account-scoped. Reads the `connections.price_account` setting:
+    if set and valid, uses that; otherwise falls back to the first
+    available account in `secrets.yaml`.
+
+    Lets the operator centralize "which Kite handle do we hammer for
+    chart data" in /admin/settings instead of having that decision baked
+    into the calling code.
+    """
+    from backend.shared.helpers.settings import get_string
+
+    accounts = list(Connections().conn.keys())
+    if not accounts:
+        raise KeyError("No broker accounts configured.")
+
+    pinned = get_string("connections.price_account", "") or ""
+    pinned = pinned.strip()
+    if pinned and pinned in accounts:
+        return get_broker(pinned)
+    return get_broker(accounts[0])

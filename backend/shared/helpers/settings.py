@@ -127,6 +127,13 @@ SEEDS: list[tuple] = [
     ("connections", "connections.retry_count",      "int", 3,
      "Retry attempts for broker calls before giving up.", None,
      {"min": 1, "max": 10, "step": 1}),
+    ("connections", "connections.price_account",    "string", "",
+     "Account code (e.g. ZG0790) used for shared market-data fetches "
+     "— underlying spot snapshots in the paper engine, historical "
+     "candles + quotes for the options-analytics page. Blank = "
+     "auto-pick the first account in secrets.yaml. Doesn't affect "
+     "per-account holdings / positions / orders calls; those still "
+     "hit each account directly.", None, None),
 
     # ── GenAI ────────────────────────────────────────────────────────────
     ("genai",       "genai.thinking_budget",        "int", 512,

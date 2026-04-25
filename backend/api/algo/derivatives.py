@@ -283,3 +283,177 @@ def reprice_row(row: dict, *, spot: float, sigma: Optional[float],
         return black_scholes(float(spot), parsed["strike"],
                              T_yrs, risk_free, sig, parsed["opt_type"])
     return None
+
+
+# ── Greeks ────────────────────────────────────────────────────────────
+
+def _norm_pdf(x: float) -> float:
+    return math.exp(-x * x / 2.0) / math.sqrt(2.0 * math.pi)
+
+
+def greeks(S: float, K: float, T_years: float, r: float,
+           sigma: float, opt_type: str) -> dict:
+    """
+    Per-share analytical Greeks for a vanilla European option. Returned
+    fields:
+
+      delta:  ∂price/∂spot      (dimensionless; multiply by qty for $-delta)
+      gamma:  ∂²price/∂spot²    (per ₹1 spot move; tiny number for index opts)
+      theta:  ∂price/∂time      (decimal: PER DAY — divide annual θ by 365)
+      vega:   ∂price/∂σ         (per 1 % IV change — divide raw vega by 100)
+      rho:    ∂price/∂r         (per 1 % rate change — divide raw rho by 100)
+
+    Theta / vega / rho are returned in the trader-friendly units (per day,
+    per 1 % vol, per 1 % rate) rather than the raw mathematical units.
+    Degenerate cases (T ≤ 0, σ ≤ 0) return zeros for everything except
+    delta, where intrinsic-direction is preserved (calls → 1 if ITM,
+    puts → -1 if ITM).
+    """
+    if S <= 0 or K <= 0:
+        return {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
+    if T_years <= 0 or sigma <= 0:
+        # At expiry: delta is sign-of-intrinsic, others vanish.
+        if opt_type == "CE":
+            d = 1.0 if S > K else 0.0
+        else:
+            d = -1.0 if S < K else 0.0
+        return {"delta": d, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
+
+    sqrt_T = math.sqrt(T_years)
+    d1 = (math.log(S / K) + (r + sigma * sigma / 2.0) * T_years) / (sigma * sqrt_T)
+    d2 = d1 - sigma * sqrt_T
+    nd1 = _norm_pdf(d1)
+    Nd1 = _norm_cdf(d1)
+    Nd2 = _norm_cdf(d2)
+
+    if opt_type == "CE":
+        delta = Nd1
+        theta_yr = (-S * nd1 * sigma / (2.0 * sqrt_T)
+                    - r * K * math.exp(-r * T_years) * Nd2)
+        rho_raw  = K * T_years * math.exp(-r * T_years) * Nd2
+    else:
+        delta = Nd1 - 1.0
+        theta_yr = (-S * nd1 * sigma / (2.0 * sqrt_T)
+                    + r * K * math.exp(-r * T_years) * _norm_cdf(-d2))
+        rho_raw  = -K * T_years * math.exp(-r * T_years) * _norm_cdf(-d2)
+
+    gamma     = nd1 / (S * sigma * sqrt_T)
+    vega_raw  = S * nd1 * sqrt_T
+
+    # Trader-friendly units.
+    return {
+        "delta": delta,
+        "gamma": gamma,
+        "theta": theta_yr / 365.0,        # per day
+        "vega":  vega_raw / 100.0,        # per 1 % IV
+        "rho":   rho_raw  / 100.0,        # per 1 % rate
+    }
+
+
+# ── Probability of profit (POP) ───────────────────────────────────────
+
+def prob_above(S: float, K: float, T_years: float, r: float, sigma: float) -> float:
+    """
+    P(S_T ≥ K) under the Black-Scholes log-normal assumption (risk-
+    neutral). Uses the standard d2 form. Floors / ceilings at 0/1
+    when σ ≤ 0 or T ≤ 0 — those collapse to deterministic outcomes.
+    """
+    if S <= 0 or K <= 0:
+        return 0.0
+    if T_years <= 0 or sigma <= 0:
+        return 1.0 if S > K else 0.0
+    sqrt_T = math.sqrt(T_years)
+    d2 = (math.log(S / K) + (r - sigma * sigma / 2.0) * T_years) / (sigma * sqrt_T)
+    return _norm_cdf(d2)
+
+
+# ── Risk metrics + payoff curve ───────────────────────────────────────
+
+def risk_metrics(*, S: float, K: float, T_years: float, r: float,
+                 sigma: float, opt_type: str, qty: int,
+                 entry_price: float) -> dict:
+    """
+    Position-level max-profit / max-loss / breakeven / POP for a single-
+    leg option position. `qty` is signed (positive = long, negative =
+    short). `entry_price` is the per-share premium paid (long) or
+    received (short) — typically `average_price` on the broker row, or
+    the LTP for a hypothetical "what if I bought this now" view.
+
+    Returned fields are in absolute rupees for the whole position
+    (i.e. already multiplied by |qty|). `max_profit` / `max_loss` may be
+    `float('inf')` for unlimited-payoff legs; the API serializes that as
+    null so the UI can render "∞".
+    """
+    if qty == 0:
+        return {"max_profit": 0.0, "max_loss": 0.0, "breakeven": K, "pop": 0.0,
+                "long_short": "flat"}
+
+    long  = qty > 0
+    n     = abs(int(qty))
+    if opt_type == "CE":
+        breakeven = K + entry_price
+        if long:
+            max_profit = float("inf")           # call going to +∞
+            max_loss   = entry_price * n        # premium burns
+            pop = prob_above(S, breakeven, T_years, r, sigma)
+        else:
+            max_profit = entry_price * n        # premium kept if expires worthless
+            max_loss   = float("inf")
+            pop = 1.0 - prob_above(S, breakeven, T_years, r, sigma)
+    else:                                       # PE
+        breakeven = K - entry_price
+        if long:
+            max_profit = max(0.0, K - entry_price) * n   # spot → 0 floor
+            max_loss   = entry_price * n
+            pop = 1.0 - prob_above(S, breakeven, T_years, r, sigma)
+        else:
+            max_profit = entry_price * n
+            max_loss   = max(0.0, K - entry_price) * n
+            pop = prob_above(S, breakeven, T_years, r, sigma)
+
+    return {
+        "max_profit": max_profit,
+        "max_loss":   max_loss,
+        "breakeven":  breakeven,
+        "pop":        pop,
+        "long_short": "long" if long else "short",
+    }
+
+
+def payoff_curve(*, S: float, K: float, T_years: float, r: float,
+                 sigma: float, opt_type: str, qty: int,
+                 entry_price: float, span_pct: float = 0.10,
+                 points: int = 51) -> list[dict]:
+    """
+    Build a list of {spot, today_value, expiry_value} entries spanning
+    ±span_pct around the current spot. `today_value` uses Black-Scholes
+    (current DTE + IV); `expiry_value` is the intrinsic payoff. Both are
+    P&L for the WHOLE position (already multiplied by qty), net of
+    `entry_price * qty`, so they read as "money you'd make/lose" rather
+    than "what the option's worth".
+
+    Used by the /admin/options payoff chart — the operator sees today's
+    curve (with time value) sitting above the expiry curve (intrinsic),
+    converging as DTE → 0.
+    """
+    if S <= 0 or qty == 0 or points < 2:
+        return []
+    lo  = S * (1.0 - span_pct)
+    hi  = S * (1.0 + span_pct)
+    step = (hi - lo) / (points - 1)
+    cost = entry_price * qty   # signed: positive when you paid, negative when you collected
+    out: list[dict] = []
+    for i in range(points):
+        s_i = lo + step * i
+        # Today's BS value × qty − what you paid
+        bs_value     = black_scholes(s_i, K, T_years, r, sigma, opt_type)
+        today_pnl    = bs_value * qty - cost
+        # Expiry intrinsic × qty − what you paid
+        intrinsic    = max(0.0, s_i - K) if opt_type == "CE" else max(0.0, K - s_i)
+        expiry_pnl   = intrinsic * qty - cost
+        out.append({
+            "spot":         round(s_i, 4),
+            "today_value":  round(today_pnl, 2),
+            "expiry_value": round(expiry_pnl, 2),
+        })
+    return out

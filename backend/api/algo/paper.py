@@ -264,13 +264,24 @@ class PaperTradeEngine:
 
     def _capture_underlyings(self, ts: str, account: str | None,
                              underlyings: dict[str, str]) -> None:
-        if not account:
-            return
+        # Underlying spots (NIFTY 50, NIFTY BANK, etc.) aren't
+        # account-scoped — they're public market data. Route through
+        # `get_price_broker()` which honors the
+        # `connections.price_account` setting, so the operator can
+        # centralize "which Kite handle do we use for shared data" in
+        # /admin/settings. Fall back to whatever account opened the
+        # first order if the setting hasn't been set + the pinned
+        # account isn't configured.
         try:
-            from backend.shared.brokers import get_broker
-            broker = get_broker(account)
-            keys   = list(underlyings.values())
-            resp   = broker.ltp(keys) or {}
+            from backend.shared.brokers.registry import get_price_broker, get_broker
+            try:
+                broker = get_price_broker()
+            except Exception:
+                if not account:
+                    return
+                broker = get_broker(account)
+            keys = list(underlyings.values())
+            resp = broker.ltp(keys) or {}
         except Exception as e:
             logger.debug(f"PaperTradeEngine[{self._label}] underlying ltp fetch failed: {e}")
             return

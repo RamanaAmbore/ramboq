@@ -385,6 +385,66 @@ You'll see:
 
 **When the page is most useful**: during the soak phase, after you've flipped a single `execution.live.<action>` flag to `true` and want to watch the chase against the live market without the order touching the broker. Every paper fire shows up here, and you can compare it to what the agent's `[PAPER]` Telegram alert said would happen.
 
+---
+
+## Options analytics (`/admin/options`)
+
+A separate workspace from the tick-chart pages — this is for **options research**: pick a position, see what it'd be worth at any spot price today vs at expiry, with all the Greeks and risk metrics on the side.
+
+### What you see
+
+```
+┌──────────────────────────────────────────────┬────────────────────┐
+│  Payoff diagram                              │  Pricing           │
+│   - amber line: today (BS, current DTE/IV)   │    Spot / LTP /    │
+│   - sky dashed: expiry (intrinsic)           │    BS / Diff / IV  │
+│   - green zone: profit                       │                    │
+│   - red zone:   loss                         │  Greeks            │
+│   - vertical markers: spot · strike · BE     │    Δ Γ Θ V ρ       │
+│                                              │                    │
+│                                              │  Risk              │
+│                                              │    max profit      │
+│                                              │    max loss        │
+│                                              │    breakeven       │
+│                                              │    POP             │
+└──────────────────────────────────────────────┴────────────────────┘
+│  Historical · last 30 days (full-width)                           │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Three input sources
+
+- **Live position** — every option/future in your real broker book is in the picker. Click one, the page loads its Greeks, payoff, risk metrics in under a second. This is the "show me what NIFTY25APR22000CE looks like for me right now" workflow.
+- **Sim position** — same picker, but for the active simulator's positions. Useful while a sim is running and you want to drill into one contract's analytics.
+- **Hypothetical** — type any option symbol (e.g. `NIFTY25APR21500PE`), pick a quantity (negative = short), optionally an entry price (defaults to current LTP). The page computes everything as if you'd just taken the trade. **Use this before you place an order** — see the breakeven, max loss, and POP before committing capital.
+
+### Key metrics — what they mean
+
+| Metric | What it tells you |
+|---|---|
+| **BS theo** | Black-Scholes fair value at the current spot, IV, and DTE. |
+| **Diff** | Market LTP minus theoretical. Positive = market is asking more than fair (you'd be overpaying to buy). Negative = market is cheap (potential edge, or a stale quote). |
+| **IV** | Implied volatility back-solved from the current LTP. The chart and Greeks use this σ — change it via the URL query if you want a what-if. |
+| **Delta** | ₹ change in option value per ₹1 change in spot. Position-scaled = delta × signed qty (long short calls have negative delta). |
+| **Gamma** | Rate of change of delta. Tiny number for index options; multiply by 100 to get "delta change per ₹100 spot move". |
+| **Theta** | Daily time decay in rupees. Always negative for long options, positive for short. |
+| **Vega** | ₹ change per 1 % IV change. Sign tells you if you're long or short volatility. |
+| **Rho** | ₹ change per 1 % risk-free rate change. Mostly cosmetic for short-dated index options. |
+| **Max profit / loss** | Position-level absolute rupees at expiry. ∞ for unlimited-payoff legs (long calls, short puts). |
+| **Breakeven** | Spot price at expiry where position P&L is zero. |
+| **POP (probability of profit)** | P(spot at expiry crosses your breakeven), under the Black-Scholes log-normal assumption. Greater than 60 % shows green; less than 40 % red. |
+
+### Pricing-account setting
+
+The page (and the paper-trading underlying-spot fetch) routes shared market-data calls through whichever account is set as `connections.price_account` in [Settings](`/admin/settings`). Blank = auto-pick the first account in `secrets.yaml`. Pin it explicitly if you want a specific Kite handle to take the load.
+
+### Caveats
+
+- **Options only**. Futures show in your position list but the analytics endpoint will reject them — they're linear-payoff, no Greeks needed.
+- **Sim historical isn't possible**. Sim runs are forward-only (no recorded history before the run started). For sim positions the historical chart shows a clear "unavailable" message; live + hypothetical work normally.
+- **IV is locked at the moment of the call**. The page polls every 5 s so a fast-moving market refreshes the IV calibration; the payoff curve uses whatever σ the latest poll resolved.
+- **Single-leg only in v1**. Multi-leg combinations (spreads, straddles, iron condors) have additive payoff curves but the page doesn't combine them yet — pick one leg at a time.
+
 
 
 ### Charts — see what the price did
