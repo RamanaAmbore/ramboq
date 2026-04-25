@@ -6,10 +6,11 @@
   // an options-research workspace: payoff diagram, Greeks, theoretical-
   // vs-market discrepancy, risk metrics, POP, historical price chart.
   //
-  // Three input modes:
+  // Four input modes:
   //   live          — pick a symbol from broker positions
   //   sim           — pick from active simulator positions
   //   hypothetical  — type any option symbol to dry-analyse pre-trade
+  //   strategy      — combine multiple legs (vertical, iron condor, …)
   //
   // The analytics endpoint returns everything in one round-trip; this
   // page polls every 5 s while the symbol is set so Greeks + IV + LTP
@@ -20,12 +21,13 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchOptionAnalytics, fetchOptionHistorical,
+    fetchStrategyAnalytics,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import PriceChart    from '$lib/PriceChart.svelte';
   import Select        from '$lib/Select.svelte';
 
-  /** @type {'live'|'sim'|'hypothetical'} */
+  /** @type {'live'|'sim'|'hypothetical'|'strategy'} */
   let mode = $state('live');
   let symbol = $state('');
   let account = $state('');
@@ -36,17 +38,56 @@
 
   /** @type {any} */ let analytics = $state(null);
   /** @type {any} */ let historical = $state(null);
+  /** @type {any} */ let strategy = $state(null);
   let analyticsErr  = $state('');
   let historicalErr = $state('');
+  let strategyErr   = $state('');
   let loading       = $state(false);
   let teardown;
 
-  // Position lists for the picker.
-  /** @type {Array<{symbol:string, account:string, qty:number, source:string}>} */
+  // Strategy legs — operator builds a list, "Add from book" auto-fills
+  // from a live or sim position so sim legs ship their own ltp + cost
+  // (no broker round-trip needed). Manual rows leave ltp blank and the
+  // backend fetches it from the broker.
+  /** @type {Array<{symbol:string, qty:string|number, avg_cost:string|number, ltp:string|number, source:string}>} */
+  let legs = $state([]);
+  let legPickerValue = $state('');
+
+  function addLegRow() {
+    legs = [...legs, { symbol: '', qty: '', avg_cost: '', ltp: '', source: 'manual' }];
+  }
+  function removeLegRow(/** @type {number} */ i) {
+    legs = legs.filter((_, idx) => idx !== i);
+  }
+  function clearLegs() { legs = []; strategy = null; strategyErr = ''; }
+
+  // When the operator picks an existing position from the leg picker,
+  // append it as a new leg with ltp + avg_cost captured at click-time
+  // (sim positions need this because the backend can't fetch their ltp).
+  $effect(() => {
+    const v = legPickerValue;
+    if (!v) return;
+    const [src, acct, sym] = v.split('|');
+    const found = positions.find(p => p.source === src && p.account === acct && p.symbol === sym);
+    if (!found) return;
+    legs = [...legs, {
+      symbol:   found.symbol,
+      qty:      found.qty,
+      avg_cost: found.avg_cost ?? '',
+      ltp:      found.ltp ?? '',
+      source:   src,
+    }];
+    legPickerValue = '';   // reset picker for next add
+  });
+
+  // Position lists for the picker. Carries avg_cost + ltp so that
+  // the strategy leg-builder can ship them inline (sim legs need this
+  // because the backend can't fetch their ltp from the broker).
+  /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
   let positions = $state([]);
 
   async function loadPositions() {
-    /** @type {any[]} */
+    /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
     const merged = [];
 
     // Live broker positions
@@ -59,15 +100,19 @@
         // options-only).
         if (!/(CE|PE|FUT)$/i.test(String(sym))) continue;
         merged.push({
-          symbol:  String(sym).toUpperCase(),
-          account: String(p?.account || ''),
-          qty:     Number(p?.quantity || 0),
-          source:  'live',
+          symbol:   String(sym).toUpperCase(),
+          account:  String(p?.account || ''),
+          qty:      Number(p?.quantity || 0),
+          source:   'live',
+          avg_cost: p?.average_price != null ? Number(p.average_price) : null,
+          ltp:      p?.last_price    != null ? Number(p.last_price)    : null,
         });
       }
     } catch (_) { /* ignore — show sim only */ }
 
-    // Sim positions
+    // Sim positions — capture last_price + average_price from the
+    // driver state at click time so the strategy endpoint can compute
+    // analytics without round-tripping back to the broker.
     try {
       const s = await fetchSimStatus();
       for (const p of (s?.positions || [])) {
@@ -75,10 +120,12 @@
         if (!sym) continue;
         if (!/(CE|PE|FUT)$/i.test(String(sym))) continue;
         merged.push({
-          symbol:  String(sym).toUpperCase(),
-          account: String(p?.account || ''),
-          qty:     Number(p?.quantity || 0),
-          source:  'sim',
+          symbol:   String(sym).toUpperCase(),
+          account:  String(p?.account || ''),
+          qty:      Number(p?.quantity || 0),
+          source:   'sim',
+          avg_cost: p?.average_price != null ? Number(p.average_price) : null,
+          ltp:      p?.last_price    != null ? Number(p.last_price)    : null,
         });
       }
     } catch (_) { /* ignore */ }
@@ -111,6 +158,30 @@
     loadAnalytics();
     loadHistorical();
   });
+
+  async function loadStrategy() {
+    const cleanLegs = legs
+      .map(l => ({
+        symbol:   String(l.symbol || '').trim().toUpperCase(),
+        qty:      l.qty === '' || l.qty == null ? 0 : Number(l.qty),
+        avg_cost: l.avg_cost === '' || l.avg_cost == null ? null : Number(l.avg_cost),
+        ltp:      l.ltp      === '' || l.ltp      == null ? null : Number(l.ltp),
+      }))
+      .filter(l => l.symbol && l.qty);
+    if (!cleanLegs.length) {
+      strategy = null; strategyErr = '';
+      return;
+    }
+    loading = true; strategyErr = '';
+    try {
+      strategy = await fetchStrategyAnalytics(cleanLegs);
+    } catch (e) {
+      strategyErr = /** @type {any} */ (e).message || String(e);
+      strategy = null;
+    } finally {
+      loading = false;
+    }
+  }
 
   async function loadAnalytics() {
     if (!symbol) { analytics = null; return; }
@@ -153,9 +224,14 @@
     }
     loadPositions();
     // Re-poll analytics every 5s so Greeks + IV stay live while the
-    // operator stares at the page. Historical refreshes only on symbol
-    // change (daily candles don't change intra-day).
-    teardown = visibleInterval(() => { loadAnalytics(); loadPositions(); }, 5000);
+    // operator stares at the page. In strategy mode the same poll
+    // refreshes the multi-leg aggregate. Historical refreshes only on
+    // symbol change (daily candles don't change intra-day).
+    teardown = visibleInterval(() => {
+      if (mode === 'strategy') loadStrategy();
+      else                     loadAnalytics();
+      loadPositions();
+    }, 5000);
   });
   onDestroy(() => { teardown?.(); });
 
@@ -222,10 +298,36 @@
           { value: 'live',         label: 'Live position' },
           { value: 'sim',          label: 'Sim position'  },
           { value: 'hypothetical', label: 'Hypothetical'  },
+          { value: 'strategy',     label: 'Strategy (multi-leg)' },
         ]} />
     </div>
 
-    {#if mode !== 'hypothetical'}
+    {#if mode === 'strategy'}
+      <!-- Multi-leg builder. Two ways to add a leg:
+           1. Pick from existing live or sim positions — captures the
+              current avg_cost + ltp at click time, so sim legs ship
+              their own LTP (no broker round-trip needed).
+           2. + Add row — empty row for hypothetical legs; ltp blank means
+              the backend fetches it from the broker. -->
+      <div class="opt-field opt-field-grow">
+        <label class="field-label" for="opt-leg-pick">Add leg from book</label>
+        <Select id="opt-leg-pick"
+          bind:value={legPickerValue}
+          options={pickerOptions}
+          placeholder={pickerOptions.length ? 'Pick a position to add as a leg…' : 'No positions in book — type rows manually below'} />
+      </div>
+      <button type="button" class="sim-btn sim-btn-order"
+              title="Append a blank leg row for hypothetical / manual entry"
+              onclick={addLegRow}>+ Add row</button>
+      <button type="button" class="sim-btn sim-btn-order"
+              title="Compute aggregate analytics + payoff for the current legs"
+              onclick={loadStrategy}>Analyze</button>
+      {#if legs.length}
+        <button type="button" class="sim-btn sim-btn-order opt-clear"
+                title="Discard every leg and reset"
+                onclick={clearLegs}>Clear</button>
+      {/if}
+    {:else if mode !== 'hypothetical'}
       <div class="opt-field opt-field-grow">
         <label class="field-label" for="opt-pos">Position</label>
         <Select id="opt-pos"
@@ -259,18 +361,196 @@
   </div>
 </div>
 
-{#if analyticsErr}
+{#if analyticsErr && mode !== 'strategy'}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{analyticsErr}</div>
 {/if}
+{#if strategyErr && mode === 'strategy'}
+  <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{strategyErr}</div>
+{/if}
 
-{#if !analytics && !analyticsErr && !loading}
+{#if mode !== 'strategy' && !analytics && !analyticsErr && !loading}
   <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
     Pick a position above (or switch to Hypothetical and type a symbol)
     to load the analytics workspace.
   </div>
 {/if}
 
-{#if analytics}
+<!-- ───────────────────────── STRATEGY (multi-leg) ───────────────────── -->
+{#if mode === 'strategy'}
+  <!-- Leg-builder table — operator's working set. Each row carries the
+       full leg state (symbol/qty/avg_cost/ltp) and ships verbatim to the
+       backend on Analyze. Sim-sourced legs already have LTP filled; live
+       legs can leave LTP blank and the backend pulls it from broker. -->
+  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+      Legs <span class="opt-section-meta">({legs.length})</span>
+    </div>
+    {#if !legs.length}
+      <div class="text-[0.6rem] text-[#7e97b8] italic">
+        No legs yet. Pick from <b>Add leg from book</b> above (live or sim
+        positions) or click <b>+ Add row</b> for a blank line you can fill
+        manually.
+      </div>
+    {:else}
+      <div class="leg-grid">
+        <div class="leg-headrow">
+          <span>Symbol</span>
+          <span>Qty</span>
+          <span>Avg cost</span>
+          <span>LTP</span>
+          <span>Source</span>
+          <span></span>
+        </div>
+        {#each legs as _l, i (i)}
+          <div class="leg-row">
+            <input type="text" class="field-input"
+              placeholder="NIFTY25APR22000CE"
+              bind:value={legs[i].symbol} />
+            <input type="number" class="field-input"
+              placeholder="±qty"
+              bind:value={legs[i].qty} />
+            <input type="number" class="field-input"
+              placeholder="₹"
+              step="0.05"
+              bind:value={legs[i].avg_cost} />
+            <input type="number" class="field-input"
+              placeholder={legs[i].source === 'sim' ? '₹ (required for sim)' : '₹ (auto from broker)'}
+              step="0.05"
+              bind:value={legs[i].ltp} />
+            <span class="leg-source leg-source-{legs[i].source}">{legs[i].source}</span>
+            <button type="button" class="leg-del"
+                    title="Remove this leg"
+                    onclick={() => removeLegRow(i)}>×</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+
+  {#if strategy}
+    <div class="opt-grid">
+      <div class="opt-payoff">
+        <div class="opt-section-h">
+          Aggregate Payoff
+          <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
+          <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
+            {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
+            {fmtMoney(Math.abs(strategy.net_cost), false)}
+          </span>
+          <span class="opt-section-meta">
+            DTE {strategy.days_to_expiry.toFixed(1)} ·
+            σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
+            {strategy.legs.length} legs
+          </span>
+        </div>
+        <OptionsPayoff
+          payoff={strategy.payoff}
+          spot={strategy.spot}
+          strikes={strategy.legs.map(l => l.strike)}
+          breakevens={strategy.risk.breakevens}
+          height={320} />
+      </div>
+
+      <aside class="opt-side">
+        <div class="opt-block">
+          <div class="opt-block-h">Aggregate</div>
+          <div class="opt-kv">
+            <span class="kv-k">Underlying</span> <span class="kv-v">{strategy.underlying}</span>
+            <span class="kv-k">Spot</span>       <span class="kv-v">₹{strategy.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            <span class="kv-k">Expiry</span>     <span class="kv-v">{strategy.expiry}</span>
+            <span class="kv-k">Net cost</span>
+            <span class="kv-v {strategy.net_cost > 0 ? 'kv-neg' : strategy.net_cost < 0 ? 'kv-pos' : ''}">
+              {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
+            </span>
+          </div>
+        </div>
+
+        <div class="opt-block">
+          <div class="opt-block-h">Greeks (position)</div>
+          <div class="opt-kv">
+            <span class="kv-k">Δ delta</span>     <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
+            <span class="kv-k">Γ gamma</span>     <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
+            <span class="kv-k">Θ theta /d</span>
+            <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
+            <span class="kv-k">𝒱 vega /1%IV</span>
+            <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
+            <span class="kv-k">ρ rho /1%r</span>  <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
+          </div>
+        </div>
+
+        <div class="opt-block">
+          <div class="opt-block-h">Risk</div>
+          <div class="opt-kv">
+            <span class="kv-k">Max profit*</span>
+            <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
+            <span class="kv-k">Max loss*</span>
+            <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
+            <span class="kv-k">Breakevens</span>
+            <span class="kv-v">
+              {#if strategy.risk.breakevens.length}
+                {strategy.risk.breakevens.map(/** @param {number} b */ (b) => `₹${b.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`).join(' / ')}
+              {:else}—{/if}
+            </span>
+            <span class="kv-k">POP</span>
+            <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
+          </div>
+          <div class="text-[0.5rem] text-[#7e97b8] mt-1 italic">
+            * numerical max/min within ±{((strategy.payoff.length ? (strategy.payoff[strategy.payoff.length-1].spot - strategy.payoff[0].spot) / 2 / strategy.spot * 100 : 10)).toFixed(0)}% spot range
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Per-leg breakdown table — what each leg contributes. -->
+    <div class="algo-status-card p-3 mb-3" data-status="inactive">
+      <div class="opt-section-h" style="padding-bottom: 0.5rem;">Per-leg breakdown</div>
+      <table class="leg-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Type</th>
+            <th class="num">Strike</th>
+            <th class="num">Qty</th>
+            <th class="num">Cost</th>
+            <th class="num">LTP</th>
+            <th class="num">BS</th>
+            <th class="num">Diff</th>
+            <th class="num">IV</th>
+            <th class="num">Δ</th>
+            <th class="num">Θ/d</th>
+            <th class="num">𝒱/1%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each strategy.legs as l}
+            <tr>
+              <td class="font-mono">{l.symbol}</td>
+              <td><span class="leg-type-{l.opt_type}">{l.opt_type}</span></td>
+              <td class="num">{l.strike.toFixed(0)}</td>
+              <td class="num {l.qty < 0 ? 'kv-neg' : 'kv-pos'}">{l.qty > 0 ? '+' : ''}{l.qty}</td>
+              <td class="num">₹{l.avg_cost.toFixed(2)}</td>
+              <td class="num">₹{l.ltp.toFixed(2)}</td>
+              <td class="num">₹{l.theoretical.toFixed(2)}</td>
+              <td class="num {l.discrepancy >= 0 ? 'kv-pos' : 'kv-neg'}">{l.discrepancy >= 0 ? '+' : ''}{l.discrepancy.toFixed(2)}</td>
+              <td class="num">{(l.iv * 100).toFixed(1)}%</td>
+              <td class="num">{l.greeks.delta.toFixed(3)}</td>
+              <td class="num kv-neg">{l.greeks.theta.toFixed(2)}</td>
+              <td class="num">{l.greeks.vega.toFixed(2)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {:else if !strategyErr && !legs.length}
+    <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
+      Add at least one leg above, then click <b>Analyze</b>. All legs must
+      share the same underlying and same expiry (calendar / diagonal
+      spreads aren't supported in this version).
+    </div>
+  {/if}
+{/if}
+
+{#if mode !== 'strategy' && analytics}
   <div class="opt-grid">
     <!-- Payoff diagram (large) -->
     <div class="opt-payoff">
@@ -367,7 +647,7 @@
   <div class="opt-historical">
     <div class="opt-section-h">
       Historical · last 30 days
-      {#if historical}<span class="opt-section-meta">{historical.bars.length} daily bars · token #{historical.instrument_token}</span>{/if}
+      {#if historical}<span class="opt-section-meta">{historical.bars.length} daily bars · token {historical.instrument_token}</span>{/if}
     </div>
     {#if historicalErr}
       <div class="text-[0.6rem] text-amber-300 px-1">{historicalErr}</div>
@@ -506,5 +786,119 @@
   }
   .opt-historical {
     margin-top: 0.3rem;
+  }
+
+  /* Leg builder — compact monospace grid mirroring the simulator's
+     custom-positions panel so the two read as siblings. */
+  .leg-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.4rem;
+  }
+  .leg-headrow,
+  .leg-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .leg-headrow {
+    font-family: monospace;
+    font-size: 0.55rem;
+    color: #7e97b8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-bottom: 0.15rem;
+    border-bottom: 1px solid rgba(251,191,36,0.18);
+  }
+  :global(.leg-row .field-input) {
+    font-size: 0.62rem;
+    padding: 0.25rem 0.4rem;
+    font-family: monospace;
+  }
+  .leg-source {
+    font-family: monospace;
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7e97b8;
+    text-align: center;
+  }
+  .leg-source-live   { color: #22c55e; }
+  .leg-source-sim    { color: #fbbf24; }
+  .leg-source-manual { color: #7dd3fc; }
+  .leg-del {
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 3px;
+    border: 1px solid rgba(248,113,113,0.4);
+    background: rgba(248,113,113,0.08);
+    color: #f87171;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .leg-del:hover {
+    background: rgba(248,113,113,0.18);
+    border-color: rgba(248,113,113,0.65);
+  }
+
+  /* Per-leg breakdown table — same monospace look as the Greeks table on
+     the single-leg view, but wider (more columns to read). */
+  .leg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+    font-size: 0.6rem;
+  }
+  .leg-table th {
+    text-align: left;
+    color: #7e97b8;
+    font-weight: 700;
+    padding: 0.2rem 0.35rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(251,191,36,0.04);
+  }
+  .leg-table th.num,
+  .leg-table td.num { text-align: right; }
+  .leg-table td {
+    padding: 0.22rem 0.35rem;
+    color: #c8d8f0;
+  }
+  .leg-table tbody tr:not(:last-child) td {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .leg-type-CE {
+    color: #22c55e;
+    background: rgba(34,197,94,0.10);
+    border: 1px solid rgba(34,197,94,0.4);
+    border-radius: 2px;
+    padding: 0 4px;
+    font-weight: 700;
+    font-size: 0.55rem;
+  }
+  .leg-type-PE {
+    color: #f87171;
+    background: rgba(248,113,113,0.10);
+    border: 1px solid rgba(248,113,113,0.4);
+    border-radius: 2px;
+    padding: 0 4px;
+    font-weight: 700;
+    font-size: 0.55rem;
+  }
+
+  /* "Clear" button styled subtly red so the destructive action stands
+     out from "+ Add row" / "Analyze" without being scary. */
+  :global(.opt-clear) {
+    border-color: rgba(248,113,113,0.45) !important;
+    color: #f87171 !important;
+  }
+  :global(.opt-clear:hover) {
+    background: rgba(248,113,113,0.10) !important;
   }
 </style>

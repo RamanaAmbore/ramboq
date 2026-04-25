@@ -443,7 +443,31 @@ The page (and the paper-trading underlying-spot fetch) routes shared market-data
 - **Options only**. Futures show in your position list but the analytics endpoint will reject them — they're linear-payoff, no Greeks needed.
 - **Sim historical isn't possible**. Sim runs are forward-only (no recorded history before the run started). For sim positions the historical chart shows a clear "unavailable" message; live + hypothetical work normally.
 - **IV is locked at the moment of the call**. The page polls every 5 s so a fast-moving market refreshes the IV calibration; the payoff curve uses whatever σ the latest poll resolved.
-- **Single-leg only in v1**. Multi-leg combinations (spreads, straddles, iron condors) have additive payoff curves but the page doesn't combine them yet — pick one leg at a time.
+
+### Strategy mode — multi-leg payoff (vertical, iron condor, butterfly, strangle)
+
+Source dropdown → **Strategy (multi-leg)**. Two ways to build the basket:
+
+1. **Add leg from book** — picks any open live or sim position and appends it as a leg. Avg cost + current LTP are captured at click time, so a sim leg ships its own LTP and the backend doesn't need to round-trip to the broker.
+2. **+ Add row** — empty row for a hypothetical leg. Fill in the symbol + qty (negative = short); leave Avg cost blank to use LTP, leave LTP blank to have the backend pull it from Kite.
+
+Click **Analyze** → the page renders:
+
+- **Aggregate payoff chart** with the same colour scheme as the single-leg view, but every leg's strike marker shows up plus *every* breakeven (an iron condor draws 2; a butterfly 2; a vertical 1).
+- **Aggregate side panel**:
+  - Net cost (debit / credit) — sign tells you whether you paid or collected
+  - Position-level Greeks (Δ Γ Θ V ρ) — summed across legs, signed by qty
+  - Max profit / max loss — numerical, within the spot range you're charting
+  - Breakevens — multiple, comma-separated
+  - POP — probability the strategy lands in any profitable region at expiry, computed from a qty-weighted-IV log-normal
+- **Per-leg breakdown table** — every leg with its own theo / LTP / discrepancy / IV / Δ / Θ / V
+
+Constraints (v1):
+- All legs must share the **same underlying** (the page rejects mixed underlyings — would be unplottable on a single x-axis anyway).
+- All legs must share the **same expiry** (calendar + diagonal spreads need separate per-leg expiry handling and aren't supported yet).
+- Sim legs must supply LTP inline (the leg picker captures it automatically; manual rows have to fill it in).
+
+Use it before you put on a complex trade — spread the legs out, hit Analyze, look at the BE markers and POP, *then* hit the broker. The numbers won't lie.
 
 
 

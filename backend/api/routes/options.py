@@ -23,15 +23,21 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 import msgspec
-from litestar import Controller, get
+from litestar import Controller, get, post
 from litestar.exceptions import HTTPException
 
 from backend.api.algo.derivatives import (
+    DEFAULT_IV,
     DEFAULT_RISK_FREE,
     black_scholes,
     days_to_expiry,
+    find_breakevens,
     greeks,
     implied_vol,
+    multileg_extremes,
+    multileg_greeks,
+    multileg_payoff_curve,
+    multileg_pop,
     parse_tradingsymbol,
     payoff_curve,
     risk_metrics,
@@ -116,6 +122,59 @@ class HistoricalResponse(msgspec.Struct):
     instrument_token: int | None
     interval:         str
     bars:             list[HistoricalBar]
+
+
+# Multi-leg strategy schemas. Each leg can come from any source — live
+# broker, simulator, or operator imagination. The route resolves missing
+# LTPs by hitting the broker; sim legs supply ltp inline so no broker
+# round-trip is needed for them.
+class StrategyLeg(msgspec.Struct):
+    symbol:    str
+    qty:       int                       # signed: + long, − short
+    avg_cost:  float | None = None       # per-share entry premium; defaults to ltp
+    ltp:       float | None = None       # current premium; fetched from broker if absent
+    iv:        float | None = None       # IV override; calibrated from ltp otherwise
+
+
+class StrategyRequest(msgspec.Struct):
+    legs:     list[StrategyLeg]
+    spot:     float | None = None        # spot override; sim or broker otherwise
+    span_pct: float = 0.10               # ±span around current spot
+    points:   int   = 51
+
+
+class LegDetail(msgspec.Struct):
+    symbol:       str
+    opt_type:     str
+    strike:       float
+    qty:          int
+    avg_cost:     float
+    ltp:          float
+    iv:           float
+    theoretical:  float
+    discrepancy:  float
+    greeks:       OptionGreeks
+
+
+class StrategyRisk(msgspec.Struct):
+    max_profit:  float                   # numerical max — only as wide as the curve
+    max_loss:    float
+    breakevens:  list[float]
+    pop:         float                   # 0..1
+
+
+class StrategyResponse(msgspec.Struct):
+    underlying:        str
+    expiry:            str
+    days_to_expiry:    float
+    spot:              float
+    net_cost:          float             # signed: + paid, − collected
+    net_qty:           int               # ∑ signed qty (just for the header)
+    iv_proxy:          float             # qty-weighted IV used by POP
+    aggregate_greeks:  OptionGreeks
+    risk:              StrategyRisk
+    payoff:            list[PayoffPoint]
+    legs:              list[LegDetail]
 
 
 # ── Resolvers ─────────────────────────────────────────────────────────
@@ -404,3 +463,202 @@ class OptionsController(Controller):
         ]
         return HistoricalResponse(symbol=sym, instrument_token=token,
                                   interval=interval, bars=bars)
+
+    # ── Multi-leg strategy analytics (POST) ────────────────────────────
+
+    @post("/strategy-analytics")
+    async def strategy_analytics(self, data: "StrategyRequest") -> "StrategyResponse":
+        """
+        Aggregate analytics for a multi-leg single-underlying strategy
+        (vertical spread, iron condor, butterfly, strangle, etc.).
+        Accepts a list of legs; v1 requires every leg to share the same
+        underlying and same expiry.
+
+        Per-leg `ltp` and `avg_cost` are optional — if provided (e.g.
+        legs sourced from the simulator), they're used directly; if
+        missing, the broker is hit for the current LTP and `avg_cost`
+        falls back to the LTP (treats the leg as "what if I open this
+        right now").
+        """
+        if not data.legs:
+            raise HTTPException(status_code=400, detail="legs is required")
+
+        # ── 1. Resolve metadata + LTP per leg ─────────────────────────
+        resolved_legs: list[dict] = []
+        underlyings: set[str] = set()
+        expiries: set[str]    = set()
+        from backend.shared.brokers.registry import get_price_broker
+
+        # Bulk LTP fetch — collect every symbol that doesn't have a
+        # caller-supplied LTP, hit broker.ltp once, distribute back.
+        need_ltp: dict[str, str] = {}   # nfo_key → leg_symbol
+        for leg in data.legs:
+            sym = (leg.symbol or "").upper().strip()
+            if not sym:
+                raise HTTPException(status_code=400, detail="leg.symbol is required")
+            parsed = parse_tradingsymbol(sym)
+            if not parsed or parsed.get("kind") != "opt":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"'{sym}' isn't a recognised option contract."
+                )
+            underlyings.add(parsed["underlying"])
+            expiries.add(parsed["expiry"].isoformat())
+            if leg.ltp is None:
+                need_ltp[f"NFO:{sym}"] = sym
+
+        if len(underlyings) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"All legs must share an underlying; got {sorted(underlyings)}"
+            )
+        if len(expiries) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(f"All legs must share an expiry (v1 doesn't support "
+                        f"calendar / diagonal spreads); got {sorted(expiries)}")
+            )
+        underlying = next(iter(underlyings))
+
+        ltp_resp: dict = {}
+        if need_ltp:
+            try:
+                ltp_resp = get_price_broker().ltp(list(need_ltp.keys())) or {}
+            except Exception as e:
+                # Don't fail the whole request — sim legs and operator
+                # overrides can still produce useful output. Surface a
+                # warning so the UI can flag missing LTPs.
+                logger.warning(f"Strategy LTP fetch failed: {e}")
+
+        # ── 2. Resolve spot (request override > sim > broker) ─────────
+        S: float
+        if data.spot is not None and data.spot > 0:
+            S = float(data.spot)
+        else:
+            try:
+                from backend.api.algo.sim.driver import get_driver
+                drv = get_driver()
+                if drv.active and underlying in drv._underlyings:
+                    S = float(drv._underlyings[underlying])
+                else:
+                    raise RuntimeError("no sim spot")
+            except Exception:
+                key = underlying_ltp_key(underlying)
+                try:
+                    resp = get_price_broker().ltp([key]) or {}
+                except Exception as e:
+                    raise HTTPException(status_code=502,
+                        detail=f"underlying spot unavailable: {e}")
+                q = resp.get(key) or {}
+                lp = q.get("last_price")
+                if lp is None:
+                    raise HTTPException(status_code=502,
+                        detail=f"spot for {underlying} unavailable")
+                S = float(lp)
+
+        # ── 3. Build resolved-leg list with σ calibrated per leg ──────
+        T_yrs_shared = 0.0
+        sigma_weight_num = 0.0
+        sigma_weight_den = 0.0
+        leg_details: list[dict] = []
+        for leg in data.legs:
+            sym = leg.symbol.upper().strip()
+            parsed = parse_tradingsymbol(sym)
+            T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
+            T_yrs_shared = T_yrs
+            qty   = int(leg.qty or 0)
+            if qty == 0:
+                raise HTTPException(status_code=400,
+                    detail=f"leg '{sym}' has qty=0")
+
+            # LTP: operator > broker fetch > complain
+            ltp_val: float | None = leg.ltp
+            if ltp_val is None:
+                q = ltp_resp.get(f"NFO:{sym}") or {}
+                ltp_val = q.get("last_price")
+            if ltp_val is None or ltp_val <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(f"leg '{sym}' has no LTP. Pass `ltp` in the leg "
+                            f"body (sim positions) or check the broker quote.")
+                )
+            ltp_val = float(ltp_val)
+
+            # σ: operator > calibrate > default
+            if leg.iv is not None and leg.iv > 0:
+                sig = float(leg.iv)
+            else:
+                sig = implied_vol(ltp_val, S, parsed["strike"], T_yrs,
+                                  DEFAULT_RISK_FREE, parsed["opt_type"])
+
+            # Cost basis: operator > LTP fallback (just-opened semantics)
+            entry = float(leg.avg_cost) if leg.avg_cost is not None else ltp_val
+
+            # Theoretical for the leg + per-share Greeks (UI shows them).
+            theo = black_scholes(S, parsed["strike"], T_yrs,
+                                 DEFAULT_RISK_FREE, sig, parsed["opt_type"])
+            g_per = greeks(S, parsed["strike"], T_yrs,
+                           DEFAULT_RISK_FREE, sig, parsed["opt_type"])
+
+            resolved_legs.append({
+                "strike":      parsed["strike"],
+                "opt_type":    parsed["opt_type"],
+                "qty":         qty,
+                "entry_price": entry,
+                "T_years":     T_yrs,
+                "sigma":       sig,
+            })
+            sigma_weight_num += sig * abs(qty)
+            sigma_weight_den += abs(qty)
+            leg_details.append({
+                "symbol":      sym,
+                "opt_type":    parsed["opt_type"],
+                "strike":      parsed["strike"],
+                "qty":         qty,
+                "avg_cost":    entry,
+                "ltp":         ltp_val,
+                "iv":          sig,
+                "theoretical": theo,
+                "discrepancy": ltp_val - theo,
+                "greeks":      g_per,
+            })
+
+        # ── 4. Aggregate analytics ────────────────────────────────────
+        # qty-weighted IV used for the lognormal that drives POP. Imperfect
+        # (the real underlying σ isn't the same as any leg's IV) but it's
+        # the most defensible single number from the data we have.
+        sigma_proxy = (sigma_weight_num / sigma_weight_den
+                       if sigma_weight_den else DEFAULT_IV)
+
+        curve = multileg_payoff_curve(
+            resolved_legs, S=S,
+            span_pct=max(0.01, min(float(data.span_pct or 0.10), 0.5)),
+            points=max(11, min(int(data.points or 51), 121)),
+        )
+        agg_greeks  = multileg_greeks(resolved_legs, S=S)
+        bes         = find_breakevens(curve)
+        max_p, max_l = multileg_extremes(curve)
+        pop = multileg_pop(curve, S=S, T_years=T_yrs_shared, sigma=sigma_proxy)
+        net_cost = sum(l["entry_price"] * l["qty"] for l in resolved_legs)
+
+        return StrategyResponse(
+            underlying=underlying,
+            expiry=next(iter(expiries)),
+            days_to_expiry=days_to_expiry(parsed["expiry"]),
+            spot=S,
+            net_cost=net_cost,
+            net_qty=sum(int(l["qty"]) for l in resolved_legs),
+            iv_proxy=sigma_proxy,
+            aggregate_greeks=OptionGreeks(**agg_greeks),
+            risk=StrategyRisk(
+                max_profit=max_p, max_loss=max_l,
+                breakevens=bes, pop=pop,
+            ),
+            payoff=[PayoffPoint(**p) for p in curve],
+            legs=[LegDetail(
+                symbol=l["symbol"], opt_type=l["opt_type"], strike=l["strike"],
+                qty=l["qty"], avg_cost=l["avg_cost"], ltp=l["ltp"], iv=l["iv"],
+                theoretical=l["theoretical"], discrepancy=l["discrepancy"],
+                greeks=OptionGreeks(**l["greeks"]),
+            ) for l in leg_details],
+        )

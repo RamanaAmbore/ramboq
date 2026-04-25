@@ -824,16 +824,27 @@ Distinct workspace from the tick-chart pages — this is options *research*, not
 
 | Route | Purpose |
 |---|---|
-| `GET /api/options/analytics?mode=live\|sim\|hypothetical&symbol=…&[account, qty, avg_cost, spot, ltp, iv, span_pct, points]` | Full bundle — Greeks (per-share + position-scaled), pricing block, risk, payoff curve. One round-trip. Hypothetical mode lets the operator dry-analyse a strike before taking the trade. |
+| `GET /api/options/analytics?mode=live\|sim\|hypothetical&symbol=…&[account, qty, avg_cost, spot, ltp, iv, span_pct, points]` | Single-leg bundle — Greeks (per-share + position-scaled), pricing block, risk, payoff curve. One round-trip. Hypothetical mode lets the operator dry-analyse a strike before taking the trade. |
 | `GET /api/options/historical?symbol=…&days=30&interval=day&exchange=NFO` | Kite OHLCV bars. Instrument-token lookup goes through the cached instruments dump. |
+| `POST /api/options/strategy-analytics` (body `{legs: [{symbol, qty, avg_cost?, ltp?, iv?}], spot?, span_pct?, points?}`) | Multi-leg aggregate analytics — vertical spreads, iron condors, butterflies, strangles. Each leg's `ltp` is optional: when present (e.g. legs sourced from the simulator) it's used directly; when absent, the broker is hit once for the whole batch. v1 enforces same-underlying + same-expiry across legs (calendar / diagonal spreads not yet supported). |
+
+**Multi-leg math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
+
+- `multileg_payoff_curve(legs, S, ...)` — sums per-leg `today_value` + `expiry_value` at each spot. Each leg keeps its own (T_years, σ).
+- `multileg_greeks(legs, S, ...)` — sums signed-qty per-leg Greeks (Greeks are linear in qty).
+- `find_breakevens(curve)` — linear-interpolated zero-crossings on the expiry curve. Iron-condor-shaped strategies report 2 BEs; verticals 1; fully ITM/OTM 0.
+- `multileg_pop(curve, S, T, σ_proxy)` — walks the expiry curve, identifies contiguous profit segments, integrates the lognormal `prob_above` over each. Open-ended endpoints (curve runs off-screen still in the money) use the analytical limits so we don't artificially clip POP. `σ_proxy` is the qty-weighted IV across legs — defensible single number from the data we have.
+- `multileg_extremes(curve)` — numerical max profit / max loss from the expiry curve. As wide as the spot range; unlimited-payoff legs (long calls, short puts) need the operator to widen `span_pct` if the realistic upside isn't covered.
 
 **Pricing-account setting** — `connections.price_account` (string, default blank) lets the operator pin which Kite account to use for shared market-data fetches (underlying spots in `PaperTradeEngine._capture_underlyings`, instrument lookup + LTP + historical for `/admin/options`). Implemented in [`backend/shared/brokers/registry.py::get_price_broker()`](backend/shared/brokers/registry.py); falls back to the first available account when the setting is blank.
 
 **UI** — [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte) is the payoff-chart SVG. Two curves (today amber solid, expiry sky dashed), profit/loss zone shading, vertical markers for spot (cyan) / strike (white dashed) / breakeven (amber dashed), hover crosshair with a 3-line tooltip. Hand-rolled SVG, no chart lib.
 
-[`frontend/src/routes/(algo)/admin/options/+page.svelte`](frontend/src/routes/(algo)/admin/options/+page.svelte) wires the picker (live + sim positions auto-discovered, hypothetical = symbol + qty input) above a two-column workspace: payoff chart on the left, side panel on the right with Pricing / Greeks table / Risk blocks. Historical chart sits full-width below, fed via the existing `PriceChart` component with `data` prop set to the historical bars (same SVG line, same theme).
+[`frontend/src/routes/(algo)/admin/options/+page.svelte`](frontend/src/routes/(algo)/admin/options/+page.svelte) wires four input modes: live position / sim position / hypothetical (single-leg) / **strategy** (multi-leg). Single-leg modes render the payoff chart on the left + Pricing / Greeks / Risk blocks on the right + historical chart full-width below. Strategy mode shows a leg-builder table (Add leg from book auto-fills LTP+cost from a live or sim position; + Add row gives a blank line for hypothetical legs), then aggregates into the same payoff chart (with multiple breakeven markers + every leg's strike marked) plus an Aggregate / Greeks / Risk side panel and a per-leg breakdown table beneath.
 
-Polling: analytics every 5 s while a symbol is set; historical only on symbol change (daily candles don't move intra-day).
+`OptionsPayoff` accepts either scalar `strike` / `breakeven` props (single-leg) or arrays `strikes` / `breakevens` (multi-leg) — same SVG, same palette.
+
+Polling: analytics every 5 s while a symbol is set; historical only on symbol change (daily candles don't move intra-day). Strategy mode polls the same cadence so Greeks + IV stay live while the operator stares at the page.
 
 ---
 

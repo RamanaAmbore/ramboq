@@ -13,13 +13,34 @@
 
   /** @type {{
    *   payoff: Array<{spot:number,today_value:number,expiry_value:number}>,
-   *   spot:        number,
-   *   strike:      number,
-   *   breakeven:   number,
-   *   height?:     number,
-   *   currentPnl?: number|null,
+   *   spot:         number,
+   *   strike?:      number,
+   *   breakeven?:   number,
+   *   strikes?:     number[],
+   *   breakevens?:  number[],
+   *   height?:      number,
+   *   currentPnl?:  number|null,
    * }} */
-  let { payoff = [], spot, strike, breakeven, height = 280, currentPnl = null } = $props();
+  let {
+    payoff = [],
+    spot,
+    strike     = undefined,
+    breakeven  = undefined,
+    strikes    = /** @type {number[]|undefined} */ (undefined),
+    breakevens = /** @type {number[]|undefined} */ (undefined),
+    height     = 280,
+    currentPnl = null,
+  } = $props();
+
+  // Multi-leg charts pass `strikes` / `breakevens` arrays; single-leg
+  // charts pass scalars. Normalise to arrays so the render code is one
+  // path. Undefined / empty falls through to no markers.
+  const strikeList    = $derived(strikes
+    ? strikes.filter(s => s != null)
+    : (strike != null ? [strike] : []));
+  const breakevenList = $derived(breakevens
+    ? breakevens.filter(b => b != null)
+    : (breakeven != null ? [breakeven] : []));
 
   /** @type {{x:number,y:number,spot:number,today:number,expiry:number}|null} */
   let hover = $state(null);
@@ -135,6 +156,7 @@
   {:else}
     <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none"
          class="payoff-svg"
+         role="img" aria-label="Option payoff diagram"
          onpointermove={onPointerMove}
          onpointerleave={onPointerLeave}>
       <!-- Profit / loss shading (under the curves so the lines pop) -->
@@ -155,25 +177,32 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Strike marker — solid white vertical line -->
-      <line x1={xOf(strike)} x2={xOf(strike)} y1={PAD_T} y2={height - PAD_B}
-            stroke="rgba(226,232,240,0.40)" stroke-width="1" stroke-dasharray="2 2"/>
-      <text x={xOf(strike)} y={PAD_T + 10}
-            text-anchor="middle" fill="#e2e8f0"
-            font-size="9" font-family="monospace" opacity="0.7">
-        K {strike.toFixed(0)}
-      </text>
+      <!-- Strike markers — one dashed white vertical per strike -->
+      {#each strikeList as k}
+        {#if k >= sMin && k <= sMax}
+          <line x1={xOf(k)} x2={xOf(k)} y1={PAD_T} y2={height - PAD_B}
+                stroke="rgba(226,232,240,0.40)" stroke-width="1" stroke-dasharray="2 2"/>
+          <text x={xOf(k)} y={PAD_T + 10}
+                text-anchor="middle" fill="#e2e8f0"
+                font-size="9" font-family="monospace" opacity="0.7">
+            K {k.toFixed(0)}
+          </text>
+        {/if}
+      {/each}
 
-      <!-- Breakeven marker — amber dashed -->
-      {#if breakeven > sMin && breakeven < sMax}
-        <line x1={xOf(breakeven)} x2={xOf(breakeven)} y1={PAD_T} y2={height - PAD_B}
-              stroke="rgba(251,191,36,0.55)" stroke-width="1" stroke-dasharray="3 3"/>
-        <text x={xOf(breakeven)} y={height - PAD_B + 18}
-              text-anchor="middle" fill="#fbbf24"
-              font-size="9" font-family="monospace">
-          BE {breakeven.toFixed(0)}
-        </text>
-      {/if}
+      <!-- Breakeven markers — amber dashed verticals; multi-leg
+           strategies (iron condor, butterfly) can produce two. -->
+      {#each breakevenList as be}
+        {#if be > sMin && be < sMax}
+          <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
+                stroke="rgba(251,191,36,0.55)" stroke-width="1" stroke-dasharray="3 3"/>
+          <text x={xOf(be)} y={height - PAD_B + 18}
+                text-anchor="middle" fill="#fbbf24"
+                font-size="9" font-family="monospace">
+            BE {be.toFixed(0)}
+          </text>
+        {/if}
+      {/each}
 
       <!-- Current spot marker — cyan vertical -->
       <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}

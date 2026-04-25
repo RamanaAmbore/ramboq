@@ -363,3 +363,21 @@ export async function fetchOptionHistorical(symbol, days = 30,
   const p = new URLSearchParams({ symbol, days: String(days), interval, exchange });
   return _get(`/options/historical?${p}`, { auth: true });
 }
+
+/** POST /api/options/strategy-analytics — multi-leg aggregate analytics. */
+export async function fetchStrategyAnalytics(legs, opts = {}) {
+  return _post('/options/strategy-analytics',
+    {
+      legs: (legs || []).map(l => ({
+        symbol:   String(l.symbol || '').trim().toUpperCase(),
+        qty:      Number(l.qty),
+        avg_cost: l.avg_cost == null || l.avg_cost === '' ? null : Number(l.avg_cost),
+        ltp:      l.ltp      == null || l.ltp      === '' ? null : Number(l.ltp),
+        iv:       l.iv       == null || l.iv       === '' ? null : Number(l.iv),
+      })),
+      spot:     opts.spot     ?? null,
+      span_pct: opts.span_pct ?? 0.10,
+      points:   opts.points   ?? 51,
+    },
+    { auth: true });
+}

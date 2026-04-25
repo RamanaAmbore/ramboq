@@ -457,3 +457,153 @@ def payoff_curve(*, S: float, K: float, T_years: float, r: float,
             "expiry_value": round(expiry_pnl, 2),
         })
     return out
+
+
+# ── Multi-leg helpers ─────────────────────────────────────────────────
+#
+# A "leg" is a dict with the per-leg state we need:
+#   {strike, opt_type, qty (signed), entry_price, T_years, sigma}
+#
+# All legs in a strategy must share the same underlying and (for v1)
+# the same expiry. The route layer enforces that; the math here doesn't
+# revalidate.
+
+def multileg_payoff_curve(legs: list[dict], *, S: float,
+                          r: float = DEFAULT_RISK_FREE,
+                          span_pct: float = 0.10,
+                          points: int = 51) -> list[dict]:
+    """
+    Aggregate `(spot, today_value, expiry_value)` curve summed across all
+    legs. `today_value` uses each leg's own (T_years, sigma); `expiry_value`
+    is intrinsic at the (shared) expiry. Both are net of cumulative entry
+    cost, so they read as total position P&L.
+    """
+    if S <= 0 or not legs or points < 2:
+        return []
+    lo  = S * (1.0 - span_pct)
+    hi  = S * (1.0 + span_pct)
+    step = (hi - lo) / (points - 1)
+    total_cost = sum(float(l.get("entry_price") or 0) * int(l.get("qty") or 0) for l in legs)
+
+    out: list[dict] = []
+    for i in range(points):
+        s_i = lo + step * i
+        today_sum  = 0.0
+        expiry_sum = 0.0
+        for l in legs:
+            K     = float(l["strike"])
+            opt   = l["opt_type"]
+            qty   = int(l["qty"])
+            T_yrs = float(l.get("T_years") or 0)
+            sig   = float(l.get("sigma") or DEFAULT_IV)
+            today_sum  += black_scholes(s_i, K, T_yrs, r, sig, opt) * qty
+            intrinsic   = max(0.0, s_i - K) if opt == "CE" else max(0.0, K - s_i)
+            expiry_sum += intrinsic * qty
+        out.append({
+            "spot":         round(s_i, 4),
+            "today_value":  round(today_sum  - total_cost, 2),
+            "expiry_value": round(expiry_sum - total_cost, 2),
+        })
+    return out
+
+
+def multileg_greeks(legs: list[dict], *, S: float,
+                    r: float = DEFAULT_RISK_FREE) -> dict:
+    """
+    Position-level Greeks summed across all legs (signed qty applied per
+    leg). Linear in qty so summation works directly. Returned in trader
+    units (theta/day, vega per 1 % IV, rho per 1 % rate).
+    """
+    out = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
+    for l in legs:
+        K     = float(l["strike"])
+        opt   = l["opt_type"]
+        qty   = int(l["qty"])
+        T_yrs = float(l.get("T_years") or 0)
+        sig   = float(l.get("sigma") or DEFAULT_IV)
+        g = greeks(S, K, T_yrs, r, sig, opt)
+        for k in out:
+            out[k] += g[k] * qty
+    return out
+
+
+def find_breakevens(curve: list[dict], *, key: str = "expiry_value"
+                    ) -> list[float]:
+    """
+    Linear-interpolated zero-crossings on `curve[*][key]`. Iron-condor-
+    shaped strategies have 2 breakevens; verticals usually have 1; a
+    fully ITM/OTM strategy has 0.
+    """
+    if len(curve) < 2:
+        return []
+    out: list[float] = []
+    for i in range(len(curve) - 1):
+        a, b = curve[i], curve[i + 1]
+        ya, yb = a[key], b[key]
+        if ya == 0.0:
+            out.append(float(a["spot"]))
+            continue
+        if (ya < 0) != (yb < 0):
+            xa, xb = a["spot"], b["spot"]
+            t = ya / (ya - yb)   # linear interp
+            out.append(round(xa + t * (xb - xa), 2))
+    # Don't double-report the endpoint when ya was exactly zero AND the
+    # next segment crosses immediately.
+    return sorted(set(round(x, 2) for x in out))
+
+
+def multileg_pop(curve: list[dict], *, S: float, T_years: float,
+                 sigma: float, r: float = DEFAULT_RISK_FREE,
+                 key: str = "expiry_value") -> float:
+    """
+    Probability that the strategy ends profitable AT EXPIRY under the
+    Black-Scholes log-normal assumption. Walks the expiry curve, finds
+    every contiguous segment where value > 0, and sums
+    `prob_above(low) - prob_above(high)` for each. Open-ended segments
+    (extending to ∞ or 0) use the analytical limits.
+    """
+    if not curve or T_years <= 0 or sigma <= 0:
+        return 0.0
+    # Build segments by sign. A single sweep — O(N).
+    segs: list[tuple[float, float, bool]] = []   # (lo, hi, is_profit)
+    cur_lo  = curve[0]["spot"]
+    cur_pos = curve[0][key] > 0
+    for i in range(1, len(curve)):
+        a, b = curve[i - 1], curve[i]
+        if (a[key] > 0) != (b[key] > 0):
+            # Sign change — interpolate the crossing point.
+            xa, xb = a["spot"], b["spot"]
+            t = a[key] / (a[key] - b[key])
+            cross = xa + t * (xb - xa)
+            segs.append((cur_lo, cross, cur_pos))
+            cur_lo, cur_pos = cross, b[key] > 0
+    segs.append((cur_lo, curve[-1]["spot"], cur_pos))
+
+    pop = 0.0
+    first_spot = curve[0]["spot"]
+    last_spot  = curve[-1]["spot"]
+    for lo_s, hi_s, is_profit in segs:
+        if not is_profit:
+            continue
+        # Treat the leftmost / rightmost segment as open-ended so the
+        # operator's payoff curve doesn't artificially clip POP.
+        lo_open = (abs(lo_s - first_spot) < 1e-6)
+        hi_open = (abs(hi_s - last_spot)  < 1e-6)
+        p_low  = prob_above(S, max(0.01, lo_s), T_years, r, sigma) if not lo_open else 1.0
+        p_high = prob_above(S, max(0.01, hi_s), T_years, r, sigma) if not hi_open else 0.0
+        pop += max(0.0, p_low - p_high)
+    return min(1.0, max(0.0, pop))
+
+
+def multileg_extremes(curve: list[dict], *, key: str = "expiry_value"
+                      ) -> tuple[float, float]:
+    """
+    Numerical max profit / max loss off the expiry curve. NOTE: only as
+    accurate as the curve's spot range — strategies with unbounded
+    payoff (long call, short put) need the operator to widen the span
+    or the route layer to flag those legs explicitly.
+    """
+    if not curve:
+        return (0.0, 0.0)
+    vals = [p[key] for p in curve]
+    return (round(max(vals), 2), round(min(vals), 2))
