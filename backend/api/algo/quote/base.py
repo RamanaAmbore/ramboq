@@ -40,3 +40,16 @@ class QuoteSource(ABC):
         agent against a phantom position.
         """
         return None
+
+    def prefetch_for(self, orders: list[dict]) -> None:
+        """
+        Optional bulk fetch — the engine calls this once at the start
+        of `step()` so sources that hit a remote API can batch instead
+        of round-tripping per order. Default: no-op (in-memory
+        sources read directly from local state in `bid_ask_for_order`).
+
+        The LiveQuoteSource override groups orders by account, calls
+        `broker.quote([key1, key2, ...])` once per account, and caches
+        the result so `bid_ask_for_order` becomes a dict lookup.
+        """
+        return None

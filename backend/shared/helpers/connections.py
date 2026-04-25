@@ -1,4 +1,7 @@
+import contextlib
+import fcntl
 import json
+import os
 import socket
 import threading
 from datetime import datetime, timedelta, timezone
@@ -21,8 +24,62 @@ from backend.shared.helpers.ramboq_logger import get_logger
 from backend.shared.helpers.singleton_base import SingletonBase
 from backend.shared.helpers.utils import generate_totp, secrets, config
 
-# Token cache — JSON file per environment (lives in .log/ which is gitignored)
-_TOKEN_CACHE_PATH = Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
+# Token cache — shared across processes via a single file on disk so a
+# successful login from prod's process is reused by dev (and vice versa)
+# instead of each starting their own login flow against the same Kite app.
+# Coordination uses fcntl.flock on a per-account `.lock` file in the same
+# directory so two processes can't run the login critical section at the
+# same time. Without this Kite invalidates the older session whenever the
+# newer one logs in for the same app key, which used to manifest as ~5
+# minutes of 401s on every endpoint.
+#
+# Default path is `/opt/ramboq/.log/kite_tokens.json` — reachable by both
+# `/opt/ramboq` (prod) and `/opt/ramboq_dev` (dev) since both services run
+# as `www-data` on the same server. Override with the
+# `RAMBOQ_KITE_TOKEN_CACHE` env var when running locally or in any layout
+# where the prod path doesn't exist.
+_DEFAULT_TOKEN_CACHE = '/opt/ramboq/.log/kite_tokens.json'
+_FALLBACK_TOKEN_CACHE = (
+    Path(__file__).resolve().parent.parent.parent.parent / '.log' / 'kite_tokens.json'
+)
+_env_path = os.environ.get('RAMBOQ_KITE_TOKEN_CACHE')
+if _env_path:
+    _TOKEN_CACHE_PATH = Path(_env_path)
+elif Path(_DEFAULT_TOKEN_CACHE).parent.is_dir() or Path(_DEFAULT_TOKEN_CACHE).exists():
+    _TOKEN_CACHE_PATH = Path(_DEFAULT_TOKEN_CACHE)
+else:
+    # Local dev / any environment where the prod path doesn't exist —
+    # fall back to the per-process .log/ directory.
+    _TOKEN_CACHE_PATH = _FALLBACK_TOKEN_CACHE
+
+
+@contextlib.contextmanager
+def _cross_process_login_lock(account: str):
+    """
+    Cross-process exclusive lock keyed by account. Pairs with each
+    KiteConnection's in-process `_login_lock` to keep parallel logins
+    serialized both within a process AND across processes (prod + dev
+    sharing the same Kite app keys). The lock file lives next to the
+    token cache; opening it in append mode is safe even if the file
+    doesn't exist yet — `flock` works on the file descriptor.
+    """
+    lock_path = _TOKEN_CACHE_PATH.with_suffix(f'.{account}.lock')
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    fp = None
+    try:
+        fp = open(lock_path, 'a+')
+        fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        if fp is not None:
+            try:
+                fcntl.flock(fp.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            fp.close()
 
 
 class _IPv6SourceAdapter(HTTPAdapter):
@@ -222,9 +279,17 @@ class KiteConnection:
         if not (expired or test_conn):
             return self.kite
 
-        with self._login_lock:
-            # Double-check under the lock — another thread may have
-            # just refreshed while we were waiting.
+        # Two layers of locking:
+        #   1. self._login_lock — coordinates threads inside this process
+        #   2. _cross_process_login_lock — coordinates with any other
+        #      process holding open the same shared token cache file
+        #      (typically prod ↔ dev on the same server).
+        # The cross-process lock is acquired second so we don't hold an
+        # OS-level fd while every concurrent thread waits in line.
+        with self._login_lock, _cross_process_login_lock(self.account):
+            # Double-check under both locks — a peer may have just
+            # refreshed and written a new token to the shared cache
+            # while we were waiting.
             now = timestamp_indian()
             expired = (
                 self._conn_created_at is None

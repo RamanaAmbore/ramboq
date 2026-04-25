@@ -562,6 +562,16 @@ async def on_startup(app) -> None:
     if is_prod_branch():
         from backend.api.algo.paper import get_prod_paper_engine
         paper_engine = get_prod_paper_engine()
+        # Re-register OPEN paper orders from the DB so a service restart
+        # doesn't leave in-flight chases stranded (their AlgoOrder rows
+        # would stay OPEN forever otherwise).
+        try:
+            recovered = await paper_engine.recover_from_db()
+            if recovered:
+                logger.info(f"Background: paper engine recovered {recovered} "
+                            "OPEN order(s) from previous run")
+        except Exception as e:
+            logger.warning(f"Background: paper engine recovery failed: {e}")
         app.state.bg_tasks.append(
             asyncio.create_task(paper_engine.tick_loop(interval_seconds=5),
                                 name="bg-paper-chase")

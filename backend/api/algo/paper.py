@@ -97,6 +97,16 @@ class PaperTradeEngine:
         """
         if not self._open_orders:
             return
+        # Bulk-fetch quotes for every open order before the loop —
+        # LiveQuoteSource does one broker.quote([many]) per account
+        # instead of N round-trips. SimQuoteSource is in-memory so its
+        # prefetch is a no-op.
+        open_now = [o for o in self._open_orders if o.get("status") == "OPEN"]
+        if open_now:
+            try:
+                self._quote.prefetch_for(open_now)
+            except Exception as e:
+                logger.debug(f"PaperTradeEngine[{self._label}] prefetch failed: {e}")
         max_attempts = max(0, int(self._get_max() or 0))
 
         for order in list(self._open_orders):
@@ -182,6 +192,57 @@ class PaperTradeEngine:
     def reset(self) -> None:
         """Wipe the open-order book — used by SimDriver.start()."""
         self._open_orders = []
+
+    async def recover_from_db(self) -> int:
+        """
+        Re-register this engine's `mode == self._label` rows that are
+        still OPEN in the database. Survives a service restart so paper
+        chases that were mid-flight when the process died can resume
+        from where they left off.
+
+        Returns the count recovered.
+        """
+        from backend.api.database  import async_session
+        from backend.api.models    import AlgoOrder
+        from sqlalchemy            import select, and_
+
+        try:
+            async with async_session() as s:
+                rows = (await s.execute(
+                    select(AlgoOrder).where(and_(
+                        AlgoOrder.mode   == self._label,
+                        AlgoOrder.status == "OPEN",
+                    ))
+                )).scalars().all()
+        except Exception as e:
+            logger.warning(f"PaperTradeEngine[{self._label}] recover query failed: {e}")
+            return 0
+
+        for r in rows:
+            init_price = float(r.initial_price) if r.initial_price is not None else None
+            self.register_open_order({
+                "algo_order_id": r.id,
+                "account":       r.account,
+                "symbol":        r.symbol,
+                "exchange":      r.exchange,
+                "side":          r.transaction_type,
+                "qty":           int(r.quantity or 0),
+                # Restart at initial_price — the in-memory current limit
+                # was lost on shutdown. The chase loop will re-quote on
+                # the very next tick anyway, so worst case we re-do one
+                # cycle. attempts resets to 0 so a stranded order near
+                # the cap gets a clean chance to fill.
+                "limit_price":   init_price,
+                "initial_price": init_price,
+                "agent_slug":    "(recovered)",
+                "action_type":   "recovered",
+            })
+        if rows:
+            logger.info(
+                f"PaperTradeEngine[{self._label}]: recovered {len(rows)} OPEN "
+                "order(s) from DB after restart"
+            )
+        return len(rows)
 
     # ── Internals ────────────────────────────────────────────────────
 
