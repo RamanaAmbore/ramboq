@@ -306,31 +306,29 @@
     font-family: ui-monospace, monospace;
   }
 
-  /* Vertical "log" label — lowercase on a faint amber background so
-     it reads as a quiet section stamp. Two-layer split (wrap + text)
-     keeps flex layout and writing-mode from conflicting. */
+  /* Vertical "log" label — muted monospace section marker, mirrors the
+     understated navbar brand text instead of a coloured chip. The
+     two-layer split (wrap + text) keeps flex layout and writing-mode
+     from conflicting. */
   .log-section-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 0.9rem;
-    padding: 0.1rem 0.2rem;
-    margin-right: 0.15rem;
-    background: rgba(251,191,36,0.12);
-    border-right: 1px solid rgba(251,191,36,0.4);
-    border-radius: 3px 0 0 3px;
+    min-width: 0.7rem;
+    padding: 0 0.15rem;
+    margin-right: 0.2rem;
     align-self: stretch;
   }
   .log-section-text {
     writing-mode: vertical-lr;
     transform: rotate(180deg);
     font-family: ui-monospace, monospace;
-    font-size: 0.5rem;
-    font-weight: 700;
+    font-size: 0.48rem;
+    font-weight: 500;
     line-height: 1;
-    color: #fbbf24;
-    text-transform: none;
-    letter-spacing: 0.05em;
+    color: rgba(126, 151, 184, 0.55);
+    text-transform: lowercase;
+    letter-spacing: 0.08em;
     user-select: none;
   }
 

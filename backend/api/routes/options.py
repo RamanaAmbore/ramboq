@@ -265,12 +265,20 @@ def _ltp_from_quote(q: dict) -> tuple[Optional[float], str]:
     return (None, "none")
 
 
-def _resolve_spot(underlying: str, override: Optional[float]
+def _resolve_spot(underlying: str, override: Optional[float],
+                  *, fallback: Optional[float] = None
                   ) -> tuple[float, str]:
-    """Spot for the underlying. Returns `(spot, source)` so the caller
-    can flag stale data in the response. Sources: 'override' | 'sim' |
-    'live' | 'close' | 'depth'. Raises 502 only if every source fails."""
-    if override is not None:
+    """Spot for the underlying. Returns `(spot, source)` so the UI can
+    flag stale data. Sources: 'override' | 'sim' | 'live' | 'close' |
+    'depth' | 'fallback'.
+
+    When the broker is unreachable AND no `fallback` is provided, raises
+    502. With `fallback` (typically the strike of the option being
+    analysed), uses that and tags `source='fallback'` so the page can
+    still render a useful payoff diagram even when market-data is
+    completely down.
+    """
+    if override is not None and override > 0:
         return (float(override), "override")
     try:
         from backend.api.algo.sim.driver import get_driver
@@ -282,30 +290,53 @@ def _resolve_spot(underlying: str, override: Optional[float]
 
     from backend.shared.brokers.registry import get_price_broker
     key = underlying_ltp_key(underlying)
+    px: Optional[float] = None
+    src: str = "none"
     try:
         resp = get_price_broker().quote([key]) or {}
+        px, src = _ltp_from_quote(resp.get(key) or {})
     except Exception as e:
-        raise HTTPException(status_code=502,
-                            detail=f"broker quote for {underlying} failed: {e}")
-    px, src = _ltp_from_quote(resp.get(key) or {})
-    if px is None:
-        raise HTTPException(status_code=502,
-                            detail=f"spot for {underlying} unavailable from broker")
-    return (px, src)
+        # Broker unreachable — log + try fallback below.
+        logger.warning(f"options spot quote for {underlying} failed: {e}")
+
+    if px is not None:
+        return (px, src)
+
+    if fallback is not None and fallback > 0:
+        # Last resort: use the option's strike as a degenerate spot. The
+        # payoff diagram still draws sensibly (strike-centred); the
+        # operator gets a 'fallback' chip so they know the spot is
+        # synthetic and shouldn't be trusted for absolute P&L.
+        return (float(fallback), "fallback")
+
+    raise HTTPException(status_code=502,
+                        detail=f"spot for {underlying} unavailable from any source")
 
 
 def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
                  override: Optional[float],
-                 avg_cost_hint: Optional[float] = None
+                 avg_cost_hint: Optional[float] = None,
+                 *,
+                 estimate_inputs: Optional[dict] = None
                  ) -> tuple[float, str]:
     """
     LTP for an option contract with full fallback chain:
       override > sim-row > broker quote(last_price > close > depth-mid)
-                  > avg_cost_hint > 502.
+                  > avg_cost_hint > BS-estimated.
     Returns `(price, source)` so the UI can flag stale prices. Sources:
-    'override' | 'sim' | 'live' | 'close' | 'depth' | 'avg_cost'.
+    'override' | 'sim' | 'live' | 'close' | 'depth' | 'avg_cost' |
+    'estimated'.
+
+    `estimate_inputs` (when provided) lets the resolver synthesise an
+    estimated LTP via Black-Scholes at default IV when nothing else
+    works. Shape: `{'spot': S, 'strike': K, 'T_years': T, 'opt_type': 'CE'}`.
+    With this, the page never returns 502 — the payoff still draws
+    against an estimated price, and the UI shows an 'estimated' chip.
     """
-    if override is not None:
+    # Treat 0 / negative explicit overrides as "no override" so a sim
+    # leg or picker that copied last_price=0 falls through to broker
+    # fallbacks instead of locking in an obviously wrong number.
+    if override is not None and override > 0:
         return (float(override), "override")
 
     if mode == "sim":
@@ -330,11 +361,25 @@ def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
     if price is not None:
         return (price, src)
 
-    # Final fallbacks — if the operator told us what they paid, use that
-    # so the payoff still draws something useful even when the broker
-    # has nothing to say (illiquid contract, off-hours, weekend).
     if avg_cost_hint is not None and avg_cost_hint > 0:
         return (float(avg_cost_hint), "avg_cost")
+
+    # Final fallback — synthesise an LTP via Black-Scholes at default IV.
+    # The payoff curve still renders something the operator can read;
+    # the UI shows 'estimated' so they know not to trust absolute P&L.
+    if estimate_inputs:
+        S = float(estimate_inputs.get("spot") or 0)
+        K = float(estimate_inputs.get("strike") or 0)
+        T = float(estimate_inputs.get("T_years") or 0)
+        opt = str(estimate_inputs.get("opt_type") or "CE")
+        if S > 0 and K > 0 and T > 0:
+            from backend.api.algo.derivatives import (
+                DEFAULT_IV, black_scholes
+            )
+            est = black_scholes(S, K, T, DEFAULT_RISK_FREE, DEFAULT_IV, opt)
+            if est > 0:
+                return (est, "estimated")
+
     raise HTTPException(
         status_code=502,
         detail=(f"No LTP available for '{symbol}' from any source "
@@ -382,15 +427,26 @@ class OptionsController(Controller):
 
         qty_resolved, acct_resolved, avg_resolved = _resolve_position(
             mode, sym, qty, account, avg_cost)
-        S, spot_src = _resolve_spot(parsed["underlying"], spot)
-        # Pass avg_cost as a last-resort fallback so a stale broker
-        # quote on an illiquid contract still produces a usable payoff.
+        # Spot first, with the strike as a synthetic-spot fallback so
+        # the page never 502s when broker market-data is down. The
+        # response carries spot_source='fallback' in that case.
+        S, spot_src = _resolve_spot(parsed["underlying"], spot,
+                                    fallback=parsed["strike"])
+        T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
+        # Pass avg_cost AND estimated-BS inputs as last-resort fallbacks
+        # so a stale broker quote on an illiquid contract still produces
+        # a usable payoff curve. ltp_source='estimated' tells the UI it
+        # came from BS at default IV against the resolved spot.
         ltp_val, ltp_src = _resolve_ltp(
             sym, mode, acct_resolved or account, ltp,
             avg_cost_hint=avg_resolved if avg_resolved > 0 else avg_cost,
+            estimate_inputs={
+                "spot":      S,
+                "strike":    parsed["strike"],
+                "T_years":   T_yrs,
+                "opt_type":  parsed["opt_type"],
+            },
         )
-
-        T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
         # IV: explicit override > calibrate from current LTP > default
         if iv is not None and iv > 0:
             sigma     = float(iv)
@@ -400,9 +456,11 @@ class OptionsController(Controller):
                                      DEFAULT_RISK_FREE, parsed["opt_type"])
             # implied_vol returns DEFAULT_IV (0.15) on bracket failure or
             # near-intrinsic / degenerate inputs; treat that as the
-            # "default" source so the UI can flag it.
+            # "default" source so the UI can flag it. Estimated-LTP
+            # fallback also forces 'default' since the calibration
+            # would just be a self-referential round-trip.
             if (calibrated == DEFAULT_IV
-                or ltp_src in ("close", "depth", "avg_cost")):
+                or ltp_src in ("close", "depth", "avg_cost", "estimated")):
                 sigma  = calibrated
                 iv_src = "default" if calibrated == DEFAULT_IV else "calibrated"
             else:
@@ -587,7 +645,10 @@ class OptionsController(Controller):
                 )
             underlyings.add(parsed["underlying"])
             expiries.add(parsed["expiry"].isoformat())
-            if leg.ltp is None:
+            # Trigger broker fetch when ltp is missing OR explicitly 0
+            # (sim picker that copied a stale last_price=0 would otherwise
+            # bypass the fetch and fall straight to avg_cost).
+            if leg.ltp is None or leg.ltp <= 0:
                 need_quote[f"NFO:{sym}"] = sym
 
         if len(underlyings) > 1:
@@ -614,31 +675,19 @@ class OptionsController(Controller):
                 # flag the legs whose LTP came from a fallback.
                 logger.warning(f"Strategy quote() failed: {e}")
 
-        # ── 2. Resolve spot (request override > sim > broker) ─────────
-        S: float
-        if data.spot is not None and data.spot > 0:
-            S = float(data.spot)
-        else:
-            try:
-                from backend.api.algo.sim.driver import get_driver
-                drv = get_driver()
-                if drv.active and underlying in drv._underlyings:
-                    S = float(drv._underlyings[underlying])
-                else:
-                    raise RuntimeError("no sim spot")
-            except Exception:
-                key = underlying_ltp_key(underlying)
-                try:
-                    resp = get_price_broker().ltp([key]) or {}
-                except Exception as e:
-                    raise HTTPException(status_code=502,
-                        detail=f"underlying spot unavailable: {e}")
-                q = resp.get(key) or {}
-                lp = q.get("last_price")
-                if lp is None:
-                    raise HTTPException(status_code=502,
-                        detail=f"spot for {underlying} unavailable")
-                S = float(lp)
+        # ── 2. Resolve spot (request override > sim > broker > fallback) ─
+        # Strike-of-the-median-leg used as the synthetic-spot fallback so
+        # the strategy still draws a payoff curve even when broker market
+        # data is fully unreachable. The response carries no spot_source
+        # field today, but the per-leg ltp_source='estimated' or 'fallback'
+        # downstream gives the operator the right "treat with care" signal.
+        sorted_strikes = sorted({parse_tradingsymbol(l.symbol)["strike"]
+                                 for l in data.legs
+                                 if parse_tradingsymbol(l.symbol)})
+        median_strike = (sorted_strikes[len(sorted_strikes) // 2]
+                         if sorted_strikes else None)
+        S, _spot_src = _resolve_spot(underlying, data.spot,
+                                     fallback=median_strike)
 
         # ── 3. Build resolved-leg list with σ calibrated per leg ──────
         T_yrs_shared = 0.0
@@ -668,6 +717,20 @@ class OptionsController(Controller):
             # Fallback to operator's avg_cost if no broker price was usable.
             if ltp_val is None and leg.avg_cost is not None and leg.avg_cost > 0:
                 ltp_val, ltp_source = float(leg.avg_cost), "avg_cost"
+            # Final fallback — synthesise via Black-Scholes at default IV
+            # against the resolved spot. The strategy still produces a
+            # readable payoff curve when the broker is fully unreachable;
+            # leg.ltp_source='estimated' tells the UI to treat absolute
+            # numbers with care.
+            if ltp_val is None or ltp_val <= 0:
+                from backend.api.algo.derivatives import (
+                    DEFAULT_IV, black_scholes
+                )
+                est = black_scholes(S, parsed["strike"], T_yrs,
+                                    DEFAULT_RISK_FREE, DEFAULT_IV,
+                                    parsed["opt_type"])
+                if est > 0:
+                    ltp_val, ltp_source = est, "estimated"
             if ltp_val is None or ltp_val <= 0:
                 raise HTTPException(
                     status_code=400,
@@ -687,6 +750,10 @@ class OptionsController(Controller):
             else:
                 sig = implied_vol(ltp_val, S, parsed["strike"], T_yrs,
                                   DEFAULT_RISK_FREE, parsed["opt_type"])
+                # Fresh sources: live (broker last_price), override
+                # (operator-supplied), sim (driver state). Anything else
+                # means the LTP was a fallback so the calibrated σ
+                # shouldn't be trusted as authoritative.
                 if sig == DEFAULT_IV or ltp_source not in ("override", "live", "sim"):
                     iv_source = "default" if sig == DEFAULT_IV else "calibrated"
                 else:

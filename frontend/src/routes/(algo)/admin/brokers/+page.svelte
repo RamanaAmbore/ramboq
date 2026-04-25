@@ -25,6 +25,7 @@
     fetchBrokerAccounts, createBrokerAccount, updateBrokerAccount,
     deleteBrokerAccount, testBrokerAccount,
   } from '$lib/api';
+  import InfoHint from '$lib/InfoHint.svelte';
 
   /** @type {Array<{id:number,account:string,broker_id:string,api_key:string,
    *   source_ip:string|null,is_active:boolean,notes:string|null,
@@ -157,23 +158,20 @@
 <svelte:head><title>Brokers | RamboQuant Analytics</title></svelte:head>
 
 <div class="page-header">
-  <h1 class="page-title-chip"
-      title="Add, edit, and remove broker accounts. Credentials are encrypted at rest with a key derived from cookie_secret.">
-    Brokers
-  </h1>
+  <h1 class="page-title-chip">Brokers</h1>
+  <InfoHint>
+    CRUD over the broker-accounts table. New accounts go live immediately —
+    the Connections singleton reloads on every save, so the next broker
+    call uses the new credentials without a service restart. Secrets
+    (<span class="font-mono">api_secret</span>,
+    <span class="font-mono">password</span>,
+    <span class="font-mono">totp_token</span>) are encrypted at rest with
+    a key derived from <span class="font-mono">cookie_secret</span> via
+    HKDF, never readable from the API. On Edit, leave a secret field
+    blank to keep the existing value.
+  </InfoHint>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
-
-<p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  CRUD over the broker-accounts table. New accounts go live immediately —
-  the Connections singleton reloads on every save, so the next broker
-  call uses the new credentials without a service restart. Secrets
-  (<span class="font-mono">api_secret</span>,
-  <span class="font-mono">password</span>,
-  <span class="font-mono">totp_token</span>) are encrypted at rest and
-  never readable from the API; on Edit, leave the field blank to keep
-  the existing value.
-</p>
 
 {#if error}<div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{error}</div>{/if}
 {#if note}<div class="mb-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.65rem] border border-emerald-500/30">{note}</div>{/if}
@@ -197,6 +195,7 @@
       server and restart — the table will auto-seed from YAML on first run).
     </div>
   {:else}
+    <div class="brokers-scroll">
     <table class="brokers-table">
       <thead>
         <tr>
@@ -219,11 +218,11 @@
             <td class="font-mono mono-trunc" title={row.source_ip}>{row.source_ip || '—'}</td>
             <td>
               {#if !row.is_active}
-                <span class="status-pill status-inactive">DISABLED</span>
+                <span class="status-pill status-inactive" title="is_active = false">OFF</span>
               {:else if row.loaded}
-                <span class="status-pill status-loaded">LOADED</span>
+                <span class="status-pill status-loaded" title="account is in the live Connections map">ON</span>
               {:else}
-                <span class="status-pill status-pending">PENDING</span>
+                <span class="status-pill status-pending" title="row exists but Connections hasn't picked it up yet — will refresh on the next 15 s poll">…</span>
               {/if}
             </td>
             <td class="notes" title={row.notes}>{row.notes || ''}</td>
@@ -251,6 +250,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
 </div>
 
@@ -360,12 +360,23 @@
     margin: 0;
   }
 
+  /* Horizontal scroll wrapper — narrow viewports otherwise push the
+     status pill (and the action buttons) out past the card edge. */
+  .brokers-scroll {
+    width: 100%;
+    overflow-x: auto;
+  }
   .brokers-table {
     width: 100%;
+    min-width: 720px;
     border-collapse: collapse;
     font-family: monospace;
     font-size: 0.62rem;
+    table-layout: auto;
   }
+  .brokers-table td:nth-child(5) { width: 1%; white-space: nowrap; }   /* status */
+  .brokers-table td:nth-child(7),
+  .brokers-table td:nth-child(8) { width: 1%; white-space: nowrap; }   /* test, actions */
   .brokers-table th {
     text-align: left;
     color: #7e97b8;

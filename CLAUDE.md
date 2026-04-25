@@ -860,6 +860,22 @@ Distinct workspace from the tick-chart pages — this is options *research*, not
 - `risk_metrics(S, K, T, r, sigma, opt_type, qty, entry_price)` — single-leg max profit / max loss / breakeven / POP. Returns `inf` for unlimited-payoff legs (long calls, short puts); the API serializes those as `null` so the UI renders "∞".
 - `payoff_curve(S, K, T, r, sigma, opt_type, qty, entry_price, span_pct, points)` — list of `{spot, today_value, expiry_value}` spanning ±`span_pct` around current spot. Both values are **position P&L** (signed qty, net of entry cost) so they read as money the operator would make/lose.
 
+**LTP fallback chain (graceful degradation)**
+
+Both endpoints now use `broker.quote()` (richer than `ltp()` — has `ohlc.close` + depth) and degrade through this chain rather than 502'ing on any failure:
+
+1. **override** — operator-supplied `ltp` query param / leg field
+2. **sim** — `_positions_rows` row's `last_price` when sim is active
+3. **live** — broker's `last_price`
+4. **close** — previous-day `ohlc.close` (off-hours, weekend, illiquid)
+5. **depth** — midpoint of top-of-book bid/ask
+6. **avg_cost** — operator's recorded entry price
+7. **estimated** — Black-Scholes at `DEFAULT_IV` against the resolved spot
+
+Spot fallback chain mirrors this: override → sim → broker quote → `fallback` (the option's strike used as a synthetic spot — payoff shape is preserved, absolute P&L is not). The endpoint never returns 502 when the operator passed an option that's parseable; it always produces a payoff curve and surfaces source provenance for the UI to render appropriate stale chips.
+
+`ltp <= 0` is treated identically to `ltp = None` (sim pickers that copied a stale `last_price=0` would otherwise bypass the broker fetch and fail straight to `avg_cost`).
+
 **Endpoints** ([`backend/api/routes/options.py`](backend/api/routes/options.py), admin-guarded):
 
 | Route | Purpose |
@@ -899,6 +915,14 @@ The chart panel's per-symbol polling could blow up to N+M requests every 3 s (N 
 **Frontend distribution**: [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) gained a `data` prop. When the parent feeds it (and `chartsBySymbol` for underlying-overlay lookup), the chart skips its own poll timer (`stopPolling()` in a `$effect` triggered when `externalData` flips on). The simulator, paper, and agents pages all poll once and distribute via `chartsBySymbol`.
 
 Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviour change for charts shown without a parent (Chart tab on /orders, /console where it falls back to per-chart polling).
+
+---
+
+## InfoHint pattern
+
+Most algo admin pages used to ship a long descriptive paragraph at the top — fine for first-time onboarding but pure noise once the operator knows what the page does. [`frontend/src/lib/InfoHint.svelte`](frontend/src/lib/InfoHint.svelte) replaces those with a small amber `(i)` chip next to the page title; click to toggle an inline popover with the same gradient + amber accent the Settings row info uses. Implemented across `/admin/brokers`, `/admin/options`, `/admin/paper`, `/admin/simulator`, `/admin/settings`. ~30-40 vh saved per page; help text is one click away when needed.
+
+`<InfoHint>` accepts a children snippet so the popover can include HTML / Svelte content. Default `label='i'`; `align='right'` available for header-bar use cases. Component is theme-aligned (no extra CSS in callers).
 
 ---
 

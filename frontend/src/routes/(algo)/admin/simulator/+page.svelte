@@ -19,6 +19,7 @@
   import Select      from '$lib/Select.svelte';
   import MultiSelect from '$lib/MultiSelect.svelte';
   import PriceChart  from '$lib/PriceChart.svelte';
+  import InfoHint    from '$lib/InfoHint.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
@@ -309,7 +310,15 @@
 <svelte:head><title>Market Simulator | RamboQuant Analytics</title></svelte:head>
 
 <div class="page-header">
-  <h1 class="page-title-chip" title="Feeds fabricated positions into the live agent engine. Every alert, email, and paper-traded order is tagged SIMULATOR so it can't be confused with a real fire. Gated by cap_in_<branch>.simulator.">Simulator</h1>
+  <h1 class="page-title-chip">Simulator</h1>
+  <InfoHint>
+    Feeds fabricated positions into the live agent engine. Every alert,
+    email, and paper-traded order is tagged
+    <span class="font-mono">SIMULATOR</span> so it can't be confused
+    with a real fire. Gated by
+    <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span>
+    in <span class="font-mono">backend_config.yaml</span>.
+  </InfoHint>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
 

@@ -21,6 +21,7 @@
   } from '$lib/api';
   import LogPanel   from '$lib/LogPanel.svelte';
   import PriceChart from '$lib/PriceChart.svelte';
+  import InfoHint   from '$lib/InfoHint.svelte';
 
   let status         = $state(/** @type {any} */ ({}));
   let orderRows      = $state(/** @type {any[]} */ ([]));
@@ -83,21 +84,18 @@
 <svelte:head><title>Paper Trading | RamboQuant Analytics</title></svelte:head>
 
 <div class="page-header">
-  <h1 class="page-title-chip"
-      title="Real Kite quotes + paper trade engine. Reads what mode 2 is doing on prod without ever placing an order against the broker.">
-    Paper Trading
-  </h1>
+  <h1 class="page-title-chip">Paper Trading</h1>
+  <InfoHint>
+    Visual dashboard for the prod paper-trade engine. Every broker-hitting
+    action that hasn't been promoted to
+    <span class="font-mono">execution.live</span> in
+    <a class="text-[#7dd3fc] underline" href="/admin/settings">Settings</a>
+    shows up here as an open chase order, and the chart panel tracks the
+    bid/ask + underlying spot for the symbols involved. No real orders
+    reach the broker.
+  </InfoHint>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
-
-<p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  Visual dashboard for the prod paper-trade engine. Every broker-hitting
-  action that hasn't been promoted to <span class="font-mono">execution.live</span>
-  in <a class="text-[#7dd3fc] underline" href="/admin/settings">Settings</a>
-  shows up here as an open chase order, and the chart panel tracks the
-  bid/ask + underlying spot for the symbols involved. No real orders
-  reach the broker.
-</p>
 
 {#if error}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{error}</div>

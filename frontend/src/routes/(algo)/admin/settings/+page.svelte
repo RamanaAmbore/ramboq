@@ -8,6 +8,7 @@
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp } from '$lib/stores';
   import { fetchSettings, updateSetting, resetSetting } from '$lib/api';
+  import InfoHint from '$lib/InfoHint.svelte';
 
   /** @type {Array<{id:number, category:string, key:string, value_type:string,
    *                value:string, default_value:string, description:string,
@@ -120,17 +121,16 @@
 
 <div class="page-header">
   <h1 class="page-title-chip">Settings</h1>
+  <InfoHint>
+    DB-backed tunables. Edits take effect on the next agent tick / sim run
+    without a deploy. Values are preserved across deploys; pressing
+    <b>Reset</b> returns a key to its code-shipped default. Infrastructure
+    parameters (DB credentials, market hours, Kite URLs, IPv6 addresses)
+    deliberately stay in <span class="font-mono">backend_config.yaml</span>
+    — they change once a quarter and have no business being in the DB.
+  </InfoHint>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
-
-<p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  DB-backed tunables. Edits here take effect on the next agent tick / sim run
-  without a deploy. Values are preserved across deploys; pressing <b>Reset</b>
-  returns a key to its code-shipped default. Infrastructure parameters (DB
-  credentials, market hours, Kite URLs, IPv6 addresses) deliberately stay in
-  <span class="font-mono">backend_config.yaml</span> — they change once a
-  quarter and have no business being in the DB.
-</p>
 
 {#if error}<div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{error}</div>{/if}
 {#if note}<div class="mb-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.65rem] border border-emerald-500/30">{note}</div>{/if}

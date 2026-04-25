@@ -26,6 +26,7 @@
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import PriceChart    from '$lib/PriceChart.svelte';
   import Select        from '$lib/Select.svelte';
+  import InfoHint      from '$lib/InfoHint.svelte';
 
   /** @type {'live'|'sim'|'hypothetical'|'strategy'} */
   let mode = $state('live');
@@ -44,6 +45,7 @@
   let strategyErr   = $state('');
   let loading       = $state(false);
   let teardown;
+  let posTeardown;
 
   // Strategy legs — operator builds a list, "Add from book" auto-fills
   // from a live or sim position so sim legs ship their own ltp + cost
@@ -223,17 +225,22 @@
       goto('/signin'); return;
     }
     loadPositions();
-    // Re-poll analytics every 5s so Greeks + IV stay live while the
-    // operator stares at the page. In strategy mode the same poll
-    // refreshes the multi-leg aggregate. Historical refreshes only on
-    // symbol change (daily candles don't change intra-day).
+    // Two separate cadences:
+    //   - hot (5 s): analytics / strategy aggregate — Greeks + IV move
+    //     intra-tick so the operator wants this fresh.
+    //   - cold (30 s): the picker's position list — the broker book
+    //     changes on the order of minutes; polling it every 5 s wasted
+    //     a /api/positions/ + /api/simulator/status round-trip per tick
+    //     for no operator-visible benefit.
+    // Historical refreshes only on symbol change (daily candles don't
+    // change intra-day).
     teardown = visibleInterval(() => {
       if (mode === 'strategy') loadStrategy();
       else                     loadAnalytics();
-      loadPositions();
     }, 5000);
+    posTeardown = visibleInterval(loadPositions, 30000);
   });
-  onDestroy(() => { teardown?.(); });
+  onDestroy(() => { teardown?.(); posTeardown?.(); });
 
   // ── Helpers ──────────────────────────────────────────────────────
   function fmtMoney(/** @type {number|null|undefined} */ v, /** @type {boolean} */ signed = true) {
@@ -270,21 +277,20 @@
 <svelte:head><title>Options Analytics | RamboQuant Analytics</title></svelte:head>
 
 <div class="page-header">
-  <h1 class="page-title-chip"
-      title="Greeks, payoff diagram, theoretical-vs-market discrepancy, risk metrics, and historical price for any single-leg option position.">
-    Options Analytics
-  </h1>
+  <h1 class="page-title-chip">Options Analytics</h1>
+  <InfoHint>
+    Pick a position from your live or sim book, or type any option symbol
+    to analyze it as a hypothetical trade. The payoff diagram shows how
+    the position pays at <span class="font-mono">today</span>
+    (Black-Scholes with current DTE/IV) vs
+    <span class="font-mono">expiry</span> (intrinsic only). Side panel:
+    Greeks, IV, theoretical-vs-market gap, max profit / max loss /
+    breakeven / probability of profit. Switch source to
+    <span class="font-mono">Strategy</span> for multi-leg analytics
+    (vertical / iron condor / butterfly).
+  </InfoHint>
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
-
-<p class="text-[0.65rem] text-[#c8d8f0]/70 mb-3 max-w-3xl">
-  Pick a position from your live or sim book, or type any option symbol
-  to analyze it as a hypothetical trade. The payoff diagram shows how
-  the position pays at <span class="font-mono">today</span> (Black-Scholes
-  with current DTE/IV) vs <span class="font-mono">expiry</span> (intrinsic
-  only). Side panel: Greeks, IV, theoretical-vs-market gap, max profit /
-  max loss / breakeven / probability of profit.
-</p>
 
 <!-- Picker bar — three input modes share the same row so switching modes
      is a one-click action. -->
@@ -592,9 +598,18 @@
       <div class="opt-block">
         <div class="opt-block-h">
           Pricing
-          {#if analytics.ltp_source !== 'live' && analytics.ltp_source !== 'override' && analytics.ltp_source !== 'sim'}
+          {#if analytics.ltp_source === 'estimated'}
+            <span class="src-chip src-warn" title="Broker market-data unreachable — payoff drawn against an estimated LTP at default IV. Treat absolute numbers with care.">
+              estimated
+            </span>
+          {:else if analytics.ltp_source !== 'live' && analytics.ltp_source !== 'override' && analytics.ltp_source !== 'sim'}
             <span class="src-chip src-stale" title="Live LTP unavailable — using {analytics.ltp_source}">
               stale: {analytics.ltp_source}
+            </span>
+          {/if}
+          {#if analytics.spot_source === 'fallback'}
+            <span class="src-chip src-warn" title="Underlying spot unavailable — using strike as synthetic spot. Payoff shape is preserved; absolute P&L is not reliable.">
+              spot: synthetic
             </span>
           {/if}
         </div>
@@ -966,6 +981,10 @@
     letter-spacing: 0.03em;
   }
   .src-warn { color: #fbbf24; font-weight: 700; }
+  /* When .src-warn is paired with .src-chip (background context), give
+     it the same amber-tinted background as .src-stale so the chip looks
+     like a chip and not just amber text floating on the panel. */
+  .src-chip.src-warn { background: rgba(251,191,36,0.14); }
 
   /* Per-leg LTP source pill — fresh = sky-blue, stale = amber. Sits in
      its own column on the breakdown table. */
