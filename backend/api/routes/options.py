@@ -107,6 +107,14 @@ class OptionAnalyticsResponse(msgspec.Struct):
     risk:    OptionRisk
     payoff:  list[PayoffPoint]
 
+    # Provenance — lets the UI flag stale data with a yellow chip.
+    # ltp_source ∈ {'override','sim','live','close','depth','avg_cost'}
+    # spot_source ∈ {'override','sim','live','close','depth'}
+    # iv_source  ∈ {'override','calibrated','default'}
+    ltp_source:   str
+    spot_source:  str
+    iv_source:    str
+
 
 class HistoricalBar(msgspec.Struct):
     ts:     str
@@ -154,6 +162,10 @@ class LegDetail(msgspec.Struct):
     theoretical:  float
     discrepancy:  float
     greeks:       OptionGreeks
+    # Provenance per leg — UI flags any leg whose LTP came from a fallback
+    # (close / avg_cost) so the operator knows which numbers to trust.
+    ltp_source:   str = "live"
+    iv_source:    str = "calibrated"
 
 
 class StrategyRisk(msgspec.Struct):
@@ -226,59 +238,109 @@ def _resolve_position(mode: str, symbol: str, qty: Optional[int],
                         detail=f"account {account!r} has no position '{symbol}'")
 
 
-def _resolve_spot(underlying: str, override: Optional[float]) -> float:
-    """Spot price for the underlying. Override > sim-known spot > live ltp."""
+def _ltp_from_quote(q: dict) -> tuple[Optional[float], str]:
+    """
+    Pick the best price out of a Kite quote dict. Order:
+      1. last_price (live, freshest)
+      2. ohlc.close (previous-day close — stale but real)
+      3. depth mid (bid+ask)/2 if both present
+    Returns `(price, source)` where source ∈ {'live','close','depth','none'}.
+    """
+    if not q:
+        return (None, "none")
+    lp = q.get("last_price")
+    if lp not in (None, 0, 0.0):
+        return (float(lp), "live")
+    ohlc  = q.get("ohlc") or {}
+    close = ohlc.get("close")
+    if close not in (None, 0, 0.0):
+        return (float(close), "close")
+    depth = q.get("depth") or {}
+    buy   = (depth.get("buy")  or [{}])[0]
+    sell  = (depth.get("sell") or [{}])[0]
+    bid   = buy.get("price")
+    ask   = sell.get("price")
+    if bid and ask and bid > 0 and ask > 0:
+        return ((float(bid) + float(ask)) / 2.0, "depth")
+    return (None, "none")
+
+
+def _resolve_spot(underlying: str, override: Optional[float]
+                  ) -> tuple[float, str]:
+    """Spot for the underlying. Returns `(spot, source)` so the caller
+    can flag stale data in the response. Sources: 'override' | 'sim' |
+    'live' | 'close' | 'depth'. Raises 502 only if every source fails."""
     if override is not None:
-        return float(override)
-    # If a sim is running and knows this underlying, use it (operators
-    # analyzing a sim position see consistent numbers).
+        return (float(override), "override")
     try:
         from backend.api.algo.sim.driver import get_driver
         drv = get_driver()
         if drv.active and underlying in drv._underlyings:
-            return float(drv._underlyings[underlying])
+            return (float(drv._underlyings[underlying]), "sim")
     except Exception:
         pass
 
     from backend.shared.brokers.registry import get_price_broker
-    key  = underlying_ltp_key(underlying)
-    resp = get_price_broker().ltp([key]) or {}
-    quote = resp.get(key) or {}
-    ltp = quote.get("last_price")
-    if ltp is None:
+    key = underlying_ltp_key(underlying)
+    try:
+        resp = get_price_broker().quote([key]) or {}
+    except Exception as e:
+        raise HTTPException(status_code=502,
+                            detail=f"broker quote for {underlying} failed: {e}")
+    px, src = _ltp_from_quote(resp.get(key) or {})
+    if px is None:
         raise HTTPException(status_code=502,
                             detail=f"spot for {underlying} unavailable from broker")
-    return float(ltp)
+    return (px, src)
 
 
 def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
-                 override: Optional[float]) -> float:
-    """Current LTP for the option contract itself."""
+                 override: Optional[float],
+                 avg_cost_hint: Optional[float] = None
+                 ) -> tuple[float, str]:
+    """
+    LTP for an option contract with full fallback chain:
+      override > sim-row > broker quote(last_price > close > depth-mid)
+                  > avg_cost_hint > 502.
+    Returns `(price, source)` so the UI can flag stale prices. Sources:
+    'override' | 'sim' | 'live' | 'close' | 'depth' | 'avg_cost'.
+    """
     if override is not None:
-        return float(override)
+        return (float(override), "override")
+
     if mode == "sim":
         from backend.api.algo.sim.driver import get_driver
         for r in get_driver()._positions_rows:
             if str(r.get("tradingsymbol", "")).upper() == symbol.upper():
                 lp = r.get("last_price")
-                if lp is not None:
-                    return float(lp)
-        raise HTTPException(status_code=404,
-                            detail=f"sim has no LTP for '{symbol}'")
+                if lp not in (None, 0, 0.0):
+                    return (float(lp), "sim")
+        # Sim mode but no row — operator may be requesting a contract
+        # outside the sim. Fall through to broker fallbacks (handy when
+        # the sim is paused but real-data analytics are still useful).
 
-    # live + hypothetical → broker quote
     from backend.shared.brokers.registry import get_price_broker
     key = f"NFO:{symbol}"
     try:
-        resp = get_price_broker().ltp([key]) or {}
+        resp = get_price_broker().quote([key]) or {}
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"broker ltp fetch failed: {e}")
-    q = resp.get(key) or {}
-    ltp = q.get("last_price")
-    if ltp is None:
-        raise HTTPException(status_code=404,
-                            detail=f"LTP for '{symbol}' not returned by broker")
-    return float(ltp)
+        logger.warning(f"options LTP quote() failed for {symbol}: {e}")
+        resp = {}
+    price, src = _ltp_from_quote(resp.get(key) or {})
+    if price is not None:
+        return (price, src)
+
+    # Final fallbacks — if the operator told us what they paid, use that
+    # so the payoff still draws something useful even when the broker
+    # has nothing to say (illiquid contract, off-hours, weekend).
+    if avg_cost_hint is not None and avg_cost_hint > 0:
+        return (float(avg_cost_hint), "avg_cost")
+    raise HTTPException(
+        status_code=502,
+        detail=(f"No LTP available for '{symbol}' from any source "
+                f"(broker quote, sim, avg_cost). "
+                f"Pass `ltp=<value>` to override.")
+    )
 
 
 # ── Controller ────────────────────────────────────────────────────────
@@ -320,16 +382,32 @@ class OptionsController(Controller):
 
         qty_resolved, acct_resolved, avg_resolved = _resolve_position(
             mode, sym, qty, account, avg_cost)
-        S        = _resolve_spot(parsed["underlying"], spot)
-        ltp_val  = _resolve_ltp(sym, mode, acct_resolved or account, ltp)
+        S, spot_src = _resolve_spot(parsed["underlying"], spot)
+        # Pass avg_cost as a last-resort fallback so a stale broker
+        # quote on an illiquid contract still produces a usable payoff.
+        ltp_val, ltp_src = _resolve_ltp(
+            sym, mode, acct_resolved or account, ltp,
+            avg_cost_hint=avg_resolved if avg_resolved > 0 else avg_cost,
+        )
 
         T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
         # IV: explicit override > calibrate from current LTP > default
         if iv is not None and iv > 0:
-            sigma = float(iv)
+            sigma     = float(iv)
+            iv_src    = "override"
         else:
-            sigma = implied_vol(ltp_val, S, parsed["strike"], T_yrs,
-                                DEFAULT_RISK_FREE, parsed["opt_type"])
+            calibrated = implied_vol(ltp_val, S, parsed["strike"], T_yrs,
+                                     DEFAULT_RISK_FREE, parsed["opt_type"])
+            # implied_vol returns DEFAULT_IV (0.15) on bracket failure or
+            # near-intrinsic / degenerate inputs; treat that as the
+            # "default" source so the UI can flag it.
+            if (calibrated == DEFAULT_IV
+                or ltp_src in ("close", "depth", "avg_cost")):
+                sigma  = calibrated
+                iv_src = "default" if calibrated == DEFAULT_IV else "calibrated"
+            else:
+                sigma  = calibrated
+                iv_src = "calibrated"
 
         theo = black_scholes(S, parsed["strike"], T_yrs,
                              DEFAULT_RISK_FREE, sigma, parsed["opt_type"])
@@ -391,6 +469,9 @@ class OptionsController(Controller):
                 long_short=risk["long_short"],
             ),
             payoff=[PayoffPoint(**p) for p in curve],
+            ltp_source=ltp_src,
+            spot_source=spot_src,
+            iv_source=iv_src,
         )
 
     @get("/historical")
@@ -489,9 +570,11 @@ class OptionsController(Controller):
         expiries: set[str]    = set()
         from backend.shared.brokers.registry import get_price_broker
 
-        # Bulk LTP fetch — collect every symbol that doesn't have a
-        # caller-supplied LTP, hit broker.ltp once, distribute back.
-        need_ltp: dict[str, str] = {}   # nfo_key → leg_symbol
+        # Bulk quote fetch — for legs without operator-supplied ltp, hit
+        # broker.quote() once (richer than ltp(): includes ohlc.close +
+        # depth, so the per-leg fallback can pick `close` when no live
+        # last_price is on the wire — handy for off-hours / illiquid).
+        need_quote: dict[str, str] = {}   # nfo_key → leg_symbol
         for leg in data.legs:
             sym = (leg.symbol or "").upper().strip()
             if not sym:
@@ -505,7 +588,7 @@ class OptionsController(Controller):
             underlyings.add(parsed["underlying"])
             expiries.add(parsed["expiry"].isoformat())
             if leg.ltp is None:
-                need_ltp[f"NFO:{sym}"] = sym
+                need_quote[f"NFO:{sym}"] = sym
 
         if len(underlyings) > 1:
             raise HTTPException(
@@ -520,15 +603,16 @@ class OptionsController(Controller):
             )
         underlying = next(iter(underlyings))
 
-        ltp_resp: dict = {}
-        if need_ltp:
+        quote_resp: dict = {}
+        if need_quote:
             try:
-                ltp_resp = get_price_broker().ltp(list(need_ltp.keys())) or {}
+                quote_resp = get_price_broker().quote(list(need_quote.keys())) or {}
             except Exception as e:
                 # Don't fail the whole request — sim legs and operator
-                # overrides can still produce useful output. Surface a
-                # warning so the UI can flag missing LTPs.
-                logger.warning(f"Strategy LTP fetch failed: {e}")
+                # overrides + per-leg fallbacks (avg_cost) can still
+                # produce useful output. Surface a warning so the UI can
+                # flag the legs whose LTP came from a fallback.
+                logger.warning(f"Strategy quote() failed: {e}")
 
         # ── 2. Resolve spot (request override > sim > broker) ─────────
         S: float
@@ -571,25 +655,42 @@ class OptionsController(Controller):
                 raise HTTPException(status_code=400,
                     detail=f"leg '{sym}' has qty=0")
 
-            # LTP: operator > broker fetch > complain
-            ltp_val: float | None = leg.ltp
-            if ltp_val is None:
-                q = ltp_resp.get(f"NFO:{sym}") or {}
-                ltp_val = q.get("last_price")
+            # LTP fallback chain — return `(price, source)` so the UI can
+            # flag stale legs. Order:
+            #   operator override → broker live/close/depth → avg_cost → fail
+            ltp_val: Optional[float]
+            ltp_source: str
+            if leg.ltp is not None and leg.ltp > 0:
+                ltp_val, ltp_source = float(leg.ltp), "override"
+            else:
+                q = quote_resp.get(f"NFO:{sym}") or {}
+                ltp_val, ltp_source = _ltp_from_quote(q)
+            # Fallback to operator's avg_cost if no broker price was usable.
+            if ltp_val is None and leg.avg_cost is not None and leg.avg_cost > 0:
+                ltp_val, ltp_source = float(leg.avg_cost), "avg_cost"
             if ltp_val is None or ltp_val <= 0:
                 raise HTTPException(
                     status_code=400,
-                    detail=(f"leg '{sym}' has no LTP. Pass `ltp` in the leg "
-                            f"body (sim positions) or check the broker quote.")
+                    detail=(f"Leg '{sym}' has no usable price. Pass `ltp` "
+                            f"or `avg_cost` in the leg body (sim positions "
+                            f"and illiquid contracts often need this).")
                 )
-            ltp_val = float(ltp_val)
 
-            # σ: operator > calibrate > default
+            # σ fallback — operator override > calibrate > default IV.
+            # When the LTP came from a fallback (close/avg_cost) the
+            # calibration uses a stale price, so flag iv_source as
+            # 'default' so the UI doesn't treat the σ as authoritative.
+            iv_source: str
             if leg.iv is not None and leg.iv > 0:
                 sig = float(leg.iv)
+                iv_source = "override"
             else:
                 sig = implied_vol(ltp_val, S, parsed["strike"], T_yrs,
                                   DEFAULT_RISK_FREE, parsed["opt_type"])
+                if sig == DEFAULT_IV or ltp_source not in ("override", "live", "sim"):
+                    iv_source = "default" if sig == DEFAULT_IV else "calibrated"
+                else:
+                    iv_source = "calibrated"
 
             # Cost basis: operator > LTP fallback (just-opened semantics)
             entry = float(leg.avg_cost) if leg.avg_cost is not None else ltp_val
@@ -621,6 +722,8 @@ class OptionsController(Controller):
                 "theoretical": theo,
                 "discrepancy": ltp_val - theo,
                 "greeks":      g_per,
+                "ltp_source":  ltp_source,
+                "iv_source":   iv_source,
             })
 
         # ── 4. Aggregate analytics ────────────────────────────────────
@@ -660,5 +763,6 @@ class OptionsController(Controller):
                 qty=l["qty"], avg_cost=l["avg_cost"], ltp=l["ltp"], iv=l["iv"],
                 theoretical=l["theoretical"], discrepancy=l["discrepancy"],
                 greeks=OptionGreeks(**l["greeks"]),
+                ltp_source=l["ltp_source"], iv_source=l["iv_source"],
             ) for l in leg_details],
         )

@@ -513,6 +513,7 @@
             <th class="num">Qty</th>
             <th class="num">Cost</th>
             <th class="num">LTP</th>
+            <th>Src</th>
             <th class="num">BS</th>
             <th class="num">Diff</th>
             <th class="num">IV</th>
@@ -530,9 +531,21 @@
               <td class="num {l.qty < 0 ? 'kv-neg' : 'kv-pos'}">{l.qty > 0 ? '+' : ''}{l.qty}</td>
               <td class="num">₹{l.avg_cost.toFixed(2)}</td>
               <td class="num">₹{l.ltp.toFixed(2)}</td>
+              <td>
+                {#if l.ltp_source === 'live' || l.ltp_source === 'override' || l.ltp_source === 'sim'}
+                  <span class="leg-src leg-src-fresh">{l.ltp_source}</span>
+                {:else}
+                  <span class="leg-src leg-src-stale" title="LTP came from a fallback — treat numbers with care">{l.ltp_source}</span>
+                {/if}
+              </td>
               <td class="num">₹{l.theoretical.toFixed(2)}</td>
               <td class="num {l.discrepancy >= 0 ? 'kv-pos' : 'kv-neg'}">{l.discrepancy >= 0 ? '+' : ''}{l.discrepancy.toFixed(2)}</td>
-              <td class="num">{(l.iv * 100).toFixed(1)}%</td>
+              <td class="num">
+                {(l.iv * 100).toFixed(1)}%
+                {#if l.iv_source === 'default'}
+                  <span class="src-tag src-warn">·dflt</span>
+                {/if}
+              </td>
               <td class="num">{l.greeks.delta.toFixed(3)}</td>
               <td class="num kv-neg">{l.greeks.theta.toFixed(2)}</td>
               <td class="num">{l.greeks.vega.toFixed(2)}</td>
@@ -577,17 +590,40 @@
     <!-- Side panel: pricing + Greeks + risk -->
     <aside class="opt-side">
       <div class="opt-block">
-        <div class="opt-block-h">Pricing</div>
+        <div class="opt-block-h">
+          Pricing
+          {#if analytics.ltp_source !== 'live' && analytics.ltp_source !== 'override' && analytics.ltp_source !== 'sim'}
+            <span class="src-chip src-stale" title="Live LTP unavailable — using {analytics.ltp_source}">
+              stale: {analytics.ltp_source}
+            </span>
+          {/if}
+        </div>
         <div class="opt-kv">
-          <span class="kv-k">Spot</span>     <span class="kv-v">₹{analytics.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          <span class="kv-k">LTP</span>      <span class="kv-v">₹{analytics.ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+          <span class="kv-k">Spot</span>
+          <span class="kv-v">
+            ₹{analytics.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+            {#if analytics.spot_source !== 'live' && analytics.spot_source !== 'override' && analytics.spot_source !== 'sim'}
+              <span class="src-tag" title="spot source = {analytics.spot_source}">·{analytics.spot_source}</span>
+            {/if}
+          </span>
+          <span class="kv-k">LTP</span>
+          <span class="kv-v">
+            ₹{analytics.ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+            <span class="src-tag" title="ltp source = {analytics.ltp_source}">·{analytics.ltp_source}</span>
+          </span>
           <span class="kv-k">BS theo</span>  <span class="kv-v">₹{analytics.theoretical.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
           <span class="kv-k">Diff</span>
           <span class="kv-v {analytics.discrepancy >= 0 ? 'kv-pos' : 'kv-neg'}">
             {analytics.discrepancy >= 0 ? '+' : ''}₹{analytics.discrepancy.toFixed(2)}
             <span class="kv-sub">({analytics.discrepancy_pct.toFixed(1)}%)</span>
           </span>
-          <span class="kv-k">IV</span>       <span class="kv-v">{(analytics.iv * 100).toFixed(2)}%</span>
+          <span class="kv-k">IV</span>
+          <span class="kv-v">
+            {(analytics.iv * 100).toFixed(2)}%
+            {#if analytics.iv_source === 'default'}
+              <span class="src-tag src-warn" title="Calibration fell back to default 15% — LTP/spot data was insufficient">·default</span>
+            {/if}
+          </span>
         </div>
       </div>
 
@@ -901,4 +937,49 @@
   :global(.opt-clear:hover) {
     background: rgba(248,113,113,0.10) !important;
   }
+
+  /* Stale-LTP / fallback-source chips — surfaced when broker live price
+     wasn't available and the engine fell back (close/depth/avg_cost/
+     default IV). Lets the operator know which numbers to treat with
+     extra care, without burying the result. */
+  .src-chip {
+    margin-left: 0.5rem;
+    font-family: monospace;
+    font-size: 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+  }
+  .src-stale {
+    color: #fbbf24;
+    background: rgba(251,191,36,0.10);
+  }
+  .src-tag {
+    margin-left: 0.3rem;
+    font-family: monospace;
+    font-size: 0.5rem;
+    color: #7e97b8;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .src-warn { color: #fbbf24; font-weight: 700; }
+
+  /* Per-leg LTP source pill — fresh = sky-blue, stale = amber. Sits in
+     its own column on the breakdown table. */
+  .leg-src {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    font-weight: 700;
+  }
+  .leg-src-fresh { color: #7dd3fc; background: rgba(125,211,252,0.10); }
+  .leg-src-stale { color: #fbbf24; background: rgba(251,191,36,0.10); }
 </style>
