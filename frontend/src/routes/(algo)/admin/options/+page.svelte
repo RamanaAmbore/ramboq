@@ -27,6 +27,10 @@
   import PriceChart    from '$lib/PriceChart.svelte';
   import Select        from '$lib/Select.svelte';
   import InfoHint      from '$lib/InfoHint.svelte';
+  import {
+    loadInstruments, suggestUnderlyings,
+    listExpiries, listStrikes, findOption,
+  } from '$lib/data/instruments';
 
   /** @type {'live'|'sim'|'hypothetical'|'strategy'} */
   let mode = $state('live');
@@ -54,6 +58,57 @@
   /** @type {Array<{symbol:string, qty:string|number, avg_cost:string|number, ltp:string|number, source:string}>} */
   let legs = $state([]);
   let legPickerValue = $state('');
+
+  // ── Option-chain picker (Strategy mode) ───────────────────────────
+  // Lets the operator browse strikes for a given underlying + expiry
+  // and add legs by clicking CE / PE buttons next to each strike. Pulls
+  // the contract universe from the instruments cache (already loaded
+  // for /console autocomplete) — no extra API round-trips.
+  let instrumentsReady = $state(false);
+  let chainUnderlying  = $state('');
+  let chainExpiry      = $state('');
+  let chainSide        = $state(/** @type {'long'|'short'} */ ('long'));
+  // Convenience presets — auto-populate underlying when there's an
+  // obvious choice from the operator's existing legs.
+  /** @type {string[]} */
+  let underlyingChoices = $state([]);
+
+  // Expiry list rebuilds when the operator picks a different underlying.
+  const chainExpiries = $derived.by(() => {
+    if (!instrumentsReady || !chainUnderlying) return [];
+    // Use 'CE' as the type — every option underlying has both CE + PE
+    // expiries on the same dates, so checking one is enough.
+    return listExpiries(chainUnderlying.toUpperCase(), 'CE');
+  });
+  // Strike grid for the picked (underlying, expiry).
+  const chainStrikes = $derived.by(() => {
+    if (!instrumentsReady || !chainUnderlying || !chainExpiry) return [];
+    return listStrikes(chainUnderlying.toUpperCase(), 'CE', chainExpiry);
+  });
+
+  // Auto-pick first expiry when underlying changes.
+  $effect(() => {
+    void chainUnderlying;
+    if (chainExpiries.length && !chainExpiries.includes(chainExpiry)) {
+      chainExpiry = chainExpiries[0];
+    }
+  });
+
+  function addChainLeg(/** @type {number} */ strike,
+                       /** @type {'CE'|'PE'} */ optType) {
+    if (!chainUnderlying || !chainExpiry) return;
+    const inst = findOption(chainUnderlying.toUpperCase(), optType, strike, chainExpiry);
+    if (!inst) return;
+    const lot = Number(inst.ls || 1);
+    const signedQty = chainSide === 'long' ? lot : -lot;
+    legs = [...legs, {
+      symbol:   inst.s,
+      qty:      signedQty,
+      avg_cost: '',
+      ltp:      '',
+      source:   'chain',
+    }];
+  }
 
   function addLegRow() {
     legs = [...legs, { symbol: '', qty: '', avg_cost: '', ltp: '', source: 'manual' }];
@@ -220,11 +275,37 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     if (!$authStore.user || $authStore.user.role !== 'admin') {
       goto('/signin'); return;
     }
     loadPositions();
+    // Load the instruments cache so the option-chain picker has data.
+    // Already cached in IndexedDB after the first /console autocomplete
+    // load — most operators will see this resolve from cache instantly.
+    try {
+      await loadInstruments();
+      instrumentsReady = true;
+      // Pre-populate underlying choices from common indices first, then
+      // anything else the operator has open positions on so the dropdown
+      // shows familiar names at the top.
+      const seen = new Set();
+      const out = [];
+      for (const u of ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX']) {
+        if (!seen.has(u)) { seen.add(u); out.push(u); }
+      }
+      for (const p of positions) {
+        const u = p.symbol.replace(/\d.*$/, '');
+        if (u && !seen.has(u)) { seen.add(u); out.push(u); }
+      }
+      // Fall back to a wider suggest scan so the dropdown isn't tiny on
+      // a fresh book — pull every underlying that has CE options.
+      for (const u of suggestUnderlyings('', 50)) {
+        if (!seen.has(u)) { seen.add(u); out.push(u); }
+      }
+      underlyingChoices = out;
+      if (!chainUnderlying && out.length) chainUnderlying = out[0];
+    } catch (_) { /* instruments unreachable — chain picker hides */ }
     // Two separate cadences:
     //   - hot (5 s): analytics / strategy aggregate — Greeks + IV move
     //     intra-tick so the operator wants this fresh.
@@ -432,6 +513,85 @@
       </div>
     {/if}
   </div>
+
+  <!-- Option-chain picker — browse strikes for one underlying / expiry
+       and click CE / PE to drop a leg into the basket. Sourced from the
+       cached instruments dump (already loaded by /console autocomplete),
+       so no extra round-trips. Hidden until instruments finish loading. -->
+  {#if instrumentsReady && underlyingChoices.length}
+    <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+      <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+        Option chain
+        <span class="opt-section-meta">
+          click CE / PE next to a strike to add a leg ·
+          quantity defaults to 1 lot
+        </span>
+      </div>
+      <div class="chain-controls">
+        <div class="chain-field">
+          <label class="field-label" for="chain-und">Underlying</label>
+          <Select id="chain-und"
+            bind:value={chainUnderlying}
+            options={underlyingChoices.map(u => ({ value: u, label: u }))} />
+        </div>
+        <div class="chain-field">
+          <label class="field-label" for="chain-exp">Expiry</label>
+          <Select id="chain-exp"
+            bind:value={chainExpiry}
+            options={chainExpiries.map(e => ({ value: e, label: e }))}
+            placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
+        </div>
+        <div class="chain-field">
+          <label class="field-label" for="chain-side">Side</label>
+          <Select id="chain-side"
+            bind:value={chainSide}
+            options={[
+              { value: 'long',  label: 'Long (+)' },
+              { value: 'short', label: 'Short (−)' },
+            ]} />
+        </div>
+      </div>
+      {#if chainStrikes.length}
+        <div class="chain-grid-wrap">
+          <table class="chain-grid">
+            <thead>
+              <tr>
+                <th class="chain-th-ce">CE</th>
+                <th class="chain-th-strike">Strike</th>
+                <th class="chain-th-pe">PE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each chainStrikes as k (k)}
+                <tr>
+                  <td class="chain-td-ce">
+                    <button type="button" class="chain-btn chain-btn-ce"
+                            title="Add {k} CE as a {chainSide} leg"
+                            onclick={() => addChainLeg(k, 'CE')}>
+                      + CE
+                    </button>
+                  </td>
+                  <td class="chain-td-strike">{k.toFixed(0)}</td>
+                  <td class="chain-td-pe">
+                    <button type="button" class="chain-btn chain-btn-pe"
+                            title="Add {k} PE as a {chainSide} leg"
+                            onclick={() => addChainLeg(k, 'PE')}>
+                      + PE
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <div class="text-[0.6rem] text-[#7e97b8] italic mt-2">
+          No strikes for {chainUnderlying} expiring {chainExpiry || '(pick expiry)'}.
+          Try a different underlying or expiry.
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   {#if strategy}
     <div class="opt-grid">
@@ -1037,4 +1197,79 @@
   }
   .leg-src-fresh { color: #7dd3fc; background: rgba(125,211,252,0.10); }
   .leg-src-stale { color: #fbbf24; background: rgba(251,191,36,0.10); }
+
+  /* Option-chain picker — three-column controls (Underlying / Expiry /
+     Side) above a CE-strike-PE table. Each row shows one strike with
+     Add-leg buttons on either side. Capped height so the page doesn't
+     scroll into oblivion when an underlying has 100+ strikes. */
+  .chain-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.4rem 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  @media (max-width: 600px) {
+    .chain-controls { grid-template-columns: 1fr; }
+  }
+  .chain-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .chain-grid-wrap {
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid rgba(251,191,36,0.18);
+    border-radius: 3px;
+    background: rgba(0,0,0,0.10);
+  }
+  .chain-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+    font-size: 0.65rem;
+  }
+  .chain-grid th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(251,191,36,0.10);
+    color: #7e97b8;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.55rem;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0.4rem;
+    border-bottom: 1px solid rgba(251,191,36,0.25);
+  }
+  .chain-th-ce     { text-align: left; color: #22c55e; }
+  .chain-th-pe     { text-align: right; color: #f87171; }
+  .chain-th-strike { text-align: center; color: #c8d8f0; }
+  .chain-grid td {
+    padding: 0.18rem 0.4rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .chain-grid tr:last-child td { border-bottom: 0; }
+  .chain-td-ce      { text-align: left; }
+  .chain-td-pe      { text-align: right; }
+  .chain-td-strike  { text-align: center; color: #c8d8f0; font-weight: 700; }
+  .chain-btn {
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    background: transparent;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.12s;
+  }
+  .chain-btn-ce { color: #22c55e; }
+  .chain-btn-pe { color: #f87171; }
+  .chain-btn-ce:hover { background: rgba(34,197,94,0.10); }
+  .chain-btn-pe:hover { background: rgba(248,113,113,0.10); }
+  /* "chain" source pill on legs added via the chain picker — sky-blue
+     to distinguish from manual / live / sim. */
+  .leg-source-chain { color: #c084fc; }
 </style>

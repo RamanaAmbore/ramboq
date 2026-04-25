@@ -6,12 +6,71 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import PerformancePage from '$lib/PerformancePage.svelte';
-  import { fetchNews } from '$lib/api';
+  import { fetchNews, fetchMarket } from '$lib/api';
 
-  // Market News alongside the performance grids — same /api/news feed
-  // the /market page uses, public-site palette. Auto-refreshes every 10
-  // minutes (server caps the upstream feed at that cadence). Operators
-  // monitoring positions get headline context without leaving the page.
+  // Tabbed Market Summary + Market News card under the performance
+  // grids. Same /api/market and /api/news feeds the /market page uses,
+  // public-site palette throughout. Operators monitoring positions get
+  // headline context AND the AI summary without leaving the page.
+
+  /** @type {'summary' | 'news'} */
+  let tab = $state('summary');
+
+  // ── Market Summary (AI-generated markdown) ─────────────────────
+  let summaryContent = $state('');
+  let summaryRefresh = $state('');
+  let summaryLoading = $state(false);
+  let summaryError   = $state('');
+
+  /** Tiny markdown renderer — same shape as /market page's. Kept
+   *  inline so /performance doesn't depend on the /market component. */
+  function renderMarkdown(/** @type {string} */ md) {
+    const lines = md.split('\n');
+    let html = '';
+    let inList = false;
+    for (const raw of lines) {
+      const line = raw
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+      if (/^###\s/.test(raw)) {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += `<h3 class="md-h3">${line.replace(/^###\s/, '')}</h3>`;
+      } else if (/^####\s/.test(raw)) {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += `<h4 class="md-h4">${line.replace(/^####\s/, '')}</h4>`;
+      } else if (/^\s*[-*•]\s+/.test(raw)) {
+        if (!inList) { html += '<ul class="md-ul">'; inList = true; }
+        html += `<li class="md-li">${line.replace(/^\s*[-*•]\s+/, '')}</li>`;
+      } else if (/^---/.test(raw)) {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<hr class="md-hr">';
+      } else if (line.trim() === '') {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<div class="md-gap"></div>';
+      } else {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += `<p class="md-p">${line}</p>`;
+      }
+    }
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  async function loadSummary() {
+    summaryLoading = true; summaryError = '';
+    try {
+      const data = await fetchMarket();
+      summaryContent = data.content ?? '';
+      summaryRefresh = data.refreshed_at ?? '';
+    } catch (e) {
+      summaryError = /** @type {any} */ (e)?.message || 'Failed to load market summary';
+    } finally {
+      summaryLoading = false;
+    }
+  }
+
+  // ── Market News ─────────────────────────────────────────────────
   /** @type {Array<{title:string, link:string, source:string, timestamp:string}>} */
   let news        = $state([]);
   let newsLoading = $state(false);
@@ -38,7 +97,13 @@
     return m ? m[0] : ts;
   }
 
+  // First-load: kick off both immediately so flipping tabs after the
+  // page settles is a paint, not a fetch. News refreshes on a 10-min
+  // cadence; summary doesn't auto-refresh (the /market page handles
+  // server-pushed refreshes via the WebSocket — operators on
+  // /performance see a static snapshot until they revisit).
   onMount(() => {
+    loadSummary();
     loadNews();
     newsTimer = setInterval(loadNews, 10 * 60 * 1000);
   });
@@ -52,36 +117,79 @@
   <PerformancePage />
 </div>
 
-<!-- Market News — full-width card below the grids. Same shape as on
-     /market: just the heading + headline rows, no metadata noise. -->
+<!-- Tabbed Market Summary | Market News card. Only one panel is
+     visible at a time so the page doesn't grow unbounded — operators
+     pick the view they want. Same content as the /market page, just
+     consolidated into a single below-the-fold card. -->
 <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4 mt-4">
-  <div class="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
-    <h2 class="news-h">Market News</h2>
-    {#if newsLoading && !news.length}
-      <span class="news-meta">Loading…</span>
-    {/if}
+  <div class="market-tabs-row">
+    <div class="market-tabs">
+      <button type="button"
+              class="market-tab"
+              class:market-tab-active={tab === 'summary'}
+              onclick={() => tab = 'summary'}>
+        Market Summary
+      </button>
+      <button type="button"
+              class="market-tab"
+              class:market-tab-active={tab === 'news'}
+              onclick={() => tab = 'news'}>
+        Market News
+      </button>
+    </div>
+    <div class="market-tabs-meta">
+      {#if tab === 'summary'}
+        {#if summaryLoading && !summaryRefresh}
+          Loading…
+        {:else if summaryRefresh}
+          {summaryRefresh}
+        {/if}
+      {:else if newsLoading && !news.length}
+        Loading…
+      {/if}
+    </div>
   </div>
 
-  {#if newsError}
-    <div class="p-2 rounded bg-red-50 text-red-700 text-xs mb-2 border border-red-200">{newsError}</div>
-  {/if}
-
-  {#if news.length}
-    <ul class="news-list">
-      {#each news as n}
-        <li class="news-row">
-          <span class="news-time">{newsTime(n.timestamp)}</span>
-          <a class="news-title" href={n.link} target="_blank" rel="noopener">
-            {n.title}
-          </a>
-          {#if n.source}
-            <span class="news-src" title={n.source}>{n.source}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {:else if !newsLoading}
-    <p class="text-text/40 text-sm">No headlines available right now.</p>
+  {#if tab === 'summary'}
+    {#if summaryError}
+      <div class="p-2 rounded bg-red-50 text-red-700 text-xs mb-2 border border-red-200">
+        {summaryError}
+      </div>
+    {/if}
+    {#if !summaryContent && summaryLoading}
+      <div class="text-center text-text/40 text-sm animate-pulse py-8">
+        Loading market summary…
+      </div>
+    {:else if summaryContent}
+      <div class="market-report w-full">
+        {@html renderMarkdown(summaryContent)}
+      </div>
+    {:else if !summaryLoading}
+      <p class="text-text/40 text-sm">No market summary available right now.</p>
+    {/if}
+  {:else}
+    {#if newsError}
+      <div class="p-2 rounded bg-red-50 text-red-700 text-xs mb-2 border border-red-200">
+        {newsError}
+      </div>
+    {/if}
+    {#if news.length}
+      <ul class="news-list">
+        {#each news as n}
+          <li class="news-row">
+            <span class="news-time">{newsTime(n.timestamp)}</span>
+            <a class="news-title" href={n.link} target="_blank" rel="noopener">
+              {n.title}
+            </a>
+            {#if n.source}
+              <span class="news-src" title={n.source}>{n.source}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {:else if !newsLoading}
+      <p class="text-text/40 text-sm">No headlines available right now.</p>
+    {/if}
   {/if}
 </div>
 
@@ -91,23 +199,72 @@
     margin-right: -0.5rem;
   }
 
-  /* Market News — same palette as /market so the card reads as a
-     sibling. Both pages now share this look (headline list + champagne
-     accent on the heading) without using the LogPanel chrome. */
-  .news-h {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #1a2744;
-    border-left: 3px solid #d4920c;
-    padding-left: 0.5rem;
-    line-height: 1.2;
-    margin: 0;
+  /* Tab row — public-palette tabs (cream + champagne accent), sits
+     above the panel like a real tab strip. Active tab carries the
+     champagne underline + slightly darker text. */
+  .market-tabs-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+    border-bottom: 1px solid #e7e0cf;
+    padding-bottom: 0.25rem;
+    flex-wrap: wrap;
   }
-  .news-meta {
+  .market-tabs {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .market-tab {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #6b7894;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.35rem 0.75rem 0.4rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    margin-bottom: -1px;     /* overlap card border */
+  }
+  .market-tab:hover  { color: #1a2744; }
+  .market-tab-active {
+    color: #1a2744;
+    font-weight: 700;
+    border-bottom-color: #d4920c;
+  }
+  .market-tabs-meta {
     font-size: 0.7rem;
     color: #6b7894;
     font-family: ui-monospace, monospace;
   }
+
+  /* Market summary — match /market page's markdown styling. */
+  :global(.market-report .md-h3) {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1a2744;
+    margin: 1.25rem 0 0.5rem;
+    border-left: 3px solid #d4920c;
+    border-bottom: none;
+    padding-left: 0.5rem;
+  }
+  :global(.market-report .md-h4) {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1a2744;
+    margin: 1rem 0 0.35rem;
+  }
+  :global(.market-report .md-p)  { font-size: 0.875rem; color: #1e3050; line-height: 1.65; margin: 0.25rem 0; }
+  :global(.market-report .md-ul) { margin: 0.25rem 0 0.5rem 1.25rem; list-style: disc; }
+  :global(.market-report .md-li) { font-size: 0.875rem; color: #1e3050; line-height: 1.6; margin: 0.15rem 0; }
+  :global(.market-report .md-hr) { border: none; border-top: 1px solid #dde4f0; margin: 0.75rem 0; }
+  :global(.market-report .md-gap){ height: 0.4rem; }
+  :global(.market-report strong) { font-weight: 700; color: #1a2744; }
+  :global(.market-report em)     { font-style: italic; color: #1e3050; }
+
+  /* News list — same shape as /market. */
   .news-list {
     list-style: none;
     padding: 0;

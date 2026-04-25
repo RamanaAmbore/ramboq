@@ -914,6 +914,8 @@ Both endpoints surface position-level expected value and R:R alongside the exist
 
 **Why this matters operationally** — POP alone is misleading. A 95 %-POP credit spread that risks ₹50k to make ₹500 has positive expectancy but a single loss takes 100 winners to recover; EV captures the magnitude side and tells you whether the trade is actually worth taking. R:R does the same for the asymmetric clip-size aspect.
 
+**Option-chain picker** — `/admin/options` Strategy mode now has a third leg-input alongside "Add from book" and "+ Add row": an option-chain table that lets the operator browse strikes for any underlying / expiry and click `+ CE` / `+ PE` to drop a leg. Sourced from the existing instruments cache ([`frontend/src/lib/data/instruments.js`](frontend/src/lib/data/instruments.js); IndexedDB-backed, ~90k contracts) so no new API. Default qty = `lot_size` for the contract, side toggle (Long / Short) flips the sign. Particularly useful for spreads and strangles where the operator doesn't have any of the legs in their book yet.
+
 **Multi-leg math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
 
 - `multileg_payoff_curve(legs, S, ...)` — sums per-leg `today_value` + `expiry_value` at each spot. Each leg keeps its own (T_years, σ).
@@ -979,15 +981,16 @@ OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that t
 
 ---
 
-## Market News on `/market` + `/performance` (public)
+## Market Summary + Market News (public)
 
-Both public pages render a "Market News" card with headlines from `/api/news` (the same feed the algo LogPanel uses) in the public cream / navy / champagne palette. Auto-refreshes every 10 minutes; no "log" terminology anywhere.
+`/market` shows the AI summary as the only card on the page (with the dual-timezone timestamp above) plus a separate "Market News" card below. `/performance` consolidates BOTH surfaces into a single tabbed card under the position grids: `[Market Summary | Market News]`. Only one panel is visible at a time so the page doesn't grow unbounded; flipping tabs is a paint, not a fetch (both feeds are loaded on mount).
 
-The card heading shows just `Market News` plus a "Loading…" indicator on first load — the headlines-count + refresh-meta line was dropped to keep the heading punchy. Per-row layout: `news-time` (HH:MM) · `news-title` (link) · `news-src` (source-pill, hidden on mobile). All anchors `target="_blank" rel="noopener"`.
+Tab styling matches the public palette — navy text, champagne underline on the active tab, no extra chrome. Right side of the tab row carries the `lastRefresh` timestamp when on Summary, "Loading…" when news is still loading on first visit. Routes:
 
-Implemented in [`frontend/src/routes/(public)/market/+page.svelte`](frontend/src/routes/(public)/market/+page.svelte) and [`frontend/src/routes/(public)/performance/+page.svelte`](frontend/src/routes/(public)/performance/+page.svelte). Same component shape in both, copied so the route file stays self-contained without forcing PerformancePage.svelte to know about news.
+- [`/market`](frontend/src/routes/(public)/market/+page.svelte) — single AI-summary card + separate news card.
+- [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids + tabbed `[Summary | News]` card.
 
-The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp shown above the card. Now the prompt asks for just the dual-timezone timestamp without the title prefix, so both render the same format and the visual stack reads cleanly.
+The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp shown above the card. Now the prompt asks for just the dual-timezone timestamp without the title prefix.
 
 ---
 
