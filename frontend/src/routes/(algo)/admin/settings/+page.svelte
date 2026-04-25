@@ -18,6 +18,12 @@
   let note     = $state('');
   let dirty    = $state(/** @type {Record<string, string>} */({}));
   let filter   = $state('');
+  let expanded = $state(/** @type {Record<string, boolean>} */({}));
+
+  function toggleInfo(/** @type {string} */ key) {
+    expanded[key] = !expanded[key];
+    expanded = { ...expanded };
+  }
 
   // Render order: high-touch operator knobs first, vendor/infra knobs last.
   // Anything not in this list falls through to 'misc' and is appended.
@@ -168,73 +174,135 @@
     <div class="text-[0.65rem] text-[#c8d8f0]/60">No settings match the filter.</div>
   {/if}
   {#each grouped as [category, rows]}
-    <section class="algo-status-card p-3 mb-3" data-status="inactive">
-      <h2 class="text-[0.6rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2 pb-1 border-b border-[#fbbf24]/25">
+    <section class="algo-status-card p-2 mb-2" data-status="inactive">
+      <h2 class="text-[0.6rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-1 pb-1 border-b border-[#fbbf24]/25">
         {category} <span class="opacity-60 font-normal ml-1">({rows.length})</span>
       </h2>
-      <div class="space-y-2">
+      <div>
         {#each rows as s}
-          <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_120px_auto_auto] gap-2 items-start text-[0.65rem] py-1 border-b border-white/5 last:border-0">
-            <div>
-              <div class="flex items-baseline gap-2 flex-wrap">
-                <span class="font-mono text-[#7dd3fc]">{s.key}</span>
+          <div class="settings-row">
+            <div class="grid grid-cols-[auto_minmax(0,1fr)_160px_auto_auto] gap-2 items-center text-[0.65rem] py-1">
+              <button type="button"
+                      class="info-btn"
+                      class:open={expanded[s.key]}
+                      title={expanded[s.key] ? 'Hide details' : 'Show details'}
+                      onclick={() => toggleInfo(s.key)}>i</button>
+
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="font-mono text-[#7dd3fc] truncate" title={s.key}>{s.key}</span>
                 {#if isModified(s)}
-                  <span class="px-1 rounded bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/30 text-[0.55rem]">modified</span>
+                  <span class="px-1 rounded bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/30 text-[0.55rem] shrink-0">mod</span>
                 {/if}
               </div>
-              <div class="text-[0.6rem] text-[#c8d8f0]/75 mt-0.5">{s.description}</div>
-              <div class="text-[0.55rem] text-[#7e97b8] mt-0.5">
-                default: <span class="font-mono">{s.default_value}</span>
-                {#if s.schema && (s.schema.min !== undefined || s.schema.max !== undefined)}
-                  <span class="mx-1">·</span>range: {s.schema.min ?? '−∞'} … {s.schema.max ?? '+∞'}
+
+              <div class="flex items-center gap-1">
+                {#if s.value_type === 'bool'}
+                  <select class="field-input flex-1 py-0.5"
+                          value={currentValue(s)}
+                          onchange={(e) => onEdit(s, e.currentTarget.value)}>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                {:else if s.value_type === 'enum'}
+                  <select class="field-input flex-1 py-0.5"
+                          value={currentValue(s)}
+                          onchange={(e) => onEdit(s, e.currentTarget.value)}>
+                    {#each (s.schema?.enum || []) as opt}<option value={opt}>{opt}</option>{/each}
+                  </select>
+                {:else if s.value_type === 'int' || s.value_type === 'float'}
+                  <input type="number"
+                         class="field-input flex-1 py-0.5"
+                         value={currentValue(s)}
+                         min={s.schema?.min} max={s.schema?.max} step={s.schema?.step ?? 1}
+                         oninput={(e) => onEdit(s, e.currentTarget.value)} />
+                {:else}
+                  <input type="text"
+                         class="field-input flex-1 py-0.5"
+                         value={currentValue(s)}
+                         oninput={(e) => onEdit(s, e.currentTarget.value)} />
                 {/if}
-                {#if s.schema?.enum}
-                  <span class="mx-1">·</span>choices: {s.schema.enum.join(' / ')}
-                {/if}
+                {#if s.units}<span class="text-[0.55rem] text-[#7e97b8] whitespace-nowrap">{s.units}</span>{/if}
               </div>
+
+              <button type="button"
+                onclick={() => save(s)}
+                disabled={!isDirty(s)}
+                class="btn-primary text-[0.6rem] py-0.5 px-2 disabled:opacity-30 whitespace-nowrap">Save</button>
+
+              <button type="button"
+                onclick={() => reset(s)}
+                disabled={!isModified(s)}
+                class="btn-secondary text-[0.6rem] py-0.5 px-2 disabled:opacity-30 whitespace-nowrap">Reset</button>
             </div>
 
-            <div class="flex items-center gap-1">
-              {#if s.value_type === 'bool'}
-                <select class="field-input flex-1"
-                        value={currentValue(s)}
-                        onchange={(e) => onEdit(s, e.currentTarget.value)}>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              {:else if s.value_type === 'enum'}
-                <select class="field-input flex-1"
-                        value={currentValue(s)}
-                        onchange={(e) => onEdit(s, e.currentTarget.value)}>
-                  {#each (s.schema?.enum || []) as opt}<option value={opt}>{opt}</option>{/each}
-                </select>
-              {:else if s.value_type === 'int' || s.value_type === 'float'}
-                <input type="number"
-                       class="field-input flex-1"
-                       value={currentValue(s)}
-                       min={s.schema?.min} max={s.schema?.max} step={s.schema?.step ?? 1}
-                       oninput={(e) => onEdit(s, e.currentTarget.value)} />
-              {:else}
-                <input type="text"
-                       class="field-input flex-1"
-                       value={currentValue(s)}
-                       oninput={(e) => onEdit(s, e.currentTarget.value)} />
-              {/if}
-              {#if s.units}<span class="text-[0.55rem] text-[#7e97b8] whitespace-nowrap">{s.units}</span>{/if}
-            </div>
-
-            <button type="button"
-              onclick={() => save(s)}
-              disabled={!isDirty(s)}
-              class="btn-primary text-[0.6rem] py-1 px-3 disabled:opacity-30 whitespace-nowrap">Save</button>
-
-            <button type="button"
-              onclick={() => reset(s)}
-              disabled={!isModified(s)}
-              class="btn-secondary text-[0.6rem] py-1 px-3 disabled:opacity-30 whitespace-nowrap">Reset</button>
+            {#if expanded[s.key]}
+              <div class="info-popout">
+                <div class="text-[0.6rem] text-[#c8d8f0]/85">{s.description}</div>
+                <div class="text-[0.55rem] text-[#7e97b8] mt-1">
+                  default: <span class="font-mono text-[#c8d8f0]/80">{s.default_value}</span>
+                  {#if s.schema && (s.schema.min !== undefined || s.schema.max !== undefined)}
+                    <span class="mx-1">·</span>range: {s.schema.min ?? '−∞'} … {s.schema.max ?? '+∞'}
+                  {/if}
+                  {#if s.schema?.enum}
+                    <span class="mx-1">·</span>choices: {s.schema.enum.join(' / ')}
+                  {/if}
+                  {#if s.units}
+                    <span class="mx-1">·</span>units: <span class="font-mono">{s.units}</span>
+                  {/if}
+                </div>
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
     </section>
   {/each}
 {/if}
+
+<style>
+  .settings-row {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .settings-row:last-child { border-bottom: 0; }
+
+  /* Info toggle — mirrors the page's amber accent so it reads as part
+     of the algo palette, not a generic chrome control. */
+  .info-btn {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(251,191,36,0.35);
+    background: rgba(251,191,36,0.08);
+    color: #fbbf24;
+    font-size: 0.6rem;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .info-btn:hover {
+    background: rgba(251,191,36,0.18);
+    border-color: rgba(251,191,36,0.6);
+  }
+  .info-btn.open {
+    background: #fbbf24;
+    color: #0c1830;
+    border-color: #fbbf24;
+  }
+
+  /* Expanded info — same gradient + amber accent the OrderPopup and
+     <select> dropdown use, so info reveals feel like a continuation of
+     the row, not an OS-native tooltip. */
+  .info-popout {
+    margin: 0.15rem 0 0.4rem 1.6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(251,191,36,0.25);
+    border-left: 3px solid #fbbf24;
+    background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
+  }
+</style>
