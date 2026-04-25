@@ -324,6 +324,30 @@ On the `/agents` page, every row has a **Run in Simulator** button. Click it:
 
 This is the safest way to test a new agent before activating it.
 
+### Underlying-driven F&O scenarios
+
+For options + futures books, the simulator can move the **underlying spot** (NIFTY, BANKNIFTY, etc.) and have every contract on that underlying re-price coherently — so a "−3% NIFTY" tick gives you realistic gamma + skew effects instead of moving each strike in isolation.
+
+**How it works (one paragraph)**: at sim start, the driver detects every underlying in your book, snapshots its spot price (from a futures contract on it, or from `scenario.initial.underlyings`, or as a crude ATM proxy), and calibrates **implied volatility per option** by inverting Black-Scholes against each option's current premium. When you fire an `underlying_pct -0.03` move, the spot drops 3 %, and every option re-prices via Black-Scholes with the IV that was locked at start. Futures track spot 1:1.
+
+**Two new built-in scenarios**:
+
+| Slug | What it does |
+|---|---|
+| `nifty-down-3pct` | NIFTY spot −1% / −2% / −3% over three ticks. ITM puts inflate, OTM calls collapse, futures fall 1:1. |
+| `nifty-up-3pct`   | NIFTY spot +1% / +2% / +3% over three ticks. ITM calls inflate, OTM puts collapse — squeezes short-call writers. |
+
+**Use it like this**:
+1. `/admin/simulator` → press **Load live book** → switch Seed to **Live** or **Live + scenario**.
+2. Pick `nifty-down-3pct`.
+3. Press **Start**.
+4. Watch the chart panel — the NIFTY chart (sky-blue `SPOT` tag) shows the 3 % drop; each option chart (amber `F&O` tag) shows the derived premium move with the underlying overlaid as a dashed sky-blue line.
+
+**Caveats**:
+- Vega and theta are intentionally ignored — sim runs are minutes, not days.
+- IV is locked at sim start. Real-world IV expands during sell-offs; the sim doesn't model that. If you want to study IV-expansion effects, layer a per-option `pct` move on top of the underlying move.
+- Stock-option books need explicit underlyings in `scenario.initial.underlyings: {RELIANCE: 2800}` if no futures contract is in the book — the driver can't resolve a stock spot from an arbitrary option chain alone.
+
 ### Charts — see what the price did
 
 While a sim is running, the page renders one **mini chart per active symbol** directly under the position pills:

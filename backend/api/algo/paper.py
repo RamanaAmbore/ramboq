@@ -83,6 +83,11 @@ class PaperTradeEngine:
         # API layer reading from algo_orders.
         self._price_history: dict[str, deque] = {}
 
+        # Parallel buffer for underlying spot prices (NIFTY, BANKNIFTY, …).
+        # Populated alongside contract ticks so the chart panel can render
+        # underlying lines next to derivatives — same UX as the simulator.
+        self._underlying_history: dict[str, deque] = {}
+
     # ── Public surface ───────────────────────────────────────────────
 
     def register_open_order(self, order: dict) -> None:
@@ -209,6 +214,7 @@ class PaperTradeEngine:
         """Wipe the open-order book — used by SimDriver.start()."""
         self._open_orders = []
         self._price_history = {}
+        self._underlying_history = {}
 
     # ── Price history ────────────────────────────────────────────────
 
@@ -216,9 +222,16 @@ class PaperTradeEngine:
         """One (ts, ltp, bid, ask) entry per active-order symbol. Called
         after prefetch_for, so the QuoteSource cache is warm and reads are
         cheap. Symbols are deduplicated so two open orders on the same
-        symbol only produce one tick in the history."""
+        symbol only produce one tick in the history. Also fetches the
+        underlying spot for any derivative symbol so the chart panel can
+        render underlying lines next to options."""
+        from backend.api.algo.derivatives import (
+            parse_tradingsymbol, underlying_ltp_key,
+        )
+
         ts   = datetime.now().isoformat(timespec="seconds")
         seen: set[str] = set()
+        underlyings: dict[str, str] = {}   # name → ltp_key
         for o in open_orders:
             sym = str(o.get("symbol") or "")
             if not sym or sym in seen:
@@ -236,10 +249,45 @@ class PaperTradeEngine:
             buf.append({"ts": ts, "ltp": float(ltp),
                         "bid": float(bid) if bid is not None else None,
                         "ask": float(ask) if ask is not None else None})
+            parsed = parse_tradingsymbol(sym)
+            if parsed:
+                underlyings.setdefault(parsed["underlying"],
+                                       underlying_ltp_key(parsed["underlying"]))
+
+        # Best-effort underlying spot fetch — ONE broker.ltp call covers
+        # every distinct underlying. Routes through the first open order's
+        # account; underlying spots aren't account-specific so any handle
+        # works. Failures are silent — charts just miss the underlying line.
+        if underlyings and open_orders:
+            self._capture_underlyings(ts, open_orders[0].get("account"),
+                                      underlyings)
+
+    def _capture_underlyings(self, ts: str, account: str | None,
+                             underlyings: dict[str, str]) -> None:
+        if not account:
+            return
+        try:
+            from backend.shared.brokers import get_broker
+            broker = get_broker(account)
+            keys   = list(underlyings.values())
+            resp   = broker.ltp(keys) or {}
+        except Exception as e:
+            logger.debug(f"PaperTradeEngine[{self._label}] underlying ltp fetch failed: {e}")
+            return
+        for name, key in underlyings.items():
+            quote = resp.get(key) or {}
+            ltp   = quote.get("last_price")
+            if ltp is None:
+                continue
+            buf = self._underlying_history.get(name)
+            if buf is None:
+                buf = deque(maxlen=PRICE_HISTORY_LIMIT)
+                self._underlying_history[name] = buf
+            buf.append({"ts": ts, "ltp": float(ltp), "bid": None, "ask": None})
 
     def price_history(self, symbol: str, *, since: str | None = None,
                       limit: int = 600) -> list[dict]:
-        buf = self._price_history.get(symbol)
+        buf = self._price_history.get(symbol) or self._underlying_history.get(symbol)
         if not buf:
             return []
         out: list[dict] = []
@@ -252,7 +300,22 @@ class PaperTradeEngine:
         return out
 
     def price_history_symbols(self) -> list[str]:
-        return sorted(s for s, buf in self._price_history.items() if buf)
+        names = {s for s, buf in self._price_history.items() if buf}
+        names.update(s for s, buf in self._underlying_history.items() if buf)
+        return sorted(names)
+
+    def underlying_for(self, symbol: str) -> str | None:
+        """Return the underlying name for a contract, or None if `symbol`
+        is itself an underlying / not a derivative. Used by the chart UI
+        to overlay the spot line on each option chart."""
+        if symbol in self._underlying_history:
+            return None
+        from backend.api.algo.derivatives import parse_tradingsymbol
+        parsed = parse_tradingsymbol(symbol)
+        if not parsed:
+            return None
+        und = parsed["underlying"]
+        return und if und in self._underlying_history else None
 
     async def recover_from_db(self) -> int:
         """

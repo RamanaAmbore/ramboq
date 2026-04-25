@@ -156,3 +156,51 @@
     - at: 0
       moves:
         - {type: random_walk, scope: "positions.**", drift: -0.001, vol: 0.005}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Underlying-driven crash — moves NIFTY spot, lets BS re-price every option
+# coherently. Compare with `generic-crash` (which moves each contract by a
+# flat %) to see realistic gamma + skew effects on a hedged F&O book.
+# ─────────────────────────────────────────────────────────────────────────
+- slug: nifty-down-3pct
+  name: NIFTY underlying -3% (BS re-priced)
+  mode: symbol
+  market_state: {preset: mid_session}
+  description: >-
+    Drives NIFTY spot down -1% / -2% / -3% over three ticks. Every NIFTY
+    option re-prices via Black-Scholes using the IV calibrated at sim
+    start; futures track spot 1:1. Seed live (or live+scenario) so the
+    re-pricing runs against your real strikes + premiums.
+  ticks:
+    - at: 0
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: -0.01}
+    - at: 1
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: -0.01}
+    - at: 2
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: -0.01}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Underlying-driven gap-up — same shape, opposite direction. Useful for
+# squeezing short-call books (sees premium balloon, vega pain).
+# ─────────────────────────────────────────────────────────────────────────
+- slug: nifty-up-3pct
+  name: NIFTY underlying +3% (BS re-priced)
+  mode: symbol
+  market_state: {preset: mid_session}
+  description: >-
+    NIFTY spot +1% / +2% / +3% over three ticks. Black-Scholes re-prices
+    every NIFTY option using calibrated IV. Stresses short-call writers
+    and naked short-strangle books.
+  ticks:
+    - at: 0
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: 0.01}
+    - at: 1
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: 0.01}
+    - at: 2
+      moves:
+        - {type: underlying_pct, scope: "underlying.NIFTY", value: 0.01}

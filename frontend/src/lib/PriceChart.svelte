@@ -20,6 +20,18 @@
   let ticks = $state([]);
   /** @type {Array<{ts:string,kind:string,side:string,price:number|null,status:string,order_id:number,attempts:number,detail:string|null}>} */
   let events = $state([]);
+  // Classification surfaced by the API so the chart can render with the
+  // right palette + label (underlyings get a sky-blue line, derivatives
+  // get the amber LTP + lifecycle markers).
+  /** @type {'underlying'|'derivative'|'other'} */
+  let kind = $state(/** @type {any} */ ('other'));
+  /** @type {string|null} */
+  let underlying = $state(null);
+  // Underlying overlay — when set, fetched alongside the primary ticks
+  // and rendered as a faint sky line scaled to the option's y-range so
+  // operators can see "spot −3% → call −40%" at a glance.
+  /** @type {Array<{ts:string,ltp:number}>} */
+  let underlyingTicks = $state([]);
   let error = $state('');
   let loading = $state(true);
   let timer = $state(/** @type {any} */ (null));
@@ -34,6 +46,19 @@
       if (!mounted) return;
       ticks = r.ticks || [];
       events = r.events || [];
+      kind = r.kind || 'other';
+      underlying = r.underlying || null;
+      // Fetch the underlying spot history when this is a derivative so the
+      // chart can overlay it. Errors here are silent — the option chart
+      // still renders without the overlay.
+      if (kind === 'derivative' && underlying) {
+        try {
+          const u = await fetchChartPriceHistory(mode, underlying);
+          underlyingTicks = (u?.ticks || []).map(t => ({ ts: t.ts, ltp: t.ltp }));
+        } catch (_) { underlyingTicks = []; }
+      } else {
+        underlyingTicks = [];
+      }
       error = '';
     } catch (e) {
       error = e.message || String(e);
@@ -101,6 +126,34 @@
     ).join(' ');
   });
 
+  // Underlying overlay path — rescaled into the option's y-range so the
+  // shape of the spot move is visible alongside the option's price even
+  // though the absolute values are wildly different (e.g. 22,000 vs 180).
+  // Only drawn for derivative charts that received underlying ticks.
+  const underlyingDomain = $derived.by(() => {
+    if (!underlyingTicks.length) return null;
+    let lo = Infinity, hi = -Infinity;
+    for (const t of underlyingTicks) {
+      if (t.ltp < lo) lo = t.ltp;
+      if (t.ltp > hi) hi = t.ltp;
+    }
+    return { lo, hi, span: Math.max(0.001, hi - lo) };
+  });
+  const underlyingPath = $derived.by(() => {
+    if (!underlyingTicks.length || !underlyingDomain || !ticks.length) return '';
+    const { lo, span } = underlyingDomain;
+    // Map the underlying's normalized 0..1 onto the option's plot area
+    // (top = 1, bottom = 0). Use the option's plot extents so the line
+    // rides through the middle of the chart, never clipping the frame.
+    const top = PAD_T + 0.10 * innerH;
+    const bot = PAD_T + 0.90 * innerH;
+    return underlyingTicks.map((t, i) => {
+      const norm = (t.ltp - lo) / span;
+      const y    = bot - norm * (bot - top);
+      return `${i === 0 ? 'M' : 'L'}${xOf(t.ts).toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+  });
+
   // Bid/ask shaded band (faint cyan area between bid and ask paths) —
   // only drawn when both sides are populated, so live/paper mode shows
   // the spread band but pure-LTP-only ticks (rare) skip it cleanly.
@@ -154,7 +207,18 @@
 <div class="price-chart" style="--chart-h: {height}px">
   <div class="chart-header">
     <span class="chart-symbol">{symbol || '—'}</span>
+    {#if kind === 'underlying'}
+      <span class="chart-tag chart-tag-underlying">SPOT</span>
+    {:else if kind === 'derivative'}
+      <span class="chart-tag chart-tag-deriv">F&O</span>
+    {/if}
     <span class="chart-mode chart-mode-{mode}">{mode?.toUpperCase()}</span>
+    {#if underlyingTicks.length}
+      <span class="chart-legend" title="Spot price of {underlying}, normalized to this chart's range">
+        <span class="legend-dash" aria-hidden="true"></span>
+        {underlying}
+      </span>
+    {/if}
     {#if loading}
       <span class="chart-status">loading…</span>
     {:else if error}
@@ -196,8 +260,20 @@
         <path d={bandPath} fill="rgba(125,211,252,0.10)" stroke="none"/>
       {/if}
 
-      <!-- LTP line -->
-      <path d={ltpPath} fill="none" stroke="#fbbf24" stroke-width="1.5"/>
+      <!-- Underlying overlay — sky-blue dashed line, normalized into the
+           option's plot area. Operators see the spot move alongside the
+           derived price without the option line getting squashed. -->
+      {#if underlyingPath}
+        <path d={underlyingPath} fill="none"
+              stroke="#7dd3fc" stroke-width="1" stroke-dasharray="3 3"
+              stroke-opacity="0.7"/>
+      {/if}
+
+      <!-- LTP line — sky-blue for underlyings (so it matches the index
+           palette used elsewhere) and amber for derivatives / equities. -->
+      <path d={ltpPath} fill="none"
+            stroke={kind === 'underlying' ? '#7dd3fc' : '#fbbf24'}
+            stroke-width="1.5"/>
 
       <!-- Order event markers -->
       {#each events as ev}
@@ -277,6 +353,47 @@
   .chart-mode-sim   { color: #fbbf24; }
   .chart-mode-paper { color: #7dd3fc; }
   .chart-mode-live  { color: #22c55e; }
+  /* Kind tag — distinguishes spot vs F&O at a glance, complementary to
+     the mode tag. Subtler than the mode pill so it doesn't dominate. */
+  .chart-tag {
+    font-family: monospace;
+    font-size: 0.5rem;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .chart-tag-underlying {
+    background: rgba(125,211,252,0.12);
+    color: #7dd3fc;
+    border-color: rgba(125,211,252,0.45);
+  }
+  .chart-tag-deriv {
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+    border-color: rgba(251,191,36,0.35);
+  }
+  /* Legend for the underlying overlay — tiny dashed sample + the
+     underlying name, matching the dashed sky-blue line on the chart. */
+  .chart-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: monospace;
+    font-size: 0.55rem;
+    color: #7dd3fc;
+    padding: 1px 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(125,211,252,0.25);
+    background: rgba(125,211,252,0.05);
+  }
+  .legend-dash {
+    width: 14px;
+    height: 0;
+    border-top: 1px dashed #7dd3fc;
+    opacity: 0.8;
+  }
   .chart-status {
     color: #7e97b8;
     margin-left: auto;

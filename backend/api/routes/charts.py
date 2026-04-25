@@ -62,10 +62,36 @@ class OrderEvent(msgspec.Struct):
 
 
 class ChartResponse(msgspec.Struct):
-    mode:    str
-    symbol:  str
-    ticks:   list[PriceTick]
-    events:  list[OrderEvent]
+    mode:       str
+    symbol:     str
+    # 'underlying' for spot tickers (NIFTY, BANKNIFTY, …), 'derivative'
+    # for options/futures, 'other' for plain equity / unrecognised symbols.
+    kind:       str
+    # When `kind='derivative'`, the underlying name (e.g. 'NIFTY' for
+    # NIFTY25APR22000CE). Lets the client render the underlying line on
+    # the same chart for context. None otherwise.
+    underlying: str | None
+    ticks:      list[PriceTick]
+    events:     list[OrderEvent]
+
+
+def _classify_symbol(eng, symbol: str) -> tuple[str, str | None]:
+    """
+    Returns (kind, underlying) where kind ∈ {'underlying','derivative','other'}.
+    Underlyings live in their own buffer on the engine; derivatives parse
+    cleanly via the F&O regex; everything else is 'other'.
+    """
+    # Underlying check: the engine exposes a parallel _underlying_history
+    # dict; if `symbol` is a key there, treat it as an underlying.
+    und_buf = getattr(eng, "_underlying_history", None) or {}
+    if symbol in und_buf:
+        return ("underlying", None)
+
+    from backend.api.algo.derivatives import parse_tradingsymbol
+    parsed = parse_tradingsymbol(symbol)
+    if parsed:
+        return ("derivative", parsed["underlying"])
+    return ("other", None)
 
 
 def _engine_for_mode(mode: str):
@@ -138,11 +164,33 @@ class ChartsController(Controller):
 
     @get("/symbols")
     async def symbols(self, mode: str = "sim") -> dict:
+        """List symbols with captured ticks, classified so the UI can
+        render underlyings first and group derivatives by their root
+        without making N extra calls. Symbols are returned sorted with
+        underlyings first, then derivatives grouped by underlying, then
+        anything else."""
         if mode not in _VALID_MODES:
             raise HTTPException(status_code=400,
                                 detail=f"mode must be one of {_VALID_MODES}")
-        eng = _engine_for_mode(mode)
-        return {"mode": mode, "symbols": eng.price_history_symbols()}
+        eng     = _engine_for_mode(mode)
+        symbols = eng.price_history_symbols()
+        items   = []
+        for sym in symbols:
+            kind, und = _classify_symbol(eng, sym)
+            items.append({"symbol": sym, "kind": kind, "underlying": und})
+        # Sort: underlyings first (alpha), then derivatives grouped by
+        # underlying (alpha within the group), then 'other' (alpha).
+        kind_rank = {"underlying": 0, "derivative": 1, "other": 2}
+        items.sort(key=lambda i: (
+            kind_rank.get(i["kind"], 3),
+            i.get("underlying") or "",
+            i["symbol"],
+        ))
+        return {
+            "mode":    mode,
+            "symbols": [i["symbol"] for i in items],   # back-compat
+            "items":   items,
+        }
 
     @get("/price-history")
     async def price_history(self, mode: str = "sim", symbol: str = "",
@@ -161,19 +209,24 @@ class ChartsController(Controller):
                            bid=t.get("bid"), ask=t.get("ask"))
                  for t in raw_ticks]
 
-        # Pull recent AlgoOrder rows for this symbol+mode. We cap at 50 — a
-        # chart typically shows a single chase, but multiple consecutive
-        # chases against the same symbol are possible during a sim and
-        # should all surface as markers.
-        async with async_session() as s:
-            rows = (await s.execute(
-                select(AlgoOrder)
-                .where(AlgoOrder.mode == mode)
-                .where(AlgoOrder.symbol == symbol)
-                .order_by(desc(AlgoOrder.created_at))
-                .limit(50)
-            )).scalars().all()
-        events = _algo_order_events(list(rows))
+        # Classify the symbol so the UI can pick a colour scheme + decide
+        # whether to render an underlying overlay.
+        kind, underlying = _classify_symbol(eng, symbol)
 
-        return ChartResponse(mode=mode, symbol=symbol,
-                             ticks=ticks, events=events)
+        # Underlyings have no AlgoOrder events of their own — skip the
+        # query for them. For derivatives we still pull recent rows so
+        # placed/filled/unfilled markers land on the chart.
+        events: list[OrderEvent] = []
+        if kind != "underlying":
+            async with async_session() as s:
+                rows = (await s.execute(
+                    select(AlgoOrder)
+                    .where(AlgoOrder.mode == mode)
+                    .where(AlgoOrder.symbol == symbol)
+                    .order_by(desc(AlgoOrder.created_at))
+                    .limit(50)
+                )).scalars().all()
+            events = _algo_order_events(list(rows))
+
+        return ChartResponse(mode=mode, symbol=symbol, kind=kind,
+                             underlying=underlying, ticks=ticks, events=events)

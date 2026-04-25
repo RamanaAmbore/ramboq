@@ -290,6 +290,16 @@ class SimDriver:
         # bounded even on a long run; oldest entries fall off the deque.
         self._price_history: dict[str, deque] = {}
 
+        # Derivatives state — populated at seed time so options re-price
+        # coherently off underlying moves. `_underlyings` maps underlying
+        # name (e.g. "NIFTY") → current spot. `_iv_cache` is per-position
+        # implied vol locked at seed. `_underlying_history` mirrors
+        # `_price_history` shape but for underlyings, charted alongside
+        # the option prices via the same /api/charts endpoint.
+        self._underlyings:        dict[str, float] = {}
+        self._iv_cache:           dict[str, float] = {}
+        self._underlying_history: dict[str, deque] = {}
+
         # Bid/ask spread (decimal fraction — 0.001 = 0.10%). Applied on
         # every _recompute_position_row so every position carries per-side
         # prices. Resolved at start() from the request override or the DB
@@ -606,6 +616,13 @@ class SimDriver:
         # Wipe price history so each sim run gets a clean chart. The chart
         # panel keys on (mode, symbol) so a fresh start should look fresh.
         self._price_history.clear()
+        self._underlying_history.clear()
+        # Detect derivatives in the seeded book, resolve each underlying's
+        # spot, and calibrate per-option IV against current LTP. Done before
+        # the run loop starts so the very first underlying_pct move re-prices
+        # everything correctly. Failures are logged but don't block start —
+        # a non-derivative book just leaves these dicts empty.
+        self._seed_derivatives(scen)
         self._record_tick(
             kind="started", moves=[], changes=[],
             note=(f"{scenario_slug} · seed={seed_mode} · "
@@ -764,6 +781,12 @@ class SimDriver:
             if mtype == "set_margin":
                 changes.extend(self._apply_set_margin(scope, move))
                 continue
+            # Underlying moves: shift the spot, then re-price every option /
+            # future on that underlying using the cached IV. Drives coherent
+            # F&O sims off a single "−3% NIFTY" tick.
+            if mtype in ("underlying_pct", "underlying_abs", "underlying_target"):
+                changes.extend(self._apply_underlying_move(mtype, scope, move))
+                continue
             if scope.startswith("holdings."):
                 logger.debug(f"[SIM] ignoring holdings scope '{scope}' (positions-only sim)")
                 continue
@@ -786,6 +809,165 @@ class SimDriver:
                 changes.extend(self._apply_target_pnl(matched, target))
             else:
                 logger.warning(f"[SIM] unknown move type '{mtype}'")
+        return changes
+
+    # ── Derivatives ──────────────────────────────────────────────────
+
+    def _seed_derivatives(self, scen: dict) -> None:
+        """Walk the seeded position book, detect underlyings, resolve each
+        one's spot, and calibrate per-option IV. Underlyings are sourced
+        from (in order):
+          1. `scen.initial.underlyings: {NAME: spot}` — explicit override.
+          2. The futures contract on that underlying — its last_price IS
+             effectively spot for our purposes (intraday cost-of-carry is
+             well below the tick).
+          3. The ATM call+put midpoint via crude proxy: the strike of the
+             nearest-to-money option (no put-call parity needed in v1).
+        Anything that can't be resolved is left out — those positions will
+        only respond to per-symbol pct/abs moves, not underlying moves."""
+        from backend.api.algo.derivatives import (
+            calibrate_iv_for_row, parse_tradingsymbol,
+        )
+
+        self._underlyings.clear()
+        self._iv_cache.clear()
+
+        explicit = (scen.get("initial") or {}).get("underlyings") or {}
+        explicit = {str(k).upper(): float(v) for k, v in explicit.items()}
+
+        # 1. Explicit overrides win.
+        for name, spot in explicit.items():
+            self._underlyings[name] = spot
+
+        # Walk positions to find more underlyings.
+        by_underlying: dict[str, list[dict]] = {}
+        for r in self._positions_rows:
+            sym    = str(r.get("tradingsymbol") or "")
+            parsed = parse_tradingsymbol(sym)
+            if not parsed:
+                continue
+            by_underlying.setdefault(parsed["underlying"], []).append(r)
+
+        for name, rows in by_underlying.items():
+            if name in self._underlyings:
+                continue
+            # 2. Futures last_price as spot proxy.
+            fut = next((r for r in rows
+                        if (parse_tradingsymbol(str(r.get("tradingsymbol", ""))) or {}).get("kind") == "fut"
+                        and r.get("last_price")), None)
+            if fut:
+                self._underlyings[name] = float(fut["last_price"])
+                continue
+            # 3. Crude ATM proxy: among options, find the strike nearest to
+            #    the median strike (assumes the operator's book straddles
+            #    the spot, which is the common case for hedged F&O).
+            strikes = []
+            for r in rows:
+                p = parse_tradingsymbol(str(r.get("tradingsymbol", "")))
+                if p and p.get("kind") == "opt":
+                    strikes.append(p["strike"])
+            if strikes:
+                strikes.sort()
+                self._underlyings[name] = strikes[len(strikes) // 2]
+
+        # Calibrate IV per option position.
+        ref_now = datetime.now()
+        for r in self._positions_rows:
+            sym  = str(r.get("tradingsymbol") or "")
+            p    = parse_tradingsymbol(sym)
+            if not p or p.get("kind") != "opt":
+                continue
+            spot = self._underlyings.get(p["underlying"])
+            if spot is None:
+                continue
+            sigma = calibrate_iv_for_row(r, spot, ref_now=ref_now)
+            if sigma is not None:
+                self._iv_cache[sym] = sigma
+
+        if self._underlyings:
+            spots = ", ".join(f"{n}={v:,.2f}" for n, v in self._underlyings.items())
+            logger.info(
+                f"[SIM] derivatives seeded · underlyings: {spots} · "
+                f"iv-calibrated: {len(self._iv_cache)}"
+            )
+
+    def _apply_underlying_move(self, mtype: str, scope: str,
+                               move: dict) -> list[dict]:
+        """
+        Underlying scope is `underlying.<NAME>` or `underlying.*`. The move
+        types are:
+          underlying_pct     value=0.03         → spot × 1.03
+          underlying_abs     value=25           → spot + 25
+          underlying_target  value=22000        → spot ← 22000
+        After updating the spot, every option/future position whose
+        underlying matches is re-priced (BS for options using cached σ;
+        spot 1:1 for futures).
+        """
+        if not scope.startswith("underlying."):
+            logger.warning(f"[SIM] underlying move expects 'underlying.*' scope, got '{scope}'")
+            return []
+        which = scope.split(".", 1)[1].upper()
+        names = ([n for n in self._underlyings if fnmatch.fnmatch(n, which)]
+                 if "*" in which or "?" in which
+                 else ([which] if which in self._underlyings else []))
+        if not names:
+            logger.info(f"[SIM] underlying move '{scope}' matched no known underlying "
+                        f"(known: {sorted(self._underlyings)})")
+            return []
+
+        value = float(move.get("value") or 0)
+        changes: list[dict] = []
+        for name in names:
+            old_spot = float(self._underlyings[name])
+            if   mtype == "underlying_pct":    new_spot = old_spot * (1.0 + value)
+            elif mtype == "underlying_abs":    new_spot = old_spot + value
+            elif mtype == "underlying_target": new_spot = value
+            else:                              new_spot = old_spot
+            self._underlyings[name] = new_spot
+            # Synthetic change row so the tick log shows the underlying move.
+            # Same shape as `_change` so the LogPanel's Simulator tab renders
+            # it without special-casing.
+            changes.append({
+                "section":  "underlying",
+                "account":  None,
+                "symbol":   name,
+                "col":      "last_price",
+                "prev":     old_spot,
+                "next":     new_spot,
+                "delta":    new_spot - old_spot,
+                "reason":   f"{mtype} {value:+.4f} (underlying)",
+                "bid":      None,
+                "ask":      None,
+            })
+            # Re-price every position on this underlying — produces one
+            # change row per derived contract so the operator sees the chain.
+            changes.extend(self._reprice_derivatives_for(name, new_spot))
+        return changes
+
+    def _reprice_derivatives_for(self, underlying: str, spot: float) -> list[dict]:
+        """Walk every position on `underlying` and re-price using BS (opts)
+        or 1:1 spot (futures). Returns the change rows so the tick log + UI
+        diff stays consistent with the rest of the move primitives."""
+        from backend.api.algo.derivatives import parse_tradingsymbol, reprice_row
+        ref_now = datetime.now()
+        changes: list[dict] = []
+        for row in self._positions_rows:
+            sym    = str(row.get("tradingsymbol") or "")
+            parsed = parse_tradingsymbol(sym)
+            if not parsed or parsed.get("underlying") != underlying:
+                continue
+            sigma = self._iv_cache.get(sym)
+            new   = reprice_row(row, spot=spot, sigma=sigma, ref_now=ref_now)
+            if new is None:
+                continue
+            prev = float(row.get("last_price") or 0)
+            row["last_price"] = float(new)
+            self._refresh("positions", row)
+            kind = parsed["kind"]
+            tag  = (f"BS@σ={sigma:.3f}" if (kind == "opt" and sigma is not None)
+                    else "fut↔spot" if kind == "fut" else "BS")
+            changes.append(self._change("positions", row, prev, new,
+                                        reason=f"{tag} (spot={spot:,.2f})"))
         return changes
 
     def _scope_matches(self, scope: str) -> list[tuple[str, dict]]:
@@ -1080,7 +1262,10 @@ class SimDriver:
 
     def _capture_price_history(self) -> None:
         """Append one (ts, ltp, bid, ask) per active symbol to the rolling
-        per-symbol buffer. Called once per tick, after moves are applied."""
+        per-symbol buffer. Called once per tick, after moves are applied.
+        Also captures every known underlying spot into a parallel buffer
+        so the chart UI can render the underlying line alongside its
+        derived options."""
         ts = datetime.now().isoformat(timespec="seconds")
         for r in self._positions_rows:
             sym = str(r.get("tradingsymbol") or "")
@@ -1099,12 +1284,21 @@ class SimDriver:
                 "bid": float(r["bid"]) if r.get("bid") is not None else None,
                 "ask": float(r["ask"]) if r.get("ask") is not None else None,
             })
+        for name, spot in self._underlyings.items():
+            buf = self._underlying_history.get(name)
+            if buf is None:
+                buf = deque(maxlen=PRICE_HISTORY_LIMIT)
+                self._underlying_history[name] = buf
+            buf.append({"ts": ts, "ltp": float(spot), "bid": None, "ask": None})
 
     def price_history(self, symbol: str, *, since: str | None = None,
                       limit: int = 600) -> list[dict]:
         """Per-symbol tick stream for the chart endpoint. `since` is an
-        ISO timestamp; entries strictly after `since` are returned."""
-        buf = self._price_history.get(symbol)
+        ISO timestamp; entries strictly after `since` are returned. Looks
+        up underlyings and contracts in the same flat namespace — chart
+        clients don't have to know whether a name is a derivative or its
+        underlying."""
+        buf = self._price_history.get(symbol) or self._underlying_history.get(symbol)
         if not buf:
             return []
         out: list[dict] = []
@@ -1117,8 +1311,25 @@ class SimDriver:
         return out
 
     def price_history_symbols(self) -> list[str]:
-        """Sorted list of symbols with at least one captured tick."""
-        return sorted(s for s, buf in self._price_history.items() if buf)
+        """Sorted list of symbols with at least one captured tick. Includes
+        underlyings (e.g. NIFTY) alongside contracts so the chart panel
+        can render both."""
+        names = {s for s, buf in self._price_history.items() if buf}
+        names.update(s for s, buf in self._underlying_history.items() if buf)
+        return sorted(names)
+
+    def underlying_for(self, symbol: str) -> str | None:
+        """Return the underlying name for a contract, or None if `symbol`
+        is itself an underlying / not a derivative. Used by the chart UI
+        to overlay the spot line on each option chart."""
+        if symbol in self._underlying_history:
+            return None
+        from backend.api.algo.derivatives import parse_tradingsymbol
+        parsed = parse_tradingsymbol(symbol)
+        if not parsed:
+            return None
+        und = parsed["underlying"]
+        return und if und in self._underlyings else None
 
     # ── Convenience ──────────────────────────────────────────────────
 

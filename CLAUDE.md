@@ -754,6 +754,42 @@ where the chase fired" without any new persistent state.
 
 ---
 
+## Derivatives — underlying-driven re-pricing
+
+Options + futures re-price coherently off underlying spot moves so a single "−3% NIFTY" tick cascades through every NIFTY contract instead of each strike moving in isolation.
+
+**Module** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)) — pure-Python, no scipy:
+
+- **Symbol parser** — `parse_tradingsymbol(sym)` returns `{kind: 'opt'|'fut', underlying, strike, opt_type, expiry}` for Kite F&O symbols. Handles monthly (`NIFTY25APR22000CE`) and weekly (`NIFTY2542422000CE`) options, monthly futures (`NIFTY25APRFUT`), stock options (`RELIANCE25APR2800CE`). Returns `None` for cash-equity tradingsymbols.
+- **Black-Scholes** — `black_scholes(S, K, T_years, r, sigma, opt_type)` for vanilla European options. q=0 (Indian index options pay no carry). Vega/theta deliberately ignored — sim runs are minutes, not days.
+- **IV calibrator** — `implied_vol(price, S, K, T, r, opt_type)` is a bisection solver over [0.0001, 5.0]. Falls back to `DEFAULT_IV = 0.15` when the bracket can't bracket. Locked once at sim seed; subsequent ticks re-price with that cached σ.
+- **Re-pricer** — `reprice_row(row, *, spot, sigma)` returns the new last_price for a given derivative position. Futures track spot 1:1; options use BS with the cached σ.
+- **Underlying-key resolver** — `underlying_ltp_key(name)` maps underlying names to Kite quote keys (`NIFTY` → `NSE:NIFTY 50`, `BANKNIFTY` → `NSE:NIFTY BANK`, stock fallthrough to `NSE:<NAME>`).
+
+**Sim wiring** ([`backend/api/algo/sim/driver.py`](backend/api/algo/sim/driver.py)):
+
+- `_underlyings: dict[str, float]` — name → current spot. Resolved at seed time via (1) `scenario.initial.underlyings` explicit override → (2) the futures position's last_price → (3) median strike across the option book as a crude ATM proxy.
+- `_iv_cache: dict[str, float]` — per-option σ calibrated against the seed's last_price.
+- `_underlying_history: dict[str, deque]` — parallel rolling buffer for spot ticks; surfaced via the same `/api/charts` endpoints as contract ticks.
+- New move primitives in `_apply_moves` — scope `underlying.<NAME>` or `underlying.*`:
+  - `underlying_pct {value: -0.03}` → spot × (1 + value)
+  - `underlying_abs {value: -25}` → spot + value
+  - `underlying_target {value: 22000}` → spot ← value
+  After the move, every position whose underlying matches re-prices via `_reprice_derivatives_for`. Each derivative gets its own change row in the tick log so the LogPanel's Simulator tab shows the chain (spot move + N option re-prices).
+
+**Paper/live wiring** ([`backend/api/algo/paper.py`](backend/api/algo/paper.py)) — `PaperTradeEngine._capture_price_history` parses each open order's symbol via `parse_tradingsymbol`, dedupes underlyings, then calls `broker.ltp([keys])` once with the resolved Kite keys. Underlying spots land in `_underlying_history` alongside the contract ticks. No new schema; same deque cap.
+
+**Chart UI** ([`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte)):
+
+- `/api/charts/symbols` returns each symbol's `kind` (`underlying` / `derivative` / `other`) and `underlying` (name when kind=derivative). Sorted with underlyings first, derivatives grouped by underlying.
+- Chart header shows a kind tag (sky-blue `SPOT` for underlyings, amber `F&O` for derivatives) next to the mode pill.
+- For derivative charts the component fetches the underlying's history too and overlays it as a sky-blue dashed line, normalized into the option's plot area so a 22,000 NIFTY move doesn't squash the 180-rupee call line.
+- A `chart-legend` chip identifies the dashed underlying line so the operator never confuses the two.
+
+**Built-in scenarios** — [`scenarios.yaml`](backend/api/algo/sim/scenarios.yaml) ships `nifty-down-3pct` and `nifty-up-3pct` (each: three `underlying_pct` ticks of ±1% on `underlying.NIFTY`). Pair with `seed_mode: live` / `live+scenario` so the BS re-pricing runs against real strikes + premiums.
+
+---
+
 ## Refactoring Notes
 
 | Area | Note |
