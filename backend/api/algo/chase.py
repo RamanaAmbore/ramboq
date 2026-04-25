@@ -181,7 +181,15 @@ async def chase_order(
         ChaseResult with fill details
     """
     if cfg is None:
-        cfg = ChaseConfig()
+        # Pull defaults from /admin/settings → DB (algo.*). YAML
+        # `algo:` block is the boot-time fallback baked into
+        # ChaseConfig's dataclass defaults.
+        from backend.shared.helpers.settings import get_int, get_float
+        cfg = ChaseConfig(
+            interval_seconds=get_int("algo.chase_interval_seconds", 20),
+            aggression_step=get_float("algo.aggression_step", 0.10),
+            max_attempts=get_int("algo.max_attempts", 20),
+        )
 
     result = ChaseResult(
         account=account, symbol=symbol,

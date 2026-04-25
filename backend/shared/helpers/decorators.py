@@ -23,9 +23,14 @@ def singleton_init_guard(init_func):
     return wrapper
 
 
-def retry_kite_conn(max_attempts: int):
+def retry_kite_conn(max_attempts):
     """
     Decorator to retry a function on failure.
+
+    `max_attempts` accepts either an `int` (frozen at decoration time —
+    legacy behaviour) or a zero-arg callable (looked up on every call,
+    so live `connections.retry_count` changes from /admin/settings take
+    effect on the next attempt without a restart).
 
     If the decorated function declares a `test_conn` parameter in its
     signature, the decorator will set `test_conn=True` starting from the
@@ -34,11 +39,12 @@ def retry_kite_conn(max_attempts: int):
 
     def decorator(func):
         sig = inspect.signature(func)
-        has_test_conn = "test_conn" in sig.parameters  # ✅ explicit check
+        has_test_conn = "test_conn" in sig.parameters
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            for attempt in range(max_attempts):
+            n = max_attempts() if callable(max_attempts) else max_attempts
+            for attempt in range(n):
                 try:
                     # Only from 2nd attempt onwards, add/overwrite test_conn
                     if attempt >= 1 and has_test_conn:
@@ -48,11 +54,11 @@ def retry_kite_conn(max_attempts: int):
 
                 except Exception as e:
                     logger.debug(
-                        f"{func.__name__}: Attempt {attempt + 1} of {max_attempts} failed: {e}..."
+                        f"{func.__name__}: Attempt {attempt + 1} of {n} failed: {e}..."
                     )
-                    if attempt == max_attempts - 1:
+                    if attempt == n - 1:
                         logger.error(
-                            f"{func.__name__}: Operation failed after {max_attempts} attempts."
+                            f"{func.__name__}: Operation failed after {n} attempts."
                         )
                         raise
 

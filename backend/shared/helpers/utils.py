@@ -316,7 +316,11 @@ def validate_password_standard(password: str) -> tuple[bool, str]:
     Returns:
         (bool, str): (is_valid, message)
     """
-    if not ramboq_deploy['enforce_password_standard']:
+    # Read live: `auth.enforce_password_standard` in /admin/settings;
+    # YAML `enforce_password_standard` is the boot-time fallback.
+    from backend.shared.helpers.settings import get_bool
+    if not get_bool("auth.enforce_password_standard",
+                    bool(ramboq_deploy.get('enforce_password_standard', False))):
         return True, "Validation skipped in production mode."
 
     if len(password) < 8:

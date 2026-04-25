@@ -122,6 +122,46 @@ SEEDS: list[tuple] = [
     ("logging", "logging.error_log_level",   "enum",   "ERROR",
      "Rotating error file verbosity.", None,
      {"enum": ["DEBUG", "INFO", "WARNING", "ERROR"]}),
+
+    # ── Connections / broker ─────────────────────────────────────────────
+    ("connections", "connections.retry_count",      "int", 3,
+     "Retry attempts for broker calls before giving up.", None,
+     {"min": 1, "max": 10, "step": 1}),
+
+    # ── GenAI ────────────────────────────────────────────────────────────
+    ("genai",       "genai.thinking_budget",        "int", 512,
+     "Cap on Gemini's internal-thinking tokens so the visible response "
+     "doesn't get truncated mid-sentence.", "tokens",
+     {"min": 0, "max": 8192, "step": 64}),
+
+    # ── Auth ─────────────────────────────────────────────────────────────
+    ("auth",        "auth.enforce_password_standard", "bool", False,
+     "Reject weak passwords on registration / password change.", None, None),
+
+    # ── Performance / market refresh ─────────────────────────────────────
+    ("performance", "performance.market_refresh_time", "string", "08:30",
+     "IST clock time for the daily Gemini market-update warm "
+     "(HH:MM, 24-hour).", None, None),
+
+    # ── Algo (chase + expiry) ────────────────────────────────────────────
+    ("algo",        "algo.chase_interval_seconds",  "int", 20,
+     "Seconds between price adjustments while chasing an open order.",
+     "s", {"min": 1, "max": 300, "step": 1}),
+    ("algo",        "algo.aggression_step",         "float", 0.10,
+     "Spread-fraction increase per chase attempt.", None,
+     {"min": 0.0, "max": 1.0, "step": 0.01}),
+    ("algo",        "algo.max_attempts",            "int", 20,
+     "Maximum chase attempts before the order is marked unfilled.",
+     None, {"min": 1, "max": 100, "step": 1}),
+    ("algo",        "algo.expiry_start_offset_hours","float", 2,
+     "Hours before market close to begin expiry-day auto-close scan.",
+     "h", {"min": 0, "max": 6, "step": 0.25}),
+    ("algo",        "algo.expiry_ntm_buffer_pct",   "float", 2.0,
+     "% from strike to flag as near-the-money on expiry-day scan.",
+     "%", {"min": 0, "max": 10, "step": 0.1}),
+    ("algo",        "algo.expiry_rescan_minutes",   "int", 30,
+     "Re-scan interval (min) on expiry day for new ITM positions.",
+     "min", {"min": 1, "max": 120, "step": 1}),
 ]
 
 
@@ -230,17 +270,32 @@ def _serialise(val: Any, value_type: str) -> str:
 
 def _lookup_raw(key: str) -> str | None:
     """
-    DB cache first, then YAML. For YAML we also try a trimmed key —
-    `alerts.cooldown_minutes` → YAML `alert_cooldown_minutes` for
-    back-compat with the current yaml file.
+    DB cache first, then YAML. YAML fallback tries three shapes:
+      1. Top-level flat key matching `<key>` exactly.
+      2. Nested dotted lookup — `algo.chase_interval_seconds` →
+         yaml_config["algo"]["chase_interval_seconds"].
+      3. Legacy flat aliases — `alerts.cooldown_minutes` → YAML's
+         `alert_cooldown_minutes`, etc. — kept so downgrades to a
+         pre-DB-seeding state still resolve.
     """
     if key in _CACHE:
         return _CACHE[key]
     yaml_val = yaml_config.get(key)
     if yaml_val is not None:
         return str(yaml_val)
-    # Back-compat: strip category prefix, try YAML under a flat name.
     if "." in key:
+        # Nested traversal — walk the YAML tree by dotted segments.
+        cursor: Any = yaml_config
+        ok = True
+        for seg in key.split("."):
+            if isinstance(cursor, dict) and seg in cursor:
+                cursor = cursor[seg]
+            else:
+                ok = False
+                break
+        if ok and cursor is not None and not isinstance(cursor, dict):
+            return str(cursor)
+        # Legacy flat aliases (alert_*, performance_*).
         _, flat = key.split(".", 1)
         for candidate in (flat, "alert_" + flat, "performance_" + flat):
             v = yaml_config.get(candidate)

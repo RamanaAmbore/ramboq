@@ -68,18 +68,16 @@ LOG="$APP_ROOT/.log/hook_debug.log"
     python3 - "$CONFIG_BAK" "backend/config/backend_config.yaml" <<'PYEOF'
 import sys, yaml
 bak_path, new_path = sys.argv[1], sys.argv[2]
-PRESERVE_SCALARS = [
-    "enforce_password_standard", "genai_thinking_budget",
-]
+# Operator-tunable scalars used to be preserved here (enforce_password_standard,
+# genai_thinking_budget, alert_*, etc.). They've all moved to the `settings` DB
+# table, which the seeder preserves the operator's `value` column across deploys
+# automatically. PRESERVE_SCALARS is now empty — left in place so adding a new
+# YAML-only knob is one entry and not a re-discovery exercise.
+PRESERVE_SCALARS = []
 with open(bak_path) as f: bak = yaml.safe_load(f) or {}
 with open(new_path) as f: new = yaml.safe_load(f) or {}
 for k in PRESERVE_SCALARS:
     if k in bak:
-        new[k] = bak[k]
-# Every alert_* key is operator-tunable; pattern-match so server-side threshold
-# tweaks survive deploys automatically as new alert keys are added.
-for k in list(bak.keys()):
-    if str(k).startswith("alert_"):
         new[k] = bak[k]
 # cap_in_dev / cap_in_prod: carry the whole dict from the server's backup
 # (so each capability keeps its prior setting). Missing keys from the repo

@@ -5,6 +5,7 @@ from google.genai import types
 
 from backend.shared.helpers.date_time_utils import timestamp_indian, timestamp_est
 from backend.shared.helpers.ramboq_logger import get_logger
+from backend.shared.helpers.settings import get_int
 from backend.shared.helpers.utils import secrets, ramboq_config, is_enabled
 
 logger = get_logger(__name__)
@@ -135,7 +136,9 @@ def get_market_update(strict: bool = False):
                 temperature=float(ramboq_config['genai_temperature']),
                 max_output_tokens=int(ramboq_config['genai_max_tokens']),
                 thinking_config=types.ThinkingConfig(
-                    thinking_budget=int(ramboq_config.get('genai_thinking_budget', 512)),
+                    thinking_budget=get_int(
+                        'genai.thinking_budget',
+                        int(ramboq_config.get('genai_thinking_budget', 512))),
                 ),
             ),
         )

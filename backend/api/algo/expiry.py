@@ -65,14 +65,31 @@ class ExpiryEngine:
     def __init__(self, on_event: Callable | None = None):
         self.state = ExpiryState()
         self.on_event = on_event
+        # Settings live in DB now (algo.*); YAML `algo:` block is the
+        # boot-time fallback. Re-read on every engine construction so a
+        # tweak via /admin/settings takes effect on the next chase run
+        # without a service restart.
+        from backend.shared.helpers.settings import get_int, get_float
         self._algo_cfg = config.get("algo", {})
-        self._ntm_buffer = self._algo_cfg.get("expiry_ntm_buffer_pct", 2.0)
-        self._start_offset_h = self._algo_cfg.get("expiry_start_offset_hours", 2)
-        self._rescan_min = self._algo_cfg.get("expiry_rescan_minutes", 30)
+        self._ntm_buffer = get_float(
+            "algo.expiry_ntm_buffer_pct",
+            float(self._algo_cfg.get("expiry_ntm_buffer_pct", 2.0)))
+        self._start_offset_h = get_float(
+            "algo.expiry_start_offset_hours",
+            float(self._algo_cfg.get("expiry_start_offset_hours", 2)))
+        self._rescan_min = get_int(
+            "algo.expiry_rescan_minutes",
+            int(self._algo_cfg.get("expiry_rescan_minutes", 30)))
         self._chase_cfg = ChaseConfig(
-            interval_seconds=self._algo_cfg.get("chase_interval_seconds", 20),
-            aggression_step=self._algo_cfg.get("aggression_step", 0.10),
-            max_attempts=self._algo_cfg.get("max_attempts", 20),
+            interval_seconds=get_int(
+                "algo.chase_interval_seconds",
+                int(self._algo_cfg.get("chase_interval_seconds", 20))),
+            aggression_step=get_float(
+                "algo.aggression_step",
+                float(self._algo_cfg.get("aggression_step", 0.10))),
+            max_attempts=get_int(
+                "algo.max_attempts",
+                int(self._algo_cfg.get("max_attempts", 20))),
         )
         self._instruments_cache: dict = {}  # exchange → list of instruments
 

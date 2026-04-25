@@ -199,12 +199,24 @@ async def _task_market(state: dict) -> None:
             logger.error(f"Background: market startup warm failed: {e}")
 
     while True:
+        # `performance.market_refresh_time` is HH:MM in IST. Live-tunable
+        # from /admin/settings; YAML `market_refresh_time` is the boot
+        # fallback.
+        from backend.shared.helpers.settings import get_string
+        hhmm = get_string(
+            "performance.market_refresh_time",
+            str(config.get("market_refresh_time", "08:30")),
+        )
+        try:
+            hour, minute = (int(x) for x in str(hhmm).split(":", 1))
+        except Exception:
+            hour, minute = 7, 0
         now = timestamp_indian()
-        next_warm = now.replace(hour=7, minute=0, second=0, microsecond=0)
+        next_warm = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if now >= next_warm:
             next_warm += timedelta(days=1)
         sleep_s = (next_warm - now).total_seconds()
-        logger.info(f"Background: market task sleeping {sleep_s/3600:.1f}h until next warm")
+        logger.info(f"Background: market task sleeping {sleep_s/3600:.1f}h until next warm at {hhmm} IST")
         await asyncio.sleep(sleep_s)
 
         try:

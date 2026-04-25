@@ -49,7 +49,14 @@ class _IPv6SourceAdapter(HTTPAdapter):
 
 
 
-RETRY_COUNT = config['retry_count']
+# Resolved at every retry-decorator entry so live changes from
+# /admin/settings → connections.retry_count take effect on the next
+# call without a restart. Falls back to YAML, then 3.
+def _retry_count() -> int:
+    from backend.shared.helpers.settings import get_int
+    return get_int("connections.retry_count",
+                   int(config.get("retry_count", 3)))
+
 CONN_RESET_HOURS = int(config['conn_reset_hours'])
 
 logger = get_logger(__name__)
@@ -196,7 +203,7 @@ class KiteConnection:
                     pass
         return None
 
-    @retry_kite_conn(RETRY_COUNT)
+    @retry_kite_conn(_retry_count)
     def get_kite_conn(self, test_conn=False):
         """Return kite connection, refreshing if older than CONN_RESET_HOURS.
 
@@ -248,7 +255,7 @@ class KiteConnection:
             self.init_kite_conn(test_conn=True)
             return self.kite
 
-    @retry_kite_conn(RETRY_COUNT)
+    @retry_kite_conn(_retry_count)
     def login(self):
         try:
             response = self.session.post(self.login_url, data={"user_id": self.account, "password": self._password})
@@ -260,7 +267,7 @@ class KiteConnection:
             raise
         return request_id
 
-    @retry_kite_conn(RETRY_COUNT)
+    @retry_kite_conn(_retry_count)
     def totp_authenticate(self, request_id):
         try:
             totp = generate_totp(self.totp_token)
@@ -272,7 +279,7 @@ class KiteConnection:
             logger.error(f"2FA authentication failed: {e}")
             raise
 
-    @retry_kite_conn(RETRY_COUNT)
+    @retry_kite_conn(_retry_count)
     def setup_access_token(self, request_token):
         try:
             self.kite = self._new_kite()

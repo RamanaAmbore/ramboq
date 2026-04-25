@@ -1,5 +1,7 @@
 # Connection settings
-retry_count: 3
+# `retry_count` moved to DB (`connections.retry_count`) — tune live from
+# /admin/settings without a deploy. `conn_reset_hours` stays here as a
+# Kite-vendor constant (token TTL is fixed by Kite, not an operator knob).
 conn_reset_hours: 23
 
 # Log file paths (relative to app working directory — works uniformly for prod and dev).
@@ -9,13 +11,15 @@ conn_reset_hours: 23
 file_log_file: .log/log_file
 error_log_file: .log/error_file
 
-# Log levels (Python logging: 10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR)
+# Log levels (Python logging: 10=DEBUG, 20=INFO, 30=WARNING, 40=ERROR).
+# Boot-time defaults — handlers wire from these at module import. Live
+# changes from /admin/settings → DB key `logging.<file|console|error>_log_level`
+# fire `_apply_live_effects` and reconfigure the handlers in place.
 file_log_level: 10
 error_log_level: 40
 console_log_level: 40
 
-# App flags — override on server after initial deploy (preserved across deploys by deploy scripts)
-enforce_password_standard: False
+# `enforce_password_standard` moved to DB (`auth.enforce_password_standard`).
 
 # Per-capability toggles. The section consulted at runtime depends on
 # deploy_branch:
@@ -36,40 +40,28 @@ cap_in_prod:
   simulator:        False  # /api/simulator market simulator (prod default: off — never run
                            # fabricated market data in production)
 
-# Gemini 2.5 Flash allocates part of max_output_tokens to internal "thinking". Cap
-# it here so the actual market-report response has room (avoids mid-sentence truncation).
-genai_thinking_budget: 512
+# `genai_thinking_budget` moved to DB (`genai.thinking_budget`).
 
 # Set by deploy script — current git branch; used to prefix Telegram/email messages on non-main branches
 deploy_branch: main
 
-# ── Agent engine globals ────────────────────────────────────────────────────
-# Per-rule thresholds used to live here. They have moved into each loss-* agent's
-# condition tree, editable from the /algo UI. What remains are the four knobs
-# that apply to every rate-based agent uniformly:
+# ── Operational tunables — all moved to DB ─────────────────────────────────
+# Every knob in these areas now lives in the `settings` table and is
+# editable from /admin/settings without a redeploy:
 #
-#   alert_rate_window_min     — history window used to compute ΔP&L/Δmin.
-#   alert_baseline_offset_min — rate rules stay silent for this many minutes
-#                                after market open so the opening gap is not
-#                                mistaken for an intra-day bleed.
-#   alert_cooldown_minutes    — minimum time between re-fires of the same agent.
-#   alert_suppress_delta_abs/_pct — even after cooldown, re-fire requires the
-#                                    loss to have deepened by at least this much.
+#   alerts.rate_window_min, alerts.baseline_offset_min, alerts.cooldown_minutes,
+#     alerts.suppress_delta_abs, alerts.suppress_delta_pct
+#   performance.refresh_interval, performance.open_summary_offset_min,
+#     performance.close_summary_offset_min, performance.market_refresh_time
+#   connections.retry_count, auth.enforce_password_standard,
+#     genai.thinking_budget
+#   algo.chase_interval_seconds, algo.aggression_step, algo.max_attempts,
+#     algo.expiry_start_offset_hours, algo.expiry_ntm_buffer_pct,
+#     algo.expiry_rescan_minutes
 #
-# deploy.sh preserves every key starting with "alert_" across deploys, so the
-# server's tuned values survive a git pull.
-alert_rate_window_min:     10
-alert_baseline_offset_min: 15
-alert_cooldown_minutes:    30
-alert_suppress_delta_abs:  15000
-alert_suppress_delta_pct:  0.5
-
-# Background refresh settings (all times in India IST)
-background_refresh: True
-performance_refresh_interval: 5    # minutes — must match get_nearest_time interval
-market_refresh_time: "08:30"       # IST — pre-fetch market update once per day before market opens
-open_summary_offset_minutes: 15    # minutes after segment open to send open summary
-close_summary_offset_minutes: 15   # minutes after segment close to send close summary
+# In-code defaults match what these YAML keys used to set, so the system
+# boots safely even before the settings cache is loaded. The DB seeder
+# writes those same defaults on first boot.
 
 # Market segments — used to determine fetch window and open/close summaries
 # holiday_exchange: exchange name passed to kite.holidays()
@@ -86,11 +78,8 @@ market_segments:
     holiday_exchange: "MCX"
     exchanges: ["MCX"]
 
-# Algo agent — adaptive order chasing and expiry auto-close
-algo:
-  chase_interval_seconds: 20        # seconds between price adjustments
-  aggression_step: 0.10             # spread fraction increase per attempt
-  max_attempts: 20                  # max attempts before giving up
-  expiry_start_offset_hours: 2      # hours before market close to start closing
-  expiry_ntm_buffer_pct: 2.0        # % from strike to flag as near-the-money
-  expiry_rescan_minutes: 30         # re-scan interval for new ITM positions
+# Algo agent (chase + expiry) — every knob moved to DB:
+#   algo.chase_interval_seconds, algo.aggression_step, algo.max_attempts
+#   algo.expiry_start_offset_hours, algo.expiry_ntm_buffer_pct,
+#   algo.expiry_rescan_minutes
+# Tune all of these from /admin/settings without a redeploy.
