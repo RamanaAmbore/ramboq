@@ -16,7 +16,7 @@
   // page polls every 5 s while the symbol is set so Greeks + IV + LTP
   // stay current. Historical chart fetches once on symbol change.
 
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
@@ -100,6 +100,10 @@
   // Candidate positions matching the filter. Each candidate is an
   // option or future on the chosen underlying held in one of the
   // selected accounts (or all accounts when none selected).
+  // In live/sim modes the source is filtered to match the active mode
+  // (so the operator only sees their live book vs the sim book, not a
+  // mix). Strategy mode shows both since you can build a strategy out
+  // of a mix of live + sim legs.
   /** @type {{symbol:string,account:string,qty:number,avg_cost:number|null,ltp:number|null,source:string,kind:string}[]} */
   const candidatePositions = $derived.by(() => {
     if (!selectedUnderlying) return [];
@@ -110,6 +114,7 @@
     const out = [];
     for (const p of positions) {
       if (acctFilter.length && !acctFilter.includes(p.account)) continue;
+      if ((mode === 'live' || mode === 'sim') && p.source !== mode) continue;
       const sym = p.symbol;
       // Match option/future by symbol prefix — same convention used by
       // parse_tradingsymbol on the backend.
@@ -128,40 +133,53 @@
   // Initialize the enable-flag map when candidates change. Default:
   // every candidate enabled (operator sees their book in the payoff
   // immediately; un-checks to drop a leg).
+  // ── untrack the read of `enabledSymbols` so this effect re-runs only
+  //    when the candidate set itself changes; otherwise the assignment
+  //    on line below would re-trigger this effect → infinite loop hang.
   $effect(() => {
-    void selectedUnderlying; void selectedAccounts;
-    /** @type {Record<string, boolean>} */
-    const next = {};
-    for (const c of candidatePositions) {
-      // Preserve existing toggle state for symbols that survive the
-      // filter change; default new ones to enabled.
-      next[c.symbol] = (c.symbol in enabledSymbols)
-        ? enabledSymbols[c.symbol]
-        : true;
-    }
-    enabledSymbols = next;
+    const cands = candidatePositions;
+    untrack(() => {
+      /** @type {Record<string, boolean>} */
+      const next = {};
+      let changed = false;
+      const prevKeys = Object.keys(enabledSymbols);
+      if (prevKeys.length !== cands.length) changed = true;
+      for (const c of cands) {
+        if (!(c.symbol in enabledSymbols)) changed = true;
+        next[c.symbol] = (c.symbol in enabledSymbols)
+          ? enabledSymbols[c.symbol]
+          : true;
+      }
+      // Skip the write entirely when nothing meaningful changed —
+      // assigning a new ref would still trigger downstream effects.
+      if (changed) enabledSymbols = next;
+    });
   });
 
   // When candidates change OR toggle changes, rebuild the book-derived
   // portion of `legs`. Manual / chain rows (source='manual'/'chain')
   // are preserved verbatim. Live + sim sourced legs are replaced from
   // the current candidates × enabled-flag combination.
+  // ── untrack the read of `legs` so this effect doesn't trigger itself
+  //    via the `legs.filter` access on the line below.
   $effect(() => {
     void candidatePositions; void enabledSymbols;
     if (mode !== 'strategy') return;
-    const nonBook = legs.filter(l =>
-      l.source === 'manual' || l.source === 'chain'
-    );
-    const book = candidatePositions
-      .filter(c => enabledSymbols[c.symbol])
-      .map(c => ({
-        symbol:   c.symbol,
-        qty:      c.qty,
-        avg_cost: c.avg_cost ?? '',
-        ltp:      c.ltp ?? '',
-        source:   c.source,   // 'live' or 'sim'
-      }));
-    legs = [...book, ...nonBook];
+    untrack(() => {
+      const nonBook = legs.filter(l =>
+        l.source === 'manual' || l.source === 'chain'
+      );
+      const book = candidatePositions
+        .filter(c => enabledSymbols[c.symbol] !== false)
+        .map(c => ({
+          symbol:   c.symbol,
+          qty:      c.qty,
+          avg_cost: c.avg_cost ?? '',
+          ltp:      c.ltp ?? '',
+          source:   c.source,   // 'live' or 'sim'
+        }));
+      legs = [...book, ...nonBook];
+    });
   });
 
   // ── Option-chain picker (Strategy mode) ───────────────────────────
@@ -326,31 +344,18 @@
     positions = merged;
   }
 
-  // Pickable list — only CE/PE for analytics (futures show on the picker
-  // but the analytics endpoint will reject them with a 400; we hide them
-  // from the picker to avoid the round-trip).
-  const pickerOptions = $derived(
-    positions
-      .filter(p => /(CE|PE)$/i.test(p.symbol))
-      .map(p => ({
-        value: `${p.source}|${p.account}|${p.symbol}`,
-        label: `${p.source.toUpperCase()} · ${p.symbol} (${p.qty > 0 ? '+' : ''}${p.qty})${p.account ? ' · ' + p.account : ''}`,
-      }))
-  );
-
-  // Picker state — bound to the Select. Wraps `mode|account|symbol` so
-  // we can react to changes via $effect (Select doesn't expose onChange).
-  let pickerValue = $state('');
-  $effect(() => {
-    const v = pickerValue;
-    if (!v) return;
-    const [src, acct, sym] = v.split('|');
-    mode    = /** @type {any} */ (src);
-    account = acct || '';
-    symbol  = sym  || '';
+  // Click-to-pick handler for live / sim modes. The candidates panel
+  // calls this when the operator clicks a row. Future row in live / sim
+  // mode would 400 from the analytics endpoint (FUT isn't an option), so
+  // the candidate row's button is disabled for kind=fut in live/sim.
+  function pickCandidate(/** @type {any} */ c) {
+    if (!c) return;
+    if (c.kind === 'fut') return;   // analytics endpoint rejects FUT
+    account = c.account || '';
+    symbol  = c.symbol  || '';
     loadAnalytics();
     loadHistorical();
-  });
+  }
 
   async function loadStrategy() {
     const cleanLegs = legs
@@ -515,11 +520,13 @@
         ]} />
     </div>
 
-    {#if mode === 'strategy'}
-      <!-- Strategy v2 — pick the underlying + accounts. Every option /
-           future on that underlying held in those accounts becomes a
-           toggleable candidate below the chart. Hypothetical legs go
-           through the chain-picker card or the manual + Add row. -->
+    {#if mode !== 'hypothetical'}
+      <!-- Account + Underlying picker — shared across live / sim /
+           strategy modes so the operator's mental model is the same in
+           every workflow: pick scope (accounts) → pick the underlying
+           → pick a candidate from the panel below the chart. In live /
+           sim mode candidates are click-to-pick (single-select); in
+           strategy mode they're checkboxes (multi-select). -->
       <div class="opt-field opt-field-grow">
         <label class="field-label" for="opt-acct">Account</label>
         <MultiSelect id="opt-acct"
@@ -534,25 +541,19 @@
           options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
           placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
       </div>
-      <button type="button" class="sim-btn sim-btn-order"
-              title="Append a blank leg row for hypothetical / manual entry"
-              onclick={addLegRow}>+ Add row</button>
-      <button type="button" class="sim-btn sim-btn-order"
-              title="Compute aggregate analytics + payoff for the current legs"
-              onclick={loadStrategy}>Analyze</button>
-      {#if legs.length}
-        <button type="button" class="sim-btn sim-btn-order opt-clear"
-                title="Discard every leg and reset"
-                onclick={clearLegs}>Clear</button>
+      {#if mode === 'strategy'}
+        <button type="button" class="sim-btn sim-btn-order"
+                title="Append a blank leg row for hypothetical / manual entry"
+                onclick={addLegRow}>+ Add row</button>
+        <button type="button" class="sim-btn sim-btn-order"
+                title="Compute aggregate analytics + payoff for the current legs"
+                onclick={loadStrategy}>Analyze</button>
+        {#if legs.length}
+          <button type="button" class="sim-btn sim-btn-order opt-clear"
+                  title="Discard every leg and reset"
+                  onclick={clearLegs}>Clear</button>
+        {/if}
       {/if}
-    {:else if mode !== 'hypothetical'}
-      <div class="opt-field opt-field-grow">
-        <label class="field-label" for="opt-pos">Position</label>
-        <Select id="opt-pos"
-          bind:value={pickerValue}
-          options={pickerOptions}
-          placeholder={pickerOptions.length ? 'Pick a position…' : 'No positions yet — switch to Hypothetical'} />
-      </div>
     {:else}
       <div class="opt-field opt-field-grow">
         <label class="field-label" for="opt-sym">Symbol</label>
@@ -586,10 +587,102 @@
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{strategyErr}</div>
 {/if}
 
-{#if mode !== 'strategy' && !analytics && !analyticsErr && !loading}
+{#if mode !== 'strategy' && !analytics && !analyticsErr && !loading && !selectedUnderlying}
   <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
-    Pick a position above (or switch to Hypothetical and type a symbol)
+    Pick an underlying above (or switch to Hypothetical and type a symbol)
     to load the analytics workspace.
+  </div>
+{/if}
+
+<!-- ───────────────────────── CANDIDATES (live / sim / strategy) ────────
+     Every option / future on the chosen underlying held in the chosen
+     accounts. Lives outside any mode-specific block so the same panel
+     serves three workflows:
+       - live / sim: click a row to analyse that single position;
+                     selected row is highlighted in amber.
+       - strategy:   checkbox per row; toggling rebuilds legs[] for the
+                     next Analyze click.
+     Hidden in hypothetical mode (operator types a symbol; no book to
+     scan). -->
+{#if mode !== 'hypothetical' && selectedUnderlying}
+  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+      Candidates
+      <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
+      <span class="opt-section-meta">
+        {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
+        {mode === 'strategy' ? 'uncheck to drop a leg from the strategy' : 'click a row to analyse it'}
+      </span>
+    </div>
+    {#if candidatePositions.length}
+      <div class="cand-grid">
+        <div class="cand-headrow">
+          <span></span>
+          <span>Symbol</span>
+          <span>Account</span>
+          <span>Kind</span>
+          <span class="num">Qty</span>
+          <span class="num">Avg cost</span>
+          <span class="num">LTP</span>
+          <span class="num">P&amp;L</span>
+          <span>Source</span>
+        </div>
+        {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
+          {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
+          {#if mode === 'strategy'}
+            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
+              <input type="checkbox"
+                     checked={enabledSymbols[c.symbol] !== false}
+                     onchange={(e) => {
+                       const next = { ...enabledSymbols };
+                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
+                       enabledSymbols = next;
+                     }} />
+              <span class="font-mono">{c.symbol}</span>
+              <span class="font-mono">{c.account}</span>
+              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
+              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
+              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
+              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span class="leg-source leg-source-{c.source}">{c.source}</span>
+            </label>
+          {:else}
+            <button type="button"
+                    class="cand-row cand-row-btn"
+                    class:cand-row-active={symbol === c.symbol && account === c.account}
+                    class:cand-row-disabled={c.kind === 'fut'}
+                    title={c.kind === 'fut' ? 'Futures are not supported by single-leg analytics — switch to Strategy mode to include this contract' : 'Click to analyse this position'}
+                    onclick={() => pickCandidate(c)}>
+              <span class="cand-bullet">{symbol === c.symbol && account === c.account ? '●' : '○'}</span>
+              <span class="font-mono">{c.symbol}</span>
+              <span class="font-mono">{c.account}</span>
+              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
+              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
+              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
+              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span class="leg-source leg-source-{c.source}">{c.source}</span>
+            </button>
+          {/if}
+        {/each}
+      </div>
+    {:else}
+      <div class="text-[0.6rem] text-[#7e97b8] italic">
+        No options or futures on <b>{selectedUnderlying}</b> in
+        {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
+        Try a different underlying / account
+        {#if mode === 'strategy'}
+          , or use the option-chain picker below to add hypothetical legs.
+        {:else}
+          , or switch to <b>Hypothetical</b> to type any symbol.
+        {/if}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -876,69 +969,6 @@
           </div>
         </div>
       </aside>
-    </div>
-  {/if}
-
-  <!-- Candidate positions panel — every option / future on the picked
-       underlying held in one of the chosen accounts. Sits below the
-       payoff chart so the operator can scan the working set, uncheck a
-       row to drop it from the strategy, and re-Analyze. Stays visible
-       even before the chart loads so the operator sees what they're
-       working with from the moment they pick an underlying. -->
-  {#if selectedUnderlying}
-    <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
-      <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-        Candidates
-        <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
-        <span class="opt-section-meta">
-          {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
-          uncheck to drop a leg from the strategy
-        </span>
-      </div>
-      {#if candidatePositions.length}
-        <div class="cand-grid">
-          <div class="cand-headrow">
-            <span></span>
-            <span>Symbol</span>
-            <span>Account</span>
-            <span>Kind</span>
-            <span class="num">Qty</span>
-            <span class="num">Avg cost</span>
-            <span class="num">LTP</span>
-            <span class="num">P&amp;L</span>
-            <span>Source</span>
-          </div>
-          {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
-            {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
-            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
-              <input type="checkbox"
-                     checked={enabledSymbols[c.symbol] !== false}
-                     onchange={(e) => {
-                       const next = { ...enabledSymbols };
-                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
-                       enabledSymbols = next;
-                     }} />
-              <span class="font-mono">{c.symbol}</span>
-              <span class="font-mono">{c.account}</span>
-              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
-              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
-              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
-                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              <span class="leg-source leg-source-{c.source}">{c.source}</span>
-            </label>
-          {/each}
-        </div>
-      {:else}
-        <div class="text-[0.6rem] text-[#7e97b8] italic">
-          No options or futures on <b>{selectedUnderlying}</b> in
-          {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
-          Try a different underlying / account, or use the option-chain picker
-          below to add hypothetical legs.
-        </div>
-      {/if}
     </div>
   {/if}
 
@@ -1467,6 +1497,35 @@
   }
   .cand-kind-fut { color: #c084fc; }
   .cand-kind-opt { color: #7dd3fc; }
+
+  /* Click-to-pick row variant — used in live / sim mode where the
+     candidate is a single-select. Reset button defaults so the row
+     reads as plain text not a button, then layer the pick-state styling
+     on top (active row gets an amber border + bg). */
+  .cand-row-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+  }
+  .cand-row-btn:hover { background: rgba(251,191,36,0.08); }
+  .cand-row-active {
+    background: rgba(251,191,36,0.15) !important;
+    border-color: rgba(251,191,36,0.55);
+  }
+  .cand-row-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .cand-row-disabled:hover { background: transparent; }
+  .cand-bullet {
+    color: #fbbf24;
+    font-size: 0.75rem;
+    text-align: center;
+    width: 0.9rem;
+    line-height: 1;
+  }
 
   /* Per-leg breakdown table — same monospace look as the Greeks table on
      the single-leg view, but wider (more columns to read). */
