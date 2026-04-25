@@ -17,6 +17,17 @@
   let error    = $state('');
   let note     = $state('');
   let dirty    = $state(/** @type {Record<string, string>} */({}));
+  let filter   = $state('');
+
+  // Render order: high-touch operator knobs first, vendor/infra knobs last.
+  // Anything not in this list falls through to 'misc' and is appended.
+  const CATEGORY_ORDER = ['execution', 'alerts', 'algo', 'performance',
+                          'simulator', 'notifications', 'logging', 'misc'];
+  // Singleton categories (1-2 keys each) collapse into 'misc' so they don't
+  // each get their own card.
+  const CATEGORY_REMAP = /** @type {Record<string,string>} */ ({
+    connections: 'misc', genai: 'misc', auth: 'misc',
+  });
 
   async function load() {
     loading = true; error = '';
@@ -57,11 +68,30 @@
   const execRows = $derived(settings.filter(s => s.key.startsWith('execution.live.')));
   const liveCount = $derived(execRows.filter(s => String(currentValue(s)).toLowerCase() === 'true').length);
 
-  // Group settings by category for rendering.
+  // Group settings by (remapped) category for rendering, applying the
+  // operator's filter and sorting groups by CATEGORY_ORDER (anything
+  // unlisted is appended alphabetically).
   const grouped = $derived.by(() => {
+    const f = filter.trim().toLowerCase();
+    const matches = (/** @type {any} */ s) => {
+      if (!f) return true;
+      return s.key.toLowerCase().includes(f)
+          || (s.description || '').toLowerCase().includes(f);
+    };
     const out = /** @type {Record<string, typeof settings>} */({});
-    for (const s of settings) (out[s.category] ??= []).push(s);
-    return Object.entries(out).sort(([a], [b]) => a.localeCompare(b));
+    for (const s of settings) {
+      if (!matches(s)) continue;
+      const cat = CATEGORY_REMAP[s.category] || s.category;
+      (out[cat] ??= []).push(s);
+    }
+    const idx = (/** @type {string} */ c) => {
+      const i = CATEGORY_ORDER.indexOf(c);
+      return i === -1 ? CATEGORY_ORDER.length : i;
+    };
+    return Object.entries(out).sort(([a], [b]) => {
+      const d = idx(a) - idx(b);
+      return d !== 0 ? d : a.localeCompare(b);
+    });
   });
 
   function currentValue(/** @type {any} */ s) {
@@ -123,6 +153,20 @@
 {:else if !settings.length}
   <div class="text-[0.65rem] text-[#c8d8f0]/60">No settings seeded yet.</div>
 {:else}
+  <div class="mb-3 flex items-center gap-2">
+    <input type="text"
+           class="field-input flex-1 max-w-md"
+           placeholder="Filter by key or description…"
+           bind:value={filter} />
+    {#if filter}
+      <button type="button"
+              class="btn-secondary text-[0.6rem] py-1 px-3"
+              onclick={() => filter = ''}>Clear</button>
+    {/if}
+  </div>
+  {#if !grouped.length}
+    <div class="text-[0.65rem] text-[#c8d8f0]/60">No settings match the filter.</div>
+  {/if}
   {#each grouped as [category, rows]}
     <section class="algo-status-card p-3 mb-3" data-status="inactive">
       <h2 class="text-[0.6rem] font-bold uppercase tracking-wider text-[#fbbf24] mb-2 pb-1 border-b border-[#fbbf24]/25">
