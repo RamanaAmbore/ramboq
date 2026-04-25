@@ -361,7 +361,7 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 **Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
-- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Options · Tokens · Settings · Brokers · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`+layout.svelte`** — algo-site top nav, ordered by usage frequency: Dashboard · Agents · Orders (live monitoring) → Options · Paper · Simulator (analysis surfaces) → Terminal · Tokens (build / extend) → Settings · Brokers (configuration) → Users (admin). The "go back to public" button reads "Investor site" so it's clear what context-switch the link triggers; the public site's reverse link reads "Algo Site". Polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
 - **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
@@ -1026,12 +1026,12 @@ OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that t
 
 Both `/market` and `/performance` consolidate the AI summary and news feed into a single tabbed card with `[Market Summary | Market News]`. Only one panel is visible at a time so the page stays compact; flipping tabs is a paint, not a fetch (both feeds load on mount). Same UX shape on both surfaces — operators get the same affordance whether they're viewing the dedicated Market page or the Performance dashboard.
 
-Tab styling matches the public palette — navy text, champagne underline on the active tab, no extra chrome. Right side of the tab row carries a "Loading…" indicator on first visit. Routes:
+Tab styling matches the public palette — navy text, champagne underline on the active tab, no extra chrome. Tab labels are short ("Summary" / "News feed") rather than the verbose "Market Summary" / "Market News" — the page title already supplies the "Market" qualifier. Right side of the tab row carries a "Loading…" indicator on first visit. Routes:
 
 - [`/market`](frontend/src/routes/(public)/market/+page.svelte) — page-level `lastRefresh` timestamp at the top, then a tabbed card.
 - [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids first, then the same tabbed card below.
 
-The Gemini market-summary prompt was simplified — the AI's first line used to be a bold `**Daily Market Report — [date] | [date]**` heading, which duplicated the page-level `lastRefresh` timestamp. Now the prompt asks for just the dual-timezone timestamp without the title prefix.
+The Gemini market-summary prompt was simplified twice — first to drop the bold `**Daily Market Report — [date]**` title prefix, then to drop the date/timestamp line entirely. The page-level `lastRefresh` timestamp above the card is the canonical date-stamp; having the AI emit another one was redundant. The AI now starts directly with section 1 (`*Market Summary*`).
 
 ---
 

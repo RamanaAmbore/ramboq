@@ -35,17 +35,24 @@
     goto('/about');
   }
 
-  // Grouped by frequency of use: operational daily work first
-  // (Dashboard / Agents / Orders), then tools (Terminal / Simulator),
-  // then configuration (Tokens / Settings), then user admin last.
+  // Grouped by what the operator's actually doing on a given visit:
+  //   1. Live monitoring  — Dashboard, Agents, Orders. Touched daily.
+  //   2. Analysis         — Options, Paper, Simulator. Research +
+  //      what-if surfaces; the Options analytics page is here (not
+  //      under "monitoring") because it's used pre-trade, not live.
+  //   3. Build / extend   — Terminal (ad-hoc commands), Tokens (agent
+  //      grammar catalog).
+  //   4. Configuration    — Settings, Brokers. Touched per quarter,
+  //      not per session.
+  //   5. User admin       — partner / KYC management. Last.
   const algoLinks = [
     { href: '/dashboard',        label: 'Dashboard' },
     { href: '/agents',           label: 'Agents'    },
     { href: '/orders',           label: 'Orders'    },
-    { href: '/console',          label: 'Terminal'  },
-    { href: '/admin/simulator',  label: 'Simulator' },
-    { href: '/admin/paper',      label: 'Paper'     },
     { href: '/admin/options',    label: 'Options'   },
+    { href: '/admin/paper',      label: 'Paper'     },
+    { href: '/admin/simulator',  label: 'Simulator' },
+    { href: '/console',          label: 'Terminal'  },
     { href: '/admin/tokens',     label: 'Tokens'    },
     { href: '/admin/settings',   label: 'Settings'  },
     { href: '/admin/brokers',    label: 'Brokers'   },
@@ -106,7 +113,7 @@
           <span class="algo-user-role">admin</span>
         </span>
         <button onclick={signOut} class="algo-nav-btn">Sign Out</button>
-        <button onclick={() => goto('/about')} class="algo-pub-link">↙ Site</button>
+        <button onclick={() => goto('/about')} class="algo-pub-link">↙ Investor site</button>
       </div>
 
       <!-- Mobile -->
@@ -149,7 +156,7 @@
               class="algo-mobile-item {isActive(link.href) ? 'algo-mobile-active' : ''}"
             >{link.label}</button>
           {/each}
-          <button onclick={() => { goto('/about'); closeMenu(); }} class="algo-mobile-item algo-mobile-site">↙ Back to Site</button>
+          <button onclick={() => { goto('/about'); closeMenu(); }} class="algo-mobile-item algo-mobile-site">↙ Investor site</button>
           <button onclick={() => { signOut(); closeMenu(); }} class="algo-mobile-item">Sign Out</button>
         </nav>
       {/if}

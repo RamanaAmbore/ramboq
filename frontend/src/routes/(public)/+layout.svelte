@@ -75,7 +75,7 @@
 
         {#if $authStore.user?.role === 'admin'}
           <button onclick={() => goto('/dashboard')} class="pub-nav-algo-btn">
-            Algo ↗
+            Algo Site ↗
           </button>
         {/if}
 
@@ -144,7 +144,7 @@
             <button
               onclick={() => { goto('/dashboard'); closeMenu(); }}
               class="pub-mobile-item pub-mobile-algo"
-            >Algo Dashboard ↗</button>
+            >Algo Site ↗</button>
           {/if}
           {#if $authStore.user}
             <button onclick={() => { signOut(); closeMenu(); }} class="pub-mobile-item">Sign Out</button>

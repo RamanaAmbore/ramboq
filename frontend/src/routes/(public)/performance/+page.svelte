@@ -128,13 +128,13 @@
               class="market-tab"
               class:market-tab-active={tab === 'summary'}
               onclick={() => tab = 'summary'}>
-        Market Summary
+        Summary
       </button>
       <button type="button"
               class="market-tab"
               class:market-tab-active={tab === 'news'}
               onclick={() => tab = 'news'}>
-        Market News
+        News feed
       </button>
     </div>
     <div class="market-tabs-meta">
