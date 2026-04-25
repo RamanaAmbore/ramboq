@@ -181,7 +181,7 @@
       <div>
         {#each rows as s}
           <div class="settings-row">
-            <div class="grid grid-cols-[auto_minmax(0,1fr)_160px_auto_auto] gap-2 items-center text-[0.65rem] py-1">
+            <div class="grid grid-cols-[auto_minmax(0,1fr)_110px_auto_auto] gap-2 items-center text-[0.65rem] py-1">
               <button type="button"
                       class="info-btn"
                       class:open={expanded[s.key]}
