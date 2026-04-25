@@ -501,7 +501,14 @@
             <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
           </div>
           <div class="text-[0.5rem] text-[#7e97b8] mt-1 italic">
-            * numerical max/min within ±{((strategy.payoff.length ? (strategy.payoff[strategy.payoff.length-1].spot - strategy.payoff[0].spot) / 2 / strategy.spot * 100 : 10)).toFixed(0)}% spot range
+            * numerical max/min within
+            {#if strategy.span_sigmas > 0}
+              ±{strategy.span_sigmas.toFixed(1)}σ
+              ({(strategy.span_pct * 100).toFixed(1)}%)
+              spot range at expiry
+            {:else}
+              ±{(strategy.span_pct * 100).toFixed(1)}% spot range
+            {/if}
           </div>
         </div>
       </aside>
@@ -582,6 +589,11 @@
         <span class="opt-section-meta">
           DTE {analytics.days_to_expiry.toFixed(1)} ·
           IV {(analytics.iv * 100).toFixed(1)}%
+          {#if analytics.span_sigmas > 0}
+            · ±{analytics.span_sigmas.toFixed(1)}σ ({(analytics.span_pct * 100).toFixed(1)}%)
+          {:else}
+            · ±{(analytics.span_pct * 100).toFixed(1)}%
+          {/if}
         </span>
       </div>
       <OptionsPayoff

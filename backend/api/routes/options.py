@@ -19,6 +19,7 @@ we hammer for shared market data" in one place.
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -115,6 +116,13 @@ class OptionAnalyticsResponse(msgspec.Struct):
     spot_source:  str
     iv_source:    str
 
+    # Payoff x-axis range used. `span_pct` is the actual decimal fraction
+    # applied (e.g. 0.06 = ±6 %); `span_sigmas` is the σ-multiple it was
+    # derived from (e.g. 2.5 means the chart spans ±2.5σ at expiry). UI
+    # shows the σ form in the chart footnote.
+    span_pct:     float
+    span_sigmas:  float
+
 
 class HistoricalBar(msgspec.Struct):
     ts:     str
@@ -145,10 +153,16 @@ class StrategyLeg(msgspec.Struct):
 
 
 class StrategyRequest(msgspec.Struct):
-    legs:     list[StrategyLeg]
-    spot:     float | None = None        # spot override; sim or broker otherwise
-    span_pct: float = 0.10               # ±span around current spot
-    points:   int   = 51
+    legs:        list[StrategyLeg]
+    spot:        float | None = None     # spot override; sim or broker otherwise
+    # span_pct=None auto-derives the chart range from σ × √T (using the
+    # qty-weighted IV proxy across legs and the shared expiry). Pass an
+    # explicit value to override. Clamped to [1%, 50%].
+    span_pct:    float | None = None
+    # σ-multiple used when span_pct is None. Default 2.5 → covers ~98 %
+    # of the lognormal mass at expiry.
+    span_sigmas: float = 2.5
+    points:      int   = 51
 
 
 class LegDetail(msgspec.Struct):
@@ -187,6 +201,10 @@ class StrategyResponse(msgspec.Struct):
     risk:              StrategyRisk
     payoff:            list[PayoffPoint]
     legs:              list[LegDetail]
+    # Same provenance as single-leg /analytics — UI shows ±2.5σ in the
+    # chart footnote when span_sigmas is non-zero.
+    span_pct:          float = 0.10
+    span_sigmas:       float = 0.0
 
 
 # ── Resolvers ─────────────────────────────────────────────────────────
@@ -236,6 +254,34 @@ def _resolve_position(mode: str, symbol: str, qty: Optional[int],
             )
     raise HTTPException(status_code=404,
                         detail=f"account {account!r} has no position '{symbol}'")
+
+
+def _resolve_span_pct(*, sigma: float, T_years: float,
+                      span_pct: Optional[float],
+                      span_sigmas: float = 2.5) -> float:
+    """
+    Pick the payoff-curve x-axis span. When the operator passed an
+    explicit `span_pct` override, use that. Otherwise derive from the
+    underlying's standard deviation at expiry:
+
+        span_pct = span_sigmas × σ × √T_years
+
+    σ × √T is the annualized vol scaled to the option's time-to-expiry
+    (so a 7-DTE 15% IV option spans ±~5% at 2.5σ; a 60-DTE same-IV
+    option spans ±~15%). Keeps the chart "tight enough to show the
+    interesting region" without manual span tuning per contract.
+
+    Clamped to [2%, 50%] so degenerate inputs (σ=0, T=0, or absurdly
+    long-dated contracts) still produce a readable chart.
+    """
+    if span_pct is not None and span_pct > 0:
+        return max(0.01, min(float(span_pct), 0.5))
+    if sigma > 0 and T_years > 0:
+        derived = float(span_sigmas) * sigma * math.sqrt(T_years)
+        return max(0.02, min(derived, 0.5))
+    # σ=0 / T=0 — fall back to a reasonable default so the operator
+    # doesn't see a zero-width chart.
+    return 0.10
 
 
 def _ltp_from_quote(q: dict) -> tuple[Optional[float], str]:
@@ -402,7 +448,8 @@ class OptionsController(Controller):
                         spot: Optional[float] = None,
                         ltp: Optional[float] = None,
                         iv: Optional[float] = None,
-                        span_pct: float = 0.10,
+                        span_pct: Optional[float] = None,
+                        span_sigmas: float = 2.5,
                         points: int = 51) -> OptionAnalyticsResponse:
         """
         Full analytics bundle for one option position. Single round-trip
@@ -488,12 +535,19 @@ class OptionsController(Controller):
             opt_type=parsed["opt_type"], qty=qty_resolved,
             entry_price=entry,
         )
+        # Span auto-derived from σ × √T so short-DTE charts don't show
+        # an absurd ±10% range and long-DTE charts aren't squashed.
+        # Operator can override by passing span_pct explicitly.
+        span_pct_resolved = _resolve_span_pct(
+            sigma=sigma, T_years=T_yrs,
+            span_pct=span_pct, span_sigmas=span_sigmas,
+        )
         curve = payoff_curve(
             S=S, K=parsed["strike"], T_years=T_yrs,
             r=DEFAULT_RISK_FREE, sigma=sigma,
             opt_type=parsed["opt_type"], qty=qty_resolved,
             entry_price=entry,
-            span_pct=max(0.01, min(float(span_pct), 0.5)),
+            span_pct=span_pct_resolved,
             points=max(11, min(int(points), 101)),
         )
 
@@ -530,6 +584,8 @@ class OptionsController(Controller):
             ltp_source=ltp_src,
             spot_source=spot_src,
             iv_source=iv_src,
+            span_pct=span_pct_resolved,
+            span_sigmas=float(span_sigmas) if span_pct is None else 0.0,
         )
 
     @get("/historical")
@@ -800,9 +856,17 @@ class OptionsController(Controller):
         sigma_proxy = (sigma_weight_num / sigma_weight_den
                        if sigma_weight_den else DEFAULT_IV)
 
+        # Span auto-derived from the qty-weighted σ × √T_shared so the
+        # chart automatically tightens for short-DTE strategies and
+        # widens for long-DTE ones. Operator override via data.span_pct.
+        span_pct_resolved = _resolve_span_pct(
+            sigma=sigma_proxy, T_years=T_yrs_shared,
+            span_pct=data.span_pct, span_sigmas=data.span_sigmas,
+        )
+
         curve = multileg_payoff_curve(
             resolved_legs, S=S,
-            span_pct=max(0.01, min(float(data.span_pct or 0.10), 0.5)),
+            span_pct=span_pct_resolved,
             points=max(11, min(int(data.points or 51), 121)),
         )
         agg_greeks  = multileg_greeks(resolved_legs, S=S)
@@ -832,4 +896,6 @@ class OptionsController(Controller):
                 greeks=OptionGreeks(**l["greeks"]),
                 ltp_source=l["ltp_source"], iv_source=l["iv_source"],
             ) for l in leg_details],
+            span_pct=span_pct_resolved,
+            span_sigmas=float(data.span_sigmas) if data.span_pct is None else 0.0,
         )

@@ -853,6 +853,18 @@ Visual surface for the prod paper-trade engine, pairing with the simulator page 
 
 Distinct workspace from the tick-chart pages — this is options *research*, not live monitoring. For any single-leg option (live position / sim position / hypothetical typed-in symbol), it computes Greeks, payoff curve, theoretical-vs-market discrepancy, max-profit / max-loss / breakeven / probability-of-profit, plus a 30-day historical price chart.
 
+**σ-driven payoff range**
+
+The chart x-axis used to be a fixed ±10% around spot, which wasted space on short-DTE options (a 7-DTE option might cover 1σ at expiry in just ±5%) and squashed long-DTE ones (60-DTE, 25% IV easily wants ±25%). Both endpoints now auto-derive the range from the underlying's standard deviation at expiry:
+
+```
+span_pct = span_sigmas × σ × √T_years        (default span_sigmas = 2.5)
+```
+
+`σ` is the calibrated IV for single-leg, the qty-weighted IV proxy for strategy. Clamped to `[2 %, 50 %]`. Operator can override by passing an explicit `span_pct` in the query (single-leg) or request body (strategy).
+
+The response now includes `span_pct` (decimal fraction actually applied) and `span_sigmas` (the σ-multiple it was derived from — 0 when the operator overrode `span_pct`). UI footnote reads "±2.5σ (7.3%)" when auto-derived, "±10.0%" when overridden.
+
 **Math** ([`backend/api/algo/derivatives.py`](backend/api/algo/derivatives.py)):
 
 - `greeks(S, K, T_years, r, sigma, opt_type)` — analytical Δ Γ Θ V ρ. Theta is per-day, Vega is per 1 % IV, Rho is per 1 % rate (trader-friendly units, not raw mathematical units).
