@@ -444,6 +444,18 @@ The page (and the paper-trading underlying-spot fetch) routes shared market-data
 - **Sim historical isn't possible**. Sim runs are forward-only (no recorded history before the run started). For sim positions the historical chart shows a clear "unavailable" message; live + hypothetical work normally.
 - **IV is locked at the moment of the call**. The page polls every 5 s so a fast-moving market refreshes the IV calibration; the payoff curve uses whatever σ the latest poll resolved.
 
+### Stale prices — what to do when the broker has nothing to say
+
+When you're looking at an option that's illiquid, off-hours, or just had a stale quote, the page shows **yellow `stale: <source>` chips** so you know which numbers came from a fallback. The fallback chain:
+
+1. **live** — the broker's current `last_price`. This is what you want.
+2. **close** — yesterday's closing price (from the broker's `ohlc.close`). Useful when the market is closed or a contract just hasn't traded today.
+3. **depth** — midpoint of the top-of-book bid/ask. Last resort when there's no live trade and no recent close.
+4. **avg_cost** — the average cost from your position. Falls back to "what you paid" when literally nothing else is available.
+5. **default IV** — an amber `·default` tag on the IV cell means the calibrator couldn't extract a sensible σ (typically because the LTP itself was a fallback) and used 15 % as a reasonable working assumption.
+
+The payoff curve still draws regardless. The Greeks and POP computed off a stale price are best treated as "shape-of-position" — directionally right, but don't rely on the absolute rupee numbers when the chip is yellow.
+
 ### Strategy mode — multi-leg payoff (vertical, iron condor, butterfly, strangle)
 
 Source dropdown → **Strategy (multi-leg)**. Two ways to build the basket:
@@ -661,6 +673,52 @@ You don't have to memorise this — the **(i)** info chip on each row tells you 
 - [ ] Schedule is `market_hours` unless you actually want it firing overnight.
 - [ ] Ran in the Simulator with a representative scenario and got the expected fires.
 - [ ] If the agent has **actions** (not just alerts): the action's params are correct and the action is safe to run against your book.
+
+---
+
+## Brokers — managing accounts from the UI (`/admin/brokers`)
+
+The broker accounts (Kite or future-other-vendor) are managed from `/admin/brokers` — no SSH, no editing `secrets.yaml`, no service restart.
+
+### What's on the page
+
+- **Account table** — one row per account with code / broker / API key / source IP / status pill / notes / Test / Edit / Delete.
+  - **Status pill**:
+    - **LOADED** (green) — the account is in the live `Connections` map and ready to take broker calls
+    - **PENDING** (amber) — the row exists in the DB but `Connections` hasn't picked it up yet (most common right after a save; the next 15 s poll will refresh)
+    - **DISABLED** (grey) — `is_active = false`; the row exists but the engine ignores it
+- **+ New account** button — opens the form below in Create mode.
+- **Edit / Delete** per row — Edit puts the form in update mode (secret fields default to blank, meaning "leave unchanged"); Delete is irreversible after a confirm.
+- **Test** per row — hits `broker.profile()` to verify the credential chain authenticates. ✓ next to the button on success (hover for the authenticated user name); ✗ on failure (hover for the broker's error).
+
+### Adding a new account
+
+1. Click **+ New account** → fill in:
+   - **Account code** — your internal identifier (e.g. `ZG0790`). Must be unique.
+   - **Broker** — defaults to `kite`; future vendors plug in here.
+   - **API key** — Kite app's API key. Plaintext (not credential-grade alone).
+   - **API secret / Password / TOTP seed** — the three secrets. Encrypted at rest.
+   - **Source IP** (optional) — IPv6 address to bind outgoing Kite traffic to. Only needed for multi-account setups (Kite enforces one IP per app).
+   - **Notes** (optional) — anything you want to remember about this account.
+2. Click **Create**. The Connections singleton reloads immediately. Click **Test** on the row — you should see ✓ within a couple of seconds.
+
+### Editing
+
+- Click **Edit** → form populates with current metadata. The secret fields are deliberately blank with a `(blank = unchanged)` hint.
+- Type a new value into any field you want to rotate; leave the rest blank.
+- Click **Save changes** → reload + Test as above.
+
+### Where the encryption lives
+
+Secrets are Fernet-encrypted at rest with a key derived from `cookie_secret` (the JWT signing secret) via HKDF. Practical implications:
+
+- The API never returns decrypted secrets. The page never reads them back.
+- If you rotate `cookie_secret` on the server, every existing `broker_accounts` row will fail to decrypt — you'll have to re-add the accounts. (Don't rotate cookie_secret without a plan.)
+- The `secrets.yaml::kite_accounts` block stays as a recovery backup. On first deploy of this feature with an empty DB, the YAML rows are auto-seeded into the table once. After that, the table is the source of truth and the YAML is just there as a fallback if you ever need to reset.
+
+### When the table is empty
+
+On a fresh server with no DB rows AND no `secrets.yaml::kite_accounts`, every broker call will fail until you add at least one account. The page surfaces this clearly: empty list + "Use **+ New account** to add one" prompt.
 
 ---
 

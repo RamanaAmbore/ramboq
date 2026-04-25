@@ -48,6 +48,7 @@
     { href: '/admin/options',    label: 'Options'   },
     { href: '/admin/tokens',     label: 'Tokens'    },
     { href: '/admin/settings',   label: 'Settings'  },
+    { href: '/admin/brokers',    label: 'Brokers'   },
     { href: '/admin',            label: 'Users'     },
   ];
 

@@ -315,3 +315,43 @@ class NewsHeadline(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+
+# ---------------------------------------------------------------------------
+# Broker accounts — DB-backed credentials with at-rest encryption.
+# secrets.yaml seeds this table on first run; subsequent CRUD edits go
+# through the /admin/brokers UI and the Connections singleton reloads
+# from here without a service restart.
+# ---------------------------------------------------------------------------
+
+class BrokerAccount(Base):
+    __tablename__ = "broker_accounts"
+
+    id: Mapped[int]              = mapped_column(primary_key=True, autoincrement=True)
+    # Account code (e.g. "ZG0790") — keep unique so the code paths that
+    # already key on this string keep working without a per-row id rewrite.
+    account: Mapped[str]         = mapped_column(String(32), unique=True, nullable=False)
+    broker_id: Mapped[str]       = mapped_column(String(16), nullable=False, default="kite")
+    # api_key is plaintext — Kite API keys aren't a credentialing secret
+    # (they pair with api_secret to authenticate, but the key alone leaks
+    # nothing). Keeping it in the clear means it shows up unmasked in
+    # admin UI lists, which is what operators expect.
+    api_key: Mapped[str]         = mapped_column(String(64), nullable=False)
+    # Fernet-encrypted; key derived from cookie_secret via HKDF.
+    api_secret_enc: Mapped[str]  = mapped_column(Text, nullable=False)
+    password_enc: Mapped[str]    = mapped_column(Text, nullable=False)
+    totp_token_enc: Mapped[str]  = mapped_column(Text, nullable=False)
+    # IPv6 source binding (Kite enforces one IP per app). Optional —
+    # accounts without this fall back to the OS default route.
+    source_ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    is_active: Mapped[bool]      = mapped_column(Boolean, nullable=False, default=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

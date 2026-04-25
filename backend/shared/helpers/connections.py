@@ -383,9 +383,142 @@ class Connections(SingletonBase):
             # completed the init while we were waiting.
             if getattr(self, '_singleton_initialized', False):
                 return
-            self.conn = {account: KiteConnection(account, secrets)
-                         for account in secrets['kite_accounts'].keys()}
+            # Sync seed from secrets.yaml — works during module imports
+            # before any DB session exists. The async `rebuild_from_db()`
+            # called on app startup swaps this for the DB-backed view if
+            # the `broker_accounts` table has rows (and seeds the table
+            # from this YAML on first run).
+            self._rebuild_from_yaml()
             self._singleton_initialized = True
+
+    def _rebuild_from_yaml(self) -> None:
+        """Build the per-account KiteConnection map from `secrets.yaml`.
+        Used as the initial sync seed AND as the fallback when the DB
+        table is empty."""
+        accts = secrets.get("kite_accounts") or {}
+        self.conn = {
+            account: KiteConnection(account, secrets)
+            for account in accts.keys()
+        }
+
+    async def rebuild_from_db(self) -> None:
+        """
+        Switch to the DB-backed view of broker accounts. Behaviour:
+
+          1. Query `broker_accounts` (admin-CRUD-managed table).
+          2. If empty AND `secrets.yaml` has `kite_accounts`: SEED the
+             table from YAML, then fall through to use the YAML view
+             we already loaded synchronously in __init__. (One-time
+             migration on first deploy of the broker CRUD feature.)
+          3. If non-empty: decrypt each row's secrets and rebuild
+             `self.conn` from those.
+          4. If both are empty: leave `self.conn = {}`.
+
+        Safe to call multiple times — every CRUD mutation on
+        `/api/admin/brokers/*` runs this so subsequent broker calls see
+        fresh credentials without a service restart.
+        """
+        from backend.api.database import async_session
+        from backend.api.models    import BrokerAccount
+        from backend.shared.helpers.broker_creds import decrypt
+        from sqlalchemy            import select
+
+        try:
+            async with async_session() as s:
+                rows = (await s.execute(
+                    select(BrokerAccount).where(BrokerAccount.is_active.is_(True))
+                )).scalars().all()
+        except Exception as e:
+            logger.warning(f"broker_accounts read failed; staying on YAML view: {e}")
+            return
+
+        if not rows:
+            # First-run migration — copy secrets.yaml into the DB.
+            seeded = await self._seed_db_from_yaml()
+            if seeded:
+                # Re-query so subsequent reloads see DB rows immediately.
+                async with async_session() as s:
+                    rows = (await s.execute(
+                        select(BrokerAccount).where(BrokerAccount.is_active.is_(True))
+                    )).scalars().all()
+            if not rows:
+                # Truly empty (no YAML either). Leave self.conn as-is.
+                return
+
+        # Build new credentials dict from DB rows + decrypt in-memory.
+        new_conn: dict[str, "KiteConnection"] = {}
+        for r in rows:
+            try:
+                creds_blob = {
+                    "api_key":    r.api_key,
+                    "api_secret": decrypt(r.api_secret_enc),
+                    "password":   decrypt(r.password_enc),
+                    "totp_token": decrypt(r.totp_token_enc),
+                    "source_ip":  r.source_ip,
+                }
+            except Exception as e:
+                logger.error(f"broker_accounts decrypt failed for {r.account!r}: {e}")
+                continue
+            # Build a synthesized "secrets-shaped" dict so KiteConnection's
+            # existing constructor still works without refactoring.
+            synthetic = {
+                "kite_accounts":  {r.account: creds_blob},
+                "kite_login_url": secrets.get("kite_login_url"),
+                "kite_twofa_url": secrets.get("kite_twofa_url"),
+            }
+            try:
+                new_conn[r.account] = KiteConnection(r.account, synthetic)
+            except Exception as e:
+                logger.error(f"KiteConnection init failed for {r.account!r}: {e}")
+                continue
+
+        if not new_conn:
+            logger.warning("rebuild_from_db: every broker_accounts row failed to load; "
+                           "leaving self.conn as YAML view.")
+            return
+
+        with Connections._init_lock:
+            self.conn = new_conn
+        logger.info(f"Connections: rebuilt from DB · accounts={sorted(new_conn.keys())}")
+
+    async def _seed_db_from_yaml(self) -> int:
+        """
+        First-run migration: copy `secrets.yaml::kite_accounts` into the
+        `broker_accounts` table, encrypting the three secret columns.
+        Returns the number of rows inserted. No-op when YAML is empty
+        or the table already has rows (caller checks emptiness first).
+        """
+        accts = secrets.get("kite_accounts") or {}
+        if not accts:
+            return 0
+
+        from backend.api.database import async_session
+        from backend.api.models    import BrokerAccount
+        from backend.shared.helpers.broker_creds import encrypt
+
+        n = 0
+        async with async_session() as s:
+            for code, blob in accts.items():
+                row = BrokerAccount(
+                    account=code,
+                    broker_id=str(blob.get("broker") or "kite"),
+                    api_key=str(blob.get("api_key") or ""),
+                    api_secret_enc=encrypt(str(blob.get("api_secret") or "")),
+                    password_enc=encrypt(str(blob.get("password") or "")),
+                    totp_token_enc=encrypt(str(blob.get("totp_token") or "")),
+                    source_ip=blob.get("source_ip"),
+                    is_active=True,
+                    notes="seeded from secrets.yaml",
+                )
+                s.add(row)
+                n += 1
+            await s.commit()
+        logger.warning(
+            f"broker_accounts: seeded {n} account(s) from secrets.yaml. "
+            f"Subsequent edits should go through /admin/brokers; "
+            f"the YAML rows remain as a recovery backup."
+        )
+        return n
 
 
 if __name__ == "__main__":

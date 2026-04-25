@@ -36,6 +36,7 @@ from backend.api.routes.orders import AccountsController, OrdersController
 from backend.api.routes.quote import QuoteController
 from backend.api.routes.positions import PositionsController
 from backend.api.routes.settings import SettingsController
+from backend.api.routes.brokers import BrokersController
 from backend.api.routes.charts import ChartsController
 from backend.api.routes.options import OptionsController
 from backend.api.routes.simulator import SimulatorController
@@ -130,6 +131,7 @@ _route_handlers = [
     SimulatorController,
     ChartsController,
     OptionsController,
+    BrokersController,
     performance_ws_handler,
     algo_ws_handler,
 ]
@@ -137,10 +139,21 @@ _route_handlers = [
 if _FRONTEND_BUILD.exists():
     _route_handlers += [_static_router, _assets_router, _spa_fallback, _spa_root]
 
+async def _rebuild_broker_connections() -> None:
+    """Move broker accounts off secrets.yaml onto the DB-backed view.
+    Runs once on startup after init_db so the broker_accounts table
+    exists. First run also seeds DB from YAML for backwards compat."""
+    from backend.shared.helpers.connections import Connections
+    try:
+        await Connections().rebuild_from_db()
+    except Exception as e:
+        logger.warning(f"broker rebuild_from_db failed (sticking with YAML view): {e}")
+
+
 app = Litestar(
     route_handlers=_route_handlers,
     cors_config=cors_config,
     openapi_config=openapi_config,
-    on_startup=[init_db, bg_startup],
+    on_startup=[init_db, _rebuild_broker_connections, bg_startup],
     on_shutdown=[bg_shutdown],
 )

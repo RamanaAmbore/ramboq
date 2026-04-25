@@ -364,6 +364,57 @@ export async function fetchOptionHistorical(symbol, days = 30,
   return _get(`/options/historical?${p}`, { auth: true });
 }
 
+// ── Broker accounts (admin CRUD) ─────────────────────────────────────
+
+/** GET /api/admin/brokers — list every broker account (no secrets). */
+export const fetchBrokerAccounts = () => _get('/admin/brokers', { auth: true });
+
+/** GET /api/admin/brokers/{account} — single account metadata. */
+export const fetchBrokerAccount = (acct) =>
+  _get(`/admin/brokers/${encodeURIComponent(acct)}`, { auth: true });
+
+/** POST /api/admin/brokers — create a new account. */
+export async function createBrokerAccount(payload) {
+  return _post('/admin/brokers', payload, { auth: true });
+}
+
+/** PATCH /api/admin/brokers/{account} — partial update. Empty secrets
+ *  fields mean "leave unchanged" so the operator can edit one credential
+ *  without re-typing the rest. */
+export async function updateBrokerAccount(acct, payload) {
+  const res = await fetch(`${BASE}/admin/brokers/${encodeURIComponent(acct)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(e.detail || `Update failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** DELETE /api/admin/brokers/{account}. */
+export async function deleteBrokerAccount(acct) {
+  const res = await fetch(`${BASE}/admin/brokers/${encodeURIComponent(acct)}`, {
+    method: 'DELETE',
+    headers: _authHeaders(),
+  });
+  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(e.detail || `Delete failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** POST /api/admin/brokers/{account}/test — try profile() and report. */
+export async function testBrokerAccount(acct) {
+  return _post(`/admin/brokers/${encodeURIComponent(acct)}/test`, {}, { auth: true });
+}
+
+
 /** POST /api/options/strategy-analytics — multi-leg aggregate analytics. */
 export async function fetchStrategyAnalytics(legs, opts = {}) {
   return _post('/options/strategy-analytics',

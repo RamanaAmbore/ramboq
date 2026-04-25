@@ -213,6 +213,46 @@ Defined in `backend_config.yaml` under `market_segments`. Background thread hand
 
 ---
 
+## Broker accounts (DB-backed CRUD)
+
+Operators add / edit / delete broker accounts via `/admin/brokers` instead of editing `secrets.yaml` on the server. Credentials live in the `broker_accounts` table; the three secret columns (`api_secret_enc`, `password_enc`, `totp_token_enc`) are Fernet-encrypted at rest.
+
+**Encryption** ([`backend/shared/helpers/broker_creds.py`](backend/shared/helpers/broker_creds.py))
+- Fernet (cryptography stdlib).
+- Key derived from existing `secrets.cookie_secret` via HKDF-SHA256 with info tag `b"ramboq-broker-creds-v1"`. No new master secret to provision.
+- Rotating `cookie_secret` invalidates the encrypted columns — operator has to decrypt-then-re-encrypt before rotation (we don't auto-do that; rotations are rare + explicit).
+- `encrypt(plaintext) -> str`, `decrypt(ciphertext) -> str`, plus `encrypt_dict(payload, fields)` / `decrypt_dict` for the route layer.
+
+**Loading** ([`backend/shared/helpers/connections.py::Connections.rebuild_from_db`](backend/shared/helpers/connections.py))
+- `Connections.__init__` still seeds synchronously from `secrets.yaml::kite_accounts` (works during module imports before any DB session exists).
+- `_rebuild_broker_connections` runs in `app.on_startup` after `init_db`. It calls `Connections().rebuild_from_db()`:
+  1. Query `broker_accounts` (active rows only).
+  2. If empty AND `secrets.yaml` has `kite_accounts`: SEED the DB once (encrypts each YAML cred + writes a row) → re-query.
+  3. Decrypt secrets in memory, rebuild `self.conn` map.
+  4. If both DB and YAML are empty, `self.conn = {}` (the broker registry will then 502 on any market-data call until an account exists).
+- Every CRUD mutation on `/api/admin/brokers/*` calls the same rebuild, so credential changes are picked up without a service restart.
+
+**API** ([`backend/api/routes/brokers.py`](backend/api/routes/brokers.py), admin-guarded)
+
+| Route | Purpose |
+|---|---|
+| `GET /api/admin/brokers` | List metadata for every account (no secrets ever returned). Each row includes a `loaded` boolean — true when the account is in the live `Connections` map. |
+| `GET /api/admin/brokers/{account}` | Single-account metadata. |
+| `POST /api/admin/brokers` | Create (full body: `account, broker_id, api_key, api_secret, password, totp_token, source_ip?, is_active?, notes?`). |
+| `PATCH /api/admin/brokers/{account}` | Partial update. Empty / missing secret fields → "leave unchanged" so a partial form doesn't accidentally clear a TOTP seed the operator didn't intend to rotate. |
+| `DELETE /api/admin/brokers/{account}` | Remove the row. |
+| `POST /api/admin/brokers/{account}/test` | Reload Connections, then call `broker.profile()` to verify the credential pipeline. Reports the authenticated `user_name` on success or the broker error verbatim on failure. |
+
+**UI** ([`frontend/src/routes/(algo)/admin/brokers/+page.svelte`](frontend/src/routes/(algo)/admin/brokers/+page.svelte))
+- Account table — one row per broker account with code / broker / api_key / source_ip / status pill (LOADED / PENDING / DISABLED) / notes / Test button / Edit / Delete.
+- Edit + Create form — same fields; Edit form's secret inputs default to blank with a `(blank = unchanged)` hint so the operator can update one credential without re-typing the rest.
+- Test button hits `/test`, shows ✓ / ✗ inline next to the row with the broker's response in the tooltip.
+- Polling: every 15 s so the LOADED status pill catches up after a save without a manual refresh.
+
+**Migration path from secrets.yaml** — first deploy of this feature, the table is empty, the YAML has accounts, and the seed-from-YAML happens automatically on startup. The YAML rows stay (recovery backup). Subsequent edits go through the UI; the YAML diverges from the DB but is never overwritten (so there's a path back if the DB row gets corrupted: just clear the table and restart, the seeder runs again).
+
+---
+
 ## Multi-Account Kite IP Binding
 
 Kite Connect restricts one IP per app. Each Zerodha account uses a separate Kite app (different API key), so multiple accounts on the same server need different source IPs.
@@ -321,7 +361,7 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 **Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
-- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Options · Tokens · Settings · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`+layout.svelte`** — algo-site top nav: Dashboard · Agents · Orders · Terminal · Simulator · Paper · Options · Tokens · Settings · Brokers · Users; polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
 - **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
