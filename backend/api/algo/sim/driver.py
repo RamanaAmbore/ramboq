@@ -48,6 +48,11 @@ logger = get_logger(__name__)
 
 SCENARIOS_PATH = Path(__file__).parent / "scenarios.yaml"
 TICK_LOG_LIMIT = 200
+# Per-symbol price history for the chart panel. Cap at 600 entries — at the
+# default 2 s tick rate that's ~20 minutes of history per symbol, which is
+# the relevant window for an in-flight chase. Auto-trimmed by deque maxlen
+# so there's no manual cleanup; the buffer wipes on every start().
+PRICE_HISTORY_LIMIT = 600
 
 
 # Market-state presets the simulator exposes to scenarios + the UI. Each
@@ -279,6 +284,11 @@ class SimDriver:
 
         # Rolling buffer of recent ticks surfaced via /api/simulator/ticks/recent.
         self._tick_log: deque[dict] = deque(maxlen=TICK_LOG_LIMIT)
+
+        # Per-symbol price history surfaced via /api/charts/price-history?mode=sim.
+        # `(ts_iso, ltp, bid, ask)` per tick. Capped per-symbol so memory stays
+        # bounded even on a long run; oldest entries fall off the deque.
+        self._price_history: dict[str, deque] = {}
 
         # Bid/ask spread (decimal fraction — 0.001 = 0.10%). Applied on
         # every _recompute_position_row so every position carries per-side
@@ -593,6 +603,9 @@ class SimDriver:
         self._rng = random.Random(rng_seed) if rng_seed is not None else random.Random()
 
         self._tick_log.clear()
+        # Wipe price history so each sim run gets a clean chart. The chart
+        # panel keys on (mode, symbol) so a fresh start should look fresh.
+        self._price_history.clear()
         self._record_tick(
             kind="started", moves=[], changes=[],
             note=(f"{scenario_slug} · seed={seed_mode} · "
@@ -712,6 +725,11 @@ class SimDriver:
 
         self.tick_index += 1
         self._record_tick(kind="tick", moves=moves, changes=changes)
+        # Snapshot the post-move price for every symbol still in the book so
+        # the chart panel can render the trajectory. Capture happens before
+        # the chase step so a fill that removes the row from `_positions_rows`
+        # still leaves its last LTP in the history.
+        self._capture_price_history()
         # Run the chase engine against the new bid/ask state: fill any
         # orders whose limit crossed, otherwise re-quote them one step
         # closer to the opposite side.
@@ -1057,6 +1075,50 @@ class SimDriver:
         """Return the most recent `limit` ticks (oldest-first)."""
         limit = max(1, min(int(limit), TICK_LOG_LIMIT))
         return list(self._tick_log)[-limit:]
+
+    # ── Price history ────────────────────────────────────────────────
+
+    def _capture_price_history(self) -> None:
+        """Append one (ts, ltp, bid, ask) per active symbol to the rolling
+        per-symbol buffer. Called once per tick, after moves are applied."""
+        ts = datetime.now().isoformat(timespec="seconds")
+        for r in self._positions_rows:
+            sym = str(r.get("tradingsymbol") or "")
+            if not sym:
+                continue
+            ltp = r.get("last_price")
+            if ltp is None:
+                continue
+            buf = self._price_history.get(sym)
+            if buf is None:
+                buf = deque(maxlen=PRICE_HISTORY_LIMIT)
+                self._price_history[sym] = buf
+            buf.append({
+                "ts":  ts,
+                "ltp": float(ltp),
+                "bid": float(r["bid"]) if r.get("bid") is not None else None,
+                "ask": float(r["ask"]) if r.get("ask") is not None else None,
+            })
+
+    def price_history(self, symbol: str, *, since: str | None = None,
+                      limit: int = 600) -> list[dict]:
+        """Per-symbol tick stream for the chart endpoint. `since` is an
+        ISO timestamp; entries strictly after `since` are returned."""
+        buf = self._price_history.get(symbol)
+        if not buf:
+            return []
+        out: list[dict] = []
+        for entry in buf:
+            if since and entry["ts"] <= since:
+                continue
+            out.append(entry)
+        if limit and len(out) > limit:
+            out = out[-limit:]
+        return out
+
+    def price_history_symbols(self) -> list[str]:
+        """Sorted list of symbols with at least one captured tick."""
+        return sorted(s for s, buf in self._price_history.items() if buf)
 
     # ── Convenience ──────────────────────────────────────────────────
 

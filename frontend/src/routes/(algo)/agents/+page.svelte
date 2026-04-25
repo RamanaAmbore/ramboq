@@ -5,7 +5,7 @@
   import {
     fetchAgents, activateAgent, deactivateAgent, updateAgent,
     fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
-    startSimForAgent, fetchAlgoOrdersRecent,
+    startSimForAgent, fetchAlgoOrdersRecent, fetchChartSymbols,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -26,6 +26,11 @@
   // the simulator's event stream so operators only see sim results in the
   // algo pages while the sim is running.
   let simActive   = $state(false);
+  // Symbols with captured price-history ticks. Sourced from the active
+  // mode (sim while a sim runs, paper otherwise) so the LogPanel's Chart
+  // tab can render one mini chart per symbol that's been touched.
+  let chartMode    = $derived(/** @type {'sim'|'paper'|'live'} */ (simActive ? 'sim' : 'paper'));
+  let chartSymbols = $state(/** @type {string[]} */([]));
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
@@ -73,6 +78,13 @@
     } catch (_) { /* cap flag off — treat as idle */ }
   }
 
+  async function loadChartSymbols() {
+    try {
+      const r = await fetchChartSymbols(chartMode);
+      chartSymbols = r?.symbols || [];
+    } catch (_) { chartSymbols = []; }
+  }
+
   async function loadSystemLog() {
     try {
       const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
@@ -110,11 +122,13 @@
     else if (logTab === 'system') loadSystemLog();
     else if (logTab === 'order') loadOrderLog();
     else if (logTab === 'simulator') loadSimLog();
+    else if (logTab === 'chart') loadChartSymbols();
   }
 
   async function loadAll() {
     loading = true;
-    await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog(), loadSimLog()]);
+    await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog(),
+                       loadSimLog(), loadChartSymbols()]);
     loading = false;
   }
 
@@ -771,5 +785,7 @@
   agentLog={agentEvents}
   {systemLog}
   {simLog}
+  {chartMode}
+  {chartSymbols}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

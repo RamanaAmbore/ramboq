@@ -310,3 +310,17 @@ export async function cancelOrder(orderId, account, variety = 'regular') {
   }
   return res.json();
 }
+
+// ── Charts (admin-guarded) ────────────────────────────────────────────────────
+
+/** GET /api/charts/symbols?mode=… — list symbols with captured ticks. */
+export async function fetchChartSymbols(mode) {
+  return _get(`/charts/symbols?mode=${encodeURIComponent(mode)}`, { auth: true });
+}
+
+/** GET /api/charts/price-history — ticks + AlgoOrder lifecycle markers. */
+export async function fetchChartPriceHistory(mode, symbol, since = null, limit = 600) {
+  const p = new URLSearchParams({ mode, symbol, limit: String(limit) });
+  if (since) p.set('since', since);
+  return _get(`/charts/price-history?${p}`, { auth: true });
+}

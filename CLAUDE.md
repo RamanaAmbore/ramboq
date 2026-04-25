@@ -725,6 +725,35 @@ Auto-stops after 30 minutes so a forgotten sim can't bleed forever.
 
 ---
 
+## Price-history charts (`/api/charts/*`)
+
+In-memory rolling per-symbol price buffers + lifecycle markers from
+`AlgoOrder` rows give the operator a chart of "what the price did and
+where the chase fired" without any new persistent state.
+
+**Capture points** (zero new schema, deque self-trims):
+
+- [`SimDriver._price_history`](backend/api/algo/sim/driver.py): `dict[symbol, deque(maxlen=600)]`. `_capture_price_history()` runs at the end of every `_apply_next_tick`, snapshotting `(ts, ltp, bid, ask)` per row in `_positions_rows`. Wiped on every `start()`.
+- [`PaperTradeEngine._price_history`](backend/api/algo/paper.py): same shape, populated in `step()` after `prefetch_for(open_now)` so the snapshot reflects the same quote the chase loop evaluated against. Wiped on `reset()`.
+- Live mode currently shares the prod paper engine — both feed off `LiveQuoteSource`. A dedicated live engine can plug in here later if real-broker mode grows its own state.
+
+**API** ([`backend/api/routes/charts.py`](backend/api/routes/charts.py), admin-guarded):
+
+| Route | Purpose |
+|---|---|
+| `GET /api/charts/symbols?mode=sim\|paper\|live` | Symbols with at least one captured tick. Used by the chart panel's symbol picker / grid. |
+| `GET /api/charts/price-history?mode=…&symbol=…&since=…&limit=600` | `{ticks: [...], events: [...]}` — ticks from the in-memory buffer, events derived from `algo_orders` rows for the same symbol+mode (placed at `created_at`/`initial_price`, terminal at `filled_at`/`fill_price` or fallback). |
+
+**UI**:
+
+- [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) — hand-rolled SVG line + bid/ask shaded band + lifecycle markers (placed=amber / filled=emerald / unfilled=red). Polls `/api/charts/price-history` every 3 s. No chart library — keeps the bundle thin.
+- [`/admin/simulator`](frontend/src/routes/(algo)/admin/simulator/+page.svelte) embeds one mini chart per symbol returned by `GET /charts/symbols?mode=sim` directly under the position pills, so the operator sees the trajectory + chase markers live.
+- [`LogPanel`](frontend/src/lib/LogPanel.svelte) gained a **Chart** tab. Consumers pass `chartMode` (`sim` while a sim runs, otherwise `paper`) + `chartSymbols`. The `/agents` page wires both — its Chart tab tracks whichever surface is active.
+
+**Cleanup**: deque `maxlen=600` is the only retention mechanism — at the default tick rates (2 s sim / 5 s paper) that's ~20 min of history per symbol. Restart loses the history; operator monitoring the chase live doesn't need cross-restart continuity. If post-mortem replay becomes valuable, swap to a `price_ticks` table here.
+
+---
+
 ## Refactoring Notes
 
 | Area | Note |

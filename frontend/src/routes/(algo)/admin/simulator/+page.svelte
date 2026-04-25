@@ -13,10 +13,12 @@
     fetchSimScenarios, fetchSimStatus, startSim, stopSim, stepSim,
     runSimCycle, clearSimArtefacts, seedSimLive, fetchSimEvents,
     fetchSimTicks, fetchAgents, fetchAlgoOrdersRecent,
+    fetchChartSymbols,
   } from '$lib/api';
   import LogPanel    from '$lib/LogPanel.svelte';
   import Select      from '$lib/Select.svelte';
   import MultiSelect from '$lib/MultiSelect.svelte';
+  import PriceChart  from '$lib/PriceChart.svelte';
 
   let scenarios = $state(/** @type {any[]} */ ([]));
   let status    = $state(/** @type {any} */ ({}));
@@ -48,6 +50,11 @@
   // Simulator" on the /algo page). Empty string = run all agents.
   let agentId   = $state('');
   let liveSnap  = $state(/** @type {any} */ (null));
+  // Symbols with captured price-history ticks. Independent from
+  // status.symbols (which is the live position list) so charts persist
+  // after a fill removes the position from the book — the operator still
+  // wants to see how the price moved leading up to the close.
+  let chartSymbols = $state(/** @type {string[]} */ ([]));
   let refreshTeardown;
 
   // ── Log panel feeds ──────────────────────────────────────────────────
@@ -98,11 +105,13 @@
   // loop halves the request count per refresh.
   async function loadHot() {
     try {
-      const [stat, ev] = await Promise.all([
+      const [stat, ev, chartSyms] = await Promise.all([
         fetchSimStatus(), fetchSimEvents(100),
+        fetchChartSymbols('sim').catch(() => ({ symbols: [] })),
       ]);
       status = stat;
       events = ev;
+      chartSymbols = chartSyms?.symbols || [];
     } catch (e) { error = e.message; }
   }
 
@@ -354,6 +363,17 @@
           <span class="sim-pill-limit">@₹{o.limit_price?.toFixed?.(2) ?? '—'}</span>
           <span class="sim-pill-attempts">#{o.attempts}</span>
         </span>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- Per-symbol price chart panel — one mini chart per symbol with
+       captured ticks. Persists after a fill removes the position so the
+       operator can still see the trajectory that led to the close. -->
+  {#if chartSymbols.length}
+    <div class="sim-charts">
+      {#each chartSymbols as sym (sym)}
+        <PriceChart mode="sim" symbol={sym} height={150} />
       {/each}
     </div>
   {/if}
@@ -788,6 +808,15 @@
   .sim-pill-pnl.neg { color: #f87171; }
   .sim-pill-pnl.pos { color: #4ade80; }
 
+  /* Mini-chart grid — two charts per row at typical desktop widths,
+     one per row on narrow viewports. */
+  .sim-charts {
+    margin-top: 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 0.5rem;
+  }
+
   /* Tighten the inputs to match button height so the row doesn't wobble. */
   :global(.sim-fields-row .field-input) {
     font-size: 0.62rem;
@@ -816,5 +845,7 @@
   agentLog={events}
   {systemLog}
   {simLog}
+  chartMode="sim"
+  {chartSymbols}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

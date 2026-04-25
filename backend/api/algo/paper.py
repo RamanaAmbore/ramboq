@@ -24,6 +24,7 @@ shows paper rows the same way it shows live and sim rows.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from datetime import datetime
 from typing import Callable, Optional
 
@@ -31,6 +32,11 @@ from backend.api.algo.quote import QuoteSource
 from backend.shared.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
+
+# Per-symbol price history cap. At a 5 s tick interval (mode-2 prod default)
+# 600 entries is ~50 minutes of history per symbol. Auto-trimmed by the
+# deque maxlen so memory stays bounded across long uptimes.
+PRICE_HISTORY_LIMIT = 600
 
 
 class PaperTradeEngine:
@@ -70,6 +76,12 @@ class PaperTradeEngine:
         # Tracks fire-and-forget DB-write tasks so a graceful shutdown
         # can await them.
         self._pending_updates: set = set()
+        # Per-symbol rolling price history surfaced via /api/charts/price-history.
+        # Populated in `step()` after every prefetch so the chart panel can
+        # show the trajectory of the bid/ask each chase saw, with order-event
+        # markers (placed / filled / unfilled / modified) overlaid by the
+        # API layer reading from algo_orders.
+        self._price_history: dict[str, deque] = {}
 
     # ── Public surface ───────────────────────────────────────────────
 
@@ -107,6 +119,10 @@ class PaperTradeEngine:
                 self._quote.prefetch_for(open_now)
             except Exception as e:
                 logger.debug(f"PaperTradeEngine[{self._label}] prefetch failed: {e}")
+            # Snapshot bid/ask per active symbol so the chart panel can render
+            # the trajectory the chase loop saw. Done before the chase walk so
+            # the snapshot reflects the same quote the engine evaluated against.
+            self._capture_price_history(open_now)
         max_attempts = max(0, int(self._get_max() or 0))
 
         for order in list(self._open_orders):
@@ -192,6 +208,51 @@ class PaperTradeEngine:
     def reset(self) -> None:
         """Wipe the open-order book — used by SimDriver.start()."""
         self._open_orders = []
+        self._price_history = {}
+
+    # ── Price history ────────────────────────────────────────────────
+
+    def _capture_price_history(self, open_orders: list[dict]) -> None:
+        """One (ts, ltp, bid, ask) entry per active-order symbol. Called
+        after prefetch_for, so the QuoteSource cache is warm and reads are
+        cheap. Symbols are deduplicated so two open orders on the same
+        symbol only produce one tick in the history."""
+        ts   = datetime.now().isoformat(timespec="seconds")
+        seen: set[str] = set()
+        for o in open_orders:
+            sym = str(o.get("symbol") or "")
+            if not sym or sym in seen:
+                continue
+            seen.add(sym)
+            bid, ask = self._quote.bid_ask_for_order(o)
+            if bid is None and ask is None:
+                continue
+            ltp = (bid + ask) / 2.0 if (bid is not None and ask is not None) \
+                  else (bid if bid is not None else ask)
+            buf = self._price_history.get(sym)
+            if buf is None:
+                buf = deque(maxlen=PRICE_HISTORY_LIMIT)
+                self._price_history[sym] = buf
+            buf.append({"ts": ts, "ltp": float(ltp),
+                        "bid": float(bid) if bid is not None else None,
+                        "ask": float(ask) if ask is not None else None})
+
+    def price_history(self, symbol: str, *, since: str | None = None,
+                      limit: int = 600) -> list[dict]:
+        buf = self._price_history.get(symbol)
+        if not buf:
+            return []
+        out: list[dict] = []
+        for entry in buf:
+            if since and entry["ts"] <= since:
+                continue
+            out.append(entry)
+        if limit and len(out) > limit:
+            out = out[-limit:]
+        return out
+
+    def price_history_symbols(self) -> list[str]:
+        return sorted(s for s, buf in self._price_history.items() if buf)
 
     async def recover_from_db(self) -> int:
         """

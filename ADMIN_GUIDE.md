@@ -324,6 +324,23 @@ On the `/agents` page, every row has a **Run in Simulator** button. Click it:
 
 This is the safest way to test a new agent before activating it.
 
+### Charts — see what the price did
+
+While a sim is running, the page renders one **mini chart per active symbol** directly under the position pills:
+
+- Amber line — last-traded price tick by tick
+- Faint cyan band — bid/ask spread
+- Markers:
+  - **Amber** dot — order placed (where the chase started)
+  - **Emerald** dot — order filled
+  - **Red** dot — order unfilled (chase gave up)
+
+Hover any marker to see the side, fill price, and order id. The chart polls every 3 s and persists across fills, so once a position closes you can still see the full trajectory that led to it.
+
+The same panel is on `/agents` as a **Chart tab** in the bottom log panel — that's how you watch the live chase engine in **paper mode** (mode 2) on prod. While a sim is active the tab shows sim symbols; otherwise it shows symbols with active paper / live orders.
+
+History is in-memory only (no DB writes). The buffer holds ~20 minutes of per-symbol history at the default tick rates; older points fall off automatically. A service restart resets the chart — that's by design (the chart is for live monitoring, not post-mortem).
+
 ### What gets tagged
 
 Because `sim_mode=True` flows through the pipeline, every artefact is marked:
