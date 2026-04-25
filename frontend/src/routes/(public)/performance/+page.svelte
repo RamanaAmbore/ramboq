@@ -130,7 +130,7 @@
               class="market-tab"
               class:market-tab-active={tab === 'summary'}
               onclick={() => tab = 'summary'}>
-        Daily market summary
+        Daily Market Report
       </button>
       <button type="button"
               class="market-tab"

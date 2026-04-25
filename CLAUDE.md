@@ -1035,7 +1035,7 @@ Tab styling matches the algo navbar's idiom — each tab carries a **left-border
 
 The Gemini market-summary prompt was simplified iteratively: drop the `**Daily Market Report — [date]**` heading, drop the date/timestamp line, drop the H3 report-title instruction, and finally hardened to "the very first line of your output MUST be `### Market Summary`" with the no-title rule lifted into the system prompt as well as the user prompt. The "Refreshed at <ts>" line under the tabs is the canonical date-stamp.
 
-Tab labels: `Daily market summary` (was "Summary") + `News feed` — the qualifier moved INTO the tab label so the operator knows what they're flipping between, even when the page title isn't visible (e.g. on `/performance` where the tab card sits below the position grids).
+Tab labels: `Daily Market Report` (was "Summary" → "Daily market summary" → final form) + `News feed` — the qualifier moved INTO the tab label so the operator knows what they're flipping between, even when the page title isn't visible (e.g. on `/performance` where the tab card sits below the position grids).
 
 `timestamp_display()` (Python) and `clientTimestamp()` (JS) use single space between weekday/day/month/time → renders `Sat 25 Apr 07:03 IST | Fri 24 Apr 21:33 EDT`. Banners, refreshed_at stamps, log timestamps all inherit the format.
 
