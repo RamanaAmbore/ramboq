@@ -156,14 +156,15 @@
     </div>
   </div>
 
-  <!-- Refreshed-at line under the tabs — small, italic, beneath the
-       headline so the operator knows how stale the panel is without
-       crowding the heading itself. Only shown when the active tab has
-       a refresh-stamp; absent during the very first load. -->
+  <!-- Refreshed-at line — matches the PerformancePage timestamp style
+       (text-[0.65rem] text-muted perf-ts) so the operator sees a
+       consistent stamp shape across the whole public site. nowrap so
+       the dual-timezone string stays on a single line; the page card
+       has horizontal padding to absorb the overflow. -->
   {#if tab === 'summary' && lastRefresh}
-    <div class="market-refresh-line">Refreshed at {lastRefresh}</div>
+    <div class="text-[0.65rem] text-muted perf-ts market-refresh-line">Refreshed at {lastRefresh}</div>
   {:else if tab === 'news' && newsRefresh}
-    <div class="market-refresh-line">Refreshed at {newsRefresh}</div>
+    <div class="text-[0.65rem] text-muted perf-ts market-refresh-line">Refreshed at {newsRefresh}</div>
   {/if}
 
   {#if tab === 'summary'}
@@ -277,15 +278,17 @@
     color: #6b7894;
     font-family: ui-monospace, monospace;
   }
-  /* Refreshed-at line — small monospace stamp beneath the tab strip,
-     so the operator can tell at a glance when each panel was last
-     updated. Doesn't compete with the tab labels for emphasis. */
+  /* Refreshed-at line — base size + colour come from the Tailwind
+     `text-[0.65rem] text-muted perf-ts` triplet so this line sits
+     visually at the same level as every other timestamp on the
+     public site. Local rules add nowrap so the long dual-timezone
+     string never wraps mid-row. */
   .market-refresh-line {
-    font-family: ui-monospace, monospace;
-    font-size: 0.66rem;
-    color: #6b7894;
     margin-bottom: 0.5rem;
     margin-top: -0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Market News — same palette as the rest of the public market page

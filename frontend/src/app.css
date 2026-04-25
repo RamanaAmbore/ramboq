@@ -174,24 +174,33 @@
 .ag-theme-ramboq .qty-short { color: #b45309 !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-flat  { color: #64748b !important; }
 /* LONG = sage-teal, SHORT = warm-terracotta — both desaturated so they
-   sit alongside the cream + champagne palette without shouting. The
-   row-level box-shadow is for legacy compatibility; the per-cell rule
-   below is the one that actually paints (the public theme's solid
-   ag-col-fill background covers the row-level shadow on the leftmost
-   cell, so we need the indicator at the cell level). */
+   sit alongside the cream + champagne palette without shouting.
+
+   Indicator placement: RIGHT edge of the row (and the rightmost cell)
+   — moved from the left edge because:
+     a) When the Account column is hidden by an account filter, the
+        leftmost cell shifts and the left-edge indicator visually
+        jumps. Right-edge stays stable across filter states.
+     b) The right edge is consistently uncovered (no `ag-col-fill`
+        cell sits there in any of our column sets), so the row's
+        box-shadow is always visible without needing a per-cell
+        override.
+   We still keep a per-cell `:last-child` rule as a defensive belt-
+   and-suspenders in case a future column set ever puts a solid bg
+   cell at the rightmost position. */
 .ag-theme-ramboq .ag-row.pos-long {
   background-color: rgba(91,142,149,0.10) !important;
-  box-shadow: inset 4px 0 0 rgba(91,142,149,0.85) !important;
+  box-shadow: inset -4px 0 0 rgba(91,142,149,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-short {
   background-color: rgba(196,122,61,0.10) !important;
-  box-shadow: inset 4px 0 0 rgba(196,122,61,0.85) !important;
+  box-shadow: inset -4px 0 0 rgba(196,122,61,0.85) !important;
 }
-.ag-theme-ramboq .ag-row.pos-long .ag-cell:first-child {
-  box-shadow: inset 4px 0 0 rgba(91,142,149,0.85) !important;
+.ag-theme-ramboq .ag-row.pos-long .ag-cell:last-child {
+  box-shadow: inset -4px 0 0 rgba(91,142,149,0.85) !important;
 }
-.ag-theme-ramboq .ag-row.pos-short .ag-cell:first-child {
-  box-shadow: inset 4px 0 0 rgba(196,122,61,0.85) !important;
+.ag-theme-ramboq .ag-row.pos-short .ag-cell:last-child {
+  box-shadow: inset -4px 0 0 rgba(196,122,61,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-long.ag-row-hover,
 .ag-theme-ramboq .ag-row.pos-short.ag-row-hover {

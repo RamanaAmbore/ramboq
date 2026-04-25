@@ -154,13 +154,14 @@
     </div>
   </div>
 
-  <!-- Refreshed-at line under the tabs — small, monospace, beneath
-       the tab strip so the operator knows when each panel was last
-       updated. Doesn't compete with the tab labels for emphasis. -->
+  <!-- Refreshed-at line — matches PerformancePage timestamp styling
+       (text-[0.65rem] text-muted perf-ts) for visual consistency
+       across the public site. nowrap keeps the dual-timezone string
+       on a single line. -->
   {#if tab === 'summary' && summaryRefresh}
-    <div class="market-refresh-line">Refreshed at {summaryRefresh}</div>
+    <div class="text-[0.65rem] text-muted perf-ts market-refresh-line">Refreshed at {summaryRefresh}</div>
   {:else if tab === 'news' && newsRefresh}
-    <div class="market-refresh-line">Refreshed at {newsRefresh}</div>
+    <div class="text-[0.65rem] text-muted perf-ts market-refresh-line">Refreshed at {newsRefresh}</div>
   {/if}
 
   {#if tab === 'summary'}
@@ -258,14 +259,15 @@
     color: #6b7894;
     font-family: ui-monospace, monospace;
   }
-  /* Refreshed-at line — small monospace stamp beneath the tab strip,
-     mirroring the same line on /market so both pages read identically. */
+  /* Refreshed-at line — base size + colour come from the Tailwind
+     triplet `text-[0.65rem] text-muted perf-ts`; local rules add
+     nowrap so the long dual-timezone string stays on a single line. */
   .market-refresh-line {
-    font-family: ui-monospace, monospace;
-    font-size: 0.66rem;
-    color: #6b7894;
     margin-bottom: 0.5rem;
     margin-top: -0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Market summary — match /market page's markdown styling. */
