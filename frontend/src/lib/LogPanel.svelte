@@ -76,8 +76,15 @@
   // Shared SIM / LIVE pills — amber for simulated (matches the page-top
   // "SIMULATOR ACTIVE" banner), emerald for live. Replaces the pink
   // badge that was making the Order log look like an error list.
-  const SIM_PILL  = '<span class="mode-pill mode-pill-sim">SIM</span>';
-  const LIVE_PILL = '<span class="mode-pill mode-pill-live">LIVE</span>';
+  const SIM_PILL   = '<span class="mode-pill mode-pill-sim">SIM</span>';
+  const LIVE_PILL  = '<span class="mode-pill mode-pill-live">LIVE</span>';
+  const PAPER_PILL = '<span class="mode-pill mode-pill-paper">PAPER</span>';
+
+  function _modePill(mode) {
+    if (mode === 'sim')   return SIM_PILL;
+    if (mode === 'paper') return PAPER_PILL;
+    return LIVE_PILL;
+  }
 
   // ── Simulator-tab rendering ──────────────────────────────────────────
   // A sim tick entry from /api/simulator/ticks/recent looks like:
@@ -171,7 +178,7 @@
   // operators can scan placements the same way they'd read a broker blotter.
   function _orderRowHtml(o) {
     const t    = _shortTime(o.created_at);
-    const tag  = o.mode === 'sim' ? SIM_PILL : LIVE_PILL;
+    const tag  = _modePill(o.mode);
     // Colour by terminal state first, then by side. FILLED = green,
     // UNFILLED = red, OPEN (still chasing) = amber, everything else
     // falls back to the old side-based cue.
@@ -324,5 +331,13 @@
     background: rgba(16,185,129,0.14);
     color: #6ee7b7;
     border-color: rgba(16,185,129,0.45);
+  }
+  /* Mode-2 paper rows — sky-blue tint, distinct from amber sim and
+     emerald live so the operator never confuses a paper fill with a
+     real one. */
+  :global(.mode-pill-paper) {
+    background: rgba(56,189,248,0.14);
+    color: #7dd3fc;
+    border-color: rgba(56,189,248,0.45);
   }
 </style>

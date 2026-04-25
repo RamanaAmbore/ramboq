@@ -52,6 +52,11 @@
     } catch (e) { error = `Reset failed: ${e.message}`; }
   }
 
+  // Execution-mode summary used by the top banner: how many of the
+  // execution.live.* flags are currently set to True.
+  const execRows = $derived(settings.filter(s => s.key.startsWith('execution.live.')));
+  const liveCount = $derived(execRows.filter(s => String(currentValue(s)).toLowerCase() === 'true').length);
+
   // Group settings by category for rendering.
   const grouped = $derived.by(() => {
     const out = /** @type {Record<string, typeof settings>} */({});
@@ -93,6 +98,25 @@
 
 {#if error}<div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{error}</div>{/if}
 {#if note}<div class="mb-3 p-2 rounded bg-emerald-500/10 text-emerald-300 text-[0.65rem] border border-emerald-500/30">{note}</div>{/if}
+
+{#if execRows.length}
+  <div class="mb-3 p-2 rounded text-[0.65rem] border
+              {liveCount === 0
+                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40'
+                : 'bg-red-500/15 text-red-300 border-red-500/50'}">
+    <b>Execution mode:</b>
+    {#if liveCount === 0}
+      Every broker action is in <b>PAPER</b> mode — no real orders will hit
+      the broker. Flip individual <span class="font-mono">execution.live.*</span>
+      flags below to promote a single action to live.
+    {:else}
+      <span class="px-1 rounded bg-red-500/30 font-bold">⚠ {liveCount} of {execRows.length}</span>
+      action{liveCount === 1 ? '' : 's'} are <b>LIVE</b> — real orders will
+      hit the broker for these. Set the flag back to <span class="font-mono">false</span>
+      to revert to paper.
+    {/if}
+  </div>
+{/if}
 
 {#if loading}
   <div class="text-[0.65rem] text-[#c8d8f0]/60">Loading…</div>

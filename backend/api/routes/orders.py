@@ -174,10 +174,8 @@ class OrdersController(Controller):
         from backend.api.models import AlgoOrder
         async with async_session() as s:
             q = sql_select(AlgoOrder).order_by(desc(AlgoOrder.id)).limit(max(1, min(n, 500)))
-            if mode == "live":
-                q = q.where(AlgoOrder.mode == "live")
-            elif mode == "sim":
-                q = q.where(AlgoOrder.mode == "sim")
+            if mode in ("live", "sim", "paper"):
+                q = q.where(AlgoOrder.mode == mode)
             rows = (await s.execute(q)).scalars().all()
         return [
             AlgoOrderInfo(
