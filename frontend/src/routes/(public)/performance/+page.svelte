@@ -199,22 +199,22 @@
     margin-right: -0.5rem;
   }
 
-  /* Tab row — public-palette tabs (cream + champagne accent), sits
-     above the panel like a real tab strip. Active tab carries the
-     champagne underline + slightly darker text. */
+  /* Tab row — public-palette tabs (cream + champagne accent). Each
+     tab carries a left-border indicator (transparent → champagne when
+     active or hovered) — same affordance the algo navbar items use,
+     so the public and algo surfaces feel like cousins. No bottom
+     underline on the active tab. */
   .market-tabs-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
     margin-bottom: 0.6rem;
-    border-bottom: 1px solid #e7e0cf;
-    padding-bottom: 0.25rem;
     flex-wrap: wrap;
   }
   .market-tabs {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.15rem;
   }
   .market-tab {
     font-size: 0.85rem;
@@ -222,17 +222,21 @@
     color: #6b7894;
     background: transparent;
     border: 0;
-    border-bottom: 2px solid transparent;
-    padding: 0.35rem 0.75rem 0.4rem;
+    border-left: 2px solid transparent;
+    padding: 0.3rem 0.7rem 0.3rem calc(0.7rem - 2px);
     cursor: pointer;
-    transition: color 0.12s, border-color 0.12s;
-    margin-bottom: -1px;     /* overlap card border */
+    transition: color 0.12s, border-color 0.12s, background-color 0.12s;
   }
-  .market-tab:hover  { color: #1a2744; }
+  .market-tab:hover {
+    color: #1a2744;
+    border-left-color: #d4920c;
+    background: rgba(212,146,12,0.06);
+  }
   .market-tab-active {
     color: #1a2744;
     font-weight: 700;
-    border-bottom-color: #d4920c;
+    border-left-color: #d4920c;
+    background: rgba(212,146,12,0.10);
   }
   .market-tabs-meta {
     font-size: 0.7rem;

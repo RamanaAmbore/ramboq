@@ -349,23 +349,28 @@
     border-bottom-color: #c8a84b;
   }
 
-  /* Algo link */
+  /* Algo Site link — muted secondary, matches the algo navbar's
+     "Investor site" cross-link in tone. Both directions are
+     de-emphasized so neither side feels like the pre-eminent surface. */
   .pub-nav-algo-btn {
-    padding: 0.2rem 0.6rem;
+    padding: 0.2rem 0.55rem;
     font-size: 0.65rem;
-    font-weight: 600;
-    border-radius: 0.25rem;
-    background: rgba(200,168,75,0.18);
-    color: #f0d070;
-    border: 1px solid rgba(200,168,75,0.5);
+    font-weight: 500;
+    border-radius: 0.2rem;
+    background: transparent;
+    color: rgba(106,124,164,0.7);
+    border: 1px solid rgba(106,124,164,0.25);
     cursor: pointer;
     letter-spacing: 0.03em;
-    transition: background-color 0.08s;
+    transition: color 0.06s, border-color 0.06s;
     outline: none !important;
     white-space: nowrap;
     margin-right: 0.25rem;
   }
-  .pub-nav-algo-btn:hover { background: rgba(200,168,75,0.32); }
+  .pub-nav-algo-btn:hover {
+    color: rgba(60,76,114,0.9);
+    border-color: rgba(106,124,164,0.5);
+  }
 
   /* Sign-in button */
   .pub-nav-signin {
