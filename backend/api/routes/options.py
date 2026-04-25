@@ -652,32 +652,50 @@ class OptionsController(Controller):
         # which Kite returns under exchange='NSE' with tradingsymbol
         # 'NIFTY 50'. Operators usually want the contract chart, not the
         # spot — keep this simple: caller passes a tradingsymbol; we look
-        # it up on `exchange`.
+        # it up on `exchange`. Stock options on BSE will land under BFO,
+        # so we also check that exchange when NFO misses.
         from backend.shared.brokers.registry import get_price_broker
         broker = get_price_broker()
         token: int | None = None
         try:
-            insts = broker.instruments(exchange) or []
-            for inst in insts:
-                if str(inst.get("tradingsymbol") or "").upper() == sym:
-                    token = int(inst.get("instrument_token"))
+            for ex in (exchange, "BFO", "NSE", "BSE"):
+                if ex == exchange and token:
+                    break
+                insts = broker.instruments(ex) or []
+                for inst in insts:
+                    if str(inst.get("tradingsymbol") or "").upper() == sym:
+                        token = int(inst.get("instrument_token"))
+                        break
+                if token:
                     break
         except Exception as e:
-            raise HTTPException(status_code=502,
-                                detail=f"instrument lookup failed: {e}")
+            # Broker unreachable — return empty bars instead of 502 so
+            # the page renders an "unavailable" state without ripping
+            # the whole panel.
+            logger.warning(f"options historical instrument lookup failed: {e}")
+            return HistoricalResponse(symbol=sym, instrument_token=None,
+                                      interval=interval, bars=[])
         if not token:
-            raise HTTPException(status_code=404,
-                                detail=f"instrument token for '{sym}' on '{exchange}' not found")
+            # Symbol not in any of the exchanges we tried (uncommon
+            # contract / typo / out-of-cycle expiry). Return empty
+            # bars + null token; the UI shows an "unavailable" message
+            # instead of a 404 ripping the whole panel.
+            logger.info(f"options historical: '{sym}' not found in NFO/BFO/NSE/BSE")
+            return HistoricalResponse(symbol=sym, instrument_token=None,
+                                      interval=interval, bars=[])
 
-        # Kite historical_data returns list[dict] with OHLCV.
+        # Kite historical_data returns list[dict] with OHLCV. Failures
+        # here (rate-limited, contract not yet listed, off-hours quirks)
+        # also degrade to empty bars instead of 502.
         try:
             kite = broker.kite  # type: ignore[attr-defined]
             to_d   = datetime.now()
             from_d = to_d - timedelta(days=days)
             raw    = kite.historical_data(token, from_d, to_d, interval) or []
         except Exception as e:
-            raise HTTPException(status_code=502,
-                                detail=f"historical_data failed: {e}")
+            logger.warning(f"options historical_data failed for {sym}: {e}")
+            return HistoricalResponse(symbol=sym, instrument_token=token,
+                                      interval=interval, bars=[])
 
         bars = [
             HistoricalBar(

@@ -1,20 +1,22 @@
 <script>
-  // Compact (i) chip → click to toggle an inline popover with the
-  // explanatory text. Replaces the verbose top-of-page paragraphs that
-  // were eating screen real estate on every algo admin page. Same
-  // amber palette as the Settings page's row-level info chips so the
-  // affordance reads as a familiar "tell me more" signal.
+  // Compact (i) chip with a click-toggle / hover-preview popover.
+  // Used across the algo admin pages to gloss page sections, stats,
+  // and form fields without taking up screen real estate.
   //
-  // Usage:
-  //   <InfoHint>
-  //     Some helpful text. Can include <b>HTML</b> and Svelte snippets.
-  //   </InfoHint>
+  // Two display modes:
+  //   - default (popup=false) — inline expansion below the chip
+  //   - popup (popup=true)    — floating absolute-positioned tooltip
+  //                            (preferred for compact stat panels)
   //
-  // The popover renders inline (not absolutely positioned) so layout
-  // never overlaps unexpected things and mobile viewports work fine.
+  // Content delivery: pass either a `text` prop (string, may include
+  // HTML) OR a children snippet. `text` wins when both are provided.
+  // The text-prop path is the safer one for stable rendering across
+  // SvelteKit hydration / SSR — children snippets occasionally lose
+  // their content during the SSR → CSR handoff in this codebase.
 
   /** @type {{
    *   children?: any,
+   *   text?: string,
    *   label?: string,
    *   maxWidth?: string,
    *   align?: 'left'|'right',
@@ -23,16 +25,11 @@
    * }} */
   let {
     children,
+    text = '',
     label = 'i',
     maxWidth = '36rem',
     align = 'left',
     defaultOpen = false,
-    // popup=false (default): inline expansion below the chip — best for
-    //   page-level hints where a sliding card doesn't disrupt layout.
-    // popup=true: floating absolute-positioned tooltip — best for compact
-    //   stats (Greeks tables, risk metrics) where pushing siblings down
-    //   would feel disruptive. Click chip to toggle, click outside to
-    //   close. Hovering also triggers a soft preview.
     popup = false,
   } = $props();
 
@@ -51,6 +48,9 @@
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   });
+
+  // Whether to render the popout right now.
+  const visible = $derived(popup ? (open || hovered) : open);
 </script>
 
 <span class="info-wrap" class:align-right={align === 'right'}
@@ -65,17 +65,16 @@
           onclick={() => open = !open}
           onmouseenter={() => hovered = true}
           onmouseleave={() => hovered = false}>{label}</button>
-  {#if popup}
-    {#if open || hovered}
-      <span class="info-popout info-popout-popup"
-            class:info-popout-pinned={open}
-            style="max-width: {maxWidth}">
-        {#if children}{@render children()}{/if}
-      </span>
-    {/if}
-  {:else if open}
-    <span class="info-popout" style="max-width: {maxWidth}">
-      {#if children}{@render children()}{/if}
+  {#if visible}
+    <span class="info-popout"
+          class:info-popout-popup={popup}
+          class:info-popout-pinned={popup && open}
+          style="max-width: {maxWidth}">
+      {#if text}
+        {@html text}
+      {:else if children}
+        {@render children()}
+      {/if}
     </span>
   {/if}
 </span>
@@ -88,9 +87,9 @@
     flex-wrap: wrap;
   }
   .align-right { justify-content: flex-end; }
-  /* Popup mode — wrap is positioned so the floating popout anchors to
-     it. No flex-wrap (popup floats absolutely so it can never push
-     siblings down into a new line). */
+  /* Popup mode — wrap is positioned so the floating popout anchors
+     to it. No flex-wrap (popup floats absolutely so it can never
+     push siblings down into a new line). */
   .info-wrap-popup {
     position: relative;
     flex-wrap: nowrap;
@@ -100,8 +99,8 @@
     width: 1.05rem;
     height: 1.05rem;
     border-radius: 9999px;
-    border: 1px solid rgba(251,191,36,0.35);
-    background: rgba(251,191,36,0.08);
+    border: 1px solid rgba(251,191,36,0.45);
+    background: rgba(251,191,36,0.10);
     color: #fbbf24;
     font-size: 0.6rem;
     font-style: italic;
@@ -115,8 +114,8 @@
     transition: background 0.12s, border-color 0.12s;
   }
   .info-btn:hover {
-    background: rgba(251,191,36,0.18);
-    border-color: rgba(251,191,36,0.6);
+    background: rgba(251,191,36,0.22);
+    border-color: rgba(251,191,36,0.7);
   }
   .info-btn.open {
     background: #fbbf24;
@@ -129,36 +128,38 @@
   .info-popout {
     display: inline-block;
     margin: 0;
-    padding: 0.45rem 0.65rem;
+    padding: 0.5rem 0.7rem;
     border-radius: 0.25rem;
-    border: 1px solid rgba(251,191,36,0.25);
+    border: 1px solid rgba(251,191,36,0.35);
     border-left: 3px solid #fbbf24;
     background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: #c8d8f0;
     line-height: 1.5;
     flex: 1 1 100%;
   }
   /* Popup variant — absolute-positioned so it floats above siblings
-     instead of pushing them. Drops a small drop-shadow so it reads as
-     a tooltip layer, not part of the content flow. */
+     instead of pushing them. Adds a drop-shadow so it reads as a
+     tooltip layer, not part of the content flow. min-width keeps a
+     tiny popup readable even when the content is short. */
   .info-popout-popup {
     position: absolute;
     top: calc(100% + 0.4rem);
-    left: -0.3rem;
-    z-index: 30;
+    left: 0;
+    z-index: 50;
     flex: none;
     width: max-content;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
-    pointer-events: none;
+    min-width: 14rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55);
   }
-  /* When pinned (toggled open with click), allow pointer events so
-     the operator can copy text from the popup. */
   .info-popout-pinned { pointer-events: auto; }
-  /* Reset margin on common children so the popover content reads
-     compactly without the operator wondering about padding. */
+
+  /* Reset margins on common children so the popover content reads
+     compactly without unintended padding. */
   :global(.info-popout p)  { margin: 0 0 0.4rem; }
   :global(.info-popout p:last-child) { margin-bottom: 0; }
   :global(.info-popout code),
   :global(.info-popout .font-mono) { color: #7dd3fc; }
+  :global(.info-popout b),
+  :global(.info-popout strong) { color: #fbbf24; font-weight: 700; }
 </style>

@@ -85,15 +85,7 @@
 
 <div class="page-header">
   <h1 class="page-title-chip">Paper Trading</h1>
-  <InfoHint>
-    Visual dashboard for the prod paper-trade engine. Every broker-hitting
-    action that hasn't been promoted to
-    <span class="font-mono">execution.live</span> in
-    <a class="text-[#7dd3fc] underline" href="/admin/settings">Settings</a>
-    shows up here as an open chase order, and the chart panel tracks the
-    bid/ask + underlying spot for the symbols involved. No real orders
-    reach the broker.
-  </InfoHint>
+  <InfoHint text={'Visual dashboard for the prod paper-trade engine. Every broker-hitting action that hasn\'t been promoted to <span class="font-mono">execution.live</span> in <a class="text-[#7dd3fc] underline" href="/admin/settings">Settings</a> shows up here as an open chase order, and the chart panel tracks the bid/ask + underlying spot for the symbols involved. No real orders reach the broker.'} />
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
 

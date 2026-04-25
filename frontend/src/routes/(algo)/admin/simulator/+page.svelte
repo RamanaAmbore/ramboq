@@ -311,14 +311,7 @@
 
 <div class="page-header">
   <h1 class="page-title-chip">Simulator</h1>
-  <InfoHint>
-    Feeds fabricated positions into the live agent engine. Every alert,
-    email, and paper-traded order is tagged
-    <span class="font-mono">SIMULATOR</span> so it can't be confused
-    with a real fire. Gated by
-    <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span>
-    in <span class="font-mono">backend_config.yaml</span>.
-  </InfoHint>
+  <InfoHint text={'Feeds fabricated positions into the live agent engine. Every alert, email, and paper-traded order is tagged <span class="font-mono">SIMULATOR</span> so it can\'t be confused with a real fire. Gated by <span class="font-mono">cap_in_&lt;branch&gt;.simulator</span> in <span class="font-mono">backend_config.yaml</span>.'} />
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
 
