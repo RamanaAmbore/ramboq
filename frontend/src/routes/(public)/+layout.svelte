@@ -349,29 +349,31 @@
     border-bottom-color: #c8a84b;
   }
 
-  /* Algo Site cross-link — visible at the same weight as the regular
-     public nav items, with a thin border so the operator recognises
-     it as a context-switch button (not just another link). Mirrors
-     the algo navbar's "Investor site" cross-link in role + visibility. */
+  /* Algo Site cross-link — gold-pill emphasis. Operators landing on
+     the public site rarely jump to the algo dashboard, but when they
+     do, the destination is the heavy-machinery surface; the pill
+     visually flags it as a "specialised" route. Mirrors the dark-side
+     amber-pill "Investor site" link so both context-switch buttons
+     read with equal visual weight. */
   .pub-nav-algo-btn {
-    padding: 0.2rem 0.55rem;
+    padding: 0.2rem 0.6rem;
     font-size: 0.65rem;
-    font-weight: 500;
-    border-radius: 0.2rem;
-    background: transparent;
-    color: #1a2744;
-    border: 1px solid rgba(106,124,164,0.4);
+    font-weight: 600;
+    border-radius: 0.25rem;
+    background: rgba(200,168,75,0.18);
+    color: #b27908;
+    border: 1px solid rgba(200,168,75,0.5);
     cursor: pointer;
     letter-spacing: 0.03em;
-    transition: color 0.08s, border-color 0.08s, background-color 0.08s;
+    transition: background-color 0.08s, border-color 0.08s, color 0.08s;
     outline: none !important;
     white-space: nowrap;
     margin-right: 0.25rem;
   }
   .pub-nav-algo-btn:hover {
-    color: #b27908;
-    border-color: rgba(212,146,12,0.6);
-    background: rgba(212,146,12,0.08);
+    background: rgba(200,168,75,0.32);
+    border-color: rgba(200,168,75,0.7);
+    color: #8c5e06;
   }
 
   /* Sign-in button */
@@ -461,16 +463,19 @@
   .pub-mobile-item:last-child { border-bottom: none; }
   .pub-mobile-item:hover { background: rgba(200,168,75,0.09); color: #f0d070; border-left-color: rgba(240,208,112,0.5); }
   .pub-mobile-active { color: #f0d070; background: rgba(200,168,75,0.14); border-left-color: #f0d070; font-weight: 600; }
-  /* Algo-site cross-link inside the mobile menu — same weight as
-     other items, with a thin top border to mark a section break.
-     Symmetric with the algo-side mobile menu's investor-site link. */
+  /* Algo-site cross-link inside the mobile menu — gold-pill emphasis
+     matching the desktop button, separated from the regular mobile
+     items by a thin top border so it reads as a context-switch row,
+     not another tab. Symmetric with the dark-side mobile menu's
+     amber-pill investor-site link. */
   .pub-mobile-algo {
-    color: #1a2744;
-    font-weight: 500;
+    color: #f0d070;
+    font-weight: 600;
     letter-spacing: 0.02em;
-    border-top: 1px solid rgba(106,124,164,0.18);
+    background: rgba(200,168,75,0.18);
+    border-top: 1px solid rgba(200,168,75,0.45);
     margin-top: 0.3rem;
-    padding-top: 0.5rem;
+    padding-top: 0.55rem;
   }
 
   /* ── Content + footer ────────────────────────────────────────────────────── */
