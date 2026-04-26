@@ -73,11 +73,16 @@
           {/each}
         </nav>
 
-        {#if $authStore.user?.role === 'admin'}
-          <button onclick={() => goto('/dashboard')} class="pub-nav-algo-btn">
-            Algo Site ↗
-          </button>
-        {/if}
+        <!-- Algo Site cross-link visible to everyone:
+              - admin → goes to the algo console with full access
+              - anonymous on prod → lands in demo mode (synthetic data,
+                paper-only) so visitors / recruiters can browse the
+                platform without a login.
+              - anonymous on dev → redirects to /signin via the algo
+                layout's auth guard. -->
+        <button onclick={() => goto('/dashboard')} class="pub-nav-algo-btn">
+          {$authStore.user?.role === 'admin' ? 'Algo Site' : 'Algo Demo'} ↗
+        </button>
 
         {#if $authStore.user}
           <span class="pub-user-pill">
@@ -140,12 +145,10 @@
               class="pub-mobile-item {isActive(link.href) ? 'pub-mobile-active' : ''}"
             >{link.label}</button>
           {/each}
-          {#if $authStore.user?.role === 'admin'}
-            <button
-              onclick={() => { goto('/dashboard'); closeMenu(); }}
-              class="pub-mobile-item pub-mobile-algo"
-            >Algo Site ↗</button>
-          {/if}
+          <button
+            onclick={() => { goto('/dashboard'); closeMenu(); }}
+            class="pub-mobile-item pub-mobile-algo"
+          >{$authStore.user?.role === 'admin' ? 'Algo Site' : 'Algo Demo'} ↗</button>
           {#if $authStore.user}
             <button onclick={() => { signOut(); closeMenu(); }} class="pub-mobile-item">Sign Out</button>
           {:else}

@@ -1101,6 +1101,98 @@ Most algo admin pages used to ship a long descriptive paragraph at the top — f
 
 ---
 
+## Reusable order ticket (`<OrderTicket>`)
+
+A single Svelte component handles every order op the platform needs (open / close / modify / repeat / cancel) across every instrument (EQ / FUT / OPT / commodities). One callsite per page; the ticket renders the right fields per instrument, owns its own validation, depth ladder, and submit lifecycle.
+
+**Files** ([`frontend/src/lib/order/`](frontend/src/lib/order/)):
+- `OrderTicket.svelte` — modal shell. Side toggle (BUY/SELL), qty + lot meta, order-type pills (MARKET / LIMIT / SL / SL-M), product pills (CNC/MIS for EQ; NRML/MIS for F&O — auto-filtered by parsed `kind`), conditional limit/trigger fields, mode toggle (DRAFT / PAPER / LIVE), validation messages, Cancel / Submit footer. Esc / overlay click / `×` to dismiss.
+- `OrderDepth.svelte` — top-5 bid/ask ladder. Polls `GET /api/quote?exchange=…&tradingsymbol=…` every 1.2 s while mounted. Falls back to em-dashes + a small "depth unavailable" hint when the broker call fails.
+
+**Three submit paths**:
+
+| Mode | What happens |
+|---|---|
+| **DRAFT** | Caller's `onSubmit` callback (no API hit). Caller appends to its local drafts array — typically the [`/admin/options`](frontend/src/routes/(algo)/admin/options/+page.svelte) page's `drafts[]`. |
+| **PAPER** | `POST /api/orders/ticket` with `mode: "paper"`. Backend persists an `AlgoOrder` row + registers the order with the prod paper engine via `register_open_order`. The engine's 5-second tick runs the same fill / modify / unfilled lifecycle that agent fires use, driven by real bid/ask via `LiveQuoteSource`. |
+| **LIVE** | Same endpoint with `mode: "live"`. Two backend gates fire before any broker call: (1) `is_prod_branch()` — non-`main` returns 403; (2) `get_bool('execution.live.place_order')` — operator flag in `/admin/settings → execution`. Both pass → `kite.place_order()` tagged `ramboq-ticket`. UI fires a `window.confirm()` with the exact order line before submit. |
+
+**Backend** ([`backend/api/routes/orders.py`](backend/api/routes/orders.py)):
+
+| Route | Purpose |
+|---|---|
+| `POST /api/orders/ticket` | Operator-initiated order. `{mode, side, tradingsymbol, qty, exchange, product, order_type, variety, price, trigger_price, account?}`. Routes by mode. |
+
+**Where the ticket gets opened today**:
+- `/admin/options` chain `+CE` / `+PE` / futures pill clicks → ticket pre-filled (DRAFT default).
+
+**Migration plan for other surfaces** (each is now just "add `<OrderTicket>` import + open it on the relevant click"):
+- `/orders` row Edit / Cancel / Repeat
+- `/agents` fire-confirm
+- `/performance`, `/dashboard` row "Square off" / "Sell" / "Top up"
+- `/console` `place …` command — replace text-only path with the ticket for explicit confirmation
+
+---
+
+## Demo mode — anonymous-on-prod = guest session
+
+`ramboq.com` algo pages are accessible to anonymous visitors on the prod (`main`) branch. They land in **demo mode**: synthetic data, paper-only orders, no broker hit, ops surface hidden. Recruiters / investors see the actual product without the security risk of exposing the real book.
+
+**The chokepoint pattern**: rather than scattering `if not is_admin` checks across every endpoint, demo session safety funnels through a small set of helpers:
+
+```python
+# backend/api/auth_guard.py
+is_demo_request(connection) -> bool   # prod + no admin JWT
+auth_or_demo_guard(connection, …)     # admits demo, tags state.is_demo
+NotAllowedInDemo                      # sentinel for chokepoints
+```
+
+The guard sets `connection.state.is_demo = True` for anonymous prod requests. Every write endpoint that could touch a real broker checks the flag and either 403s or downgrades the operation:
+
+| Endpoint | Demo behaviour |
+|---|---|
+| `POST /api/orders/place` | 403 |
+| `PUT /api/orders/{id}` (modify) | 403 |
+| `DELETE /api/orders/{id}` (cancel) | 403 |
+| `POST /api/orders/ticket` mode=`live` | silently downgraded to `paper` (visitor's Submit still works) |
+| `POST /api/agents/`, `PUT /api/agents/{slug}`, `DELETE /api/agents/{slug}` | `admin_guard` override → 401 |
+| `/api/admin/brokers/*`, `/api/admin/settings/*`, `/api/admin/grammar/*`, `/api/admin/users/*` | `admin_guard` (controller-level) → 401 |
+
+**Read-path data isolation** ([`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py)):
+
+`/api/positions`, `/api/holdings`, `/api/funds` branch on `is_demo_request(request)`:
+- demo → curated synthetic response (DEMO1 / DEMO2 accounts, ~9 F&O legs on NIFTY+BANKNIFTY, 6 cash holdings, plausible margin balances). Symbols use the next monthly expiry computed at module import so they don't go stale.
+- admin → existing real-broker path (unchanged).
+
+`/api/orders/algo/recent` filters `account.like('DEMO%')` for demo, so paper orders the operator placed don't surface in a visitor's session. `/api/orders/` returns empty rows in demo (no live-broker fetch).
+
+**Frontend** ([`(algo)/+layout.svelte`](frontend/src/routes/(algo)/+layout.svelte)):
+- Anonymous visitor on prod no longer redirects to `/signin`. The `paperStatus.branch === 'main' && !$authStore.user` predicate gates demo mode on. On non-`main` branches, anonymous visitors still redirect to signin (devs are expected to authenticate).
+- Settings / Brokers / Users nav links flag `adminOnly: true` and drop out of the navbar in demo mode.
+- "Sign In" button replaces the user pill in demo so visitors have a one-click upgrade path.
+
+**Mode badges**: navbar pills surface activity at a glance, branch-aware:
+
+| Branch | State | Badge |
+|---|---|---|
+| `main` | anonymous | **DEMO** (purple) |
+| `main` | paper engine has open orders | **PAPER** (blue) |
+| `main` | logged in, idle | (none) |
+| non-`main` | sim active | **SIM** (red) |
+| non-`main` | paper engine has open orders | **PAPER** (blue) |
+| any | both | both stack |
+
+Pill-shaped, pulse 2.4 s. Existing full-width banners under the nav still surface scenario / chase detail.
+
+**Tweaking the demo book**: edit [`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py) — three lists (`_positions_data`, `_holdings_data`, `_funds_data`). The strike levels are pegged to NIFTY ~24,000 / BANKNIFTY ~52,000 — bump them when the indexes drift. Symbols' expiry tokens auto-track the calendar via `_next_monthly_expiry()`.
+
+**What's not in demo yet**:
+- Synthetic agent fires (the Agents page reads real `agent_events` rows). Will require either a fixture event log or filtering events by `account` / `agent slug` patterns. For now, demo visitors see the real agent definitions but the event log shows whatever's persisted.
+- Synthetic `algo_orders` for the LogPanel order tab — same shape as agent events.
+- Nightly cron to wipe `account.startswith('DEMO')` rows from `algo_orders` — accumulation isn't a problem yet, will revisit if it grows.
+
+---
+
 ## Refactoring Notes
 
 | Area | Note |

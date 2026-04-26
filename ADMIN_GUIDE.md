@@ -725,6 +725,55 @@ On a fresh server with no DB rows AND no `secrets.yaml::kite_accounts`, every br
 
 ---
 
+## Reusable order ticket
+
+The `<OrderTicket>` modal in [`frontend/src/lib/order/`](frontend/src/lib/order/) is the single place every order op (open / close / modify / repeat / cancel) goes through, across every instrument (EQ / FUT / OPT). The ticket auto-detects the instrument kind from the symbol and only shows fields that apply (e.g. CNC/MIS for cash equities, NRML/MIS for F&O; trigger field only for SL / SL-M).
+
+Three submit modes:
+
+- **DRAFT** — appends to the caller's local drafts array. No API hit. Used today by `/admin/options` chain `+CE` / `+PE` clicks.
+- **PAPER** — `POST /api/orders/ticket` with `mode=paper`. Creates an `AlgoOrder` row + registers with the prod paper engine; the chase loop fills it from real bid/ask via `LiveQuoteSource`. Same lifecycle agent fires use.
+- **LIVE** — same endpoint with `mode=live`. Two backend gates:
+  1. Branch must be `main` (non-prod returns 403).
+  2. `execution.live.place_order` flag in `/admin/settings` must be true.
+  Then `kite.place_order()` with the operator's payload, tagged `ramboq-ticket`. UI fires a `window.confirm()` with the exact order line before any broker call.
+
+Today the ticket opens from `/admin/options` chain clicks. Future migration: `/orders` row Edit / Cancel / Repeat, `/agents` fire-confirm, `/performance` row "Square off" / "Sell", `/console` `place …` command.
+
+---
+
+## Demo mode — public algo console for visitors
+
+Anonymous visitors on the prod (`ramboq.com`) site can browse the algo pages without a login. The demo session sees synthetic data on two `DEMO1` / `DEMO2` accounts, can place paper orders that go through the real chase loop (against real bid/ask), but never touches a broker.
+
+**How a visitor reaches it**: the public navbar's "Algo Site" cross-link is now visible to everyone (renamed to "Algo Demo" when not logged in). Clicking lands on `/dashboard` → demo mode kicks in.
+
+**Backend chokepoint** ([`backend/api/auth_guard.py`](backend/api/auth_guard.py)):
+
+- `is_demo_request(connection)` returns true when on `main` branch + no admin JWT.
+- `auth_or_demo_guard` admits anonymous requests on prod, sets `connection.state.is_demo = True`. On dev, falls through to strict `jwt_guard` (devs are expected to log in).
+- Every order-write endpoint checks the flag: `place` / `modify` / `cancel` return 403; `/api/orders/ticket` silently downgrades `mode=live → paper` for demo so the click-Submit flow keeps working.
+
+**Read-path data isolation** ([`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py)):
+
+- `/api/positions`, `/api/holdings`, `/api/funds` return curated synthetic responses (DEMO1 / DEMO2, ~9 F&O legs on NIFTY+BANKNIFTY, 6 cash holdings, plausible margins). Symbols use the next monthly expiry computed at module import.
+- `/api/orders/algo/recent` filters `account.like('DEMO%')` so paper orders the operator placed don't surface in a visitor's session.
+- `/api/orders/` returns empty rows in demo (no live-broker fetch).
+
+**Frontend** ([`(algo)/+layout.svelte`](frontend/src/routes/(algo)/+layout.svelte)):
+
+- Anonymous visitor on prod no longer redirects to `/signin`. The layout polls `/api/charts/paper-status` for the `branch` flag and treats `branch=main` + `!user` as demo.
+- Settings / Brokers / Users nav links flag `adminOnly: true` and drop out of the navbar in demo mode.
+- "Sign In" button replaces the user pill so the operator has a one-click upgrade.
+
+**Mode badges** in the navbar: `DEMO` (purple, anonymous prod), `PAPER` (blue, paper engine has open orders), `SIM` (red, dev only).
+
+**Curating the demo book**: edit [`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py) — three lists (`_positions_data`, `_holdings_data`, `_funds_data`). Strikes are pegged near current NIFTY ~24,000 / BANKNIFTY ~52,000 levels; bump them when the indexes drift. Expiry tokens auto-track the calendar.
+
+**Migration path → real demo cron / DB seeding**: today the demo book is in-process Python data. If we ever need richer demo state (synthetic agent fires, a fake event timeline), graduate to a `seed_demo()` writer that targets the same DB tables filtered by `account.startswith('DEMO')` + a nightly cron to wipe the visitor-mutable rows. The shape doesn't change — only the source of the synthetic rows.
+
+---
+
 ## Where to go when something looks wrong
 
 | Problem | Look here |

@@ -297,6 +297,35 @@ A typical session for an active operator:
 
 ---
 
+## Demo mode — for visitors / recruiters / investors
+
+If you're not logged in and you visit `ramboq.com`, the algo console opens in **demo mode** — a synthetic but plausible book on two demo accounts (DEMO1 / DEMO2). Everything you click is real product, just running on hand-curated data:
+
+- Positions, holdings, funds — all synthetic. You're seeing the same screens an operator sees, but no real account is ever touched.
+- The order ticket works. Place a paper order — it'll register, the chase engine will track bid/ask, you can watch it fill or cancel. Never reaches a broker.
+- Settings / Brokers / Users are hidden. Those are operator surfaces; visitors don't need them.
+- Mode badge **DEMO** (purple) sits in the navbar so the context is unmistakable.
+
+To exit demo mode → click **Sign In** (top right). The link goes to the operator login.
+
+For an operator who's logged in, demo mode is invisible. Anonymous + prod = demo; everything else = your normal session.
+
+---
+
+## Mode badges in the navbar
+
+The navbar's right-hand side surfaces what the platform is currently doing. Each pill pulses while its mode is active:
+
+| Badge | When it shows |
+|---|---|
+| **DEMO** (purple) | Anonymous visitor on the prod site — the data you're seeing is synthetic, no broker touch. |
+| **PAPER** (blue) | The prod paper engine has at least one open chase order. Could be your manual paper-mode ticket, or an agent fire that landed in paper. |
+| **SIM** (red) | A simulator run is in progress (dev only — sims are capped off on prod by default). |
+
+Both PAPER and SIM can show at the same time on dev if you've started a sim AND have paper orders open. Below the badges, full-width banners under the navbar carry the scenario / chase-count detail.
+
+---
+
 ## Where to learn more
 
 - **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** — exact button labels, JSON conditions, API endpoints. The operations reference.
