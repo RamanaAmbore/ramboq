@@ -34,14 +34,18 @@
     listFutures,
   } from '$lib/data/instruments';
 
-  /** @type {'live'|'sim'|'hypothetical'|'strategy'} */
-  let mode = $state('live');
+  // Source card semantics (v3): collapsed from the old four-way (live /
+  // sim / hypothetical / strategy) into two analysis types. The data
+  // source for each leg (live / sim / draft) lives on the candidate row
+  // itself — operators can mix them freely in either analysis type.
+  /** @type {'single'|'strategy'} */
+  let mode = $state('single');
+  // Currently-picked candidate in single-leg mode. Stays in sync with
+  // the active row in the Candidates panel.
   let symbol = $state('');
   let account = $state('');
-  // Hypothetical extras — let the operator preview a position they
-  // haven't taken yet.
-  let hypoQty   = $state(/** @type {number|''} */ (50));
-  let hypoCost  = $state(/** @type {number|''} */ (''));
+  /** @type {'live'|'sim'|'draft'|''} */
+  let pickedSource = $state('');
 
   /** @type {any} */ let analytics = $state(null);
   /** @type {any} */ let historical = $state(null);
@@ -52,6 +56,25 @@
   let loading       = $state(false);
   let teardown;
   let posTeardown;
+
+  // Drafts — hypothetical positions the operator types in. They sit
+  // beside live + sim positions in the Candidates panel and feed into
+  // either single-leg or strategy analytics. `id` is a stable client-
+  // side key so the panel rows don't lose their state when one is
+  // removed mid-edit.
+  let _draftSeq = 0;
+  /** @type {Array<{id:number, symbol:string, qty:number|'', avg_cost:number|'', ltp:number|''}>} */
+  let drafts = $state([]);
+  function addDraft() {
+    drafts = [...drafts, { id: ++_draftSeq, symbol: '', qty: '', avg_cost: '', ltp: '' }];
+  }
+  function removeDraft(/** @type {number} */ id) {
+    drafts = drafts.filter(d => d.id !== id);
+    // If the removed draft was the picked single-leg position, clear it.
+    if (pickedSource === 'draft' && !drafts.some(d => d.symbol.toUpperCase() === symbol)) {
+      symbol = ''; account = ''; pickedSource = ''; analytics = null;
+    }
+  }
 
   // Strategy mode v2 — pick (Account, Underlying) and the matching
   // open positions appear as toggleable candidates below the chart.
@@ -97,14 +120,11 @@
     return Array.from(set).sort();
   });
 
-  // Candidate positions matching the filter. Each candidate is an
-  // option or future on the chosen underlying held in one of the
-  // selected accounts (or all accounts when none selected).
-  // In live/sim modes the source is filtered to match the active mode
-  // (so the operator only sees their live book vs the sim book, not a
-  // mix). Strategy mode shows both since you can build a strategy out
-  // of a mix of live + sim legs.
-  /** @type {{symbol:string,account:string,qty:number,avg_cost:number|null,ltp:number|null,source:string,kind:string}[]} */
+  // Candidate positions matching the filter. Live + sim positions on
+  // the chosen underlying held in one of the chosen accounts, plus all
+  // drafts whose symbol matches the underlying prefix. Source is a
+  // per-row property (badge in the panel), not a mode-level filter.
+  /** @type {{symbol:string,account:string,qty:number,avg_cost:number|null,ltp:number|null,source:string,kind:string,draftId?:number}[]} */
   const candidatePositions = $derived.by(() => {
     if (!selectedUnderlying) return [];
     const target = selectedUnderlying.toUpperCase();
@@ -112,12 +132,10 @@
     const acctFilter = selectedAccounts.length ? selectedAccounts : [];
     /** @type {any[]} */
     const out = [];
+    // Live + sim positions
     for (const p of positions) {
       if (acctFilter.length && !acctFilter.includes(p.account)) continue;
-      if ((mode === 'live' || mode === 'sim') && p.source !== mode) continue;
       const sym = p.symbol;
-      // Match option/future by symbol prefix — same convention used by
-      // parse_tradingsymbol on the backend.
       if (!new RegExp(`^${target}\\d`, 'i').test(sym)) continue;
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
@@ -125,6 +143,29 @@
       out.push({
         ...p,
         kind: isFut ? 'fut' : 'opt',
+      });
+    }
+    // Drafts — matched by symbol prefix; no account filter (drafts
+    // aren't tied to a broker account).
+    for (const d of drafts) {
+      const sym = String(d.symbol || '').toUpperCase();
+      if (!sym) continue;
+      if (!new RegExp(`^${target}\\d`, 'i').test(sym)) continue;
+      const isFut = /FUT$/i.test(sym);
+      const isOpt = /(CE|PE)$/i.test(sym);
+      if (!isFut && !isOpt) continue;
+      const qty = d.qty === '' || d.qty == null ? 0 : Number(d.qty);
+      const cost = d.avg_cost === '' || d.avg_cost == null ? null : Number(d.avg_cost);
+      const ltp  = d.ltp      === '' || d.ltp      == null ? null : Number(d.ltp);
+      out.push({
+        symbol: sym,
+        account: '',
+        qty,
+        avg_cost: cost,
+        ltp,
+        source: 'draft',
+        kind: isFut ? 'fut' : 'opt',
+        draftId: d.id,
       });
     }
     return out;
@@ -344,15 +385,19 @@
     positions = merged;
   }
 
-  // Click-to-pick handler for live / sim modes. The candidates panel
-  // calls this when the operator clicks a row. Future row in live / sim
-  // mode would 400 from the analytics endpoint (FUT isn't an option), so
-  // the candidate row's button is disabled for kind=fut in live/sim.
+  // Click-to-pick handler for single-leg analysis. The candidates panel
+  // calls this when the operator clicks a row in `mode === 'single'`.
+  // Future rows are disabled (single-leg analytics endpoint rejects FUT).
+  /** @type {any} Reference to the picked candidate row (used by loadAnalytics
+   *   to pull qty/avg_cost/ltp for draft rows). */
+  let pickedCandidate = $state(null);
   function pickCandidate(/** @type {any} */ c) {
     if (!c) return;
-    if (c.kind === 'fut') return;   // analytics endpoint rejects FUT
+    if (c.kind === 'fut') return;
+    pickedCandidate = c;
     account = c.account || '';
     symbol  = c.symbol  || '';
+    pickedSource = /** @type {any} */ (c.source);
     loadAnalytics();
     loadHistorical();
   }
@@ -385,11 +430,18 @@
     if (!symbol) { analytics = null; return; }
     loading = true; analyticsErr = '';
     try {
-      const opts = { mode, symbol };
-      if (account) opts.account = account;
-      if (mode === 'hypothetical') {
-        if (hypoQty !== '' && hypoQty != null) opts.qty = Number(hypoQty);
-        if (hypoCost !== '' && hypoCost != null) opts.avg_cost = Number(hypoCost);
+      // Backend's `mode` param is the data source: live / sim / hypothetical.
+      // Drafts map to hypothetical (the operator typed the symbol; broker
+      // doesn't know about it). Live + sim pull from the corresponding book.
+      const apiMode = pickedSource === 'draft' ? 'hypothetical' : pickedSource || 'live';
+      const opts = { mode: apiMode, symbol };
+      if (account && pickedSource !== 'draft') opts.account = account;
+      // Drafts ship qty + avg_cost + (optional) ltp inline so the backend
+      // can compute analytics without finding the position in any book.
+      if (pickedSource === 'draft' && pickedCandidate) {
+        if (pickedCandidate.qty != null) opts.qty = Number(pickedCandidate.qty);
+        if (pickedCandidate.avg_cost != null) opts.avg_cost = Number(pickedCandidate.avg_cost);
+        if (pickedCandidate.ltp      != null) opts.ltp      = Number(pickedCandidate.ltp);
       }
       analytics = await fetchOptionAnalytics(opts);
     } catch (e) {
@@ -403,7 +455,7 @@
   async function loadHistorical() {
     if (!symbol) { historical = null; return; }
     historicalErr = '';
-    if (mode === 'sim') {
+    if (pickedSource === 'sim') {
       historicalErr = 'Historical data unavailable for sim positions.';
       historical = null;
       return;
@@ -504,8 +556,9 @@
   <span class="algo-ts">{clientTimestamp()}</span>
 </div>
 
-<!-- Picker bar — three input modes share the same row so switching modes
-     is a one-click action. -->
+<!-- Picker bar — Source picks the analysis type (Single Leg / Strategy);
+     Account + Underlying scopes the candidate set. Drafts add via the
+     "+ Add draft" button (rows appear in the Candidates panel). -->
 <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
   <div class="opt-picker">
     <div class="opt-field">
@@ -513,84 +566,96 @@
       <Select id="opt-mode"
         bind:value={mode}
         options={[
-          { value: 'live',         label: 'Live position' },
-          { value: 'sim',          label: 'Sim position'  },
-          { value: 'hypothetical', label: 'Hypothetical'  },
-          { value: 'strategy',     label: 'Strategy (multi-leg)' },
+          { value: 'single',   label: 'Single Leg' },
+          { value: 'strategy', label: 'Strategy (multi-leg)' },
         ]} />
     </div>
-
-    {#if mode !== 'hypothetical'}
-      <!-- Account + Underlying picker — shared across live / sim /
-           strategy modes so the operator's mental model is the same in
-           every workflow: pick scope (accounts) → pick the underlying
-           → pick a candidate from the panel below the chart. In live /
-           sim mode candidates are click-to-pick (single-select); in
-           strategy mode they're checkboxes (multi-select). -->
-      <div class="opt-field opt-field-grow">
-        <label class="field-label" for="opt-acct">Account</label>
-        <MultiSelect id="opt-acct"
-          bind:value={selectedAccounts}
-          options={accountChoices.map(a => ({ value: a, label: a }))}
-          placeholder={accountChoices.length ? 'All accounts' : 'No accounts loaded'} />
-      </div>
-      <div class="opt-field opt-field-grow">
-        <label class="field-label" for="opt-und">Underlying</label>
-        <Select id="opt-und"
-          bind:value={selectedUnderlying}
-          options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
-          placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
-      </div>
-      {#if mode === 'strategy'}
-        <button type="button" class="sim-btn sim-btn-order"
-                title="Append a blank leg row for hypothetical / manual entry"
-                onclick={addLegRow}>+ Add row</button>
-        <button type="button" class="sim-btn sim-btn-order"
-                title="Compute aggregate analytics + payoff for the current legs"
-                onclick={loadStrategy}>Analyze</button>
-        {#if legs.length}
-          <button type="button" class="sim-btn sim-btn-order opt-clear"
-                  title="Discard every leg and reset"
-                  onclick={clearLegs}>Clear</button>
-        {/if}
-      {/if}
-    {:else}
-      <div class="opt-field opt-field-grow">
-        <label class="field-label" for="opt-sym">Symbol</label>
-        <input id="opt-sym" type="text" class="field-input"
-          placeholder="NIFTY25APR22000CE"
-          bind:value={symbol} />
-      </div>
-      <div class="opt-field">
-        <label class="field-label" for="opt-qty">Qty</label>
-        <input id="opt-qty" type="number" class="field-input"
-          placeholder="±qty (negative = short)"
-          bind:value={hypoQty} />
-      </div>
-      <div class="opt-field">
-        <label class="field-label" for="opt-cost">Avg cost</label>
-        <input id="opt-cost" type="number" class="field-input"
-          placeholder="(LTP)"
-          step="0.05"
-          bind:value={hypoCost} />
-      </div>
+    <div class="opt-field opt-field-grow">
+      <label class="field-label" for="opt-acct">Account</label>
+      <MultiSelect id="opt-acct"
+        bind:value={selectedAccounts}
+        options={accountChoices.map(a => ({ value: a, label: a }))}
+        placeholder={accountChoices.length ? 'All accounts' : 'No accounts loaded'} />
+    </div>
+    <div class="opt-field opt-field-grow">
+      <label class="field-label" for="opt-und">Underlying</label>
+      <Select id="opt-und"
+        bind:value={selectedUnderlying}
+        options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
+        placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
+    </div>
+    <button type="button" class="sim-btn sim-btn-order"
+            title="Add a hypothetical position to evaluate alongside your live + sim book"
+            onclick={addDraft}>+ Add draft</button>
+    {#if mode === 'strategy'}
       <button type="button" class="sim-btn sim-btn-order"
-        onclick={() => { loadAnalytics(); loadHistorical(); }}>Analyze</button>
+              title="Compute aggregate analytics + payoff for the checked candidates"
+              onclick={loadStrategy}>Analyze</button>
+      {#if legs.length}
+        <button type="button" class="sim-btn sim-btn-order opt-clear"
+                title="Discard every leg and reset"
+                onclick={clearLegs}>Clear</button>
+      {/if}
     {/if}
   </div>
 </div>
 
-{#if analyticsErr && mode !== 'strategy'}
+{#if analyticsErr && mode === 'single'}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{analyticsErr}</div>
 {/if}
 {#if strategyErr && mode === 'strategy'}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{strategyErr}</div>
 {/if}
 
-{#if mode !== 'strategy' && !analytics && !analyticsErr && !loading && !selectedUnderlying}
+{#if mode === 'single' && !analytics && !analyticsErr && !loading && !selectedUnderlying && !drafts.length}
   <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
-    Pick an underlying above (or switch to Hypothetical and type a symbol)
-    to load the analytics workspace.
+    Pick an underlying to surface live + sim candidates, or click <b>+ Add draft</b>
+    to start with a hypothetical position.
+  </div>
+{/if}
+
+<!-- Drafts editor — operator-typed hypothetical positions. Each row has
+     editable symbol/qty/avg_cost/ltp + a delete. Drafts whose symbol
+     matches the selected underlying also appear (read-only) in the
+     Candidates panel below so they can be picked / checked alongside
+     live + sim positions. -->
+{#if drafts.length}
+  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+      Drafts <span class="opt-section-meta">({drafts.length}) — hypothetical positions; appear in Candidates when their symbol matches the underlying</span>
+    </div>
+    <div class="leg-grid">
+      <div class="leg-headrow">
+        <span>Symbol</span>
+        <span>Qty</span>
+        <span>Avg cost</span>
+        <span>LTP</span>
+        <span>Source</span>
+        <span></span>
+      </div>
+      {#each drafts as _d, i (drafts[i].id)}
+        <div class="leg-row">
+          <input type="text" class="field-input"
+            placeholder="NIFTY25APR22000CE"
+            bind:value={drafts[i].symbol} />
+          <input type="number" class="field-input"
+            placeholder="±qty"
+            bind:value={drafts[i].qty} />
+          <input type="number" class="field-input"
+            placeholder="₹"
+            step="0.05"
+            bind:value={drafts[i].avg_cost} />
+          <input type="number" class="field-input"
+            placeholder="₹ (auto from broker)"
+            step="0.05"
+            bind:value={drafts[i].ltp} />
+          <span class="leg-source leg-source-draft">draft</span>
+          <button type="button" class="leg-del"
+                  title="Remove this draft"
+                  onclick={() => removeDraft(drafts[i].id)}>×</button>
+        </div>
+      {/each}
+    </div>
   </div>
 {/if}
 
@@ -604,7 +669,7 @@
                      next Analyze click.
      Hidden in hypothetical mode (operator types a symbol; no book to
      scan). -->
-{#if mode !== 'hypothetical' && selectedUnderlying}
+{#if selectedUnderlying || drafts.length}
   <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
     <div class="opt-section-h" style="padding-bottom: 0.5rem;">
       Candidates
@@ -675,12 +740,8 @@
       <div class="text-[0.6rem] text-[#7e97b8] italic">
         No options or futures on <b>{selectedUnderlying}</b> in
         {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
-        Try a different underlying / account
-        {#if mode === 'strategy'}
-          , or use the option-chain picker below to add hypothetical legs.
-        {:else}
-          , or switch to <b>Hypothetical</b> to type any symbol.
-        {/if}
+        Try a different underlying / account, or click <b>+ Add draft</b>
+        to enter a hypothetical position.
       </div>
     {/if}
   </div>
@@ -1035,7 +1096,7 @@
   {/if}
 {/if}
 
-{#if mode !== 'strategy' && analytics}
+{#if mode === 'single' && analytics}
   <div class="opt-grid">
     <!-- Payoff diagram (large) -->
     <div class="opt-payoff">
@@ -1420,6 +1481,7 @@
   .leg-source-live   { color: #22c55e; }
   .leg-source-sim    { color: #fbbf24; }
   .leg-source-manual { color: #7dd3fc; }
+  .leg-source-draft  { color: #f0abfc; }
   .leg-del {
     width: 1.4rem;
     height: 1.4rem;
