@@ -5,7 +5,7 @@ import polars as pl
 from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
-from backend.api.auth_guard import is_admin_request, is_demo_request
+from backend.api.auth_guard import is_admin_request
 from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import FundsResponse, FundsRow
 from backend.shared.helpers import broker_apis
@@ -54,11 +54,6 @@ class FundsController(Controller):
     @get("/")
     async def get_funds(self, request: Request, fresh: bool = False) -> FundsResponse:
         try:
-            # Demo session: serve curated synthetic funds — never hits
-            # the broker, never leaks real cash / margin balances.
-            if is_demo_request(request):
-                from backend.api.algo.demo import get_funds_response
-                return get_funds_response()
             if fresh:
                 invalidate("funds")
             resp = await get_or_fetch("funds", _fetch, ttl_seconds=_TTL)

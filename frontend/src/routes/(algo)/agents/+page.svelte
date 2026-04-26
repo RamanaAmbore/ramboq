@@ -351,7 +351,6 @@
   }
 
   onMount(() => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadAll();
     connectWS();
     pollSimStatus();

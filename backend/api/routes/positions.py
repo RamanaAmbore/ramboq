@@ -5,7 +5,7 @@ import polars as pl
 from litestar import Controller, Request, get
 from litestar.exceptions import HTTPException
 
-from backend.api.auth_guard import is_admin_request, is_demo_request
+from backend.api.auth_guard import is_admin_request
 from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import PositionsResponse, PositionRow, PositionsSummaryRow
 from backend.shared.helpers import broker_apis
@@ -57,12 +57,11 @@ class PositionsController(Controller):
     @get("/")
     async def get_positions(self, request: Request, fresh: bool = False) -> PositionsResponse:
         try:
-            # Demo session: serve curated synthetic book — never hits
-            # the broker, never leaks real account data. Real positions
-            # stay invisible to anonymous prod visitors.
-            if is_demo_request(request):
-                from backend.api.algo.demo import get_positions_response
-                return get_positions_response()
+            # Demo + public flow share one path: real broker data via
+            # the cached fetch, with accounts masked for non-admin
+            # callers (existing behaviour from the public /performance
+            # page). No synthetic data — demo visitors see real
+            # positions with `ZG####` style masks.
             if fresh:
                 invalidate("positions")
             resp = await get_or_fetch("positions", _fetch, ttl_seconds=_TTL)

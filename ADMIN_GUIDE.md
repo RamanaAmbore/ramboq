@@ -754,11 +754,7 @@ Anonymous visitors on the prod (`ramboq.com`) site can browse the algo pages wit
 - `auth_or_demo_guard` admits anonymous requests on prod, sets `connection.state.is_demo = True`. On dev, falls through to strict `jwt_guard` (devs are expected to log in).
 - Every order-write endpoint checks the flag: `place` / `modify` / `cancel` return 403; `/api/orders/ticket` silently downgrades `mode=live → paper` for demo so the click-Submit flow keeps working.
 
-**Read-path data isolation** ([`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py)):
-
-- `/api/positions`, `/api/holdings`, `/api/funds` return curated synthetic responses (DEMO1 / DEMO2, ~9 F&O legs on NIFTY+BANKNIFTY, 6 cash holdings, plausible margins). Symbols use the next monthly expiry computed at module import.
-- `/api/orders/algo/recent` filters `account.like('DEMO%')` so paper orders the operator placed don't surface in a visitor's session.
-- `/api/orders/` returns empty rows in demo (no live-broker fetch).
+**Read-path data**: demo sees **real broker data with accounts masked** (same masking the public `/performance` page applies). `mask_column()` turns `ZG0790` into `ZG####`. The shared rule across `/api/positions`, `/api/holdings`, `/api/funds`, `/api/orders/`, `/api/orders/algo/recent`: any non-admin caller gets masked accounts.
 
 **Frontend** ([`(algo)/+layout.svelte`](frontend/src/routes/(algo)/+layout.svelte)):
 
@@ -768,9 +764,7 @@ Anonymous visitors on the prod (`ramboq.com`) site can browse the algo pages wit
 
 **Mode badges** in the navbar: `DEMO` (purple, anonymous prod), `PAPER` (blue, paper engine has open orders), `SIM` (red, dev only).
 
-**Curating the demo book**: edit [`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py) — three lists (`_positions_data`, `_holdings_data`, `_funds_data`). Strikes are pegged near current NIFTY ~24,000 / BANKNIFTY ~52,000 levels; bump them when the indexes drift. Expiry tokens auto-track the calendar.
-
-**Migration path → real demo cron / DB seeding**: today the demo book is in-process Python data. If we ever need richer demo state (synthetic agent fires, a fake event timeline), graduate to a `seed_demo()` writer that targets the same DB tables filtered by `account.startswith('DEMO')` + a nightly cron to wipe the visitor-mutable rows. The shape doesn't change — only the source of the synthetic rows.
+**Maintenance**: zero. Demo shares the operator's real broker book — there's no fixture file to refresh, no data drift, no nightly cron. If the operator is busy trading, demo looks busy too. If the operator is idle, demo is idle. The only thing isolating them is the account mask + the write gates.
 
 ---
 

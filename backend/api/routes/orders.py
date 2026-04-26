@@ -18,7 +18,7 @@ from litestar.exceptions import HTTPException
 from litestar.params import Parameter
 from litestar.status_codes import HTTP_200_OK
 
-from backend.api.auth_guard import jwt_guard, auth_or_demo_guard
+from backend.api.auth_guard import jwt_guard, auth_or_demo_guard, is_admin_request
 from backend.api.cache import get_or_fetch, invalidate
 from backend.api.routes.ws import broadcast
 from backend.api.schemas import (
@@ -149,13 +149,13 @@ class OrdersController(Controller):
 
     @get("/")
     async def list_orders(self, request: Request) -> OrdersResponse:
-        # Demo session: live broker is never reached; return empty
-        # rows + the standard refreshed_at stamp so the UI renders
-        # without errors.
-        if getattr(request.state, "is_demo", False):
-            return OrdersResponse(rows=[], refreshed_at=timestamp_display())
         try:
-            return await get_or_fetch("orders", _fetch_orders, ttl_seconds=_ORDERS_TTL)
+            resp = await get_or_fetch("orders", _fetch_orders, ttl_seconds=_ORDERS_TTL)
+            # Mask account codes for non-admin callers (demo / public).
+            if not is_admin_request(request):
+                for r in resp.rows:
+                    r.account = mask_column(pd.Series([r.account]))[0]
+            return resp
         except Exception as e:
             logger.error(f"Orders API error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -183,15 +183,17 @@ class OrdersController(Controller):
             q = sql_select(AlgoOrder).order_by(desc(AlgoOrder.id)).limit(max(1, min(n, 500)))
             if mode in ("live", "sim", "paper"):
                 q = q.where(AlgoOrder.mode == mode)
-            # Demo session: only return rows for DEMO* accounts so real
-            # paper orders placed by the operator aren't surfaced to a
-            # recruiter / visitor session.
-            if getattr(request.state, "is_demo", False):
-                q = q.where(AlgoOrder.account.like("DEMO%"))
             rows = (await s.execute(q)).scalars().all()
+        # Mask account codes for non-admin callers (demo + public).
+        # Same masking the /performance grids apply — turns ZG0790
+        # into ZG####.
+        do_mask = not is_admin_request(request)
+        masked_acct = (
+            (lambda a: mask_column(pd.Series([a]))[0]) if do_mask else (lambda a: a)
+        )
         return [
             AlgoOrderInfo(
-                id=r.id, account=r.account, symbol=r.symbol, exchange=r.exchange,
+                id=r.id, account=masked_acct(r.account), symbol=r.symbol, exchange=r.exchange,
                 transaction_type=r.transaction_type, quantity=r.quantity,
                 initial_price=(float(r.initial_price) if r.initial_price is not None else None),
                 fill_price=(float(r.fill_price) if r.fill_price is not None else None),

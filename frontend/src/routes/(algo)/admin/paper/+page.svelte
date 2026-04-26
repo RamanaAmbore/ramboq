@@ -68,9 +68,8 @@
   }
 
   onMount(() => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') {
-      goto('/signin'); return;
-    }
+    // Auth/redirect handled by the algo layout; demo visitors view
+    // this page read-only.
     load();
     refreshTeardown = visibleInterval(load, 3000);
   });

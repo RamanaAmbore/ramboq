@@ -278,7 +278,6 @@
 
 
   onMount(() => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     // Read agent_id=<id> from URL — lets the /algo "Run in Simulator" button
     // pre-arm this page with a specific agent.
     const q = page.url.searchParams.get('agent_id');

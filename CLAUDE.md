@@ -1158,13 +1158,9 @@ The guard sets `connection.state.is_demo = True` for anonymous prod requests. Ev
 | `POST /api/agents/`, `PUT /api/agents/{slug}`, `DELETE /api/agents/{slug}` | `admin_guard` override → 401 |
 | `/api/admin/brokers/*`, `/api/admin/settings/*`, `/api/admin/grammar/*`, `/api/admin/users/*` | `admin_guard` (controller-level) → 401 |
 
-**Read-path data isolation** ([`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py)):
+**Read-path data**: demo sessions see **real broker data with accounts masked** — the same path the public `/performance` page uses. `mask_column()` turns `ZG0790` into `ZG####`. No synthetic fixtures, no parallel data plane: demo is "prod paper-trade UI minus broker writes minus ops surface". This is dramatically simpler than the synthetic-data path it replaces.
 
-`/api/positions`, `/api/holdings`, `/api/funds` branch on `is_demo_request(request)`:
-- demo → curated synthetic response (DEMO1 / DEMO2 accounts, ~9 F&O legs on NIFTY+BANKNIFTY, 6 cash holdings, plausible margin balances). Symbols use the next monthly expiry computed at module import so they don't go stale.
-- admin → existing real-broker path (unchanged).
-
-`/api/orders/algo/recent` filters `account.like('DEMO%')` for demo, so paper orders the operator placed don't surface in a visitor's session. `/api/orders/` returns empty rows in demo (no live-broker fetch).
+`/api/positions`, `/api/holdings`, `/api/funds`, `/api/orders/`, `/api/orders/algo/recent` all share one branch: if `not is_admin_request()`, mask the `account` field on every row. Demo + public anonymous flows hit the exact same code path.
 
 **Frontend** ([`(algo)/+layout.svelte`](frontend/src/routes/(algo)/+layout.svelte)):
 - Anonymous visitor on prod no longer redirects to `/signin`. The `paperStatus.branch === 'main' && !$authStore.user` predicate gates demo mode on. On non-`main` branches, anonymous visitors still redirect to signin (devs are expected to authenticate).
@@ -1184,12 +1180,7 @@ The guard sets `connection.state.is_demo = True` for anonymous prod requests. Ev
 
 Pill-shaped, pulse 2.4 s. Existing full-width banners under the nav still surface scenario / chase detail.
 
-**Tweaking the demo book**: edit [`backend/api/algo/demo/fixtures.py`](backend/api/algo/demo/fixtures.py) — three lists (`_positions_data`, `_holdings_data`, `_funds_data`). The strike levels are pegged to NIFTY ~24,000 / BANKNIFTY ~52,000 — bump them when the indexes drift. Symbols' expiry tokens auto-track the calendar via `_next_monthly_expiry()`.
-
-**What's not in demo yet**:
-- Synthetic agent fires (the Agents page reads real `agent_events` rows). Will require either a fixture event log or filtering events by `account` / `agent slug` patterns. For now, demo visitors see the real agent definitions but the event log shows whatever's persisted.
-- Synthetic `algo_orders` for the LogPanel order tab — same shape as agent events.
-- Nightly cron to wipe `account.startswith('DEMO')` rows from `algo_orders` — accumulation isn't a problem yet, will revisit if it grows.
+**No fixture maintenance**: there's no synthetic data file to keep in sync. Whatever positions / holdings / orders / agent fires the operator's prod book has, the demo session sees — masked. If demo looks empty, it's because prod is idle.
 
 ---
 

@@ -139,7 +139,6 @@
   };
 
   onMount(() => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') { goto('/signin'); return; }
     loadOrders(); loadCurrentLog();
     loadAccounts().catch(() => {});
     loadInstruments().catch(() => {});

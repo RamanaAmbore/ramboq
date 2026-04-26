@@ -483,9 +483,8 @@
   }
 
   onMount(async () => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') {
-      goto('/signin'); return;
-    }
+    // Auth/redirect handled by the algo layout; demo visitors view
+    // this page read-only.
     loadPositions();
     // Load the instruments cache so the option-chain picker has data.
     // Already cached in IndexedDB after the first /console autocomplete
