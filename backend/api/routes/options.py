@@ -728,6 +728,20 @@ class OptionsController(Controller):
         falls back to the LTP (treats the leg as "what if I open this
         right now").
         """
+        try:
+            return await self._strategy_analytics_impl(data)
+        except HTTPException:
+            raise
+        except Exception:
+            # Log the full traceback so 500s in this endpoint are
+            # debuggable — Litestar's default 500 handler swallows the
+            # exception text. Re-raise as a 500 with a generic message
+            # so the operator at least sees something actionable.
+            logger.exception("Strategy analytics failed (legs=%s)", data.legs)
+            raise HTTPException(status_code=500,
+                detail="Strategy analytics failed; see server logs.")
+
+    async def _strategy_analytics_impl(self, data: "StrategyRequest") -> "StrategyResponse":
         if not data.legs:
             raise HTTPException(status_code=400, detail="legs is required")
 
