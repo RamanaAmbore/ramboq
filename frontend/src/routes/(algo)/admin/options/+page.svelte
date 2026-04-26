@@ -678,47 +678,53 @@
         <div class="opt-block">
           <div class="opt-block-h">Aggregate</div>
           <div class="opt-kv">
-            <span class="kv-k">Underlying</span> <span class="kv-v">{strategy.underlying}</span>
-            <span class="kv-k">Spot</span>       <span class="kv-v">₹{strategy.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-            <span class="kv-k">Expiry</span>     <span class="kv-v">{strategy.expiry}</span>
-            <span class="kv-k">Net cost</span>
-            <span class="kv-v {strategy.net_cost > 0 ? 'kv-neg' : strategy.net_cost < 0 ? 'kv-pos' : ''}">
-              {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
-            </span>
+            <div class="kv-pair">
+              <span class="kv-k">Underlying</span>
+              <span class="kv-v">{strategy.underlying}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Spot</span>
+              <span class="kv-v">₹{strategy.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Expiry</span>
+              <span class="kv-v">{strategy.expiry}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Net cost</span>
+              <span class="kv-v {strategy.net_cost > 0 ? 'kv-neg' : strategy.net_cost < 0 ? 'kv-pos' : ''}">
+                {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
+              </span>
+            </div>
           </div>
         </div>
 
         <div class="opt-block">
           <div class="opt-block-h">
             Greeks (position)
-            <InfoHint popup text={'Sum of every leg\'s signed-qty Greeks. Δ tells you the net directional exposure; Θ shows the daily decay (positive when you\'re net short premium); 𝒱 shows your sensitivity to a 1 % IV move (positive = long volatility).'} />
+            <InfoHint popup text={'Sum of every leg\'s signed-qty Greeks. Δ = net directional exposure; Θ = daily decay (positive when net short premium); 𝒱 = sensitivity to a 1 % IV move.'} />
           </div>
           <div class="opt-kv">
-            <span class="kv-k">
-              Δ delta
-              <InfoHint popup text={'Net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} />
-            </span>
-            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
-            <span class="kv-k">
-              Γ gamma
-              <InfoHint popup text={'How fast delta changes as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} />
-            </span>
-            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
-            <span class="kv-k">
-              Θ theta /d
-              <InfoHint popup text={'Daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium show negative.'} />
-            </span>
-            <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
-            <span class="kv-k">
-              𝒱 vega /1%IV
-              <InfoHint popup text={'P&L change per 1 % IV move. Long volatility (long straddles, calendar spreads) = positive vega; short volatility (iron condors, naked shorts) = negative.'} />
-            </span>
-            <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
-            <span class="kv-k">
-              ρ rho /1%r
-              <InfoHint popup text={'Sensitivity to a 1 % rate change. Cosmetic for short- dated index options; matters for long-dated singles.'} />
-            </span>
-            <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
+            <div class="kv-pair">
+              <span class="kv-k">Δ <InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Γ <InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Θ <InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
+              <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">𝒱 <InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
+              <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">ρ <InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
+            </div>
           </div>
         </div>
 
@@ -728,48 +734,41 @@
             <InfoHint popup text={'Aggregate risk + expected value across all legs. Probability-weighted outcomes integrated against the lognormal pdf of the underlying using a qty-weighted IV proxy. POP × magnitudes captures the asymmetry that POP alone misses.'} />
           </div>
           <div class="opt-kv">
-            <span class="kv-k">
-              Max profit*
-              <InfoHint popup text={'Largest possible payoff at expiry, within the spot range we charted (±2.5σ by default). Asterisk because strategies with an unbounded leg (long calls, short puts) clip at the chart edge.'} />
-            </span>
-            <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
-            <span class="kv-k">
-              Max loss*
-              <InfoHint popup text={'Largest loss at expiry within the spot range charted. Asterisk for the same reason as Max profit.'} />
-            </span>
-            <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
-            <span class="kv-k">
-              R:R
-              <InfoHint popup text={'<b>Risk-to-reward</b> = max_profit / |max_loss|. "1 : 0.5" = risk ₹100 to make ₹50. "1 : 3" = risk ₹100 to make ₹300. <b>—</b> when one side is unbounded.'} />
-            </span>
-            <span class="kv-v">{strategy.risk.rr_ratio == null ? '—' : `1 : ${strategy.risk.rr_ratio.toFixed(2)}`}</span>
-            <span class="kv-k">
-              Breakevens
-              <InfoHint popup text={'Spot prices at expiry where the strategy\'s P&L crosses zero. Iron condors and butterflies have 2 (one upper, one lower); verticals have 1; fully ITM/OTM 0.'} />
-            </span>
-            <span class="kv-v">
-              {#if strategy.risk.breakevens.length}
-                {strategy.risk.breakevens.map(/** @param {number} b */ (b) => `₹${b.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`).join(' / ')}
-              {:else}—{/if}
-            </span>
-            <span class="kv-k">
-              POP
-              <InfoHint popup text={'<b>Probability of profit</b> at expiry — sum of lognormal mass over every contiguous profitable region of the payoff curve. <br>For range strategies (iron condors), this measures "P(spot ends inside the wings)".'} />
-            </span>
-            <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
-            <span class="kv-k">
-              EV
-              <InfoHint popup text={'<b>Expected value</b> — POP × win-magnitude − (1−POP) × loss-magnitude, integrated against the lognormal pdf of the underlying. <br>Positive EV = the strategy has edge in expectation; negative EV = it doesn\'t, even if POP is high.'} />
-            </span>
-            <span class="kv-v {strategy.risk.ev > 0 ? 'kv-pos' : strategy.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(strategy.risk.ev)}</span>
+            <div class="kv-pair">
+              <span class="kv-k">Max profit* <InfoHint popup text={'<b>Max profit</b> — largest possible payoff at expiry within the charted spot range (±2.5σ default). Asterisk because unbounded legs (long calls, short puts) clip at the chart edge.'} /></span>
+              <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Max loss* <InfoHint popup text={'<b>Max loss</b> — largest loss at expiry within the charted spot range. Asterisk for the same reason as Max profit.'} /></span>
+              <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">R:R <InfoHint popup text={'<b>Risk-to-reward</b> = max_profit / |max_loss|. "1 : 0.5" = risk ₹100 to make ₹50. "1 : 3" = risk ₹100 to make ₹300. <b>—</b> when one side is unbounded.'} /></span>
+              <span class="kv-v">{strategy.risk.rr_ratio == null ? '—' : `1 : ${strategy.risk.rr_ratio.toFixed(2)}`}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Breakevens <InfoHint popup text={'<b>Breakevens</b> — spot prices at expiry where the strategy\'s P&L crosses zero. Iron condors and butterflies have 2; verticals have 1; fully ITM/OTM 0.'} /></span>
+              <span class="kv-v">
+                {#if strategy.risk.breakevens.length}
+                  {strategy.risk.breakevens.map(/** @param {number} b */ (b) => `₹${b.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`).join(' / ')}
+                {:else}—{/if}
+              </span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">POP <InfoHint popup text={'<b>Probability of profit</b> at expiry — sum of lognormal mass over every contiguous profitable region of the payoff curve. For range strategies (iron condors), this measures "P(spot ends inside the wings)".'} /></span>
+              <span class="kv-v {strategy.risk.pop > 0.6 ? 'kv-pos' : strategy.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(strategy.risk.pop)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">EV <InfoHint popup text={'<b>Expected value</b> — POP × win-magnitude − (1−POP) × loss-magnitude, integrated against the lognormal pdf of the underlying. Positive EV = edge in expectation; negative EV = no edge, even if POP is high.'} /></span>
+              <span class="kv-v {strategy.risk.ev > 0 ? 'kv-pos' : strategy.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(strategy.risk.ev)}</span>
+            </div>
             {#if strategy.risk.ev_pct != null}
-              <span class="kv-k">
-                EV / cost
-                <InfoHint popup text={'EV expressed as a percentage of |net cost| — return on capital expectation. +5 % = "on average, my outlay returns 5 % of itself per cycle".'} />
-              </span>
-              <span class="kv-v {strategy.risk.ev_pct > 0 ? 'kv-pos' : strategy.risk.ev_pct < 0 ? 'kv-neg' : ''}">
-                {strategy.risk.ev_pct > 0 ? '+' : ''}{strategy.risk.ev_pct.toFixed(1)}%
-              </span>
+              <div class="kv-pair">
+                <span class="kv-k">EV / cost <InfoHint popup text={'<b>EV / cost</b> — EV as a percentage of |net cost|. Return-on-capital expectation. +5 % = "on average, my outlay returns 5 % of itself per cycle".'} /></span>
+                <span class="kv-v {strategy.risk.ev_pct > 0 ? 'kv-pos' : strategy.risk.ev_pct < 0 ? 'kv-neg' : ''}">
+                  {strategy.risk.ev_pct > 0 ? '+' : ''}{strategy.risk.ev_pct.toFixed(1)}%
+                </span>
+              </div>
             {/if}
           </div>
           <div class="text-[0.5rem] text-[#7e97b8] mt-1 italic">
@@ -997,36 +996,39 @@
     padding-bottom: 0.25rem;
     margin-bottom: 0.4rem;
   }
-  /* kv-pairs flow as TWO label/value pairs per row by default, three
-     when the card has space (container query). Earlier iteration was
-     a single 2-column grid (label | val, every pair on its own row)
-     which wasted horizontal space — every card left a wide blank
-     gutter on the right. The new layout packs pairs side by side. */
-  .opt-block {
-    container-type: inline-size;
-  }
+  /* kv-pairs flow TWO per row, with label stacked vertically above
+     value inside each pair. This packs each card tightly while
+     keeping the label / value alignment clean: labels line up across
+     pairs in a row; values do too. */
   .opt-kv {
     display: grid;
-    grid-template-columns: repeat(2, max-content 1fr);
+    grid-template-columns: 1fr 1fr;
     column-gap: 0.8rem;
-    row-gap: 0.25rem;
+    row-gap: 0.45rem;
     font-family: monospace;
     font-size: 0.65rem;
   }
-  /* Three pairs per row when the card is wide enough. */
-  @container (min-width: 360px) {
-    .opt-kv { grid-template-columns: repeat(3, max-content 1fr); }
+  .kv-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
   }
   .kv-k {
     color: #7e97b8;
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    /* Narrow labels mean the popup info chip stays close to the
-       label text without inflating the column width. */
+    gap: 0.25rem;
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     flex-wrap: nowrap;
   }
-  .kv-v { color: #c8d8f0; text-align: right; }
+  .kv-v {
+    color: #c8d8f0;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
   .kv-pos { color: #4ade80; }
   .kv-neg { color: #f87171; }
   .kv-sub { color: #7e97b8; font-size: 0.55rem; margin-left: 0.2rem; }

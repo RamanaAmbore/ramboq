@@ -54,31 +54,55 @@
   // Whether to render the popout right now.
   const visible = $derived(popup ? (open || hovered) : open);
 
-  // Viewport-bound the popup — once it's mounted, measure its
-  // bounding rect; if either edge clips outside the viewport, shift
-  // it horizontally so it sits fully inside. Re-runs whenever the
-  // popup opens (or the window resizes while it's open).
+  // Viewport-bound the popup. Strategy:
+  //   - the popup is `position: fixed` so its coordinates are
+  //     viewport-relative and unaffected by ancestor transforms,
+  //     overflow:hidden, etc.
+  //   - on open / resize / scroll we recompute (left, top) from the
+  //     chip's getBoundingClientRect(), then clamp left to keep the
+  //     entire popup on screen with an 8px gutter.
+  // This is more robust than transform-based nudging because we
+  // ignore any parent positioning context and just place the popup
+  // exactly where it fits in the viewport.
   $effect(() => {
-    if (!popup || !visible || !popoutEl || typeof window === 'undefined') return;
+    if (!popup || !visible || !popoutEl || !wrap || typeof window === 'undefined') return;
     /** @type {number} */ let raf;
     function fit() {
-      if (!popoutEl) return;
-      // Reset before measuring so the previous nudge doesn't bias the
-      // calculation (otherwise the popup snaps further every open).
-      popoutEl.style.transform = '';
-      const r = popoutEl.getBoundingClientRect();
+      if (!popoutEl || !wrap) return;
+      // Reset positional styles before measuring so the prior fit
+      // doesn't bias the popup's natural width.
+      popoutEl.style.left = '';
+      popoutEl.style.top = '';
+      popoutEl.style.right = '';
+      const chipRect = wrap.getBoundingClientRect();
+      const popRect  = popoutEl.getBoundingClientRect();
       const margin = 8;
       const vw = window.innerWidth;
-      let dx = 0;
-      if (r.right > vw - margin)  dx -= (r.right - (vw - margin));
-      if (r.left + dx < margin)   dx += (margin - (r.left + dx));
-      popoutEl.style.transform = dx ? `translateX(${dx}px)` : '';
+      const vh = window.innerHeight;
+      // Default — anchor under the chip's left edge.
+      let left = chipRect.left;
+      // Clamp to viewport. If popup is wider than viewport, just pin
+      // it at the left margin (max-width CSS clamps width to fit).
+      if (left + popRect.width > vw - margin) {
+        left = vw - margin - popRect.width;
+      }
+      if (left < margin) left = margin;
+      // Top — under the chip; flip above if no room below.
+      let top = chipRect.bottom + 6;
+      if (top + popRect.height > vh - margin) {
+        const above = chipRect.top - 6 - popRect.height;
+        if (above >= margin) top = above;
+      }
+      popoutEl.style.left = `${left}px`;
+      popoutEl.style.top  = `${top}px`;
     }
     raf = requestAnimationFrame(fit);
     window.addEventListener('resize', fit);
+    window.addEventListener('scroll', fit, true);   // capture-phase to catch nested scroll
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', fit);
+      window.removeEventListener('scroll', fit, true);
     };
   });
 </script>
@@ -178,15 +202,15 @@
     line-height: 1.5;
     flex: 1 1 100%;
   }
-  /* Popup variant — absolute-positioned so it floats above siblings
-     instead of pushing them. Width caps tightly to the viewport so
-     a popup never overflows on a narrow phone (`min(20rem, calc(100vw
-     - 1rem))` leaves at least 0.5 rem on each edge); JS in the
-     component nudges the popup horizontally after open so even a
-     chip near the right edge keeps the popup fully on-screen. */
+  /* Popup variant — `position: fixed` so the popup is positioned
+     relative to the viewport, not any ancestor. Coordinates (`left`
+     / `top`) are computed by JS in the component on every open /
+     resize / scroll, clamped to keep the entire popup inside the
+     viewport with an 8 px gutter. CSS only sets the placeholder
+     left/top (gets overridden by JS on the same frame). */
   .info-popout-popup {
-    position: absolute;
-    top: calc(100% + 0.4rem);
+    position: fixed;
+    top: 0;
     left: 0;
     z-index: 50;
     flex: none;
@@ -194,13 +218,6 @@
     min-width: min(12rem, calc(100vw - 1rem));
     max-width: min(20rem, calc(100vw - 1rem));
     box-shadow: 0 4px 14px rgba(0,0,0,0.45);
-  }
-  /* Right-aligned variant — flips the popup to anchor on the right
-     edge of its trigger. Used when the chip sits at the right side
-     of a row and a left-anchored popup would clip off-screen. */
-  .info-wrap-popup.align-right .info-popout-popup {
-    left: auto;
-    right: 0;
   }
   .info-popout-pinned { pointer-events: auto; }
 
