@@ -409,19 +409,26 @@ Live vs sim is auto-detected. While a simulator is running the page works off si
 
 ```
 ┌──────────────────────────────────────────────┬────────────────────┐
-│  Aggregate payoff diagram                    │  Aggregate         │
-│   - amber line: today (BS, current DTE/IV)   │    Spot / Net cost │
-│   - sky dashed: expiry (intrinsic)           │  Greeks (position) │
-│   - green zone: profit                       │    Δ Γ Θ V ρ       │
-│   - red zone:   loss                         │  Risk + EV         │
-│   - vertical markers: spot · strikes · BEs   │    max P / L       │
-│                                              │    R:R             │
+│ ┌── overlay (top-left of chart) ──┐          │  Aggregate         │
+│ │ SPOT  ₹9,000                    │          │    Spot / Net cost │
+│ │ TDAY  +₹1,500                   │          │  Greeks (position) │
+│ │ EXP   −₹2,400                   │          │    Δ Γ Θ V ρ       │
+│ │ MAX P +₹5,000                   │          │  Risk + EV         │
+│ │ MAX L −₹8,000                   │          │    max P / L       │
+│ └─────────────────────────────────┘          │    R:R             │
 │                                              │    breakevens      │
-│                                              │    POP / EV        │
+│  Aggregate payoff diagram                    │    POP / EV        │
+│   - amber line: today (BS, current DTE/IV)   │                    │
+│   - sky dashed: expiry (intrinsic)           │                    │
+│   - green zone: profit                       │                    │
+│   - red zone:   loss                         │                    │
+│   - vertical markers: spot · strikes · BEs   │                    │
 └──────────────────────────────────────────────┴────────────────────┘
 │  Candidates (checkbox list — uncheck to drop a leg from payoff)   │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+The **stat overlay** in the top-left corner of the chart shows the at-a-glance numerics — **SPOT**, **TDAY** P&L (today's value at spot, BS-priced), **EXP** P&L (expiry value at spot, intrinsic), **MAX P** (max profit), **MAX L** (max loss). Color-coded green/red so you can read the position health at a glance without looking at the side cards. The chart's hover tooltip uses the same `TDAY` / `EXP` labels for consistency.
 
 ### Adding draft positions
 

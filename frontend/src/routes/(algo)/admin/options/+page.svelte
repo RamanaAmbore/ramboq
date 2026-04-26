@@ -144,11 +144,13 @@
   const expiryChoicesForUnderlying = $derived.by(() => {
     if (!instrumentsReady || !selectedUnderlying) return [];
     const target = selectedUnderlying.toUpperCase();
+    // Construct the symbol-prefix regex once per re-derivation; the
+    // closure below would otherwise rebuild it for every position/draft.
+    const prefixRe = new RegExp(`^${target}\\d`, 'i');
     const set = new Set();
     const consider = /** @param {string} sym */ (sym) => {
       const upper = String(sym || '').toUpperCase();
-      if (!upper) return;
-      if (!new RegExp(`^${target}\\d`, 'i').test(upper)) return;
+      if (!upper || !prefixRe.test(upper)) return;
       const inst = getInstrument(upper);
       if (inst?.x) set.add(inst.x);
     };
@@ -181,6 +183,11 @@
     const target = selectedUnderlying.toUpperCase();
     /** @type {string[]} */
     const acctFilter = selectedAccounts.length ? selectedAccounts : [];
+    // Hoisted regexes — constructed once per re-derivation rather than
+    // once per position/draft. The literal /FUT$/ and /(CE|PE)$/ are
+    // already cached at parse time; the dynamic prefix regex is the
+    // only one that needs hoisting.
+    const prefixRe = new RegExp(`^${target}\\d`, 'i');
     /** @type {any[]} */
     const out = [];
     // Source filter — when a sim is active, work off the sim book only;
@@ -198,7 +205,7 @@
       if (p.source !== wantedSource) continue;
       if (acctFilter.length && !acctFilter.includes(p.account)) continue;
       const sym = p.symbol;
-      if (!new RegExp(`^${target}\\d`, 'i').test(sym)) continue;
+      if (!prefixRe.test(sym)) continue;
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
       if (!isFut && !isOpt) continue;
@@ -212,8 +219,7 @@
     // aren't tied to a broker account).
     for (const d of drafts) {
       const sym = String(d.symbol || '').toUpperCase();
-      if (!sym) continue;
-      if (!new RegExp(`^${target}\\d`, 'i').test(sym)) continue;
+      if (!sym || !prefixRe.test(sym)) continue;
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
       if (!isFut && !isOpt) continue;
@@ -781,18 +787,17 @@
       </div>
       <div class="opt-section-row opt-section-meta-row">
         <span class="opt-section-meta">
-          Spot ₹{Math.round(strategy.spot).toLocaleString('en-IN')} ·
           DTE {Math.round(strategy.days_to_expiry)} ·
           σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
           {strategy.legs.length} legs
           {#if _curveAtSpot}
             {@const todayVal  = _curveAtSpot.today_value}
             {@const expiryVal = _curveAtSpot.expiry_value}
-            · today
+            · TDAY
             <b class={todayVal >= 0 ? 'kv-pos' : 'kv-neg'}>
               {todayVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(todayVal), false)}
             </b>
-            · expiry
+            · EXP
             <b class={expiryVal >= 0 ? 'kv-pos' : 'kv-neg'}>
               {expiryVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(expiryVal), false)}
             </b>
@@ -807,6 +812,8 @@
       breakevens={strategy.risk.breakevens}
       spanSigmas={strategy.span_sigmas}
       spanPct={strategy.span_pct}
+      maxProfit={strategy.risk.max_profit}
+      maxLoss={strategy.risk.max_loss}
       height={320} />
   </div>
 {/if}

@@ -22,6 +22,8 @@
    *   currentPnl?:  number|null,
    *   spanSigmas?:  number,
    *   spanPct?:     number,
+   *   maxProfit?:   number|null,
+   *   maxLoss?:     number|null,
    * }} */
   let {
     payoff = [],
@@ -34,7 +36,22 @@
     currentPnl = null,
     spanSigmas = 0,
     spanPct    = 0,
+    maxProfit  = /** @type {number|null|undefined} */ (null),
+    maxLoss    = /** @type {number|null|undefined} */ (null),
   } = $props();
+
+  // Nearest curve point to current spot — drives the on-chart TDAY/EXP
+  // readouts so the operator sees position P&L right beside the chart.
+  const curveAtSpot = $derived.by(() => {
+    if (!payoff.length) return null;
+    let best = payoff[0];
+    let bestDiff = Math.abs(best.spot - spot);
+    for (const p of payoff) {
+      const d = Math.abs(p.spot - spot);
+      if (d < bestDiff) { bestDiff = d; best = p; }
+    }
+    return best;
+  });
 
   // Multi-leg charts pass `strikes` / `breakevens` arrays; single-leg
   // charts pass scalars. Normalise to arrays so the render code is one
@@ -258,6 +275,42 @@
               title="Reset zoom — return to the auto ±2.5σ range"
               onclick={resetZoom}>reset zoom</button>
     {/if}
+    <!-- Top-left stat overlay — the chart's at-a-glance numerics so the
+         operator doesn't have to glance at the Greeks / Risk cards just
+         to read TDAY P&L or max profit. Pointer-events: none so the
+         SVG hover / zoom / pan stay click-through. -->
+    <div class="payoff-stats" aria-hidden="true">
+      <div class="ps-row">
+        <span class="ps-k">SPOT</span>
+        <span class="ps-v ps-spot">₹{spot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+      </div>
+      {#if curveAtSpot}
+        <div class="ps-row">
+          <span class="ps-k">TDAY</span>
+          <span class={'ps-v ' + (curveAtSpot.today_value >= 0 ? 'ps-pos' : 'ps-neg')}>
+            {fmtMoney(curveAtSpot.today_value)}
+          </span>
+        </div>
+        <div class="ps-row">
+          <span class="ps-k">EXP</span>
+          <span class={'ps-v ' + (curveAtSpot.expiry_value >= 0 ? 'ps-pos' : 'ps-neg')}>
+            {fmtMoney(curveAtSpot.expiry_value)}
+          </span>
+        </div>
+      {/if}
+      {#if maxProfit != null && Number.isFinite(maxProfit)}
+        <div class="ps-row">
+          <span class="ps-k">MAX P</span>
+          <span class="ps-v ps-pos">{fmtMoney(maxProfit)}</span>
+        </div>
+      {/if}
+      {#if maxLoss != null && Number.isFinite(maxLoss)}
+        <div class="ps-row">
+          <span class="ps-k">MAX L</span>
+          <span class="ps-v ps-neg">{fmtMoney(maxLoss)}</span>
+        </div>
+      {/if}
+    </div>
     <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none"
          class="payoff-svg" class:payoff-panning={pan !== null}
          role="img" aria-label="Option payoff diagram — wheel to zoom, drag to pan"
@@ -348,14 +401,10 @@
         {/if}
       {/each}
 
-      <!-- Current spot marker — cyan vertical -->
+      <!-- Current spot marker — cyan vertical (numeric value lives in
+           the top-left stat overlay; the legend identifies the line). -->
       <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
             stroke="#7dd3fc" stroke-width="1.5"/>
-      <text x={xOf(spot)} y={height - PAD_B + 18}
-            text-anchor="middle" fill="#7dd3fc"
-            font-size="9" font-weight="700" font-family="monospace">
-        spot {spot.toFixed(0)}
-      </text>
 
       <!-- Expiry curve (dashed sky) -->
       <path d={pathExpiry} fill="none" stroke="#7dd3fc"
@@ -384,11 +433,11 @@
           </text>
           <text x={tx + 6} y={ty + 30} fill="#fbbf24"
                 font-size="9" font-family="monospace">
-            today {fmtMoney(hover.today)}
+            TDAY {fmtMoney(hover.today)}
           </text>
           <text x={tx + 6} y={ty + 44} fill="#7dd3fc"
                 font-size="9" font-family="monospace">
-            expiry {fmtMoney(hover.expiry)}
+            EXP  {fmtMoney(hover.expiry)}
           </text>
         </g>
       {/if}
@@ -491,4 +540,44 @@
   }
   .legend-spot-mark { border-left: 2px solid #7dd3fc; }
   .legend-be-mark   { border-left: 2px dashed #fbbf24; }
+
+  /* On-chart stat overlay — reads the key numerics off the curve so
+     the chart is self-contained. Sits top-left, semi-transparent,
+     pointer-events disabled so it never blocks the SVG hover/zoom. */
+  .payoff-stats {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.6rem;
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: 0.55rem;
+    row-gap: 0.12rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 3px;
+    background: rgba(13,21,38,0.72);
+    border: 1px solid rgba(251,191,36,0.22);
+    font-family: monospace;
+    font-size: 0.6rem;
+    line-height: 1.15;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .ps-row {
+    display: contents;
+  }
+  .ps-k {
+    color: #7e97b8;
+    letter-spacing: 0.04em;
+    font-size: 0.55rem;
+    align-self: center;
+  }
+  .ps-v {
+    text-align: right;
+    font-weight: 600;
+    color: #c8d8f0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ps-v.ps-spot { color: #7dd3fc; }
+  .ps-v.ps-pos  { color: #22c55e; }
+  .ps-v.ps-neg  { color: #f87171; }
 </style>

@@ -932,6 +932,8 @@ Both endpoints surface position-level expected value and R:R alongside the exist
 
 **UI** — [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte) is the payoff-chart SVG. Two curves (today amber solid, expiry sky dashed), profit/loss zone shading, vertical markers for spot (cyan) / strike (white dashed) / breakeven (amber dashed), hover crosshair with a 3-line tooltip. Hand-rolled SVG, no chart lib.
 
+**On-chart stat overlay** — top-left HTML overlay (`pointer-events: none` so it never blocks SVG hover/zoom/pan) showing `SPOT / TDAY / EXP / MAX P / MAX L`. Color-coded values (sky for spot, green/red for P&L direction) and `tabular-nums` so right-aligned rupees stay column-aligned. The numerics are read off the chart's own props — no upstream coordination required — so the chart is self-contained and the operator doesn't have to glance at the Greeks / Risk cards just to read TDAY P&L. Tooltip + meta row labels match (`TDAY` / `EXP`); the bottom-of-chart "spot 9000" text label was retired (redundant with the overlay; legend identifies the cyan vertical).
+
 **Page model (v4)** — the page is a single multi-leg payoff workspace; there's no Single-vs-Strategy mode any more. One leg renders the same chart + Greeks + risk panel as many. The picker bar is two dropdowns + a single `+` toggle:
 
 | Control | Purpose |
