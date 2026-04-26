@@ -119,41 +119,42 @@
   <PerformancePage />
 </div>
 
-<!-- Tabbed Market Summary | Market News card. Only one panel is
-     visible at a time so the page doesn't grow unbounded — operators
-     pick the view they want. Same content as the /market page, just
-     consolidated into a single below-the-fold card. -->
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4 mt-4">
-  <div class="market-tabs-row">
-    <div class="market-tabs">
-      <button type="button"
-              class="market-tab"
-              class:market-tab-active={tab === 'summary'}
-              onclick={() => tab = 'summary'}>
-        Daily Market Report
-      </button>
-      <button type="button"
-              class="market-tab"
-              class:market-tab-active={tab === 'news'}
-              onclick={() => tab = 'news'}>
-        News feed
-      </button>
-    </div>
-    <div class="market-tabs-meta">
-      {#if tab === 'summary'}
-        {#if summaryLoading && !summaryRefresh}
-          Loading…
-        {:else if summaryLoading}
-          Refreshing…
-        {/if}
-      {:else if newsLoading && !news.length}
+<!-- Tabs sit OUTSIDE the white card on the page background, so the
+     tab strip reads like the rest of the public surface (cream
+     ground + champagne accents) rather than as a sub-control of the
+     card below. Selected tab carries a champagne underline; the
+     white panel below holds only the content. -->
+<div class="market-tabs-row">
+  <div class="market-tabs">
+    <button type="button"
+            class="market-tab"
+            class:market-tab-active={tab === 'summary'}
+            onclick={() => tab = 'summary'}>
+      Daily Market Report
+    </button>
+    <button type="button"
+            class="market-tab"
+            class:market-tab-active={tab === 'news'}
+            onclick={() => tab = 'news'}>
+      News feed
+    </button>
+  </div>
+  <div class="market-tabs-meta">
+    {#if tab === 'summary'}
+      {#if summaryLoading && !summaryRefresh}
         Loading…
-      {:else if newsLoading}
+      {:else if summaryLoading}
         Refreshing…
       {/if}
-    </div>
+    {:else if newsLoading && !news.length}
+      Loading…
+    {:else if newsLoading}
+      Refreshing…
+    {/if}
   </div>
+</div>
 
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <!-- Refreshed-at line — matches PerformancePage timestamp styling
        (text-[0.65rem] text-muted perf-ts) for visual consistency
        across the public site. nowrap keeps the dual-timezone string
@@ -213,24 +214,27 @@
     margin-right: -0.5rem;
   }
 
-  /* Tab row — public-palette tabs (cream + champagne accent). Each
-     tab carries a left-border indicator (transparent → champagne when
-     active or hovered) — same affordance the algo navbar items use.
-     Bottom border on the row separates the tab strip from the panel
-     content, so the two regions read as distinct. */
+  /* Tab row — sits OUTSIDE the white panel, on the page's cream
+     background. Active tab gets a champagne BOTTOM border (mirrors a
+     desktop-app document-tab affordance more naturally than the
+     earlier left-border indicator). The row's own bottom border
+     stitches the active tab to the panel below — the active tab's
+     bottom border meets the row's, the inactive tabs sit just above
+     it. Margin-top gives the tabs breathing room from the
+     PerformancePage grids above. */
   .market-tabs-row {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 0.6rem;
-    margin-bottom: 0.6rem;
+    margin-top: 1rem;
     border-bottom: 1px solid #e7e0cf;
-    padding-bottom: 0.25rem;
+    padding: 0 0.25rem;
     flex-wrap: wrap;
   }
   .market-tabs {
     display: flex;
-    gap: 0.15rem;
+    gap: 0.25rem;
   }
   .market-tab {
     font-size: 0.85rem;
@@ -238,21 +242,28 @@
     color: #6b7894;
     background: transparent;
     border: 0;
-    border-left: 2px solid transparent;
-    padding: 0.3rem 0.7rem 0.3rem calc(0.7rem - 2px);
+    border-bottom: 2px solid transparent;
+    padding: 0.45rem 0.9rem;
+    margin-bottom: -1px;          /* overlap row's bottom border */
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background-color 0.12s;
   }
   .market-tab:hover {
     color: #1a2744;
-    border-left-color: #d4920c;
-    background: rgba(212,146,12,0.06);
+    border-bottom-color: rgba(212,146,12,0.5);
   }
   .market-tab-active {
     color: #1a2744;
     font-weight: 700;
-    border-left-color: #d4920c;
-    background: rgba(212,146,12,0.10);
+    border-bottom-color: #d4920c;
+  }
+  /* Bridge between the tab row and the white panel — kill the panel's
+     top-left/right rounding so the active tab visually merges with
+     the panel beneath it. */
+  .market-tabs-row + .bg-white {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: 0;
   }
   .market-tabs-meta {
     font-size: 0.7rem;

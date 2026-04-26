@@ -123,39 +123,37 @@
 </svelte:head>
 
 
-<!-- Tabbed Summary | News feed card. Same UX as /performance: only
-     one panel visible at a time, both feeds loaded on mount so
-     flipping is a paint not a fetch. Public palette throughout. The
-     page-level timestamp moved INSIDE the card as a per-tab
-     "Refreshed at" line so each panel's freshness is unambiguous. -->
-<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
-  <div class="market-tabs-row">
-    <div class="market-tabs">
-      <button type="button"
-              class="market-tab"
-              class:market-tab-active={tab === 'summary'}
-              onclick={() => tab = 'summary'}>
-        Daily Market Report
-      </button>
-      <button type="button"
-              class="market-tab"
-              class:market-tab-active={tab === 'news'}
-              onclick={() => tab = 'news'}>
-        News feed
-      </button>
-    </div>
-    <div class="market-tabs-meta">
-      {#if tab === 'summary'}
-        {#if loading && !content}Loading…
-        {:else if loading}Refreshing…{/if}
-      {:else if newsLoading && !news.length}
-        Loading…
-      {:else if newsLoading}
-        Refreshing…
-      {/if}
-    </div>
+<!-- Tabs sit OUTSIDE the white card on the page background, mirroring
+     the /performance page treatment. Champagne BOTTOM border on the
+     active tab; the panel below carries only the content. -->
+<div class="market-tabs-row">
+  <div class="market-tabs">
+    <button type="button"
+            class="market-tab"
+            class:market-tab-active={tab === 'summary'}
+            onclick={() => tab = 'summary'}>
+      Daily Market Report
+    </button>
+    <button type="button"
+            class="market-tab"
+            class:market-tab-active={tab === 'news'}
+            onclick={() => tab = 'news'}>
+      News feed
+    </button>
   </div>
+  <div class="market-tabs-meta">
+    {#if tab === 'summary'}
+      {#if loading && !content}Loading…
+      {:else if loading}Refreshing…{/if}
+    {:else if newsLoading && !news.length}
+      Loading…
+    {:else if newsLoading}
+      Refreshing…
+    {/if}
+  </div>
+</div>
 
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 pt-4">
   <!-- Refreshed-at line — matches the PerformancePage timestamp style
        (text-[0.65rem] text-muted perf-ts) so the operator sees a
        consistent stamp shape across the whole public site. nowrap so
@@ -232,24 +230,23 @@
   :global(.market-report strong) { font-weight: 700; color: #1a2744; }
   :global(.market-report em)     { font-style: italic; color: #1e3050; }
 
-  /* Tab row — public-palette tabs (cream + champagne accent). Each
-     tab carries a left-border indicator (transparent → champagne when
-     active or hovered) — same affordance the algo navbar items use.
-     Bottom border on the row separates the tab strip from the panel
-     content, so the two regions read as distinct. */
+  /* Tab row — sits OUTSIDE the white panel, on the page's cream
+     background. Active tab gets a champagne BOTTOM border; the
+     row's own border-bottom stitches the active tab to the panel
+     beneath. Same shape as /performance for visual continuity. */
   .market-tabs-row {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 0.6rem;
-    margin-bottom: 0.6rem;
+    margin-top: 0.5rem;
     border-bottom: 1px solid #e7e0cf;
-    padding-bottom: 0.25rem;
+    padding: 0 0.25rem;
     flex-wrap: wrap;
   }
   .market-tabs {
     display: flex;
-    gap: 0.15rem;
+    gap: 0.25rem;
   }
   .market-tab {
     font-size: 0.85rem;
@@ -257,21 +254,25 @@
     color: #6b7894;
     background: transparent;
     border: 0;
-    border-left: 2px solid transparent;
-    padding: 0.3rem 0.7rem 0.3rem calc(0.7rem - 2px);
+    border-bottom: 2px solid transparent;
+    padding: 0.45rem 0.9rem;
+    margin-bottom: -1px;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background-color 0.12s;
   }
   .market-tab:hover {
     color: #1a2744;
-    border-left-color: #d4920c;
-    background: rgba(212,146,12,0.06);
+    border-bottom-color: rgba(212,146,12,0.5);
   }
   .market-tab-active {
     color: #1a2744;
     font-weight: 700;
-    border-left-color: #d4920c;
-    background: rgba(212,146,12,0.10);
+    border-bottom-color: #d4920c;
+  }
+  .market-tabs-row + .bg-white {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: 0;
   }
   .market-tabs-meta {
     font-size: 0.7rem;
