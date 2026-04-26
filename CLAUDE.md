@@ -1120,7 +1120,13 @@ A single Svelte component handles every order op the platform needs (open / clos
 |---|---|
 | **DRAFT** | Caller's `onSubmit` callback (no API hit). Caller appends to its local drafts array — typically the [`/admin/options`](frontend/src/routes/(algo)/admin/options/+page.svelte) page's `drafts[]`. |
 | **PAPER** | `POST /api/orders/ticket` with `mode: "paper"`. Backend persists an `AlgoOrder` row + registers the order with the prod paper engine via `register_open_order`. The engine's 5-second tick runs the same fill / modify / unfilled lifecycle that agent fires use, driven by real bid/ask via `LiveQuoteSource`. |
-| **LIVE** | Same endpoint with `mode: "live"`. Two backend gates fire before any broker call: (1) `is_prod_branch()` — non-`main` returns 403; (2) `get_bool('execution.live.place_order')` — operator flag in `/admin/settings → execution`. Both pass → `kite.place_order()` tagged `ramboq-ticket`. UI fires a `window.confirm()` with the exact order line before submit. |
+| **LIVE** | Same endpoint with `mode: "live"`. Two backend gates fire before any broker call: (1) `is_prod_branch()` — non-prod returns 403; (2) `get_bool('execution.live.place_order')` — operator flag in `/admin/settings → execution`. Both pass → `kite.place_order()` tagged `ramboq-ticket`. UI fires a `window.confirm()` listing side / qty / symbol / price / **account** / product before submit. |
+
+**Account selector** — required for PAPER + LIVE so the operator picks which Kite handle the order routes through; never relying on the backend's silent "first available" fallback. The ticket renders a readonly account display when there's exactly one available, a `<select>` dropdown when there's more than one, and refuses to submit if `_account` is blank. Pre-filled from the calling page's account state when an obvious choice exists (e.g. the operator already filtered to one account in `/admin/options`).
+
+**Validation** — before any backend call: qty must be a positive multiple of `lotSize` when known (NIFTY 50, BANKNIFTY 15, …), price ≥ 0, trigger ≥ 0, account picked. Backend additionally validates the enum fields (variety / exchange / product / order_type) up-front so Kite's cryptic "Invalid input — 400" never reaches the operator.
+
+**Success feedback** — PAPER + LIVE submits show an inline green `✓ <MODE> order placed · #<order_id>` line inside the modal for 1.4 s before auto-closing. Earlier the modal closed silently and the operator had no idea whether the order landed on the broker.
 
 **Backend** ([`backend/api/routes/orders.py`](backend/api/routes/orders.py)):
 

@@ -272,14 +272,35 @@ class OrdersController(Controller):
         if getattr(request.state, "is_demo", False):
             data = msgspec.structs.replace(data, mode="paper")
 
+        # Server-side enum validation — same set the regular /place
+        # endpoint uses. Kite errors on invalid values look cryptic
+        # ("Invalid input — 400"); reject early with a clear reason.
         side = (data.side or "").upper()
-        if side not in ("BUY", "SELL"):
+        if side not in _TXN_TYPES:
             raise HTTPException(status_code=400, detail="side must be BUY or SELL")
         sym = (data.tradingsymbol or "").upper().strip()
         qty = int(data.quantity or 0)
         if not sym or qty <= 0:
             raise HTTPException(status_code=400,
                 detail="tradingsymbol and quantity > 0 are required")
+        if data.exchange   and data.exchange   not in _EXCHANGES:
+            raise HTTPException(status_code=400,
+                detail=f"exchange must be one of {sorted(_EXCHANGES)}")
+        if data.product    and data.product    not in _PRODUCTS:
+            raise HTTPException(status_code=400,
+                detail=f"product must be one of {sorted(_PRODUCTS)}")
+        if data.order_type and data.order_type not in _ORDER_TYPES:
+            raise HTTPException(status_code=400,
+                detail=f"order_type must be one of {sorted(_ORDER_TYPES)}")
+        if data.variety    and data.variety    not in _VARIETIES:
+            raise HTTPException(status_code=400,
+                detail=f"variety must be one of {sorted(_VARIETIES)}")
+        # LIMIT/SL need a price; MARKET/SL-M must NOT carry one (Kite
+        # rejects price on MARKET). SL/SL-M need a trigger.
+        if data.order_type in ("LIMIT", "SL") and not data.price:
+            raise HTTPException(status_code=400, detail="price is required for LIMIT/SL")
+        if data.order_type in ("SL", "SL-M") and not data.trigger_price:
+            raise HTTPException(status_code=400, detail="trigger_price is required for SL/SL-M")
 
         # Resolve account — caller may leave blank; pick the first
         # available connection (mirrors what the agent paper-trade

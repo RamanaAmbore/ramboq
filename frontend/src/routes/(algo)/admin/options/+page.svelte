@@ -357,6 +357,15 @@
   // routes back here via onSubmit when the operator confirms; in
   // DRAFT mode we just push onto the drafts array (the existing
   // strategy auto-recompute picks it up).
+  // Account hand-off: pre-select when the operator filtered to one
+  // account; otherwise leave blank and let the ticket force a pick.
+  // The ticket itself owns the dropdown UI, so pages just pass the
+  // candidate list + an optional default.
+  function _ticketAccountDefault() {
+    if (selectedAccounts.length === 1) return selectedAccounts[0];
+    if (accountChoices.length === 1)   return String(accountChoices[0]);
+    return '';
+  }
   function addChainDraft(/** @type {number} */ strike,
                          /** @type {'CE'|'PE'} */ optType) {
     if (!chainUnderlying || !chainExpiry) return;
@@ -369,6 +378,8 @@
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
+      accounts: accountChoices.map(String),
+      account:  _ticketAccountDefault(),
     });
   }
   function addFutureDraft(/** @type {string} */ sym,
@@ -381,6 +392,8 @@
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
+      accounts: accountChoices.map(String),
+      account:  _ticketAccountDefault(),
     });
   }
 

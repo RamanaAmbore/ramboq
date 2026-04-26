@@ -40,6 +40,8 @@
    *   price?:    number,
    *   trigger?:  number,
    *   lotSize?:  number,
+   *   accounts?: string[],
+   *   account?:  string,
    *   onSubmit:  (payload: any) => void | Promise<void>,
    *   onClose:   () => void,
    * }} */
@@ -55,6 +57,8 @@
     price     = /** @type {number | undefined} */ (undefined),
     trigger   = /** @type {number | undefined} */ (undefined),
     lotSize   = 0,
+    accounts  = /** @type {string[]} */ ([]),
+    account   = '',
     onSubmit,
     onClose,
   } = $props();
@@ -87,21 +91,43 @@
   let _trigger = $state(trigger ?? '');
   let _product = $state(productVal);
   let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ ('draft'));
+  // Account — explicit operator choice for which Kite handle the
+  // order routes through. Default to the only account when there's
+  // exactly one available; force a pick otherwise so the operator
+  // can never accidentally route to the wrong handle. Required for
+  // PAPER and LIVE; ignored in DRAFT.
+  let _account = $state(account || (accounts.length === 1 ? accounts[0] : ''));
 
   // Field visibility derived from order type + variety.
   const showLimit   = $derived(_type === 'LIMIT' || _type === 'SL');
   const showTrigger = $derived(_type === 'SL' || _type === 'SL-M');
 
-  // Validation — minimal phase-1 guard. Backend will validate again.
+  // Validation — applied client-side; backend validates again before
+  // hitting the broker. Lot-size check protects against rejections
+  // for non-multiple quantities (NIFTY lot 50, BANKNIFTY 15, etc.).
   const validationErr = $derived.by(() => {
     if (!Number(_qty)) return 'Qty required';
+    if (Number(_qty) <= 0) return 'Qty must be positive';
+    if (lotSize > 0 && Number(_qty) % lotSize !== 0) {
+      return `Qty must be a multiple of lot ${lotSize}`;
+    }
     if (showLimit   && !Number(_price))   return 'Limit price required';
     if (showTrigger && !Number(_trigger)) return 'Trigger price required';
+    if (Number(_price) < 0)   return 'Price must be ≥ 0';
+    if (Number(_trigger) < 0) return 'Trigger must be ≥ 0';
+    if ((_mode === 'paper' || _mode === 'live') && !_account) {
+      return 'Pick an account';
+    }
     return '';
   });
 
   let submitting = $state(false);
   /** @type {string} */ let submitErr = $state('');
+  // Inline success state — shown briefly inside the modal after a
+  // successful PAPER / LIVE submit so the operator sees confirmation
+  // before the modal closes. Without it the modal disappears silently
+  // and the operator has no idea whether the order actually landed.
+  /** @type {string} */ let submitOk = $state('');
 
   async function submit() {
     if (validationErr) return;
@@ -109,11 +135,16 @@
     // accidental click doesn't put real money on the wire. The
     // backend separately gates by branch + the
     // execution.live.place_order setting flag, but that's silent;
-    // this dialog is the loud one.
+    // this dialog is the loud one. Account is included so the
+    // operator can verify the right Kite handle BEFORE confirming.
     if (_mode === 'live') {
-      const px = showLimit ? `@₹${_price}` : '@MARKET';
+      const px = showLimit ? `@₹${_price} LIMIT` : '@MARKET';
       const ok = typeof window !== 'undefined' && window.confirm(
-        `Place LIVE broker order?\n\n${_side} ${_qty} ${symbol} ${px}\n\n` +
+        `Place LIVE broker order?\n\n` +
+        `  ${_side} ${_qty} ${symbol}\n` +
+        `  ${px}\n` +
+        `  Account: ${_account}\n` +
+        `  Product: ${_product}\n\n` +
         `This is a REAL trade. Click Cancel to stop.`
       );
       if (!ok) return;
@@ -130,13 +161,14 @@
       variety:        _variety,
       price:          showLimit   ? Number(_price)   : null,
       trigger_price:  showTrigger ? Number(_trigger) : null,
+      account:        _account,
     };
-    submitting = true; submitErr = '';
+    submitting = true; submitErr = ''; submitOk = '';
     try {
       // PAPER + LIVE both route through the backend. DRAFT hands off
       // to the caller's onSubmit only (no API call).
       if (_mode === 'paper' || _mode === 'live') {
-        await placeTicketOrder({
+        const resp = await placeTicketOrder({
           mode:             _mode,
           side:             _side,
           tradingsymbol:    symbol,
@@ -147,12 +179,25 @@
           variety:          _variety,
           price:            showLimit   ? Number(_price)   : null,
           trigger_price:    showTrigger ? Number(_trigger) : null,
+          account:          _account,
         });
+        // Show inline confirmation so the operator sees the order
+        // landed before the modal closes. Backend returns
+        // {order_id, mode, status, detail} — surface order_id +
+        // mode for clarity.
+        const oid = resp?.order_id || '?';
+        submitOk = `${(_mode || '').toUpperCase()} order placed · #${oid}`;
       }
       // Notify the caller — DRAFT mode appends to drafts[]; PAPER /
       // LIVE let the caller refresh its local view if it wants to.
       await onSubmit(payload);
-      onClose();
+      // DRAFT closes immediately; PAPER / LIVE pause briefly so the
+      // operator reads the success line before the modal disappears.
+      if (_mode === 'draft') {
+        onClose();
+      } else {
+        setTimeout(onClose, 1400);
+      }
     } catch (e) {
       submitErr = /** @type {any} */ (e)?.message || String(e);
     } finally {
@@ -204,6 +249,31 @@
         {/if}
       </div>
     </div>
+
+    <!-- Account selector — required for PAPER + LIVE so the operator
+         picks WHICH Kite handle the order routes to. Skipped only
+         when there's no account list at all (caller didn't supply
+         one) — the backend will then default to the first available,
+         but the operator should always be told. -->
+    {#if accounts.length}
+      <div class="ot-row">
+        <div class="ot-label-block">
+          <label class="ot-label" for="ot-account">Account</label>
+          {#if accounts.length === 1}
+            <input id="ot-account" type="text" class="ot-input ot-account-readonly"
+                   value={_account} readonly />
+          {:else}
+            <select id="ot-account" class="ot-input ot-account-select"
+                    bind:value={_account}>
+              <option value="" disabled>Pick an account…</option>
+              {#each accounts as a}
+                <option value={a}>{a}</option>
+              {/each}
+            </select>
+          {/if}
+        </div>
+      </div>
+    {/if}
 
     <!-- Order type pills -->
     <div class="ot-row">
@@ -272,6 +342,9 @@
     {/if}
     {#if submitErr}
       <div class="ot-err">{submitErr}</div>
+    {/if}
+    {#if submitOk}
+      <div class="ot-ok">✓ {submitOk}</div>
     {/if}
 
     <div class="ot-footer">
@@ -450,6 +523,35 @@
     border-radius: 3px;
     font-size: 0.62rem;
     margin: 0.4rem 0;
+  }
+  .ot-ok {
+    background: rgba(34,197,94,0.10);
+    border: 1px solid rgba(34,197,94,0.45);
+    color: #4ade80;
+    padding: 0.35rem 0.55rem;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin: 0.4rem 0;
+  }
+  .ot-account-readonly {
+    color: #c8d8f0;
+    background: rgba(255,255,255,0.04);
+    cursor: default;
+  }
+  .ot-account-select {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #7e97b8 50%),
+      linear-gradient(135deg, #7e97b8 50%, transparent 50%);
+    background-position:
+      calc(100% - 12px) 50%,
+      calc(100% - 8px)  50%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    padding-right: 1.4rem;
   }
 
   .ot-footer {

@@ -226,7 +226,14 @@
             >{link.label}</button>
           {/each}
           <button onclick={() => { goto('/about'); closeMenu(); }} class="algo-mobile-item algo-mobile-site">↙ Investor site</button>
-          <button onclick={() => { signOut(); closeMenu(); }} class="algo-mobile-item">Sign Out</button>
+          <!-- Sign Out only when authenticated. Anonymous demo
+               sessions get a Sign In affordance instead, mirroring
+               the desktop nav. -->
+          {#if $authStore.user}
+            <button onclick={() => { signOut(); closeMenu(); }} class="algo-mobile-item">Sign Out</button>
+          {:else}
+            <button onclick={() => { goto('/signin'); closeMenu(); }} class="algo-mobile-item">Sign In</button>
+          {/if}
         </nav>
       {/if}
     </header>
