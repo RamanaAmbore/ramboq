@@ -756,17 +756,23 @@
 
 {#if strategy}
   <div class="opt-payoff opt-payoff-full mb-3">
-    <!-- Single-row header — only the title + Net debit/credit chip
-         lives here. MAX P / MAX L chips and DTE / σ / legs / TDAY /
-         EXP all moved into the on-chart stat overlay; keeping them in
-         the header overlapped the chart's overlay box visually and
-         duplicated the same numbers in two places. -->
+    <!-- Single-row header — title + Net debit/credit + Max profit /
+         Max loss chips. DTE / σ / LEGS / SPOT / TDAY / EXP live in
+         the on-chart stat overlay; MAX P / MAX L stay outside the
+         chart so the at-a-glance "what can this strategy make/lose"
+         pair reads at the page-header altitude. -->
     <div class="opt-section-h opt-section-h-grid">
       <div class="opt-section-row">
         <span class="opt-section-title">Payoff</span>
         <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
           {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
           {fmtMoney(Math.abs(strategy.net_cost), false)}
+        </span>
+        <span class="opt-section-tag tag-long">
+          MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
+        </span>
+        <span class="opt-section-tag tag-short">
+          MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
         </span>
       </div>
     </div>
@@ -777,8 +783,6 @@
       breakevens={strategy.risk.breakevens}
       spanSigmas={strategy.span_sigmas}
       spanPct={strategy.span_pct}
-      maxProfit={strategy.risk.max_profit}
-      maxLoss={strategy.risk.max_loss}
       dte={strategy.days_to_expiry}
       ivProxy={strategy.iv_proxy}
       legCount={strategy.legs.length}

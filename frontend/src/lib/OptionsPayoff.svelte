@@ -22,8 +22,6 @@
    *   currentPnl?:  number|null,
    *   spanSigmas?:  number,
    *   spanPct?:     number,
-   *   maxProfit?:   number|null,
-   *   maxLoss?:     number|null,
    *   dte?:         number|null,
    *   ivProxy?:     number|null,
    *   legCount?:    number|null,
@@ -39,8 +37,6 @@
     currentPnl = null,
     spanSigmas = 0,
     spanPct    = 0,
-    maxProfit  = /** @type {number|null|undefined} */ (null),
-    maxLoss    = /** @type {number|null|undefined} */ (null),
     dte        = /** @type {number|null|undefined} */ (null),
     ivProxy    = /** @type {number|null|undefined} */ (null),
     legCount   = /** @type {number|null|undefined} */ (null),
@@ -302,18 +298,6 @@
           <span class={'ps-v ' + (curveAtSpot.expiry_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.expiry_value)}
           </span>
-        </div>
-      {/if}
-      {#if maxProfit != null && Number.isFinite(maxProfit)}
-        <div class="ps-row">
-          <span class="ps-k">MAX P</span>
-          <span class="ps-v ps-pos">{fmtMoney(maxProfit)}</span>
-        </div>
-      {/if}
-      {#if maxLoss != null && Number.isFinite(maxLoss)}
-        <div class="ps-row">
-          <span class="ps-k">MAX L</span>
-          <span class="ps-v ps-neg">{fmtMoney(maxLoss)}</span>
         </div>
       {/if}
       {#if dte != null}
