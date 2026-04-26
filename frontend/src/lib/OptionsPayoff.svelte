@@ -311,15 +311,25 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Strike markers — one dashed white vertical per strike -->
+      <!-- Strike markers — one dashed white vertical per strike,
+           labelled with the strike's distance from spot in σ-units
+           (e.g. "+1.5σ" / "−0.8σ"). Falls back to the raw strike
+           value when σ metadata isn't available (operator-overridden
+           span_pct on the API). The actual strike price is still
+           visible in the kv-pair tables below the chart. -->
       {#each strikeList as k}
         {#if k >= sMin && k <= sMax}
           <line x1={xOf(k)} x2={xOf(k)} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(226,232,240,0.40)" stroke-width="1" stroke-dasharray="2 2"/>
           <text x={xOf(k)} y={PAD_T + 10}
                 text-anchor="middle" fill="#e2e8f0"
-                font-size="9" font-family="monospace" opacity="0.7">
-            K {k.toFixed(0)}
+                font-size="9" font-family="monospace" opacity="0.85">
+            {#if spanSigmas > 0 && spanPct > 0 && spot > 0}
+              {@const kSig = ((k / spot) - 1) * spanSigmas / spanPct}
+              {kSig >= 0 ? '+' : '−'}{Math.abs(kSig).toFixed(1)}σ
+            {:else}
+              {k.toFixed(0)}
+            {/if}
           </text>
         {/if}
       {/each}

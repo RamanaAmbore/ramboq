@@ -717,18 +717,23 @@
 {/if}
 
 {#if strategy}
+  {@const _curveAtSpot = (() => {
+    if (!strategy.payoff?.length) return null;
+    let best = strategy.payoff[0];
+    let bestDiff = Math.abs(best.spot - strategy.spot);
+    for (const p of strategy.payoff) {
+      const d = Math.abs(p.spot - strategy.spot);
+      if (d < bestDiff) { bestDiff = d; best = p; }
+    }
+    return best;
+  })()}
   <div class="opt-payoff opt-payoff-full mb-3">
     <div class="opt-section-h">
       Payoff
-      <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
       <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
         {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
         {fmtMoney(Math.abs(strategy.net_cost), false)}
       </span>
-      <!-- Max profit / Max loss as pills in the same header row,
-           styled like the Net debit/credit chip. Operator wanted
-           the win/loss bounds visible at-a-chart-glance, not buried
-           in the Aggregate card below. -->
       <span class="opt-section-tag tag-long">
         MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
       </span>
@@ -739,6 +744,18 @@
         DTE {strategy.days_to_expiry.toFixed(1)} ·
         σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
         {strategy.legs.length} legs
+        {#if _curveAtSpot}
+          {@const todayVal  = _curveAtSpot.today_value}
+          {@const expiryVal = _curveAtSpot.expiry_value}
+          · today
+          <b class={todayVal >= 0 ? 'kv-pos' : 'kv-neg'}>
+            {todayVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(todayVal), false)}
+          </b>
+          · expiry
+          <b class={expiryVal >= 0 ? 'kv-pos' : 'kv-neg'}>
+            {expiryVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(expiryVal), false)}
+          </b>
+        {/if}
       </span>
     </div>
     <OptionsPayoff
