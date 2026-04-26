@@ -159,20 +159,15 @@
     return `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   }
 
-  function onPointerMove(/** @type {PointerEvent} */ e) {
+  // Snap the tooltip to the payoff point nearest to the given client X.
+  // Shared between hover (mouse pointermove) and tap (touch pointerdown)
+  // so the touch path produces the same tooltip as desktop hover.
+  function _setHoverFromClientX(/** @type {SVGSVGElement} */ svg,
+                                /** @type {number} */ clientX) {
     if (!payoff.length) return;
-    const svg = /** @type {SVGSVGElement} */ (e.currentTarget);
     const rect = svg.getBoundingClientRect();
-    const xPx  = (e.clientX - rect.left) * (W / rect.width);
+    const xPx  = (clientX - rect.left) * (W / rect.width);
     const xVal = sMin + ((xPx - PAD_L) / innerW) * sSpan;
-    if (pan) {
-      const dxPx = (e.clientX - pan.startClientX) * (W / rect.width);
-      const dxVal = (dxPx / innerW) * (pan.startMax - pan.startMin);
-      zoom = { xMin: pan.startMin - dxVal, xMax: pan.startMax - dxVal };
-      hover = null;
-      return;
-    }
-    // Find nearest payoff point
     let best = payoff[0];
     let bestDiff = Math.abs(best.spot - xVal);
     for (const p of payoff) {
@@ -184,7 +179,26 @@
       spot: best.spot, today: best.today_value, expiry: best.expiry_value,
     };
   }
-  function onPointerLeave() { hover = null; }
+
+  function onPointerMove(/** @type {PointerEvent} */ e) {
+    if (!payoff.length) return;
+    const svg = /** @type {SVGSVGElement} */ (e.currentTarget);
+    if (pan) {
+      const rect = svg.getBoundingClientRect();
+      const dxPx = (e.clientX - pan.startClientX) * (W / rect.width);
+      const dxVal = (dxPx / innerW) * (pan.startMax - pan.startMin);
+      zoom = { xMin: pan.startMin - dxVal, xMax: pan.startMax - dxVal };
+      hover = null;
+      return;
+    }
+    _setHoverFromClientX(svg, e.clientX);
+  }
+  // Mouse leave clears hover. Touch leaves the tooltip pinned (the
+  // operator tapped to read; they expect it to stay until they tap
+  // somewhere else).
+  function onPointerLeave(/** @type {PointerEvent} */ e) {
+    if (e.pointerType !== 'touch') hover = null;
+  }
 
   function onWheel(/** @type {WheelEvent} */ e) {
     if (!payoff.length) return;
@@ -203,6 +217,13 @@
   function onPointerDown(/** @type {PointerEvent} */ e) {
     if (!payoff.length || e.button !== 0) return;
     /** @type {any} */ const tgt = e.currentTarget;
+    // Touch tap → show the tooltip at the tap location. Don't start
+    // a pan: native scroll + page panning is rarely what the operator
+    // wants when they're trying to read a value at a strike.
+    if (e.pointerType === 'touch') {
+      _setHoverFromClientX(/** @type {SVGSVGElement} */ (tgt), e.clientX);
+      return;
+    }
     tgt.setPointerCapture?.(e.pointerId);
     pan = { startClientX: e.clientX, startMin: sMin, startMax: sMax };
   }
