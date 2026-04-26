@@ -725,6 +725,16 @@
         {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
         {fmtMoney(Math.abs(strategy.net_cost), false)}
       </span>
+      <!-- Max profit / Max loss as pills in the same header row,
+           styled like the Net debit/credit chip. Operator wanted
+           the win/loss bounds visible at-a-chart-glance, not buried
+           in the Aggregate card below. -->
+      <span class="opt-section-tag tag-long">
+        MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
+      </span>
+      <span class="opt-section-tag tag-short">
+        MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
+      </span>
       <span class="opt-section-meta">
         DTE {strategy.days_to_expiry.toFixed(1)} ·
         σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
@@ -845,14 +855,6 @@
               <span class="kv-v {strategy.net_cost > 0 ? 'kv-neg' : strategy.net_cost < 0 ? 'kv-pos' : ''}">
                 {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
               </span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Max profit</span>
-              <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Max loss</span>
-              <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
             </div>
           </div>
         </div>
