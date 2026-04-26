@@ -23,6 +23,7 @@
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
+  import OrderTicket   from '$lib/order/OrderTicket.svelte';
   import Select        from '$lib/Select.svelte';
   import MultiSelect   from '$lib/MultiSelect.svelte';
   import InfoHint      from '$lib/InfoHint.svelte';
@@ -337,32 +338,64 @@
     }
   });
 
-  // Chain "+" button handlers — drop the picked contract into Drafts.
-  // The Drafts panel surfaces editable rows; whatever lands here can be
-  // fine-tuned (qty / cost / ltp) before the next strategy refresh.
+  // Order-ticket state — chain clicks open the reusable
+  // <OrderTicket> modal; on DRAFT submit we append to drafts. Phase
+  // 2 / 3 add PAPER / LIVE submit paths through the ticket without
+  // touching this file.
+  /** @type {any} */
+  let ticketProps = $state(null);
+  function openTicket(/** @type {any} */ p) { ticketProps = p; }
+  function closeTicket() { ticketProps = null; }
+
+  // Chain "+" handlers — open the OrderTicket pre-filled. The ticket
+  // routes back here via onSubmit when the operator confirms; in
+  // DRAFT mode we just push onto the drafts array (the existing
+  // strategy auto-recompute picks it up).
   function addChainDraft(/** @type {number} */ strike,
                          /** @type {'CE'|'PE'} */ optType) {
     if (!chainUnderlying || !chainExpiry) return;
     const inst = findOption(chainUnderlying.toUpperCase(), optType, strike, chainExpiry);
     if (!inst) return;
     const lot = Number(inst.ls || 1);
-    const signedQty = chainSide === 'long' ? lot : -lot;
-    drafts = [...drafts, {
-      id: ++_draftSeq, symbol: inst.s, qty: signedQty, avg_cost: '', ltp: '',
-    }];
-    // Auto-align the page underlying so the new draft shows in
-    // candidates immediately.
-    if (!selectedUnderlying) selectedUnderlying = chainUnderlying.toUpperCase();
+    openTicket({
+      symbol:   inst.s,
+      exchange: 'NFO',
+      side:     chainSide === 'long' ? 'BUY' : 'SELL',
+      qty:      lot,
+      lotSize:  lot,
+    });
   }
   function addFutureDraft(/** @type {string} */ sym,
                           /** @type {number} */ lotSize) {
     if (!sym) return;
     const lot = Number(lotSize || 1);
-    const signedQty = chainSide === 'long' ? lot : -lot;
+    openTicket({
+      symbol:   sym,
+      exchange: 'NFO',
+      side:     chainSide === 'long' ? 'BUY' : 'SELL',
+      qty:      lot,
+      lotSize:  lot,
+    });
+  }
+
+  // Ticket → drafts: signed qty (BUY = +qty, SELL = −qty) so the
+  // existing payoff math keeps working. Auto-aligns the page
+  // underlying so the new draft surfaces in candidates immediately.
+  function onTicketSubmit(/** @type {any} */ payload) {
+    if (payload.mode !== 'draft') return;   // PAPER / LIVE land in phase 2/3
+    const signedQty = payload.side === 'BUY'
+      ? Math.abs(Number(payload.quantity || 0))
+      : -Math.abs(Number(payload.quantity || 0));
     drafts = [...drafts, {
-      id: ++_draftSeq, symbol: sym, qty: signedQty, avg_cost: '', ltp: '',
+      id:       ++_draftSeq,
+      symbol:   String(payload.symbol),
+      qty:      signedQty,
+      avg_cost: payload.price != null ? Number(payload.price) : '',
+      ltp:      '',
     }];
-    if (!selectedUnderlying) selectedUnderlying = chainUnderlying.toUpperCase();
+    if (!selectedUnderlying && chainUnderlying) {
+      selectedUnderlying = chainUnderlying.toUpperCase();
+    }
   }
 
   // Position lists for the picker. Carries avg_cost + ltp so that
@@ -971,6 +1004,20 @@
     </div>
   {/if}
 
+<!-- Reusable order ticket — opens via the option-chain CE/PE/futures
+     buttons. Phase 1: DRAFT mode wired (appends to local drafts on
+     submit). Phase 2 / 3: PAPER + LIVE submit paths land in the
+     ticket itself; this page won't need to change. -->
+{#if ticketProps}
+  <OrderTicket
+    symbol={ticketProps.symbol}
+    exchange={ticketProps.exchange}
+    side={ticketProps.side}
+    qty={ticketProps.qty}
+    lotSize={ticketProps.lotSize}
+    onSubmit={onTicketSubmit}
+    onClose={closeTicket} />
+{/if}
 
 <style>
   /* Picker bar — Account / Underlying / Expiry / + always on a
