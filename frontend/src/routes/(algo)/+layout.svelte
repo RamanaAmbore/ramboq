@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { onMount, onDestroy } from 'svelte';
   import { authStore, visibleInterval } from '$lib/stores';
-  import { fetchSimStatus } from '$lib/api';
+  import { fetchSimStatus, fetchPaperStatus } from '$lib/api';
 
   const { children } = $props();
 
@@ -62,21 +62,28 @@
   let menuOpen = $state(false);
   const closeMenu = () => { menuOpen = false; };
 
-  // ── Global simulator status ─────────────────────────────────────────
-  // Polled every 4 seconds so the SIMULATOR banner appears/disappears on
-  // every algo page without each page having to track status on its own.
-  // Errors silently no-op — the capability flag may be off.
-  let simStatus = $state(/** @type {any} */ ({ active: false }));
+  // ── Global activity status (sim + paper) ────────────────────────────
+  // Polled every 4 seconds so the activity banners appear/disappear on
+  // every algo page without each page tracking status on its own.
+  // Errors silently no-op — the capability flag may be off, or the
+  // operator may not yet have admin auth on the dev branch.
+  let simStatus   = $state(/** @type {any} */ ({ active: false }));
+  let paperStatus = $state(/** @type {any} */ ({ enabled: false, open_order_count: 0 }));
   let simTeardown;
+  let paperTeardown;
   async function pollSim() {
     try { simStatus = await fetchSimStatus(); }
     catch (_) { /* cap flag off or auth gone — treat as idle */ }
   }
+  async function pollPaper() {
+    try { paperStatus = await fetchPaperStatus(); }
+    catch (_) { /* cap flag off, dev branch, or auth gone — treat as idle */ }
+  }
   onMount(() => {
-    pollSim();
-    simTeardown = visibleInterval(pollSim, 4000);
+    pollSim();   simTeardown   = visibleInterval(pollSim,   4000);
+    pollPaper(); paperTeardown = visibleInterval(pollPaper, 4000);
   });
-  onDestroy(() => { simTeardown?.(); });
+  onDestroy(() => { simTeardown?.(); paperTeardown?.(); });
 </script>
 
 <!-- Algo-side favicon — a circled "algo" mark so the browser tab visually
@@ -178,6 +185,19 @@
           <span class="sim-banner-sep">·</span>
           <span>agents=[{simStatus.only_agent_ids.join(',')}]</span>
         {/if}
+      </div>
+    {/if}
+    {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
+      <!-- Paper-trade banner — fires when the prod paper engine has any
+           in-flight chase. Faded sky-blue tint to differentiate from
+           the red SIMULATOR banner; both can stack when both are live. -->
+      <div class="paper-banner" role="status" aria-live="polite">
+        <span class="paper-banner-dot"></span>
+        <span class="paper-banner-label">PAPER</span>
+        <span class="paper-banner-sep">·</span>
+        <span>{paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}</span>
+        <span class="paper-banner-sep">·</span>
+        <span class="paper-banner-meta">fake fills against live quotes</span>
       </div>
     {/if}
 
@@ -495,6 +515,45 @@
     0%, 100% { box-shadow: inset 0 0 0 0 rgba(251,113,133,0);   }
     50%      { box-shadow: inset 0 0 10px 0 rgba(251,113,133,0.30); }
   }
+
+  /* Paper-trade banner — sky-blue palette so it visually distinct from
+     the red SIMULATOR banner. Stacks below it when both are active. */
+  .paper-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.85rem;
+    background-color: #0a1020;
+    background-image: linear-gradient(90deg,
+                      rgba(56,189,248,0.20) 0%,
+                      rgba(125,211,252,0.20) 100%);
+    border-top: 1px solid rgba(56,189,248,0.45);
+    border-bottom: 1px solid rgba(56,189,248,0.45);
+    color: #bae6fd;
+    font-family: ui-monospace, monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    position: sticky;
+    top: 3rem;
+    z-index: 48;
+  }
+  .paper-banner-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 5px rgba(56,189,248,0.85);
+    flex-shrink: 0;
+  }
+  .paper-banner-label {
+    color: #7dd3fc;
+    letter-spacing: 0.1em;
+    font-size: 0.6rem;
+    font-weight: 800;
+  }
+  .paper-banner-sep  { color: rgba(125,211,252,0.5); }
+  .paper-banner-meta { color: #bae6fd; opacity: 0.8; }
 
   /* ── Content ─────────────────────────────────────────────────────────────── */
   .algo-content {

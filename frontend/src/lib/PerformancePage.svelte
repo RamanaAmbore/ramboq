@@ -122,7 +122,10 @@
   };
 
   const acctFill = 'ag-col-fill';
-  const symFill  = 'ag-col-fill';
+  // Symbol cells carry an extra `ag-col-sym` class so the long/short
+  // indicator can paint a left+right border on the symbol cell only,
+  // not the entire row.
+  const symFill  = 'ag-col-fill ag-col-sym';
 
   const holdingsSummaryCols = [
     { field: 'account',               headerName: 'Account',  width: 75, minWidth: 75, cellClass: acctFill, headerClass: acctFill, valueFormatter: maskAcct },

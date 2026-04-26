@@ -149,17 +149,23 @@
 .ag-theme-algo .qty-long  { color: #38bdf8 !important; font-weight: 700 !important; }
 .ag-theme-algo .qty-short { color: #fb923c !important; font-weight: 700 !important; }
 .ag-theme-algo .qty-flat  { color: #94a3b8 !important; }
-.ag-theme-algo .ag-row.pos-long {
-  background-color: rgba(56,189,248,0.06) !important;
-  box-shadow: inset 3px 0 0 rgba(56,189,248,0.7);
+/* Long/short indicator — painted on the SYMBOL cell only, on both the
+   left and right edges. Earlier iterations tinted the whole row + put
+   a single-edge bar; the user prefers the indicator scoped to the
+   symbol cell so it doesn't dominate the row visually. */
+.ag-theme-algo .ag-row.pos-long .ag-col-sym {
+  background-color: rgba(56,189,248,0.10) !important;
+  box-shadow: inset 4px 0 0 rgba(56,189,248,0.85),
+              inset -4px 0 0 rgba(56,189,248,0.85) !important;
 }
-.ag-theme-algo .ag-row.pos-short {
-  background-color: rgba(251,146,60,0.07) !important;
-  box-shadow: inset 3px 0 0 rgba(251,146,60,0.7);
+.ag-theme-algo .ag-row.pos-short .ag-col-sym {
+  background-color: rgba(251,146,60,0.10) !important;
+  box-shadow: inset 4px 0 0 rgba(251,146,60,0.85),
+              inset -4px 0 0 rgba(251,146,60,0.85) !important;
 }
-.ag-theme-algo .ag-row.pos-long.ag-row-hover,
-.ag-theme-algo .ag-row.pos-short.ag-row-hover {
-  background-color: rgba(251,191,36,0.1) !important;
+.ag-theme-algo .ag-row.pos-long.ag-row-hover .ag-col-sym,
+.ag-theme-algo .ag-row.pos-short.ag-row-hover .ag-col-sym {
+  background-color: rgba(251,191,36,0.18) !important;
 }
 
 /* Long/short cues for the light-theme ramboq grid on the public
@@ -173,38 +179,25 @@
 .ag-theme-ramboq .qty-long  { color: #0f766e !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-short { color: #b45309 !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-flat  { color: #64748b !important; }
-/* LONG = sage-teal, SHORT = warm-terracotta — both desaturated so they
+/* Long/short indicator on the symbol cell only — left + right edges.
+   LONG = sage-teal, SHORT = warm-terracotta — both desaturated so they
    sit alongside the cream + champagne palette without shouting.
-
-   Indicator placement: RIGHT edge of the row (and the rightmost cell)
-   — moved from the left edge because:
-     a) When the Account column is hidden by an account filter, the
-        leftmost cell shifts and the left-edge indicator visually
-        jumps. Right-edge stays stable across filter states.
-     b) The right edge is consistently uncovered (no `ag-col-fill`
-        cell sits there in any of our column sets), so the row's
-        box-shadow is always visible without needing a per-cell
-        override.
-   We still keep a per-cell `:last-child` rule as a defensive belt-
-   and-suspenders in case a future column set ever puts a solid bg
-   cell at the rightmost position. */
-.ag-theme-ramboq .ag-row.pos-long {
-  background-color: rgba(91,142,149,0.10) !important;
-  box-shadow: inset -4px 0 0 rgba(91,142,149,0.85) !important;
+   Scoped to the symbol cell (not the whole row) so the rest of the
+   row stays clean and the bar reads as "this is THE symbol of this
+   row" rather than "this whole row is direction-tinted". */
+.ag-theme-ramboq .ag-row.pos-long .ag-col-sym {
+  background-color: rgba(91,142,149,0.14) !important;
+  box-shadow: inset 4px 0 0 rgba(91,142,149,0.85),
+              inset -4px 0 0 rgba(91,142,149,0.85) !important;
 }
-.ag-theme-ramboq .ag-row.pos-short {
-  background-color: rgba(196,122,61,0.10) !important;
-  box-shadow: inset -4px 0 0 rgba(196,122,61,0.85) !important;
+.ag-theme-ramboq .ag-row.pos-short .ag-col-sym {
+  background-color: rgba(196,122,61,0.14) !important;
+  box-shadow: inset 4px 0 0 rgba(196,122,61,0.85),
+              inset -4px 0 0 rgba(196,122,61,0.85) !important;
 }
-.ag-theme-ramboq .ag-row.pos-long .ag-cell:last-child {
-  box-shadow: inset -4px 0 0 rgba(91,142,149,0.85) !important;
-}
-.ag-theme-ramboq .ag-row.pos-short .ag-cell:last-child {
-  box-shadow: inset -4px 0 0 rgba(196,122,61,0.85) !important;
-}
-.ag-theme-ramboq .ag-row.pos-long.ag-row-hover,
-.ag-theme-ramboq .ag-row.pos-short.ag-row-hover {
-  background-color: rgba(200,168,75,0.22) !important;
+.ag-theme-ramboq .ag-row.pos-long.ag-row-hover .ag-col-sym,
+.ag-theme-ramboq .ag-row.pos-short.ag-row-hover .ag-col-sym {
+  background-color: rgba(200,168,75,0.28) !important;
 }
 /* Totals row cells inherit the header color regardless of +/-/0 */
 .ag-theme-ramboq .ag-row.totals-row .pnl-loss,
