@@ -280,13 +280,28 @@
     const fRows     = rawFunds.filter(keepAcct);
     const hTotals   = makeHoldingsTotals(hRows);
     const pTotals   = makePositionsTotals(pRows);
-    updateGrid(holdingsSummaryGrid, hSummary);
-    updateGrid(positionsSummaryGrid, pSummary);
+    // Split TOTAL out of summary + funds data sets and pin to the
+    // bottom — pinned-bottom rows in AG Grid are immune to sort, so
+    // the TOTAL always anchors the last row regardless of which
+    // column the operator clicks on.
+    const isTotalRow = (/** @type {any} */ r) =>
+      r?.tradingsymbol === 'TOTAL' || r?.account === 'TOTAL';
+    const hSummaryBody  = hSummary.filter(r => !isTotalRow(r));
+    const hSummaryTotal = hSummary.filter(isTotalRow);
+    const pSummaryBody  = pSummary.filter(r => !isTotalRow(r));
+    const pSummaryTotal = pSummary.filter(isTotalRow);
+    const fBody         = fRows.filter(r => !isTotalRow(r));
+    const fTotal        = fRows.filter(isTotalRow);
+    updateGrid(holdingsSummaryGrid, hSummaryBody);
+    holdingsSummaryGrid.setGridOption('pinnedBottomRowData', hSummaryTotal);
+    updateGrid(positionsSummaryGrid, pSummaryBody);
+    positionsSummaryGrid.setGridOption('pinnedBottomRowData', pSummaryTotal);
     updateGrid(holdingsAllGrid, hRows);
     holdingsAllGrid.setGridOption('pinnedBottomRowData', hTotals ? [hTotals] : []);
     updateGrid(positionsAllGrid, pRows);
     positionsAllGrid.setGridOption('pinnedBottomRowData', pTotals ? [pTotals] : []);
-    updateGrid(fundsGrid, fRows);
+    updateGrid(fundsGrid, fBody);
+    fundsGrid.setGridOption('pinnedBottomRowData', fTotal);
     // Account column hides across every grid when a specific account
     // is picked. Symbol column stays visible even when filtered —
     // operators asked to keep it so they can read which symbol(s) each

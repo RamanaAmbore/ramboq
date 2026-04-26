@@ -987,21 +987,21 @@
      a third of the leftover space after the + button. */
   .opt-field-grow { flex: 1 1 0; min-width: 0; }
 
-  /* "+" toggle button — fixed-width amber pill that sits flush at the
-     end of the picker row. Square aspect so the symbol reads as a
-     single glyph not a labelled button. Flips to "−" while the chain
-     panel is open. */
+  /* "+" toggle button — square pill matching the Select trigger
+     height (Select uses min-height: 1.55rem) so the row reads as
+     one consistent control bar. Flips to "−" while the chain panel
+     is open. */
   .opt-add-btn {
-    width: 1.9rem;
-    height: 1.9rem;
+    width: 1.55rem;
+    height: 1.55rem;
+    min-height: 1.55rem;
     flex: 0 0 auto;
     align-self: flex-end;
-    margin-bottom: 1px;          /* line up baseline with the Selects */
-    border-radius: 0.25rem;
+    border-radius: 3px;          /* match Select's 3px radius */
     border: 1px solid rgba(251,191,36,0.5);
     background: rgba(251,191,36,0.10);
     color: #fbbf24;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
@@ -1049,6 +1049,14 @@
     border-radius: 2px;
     border: 1px solid currentColor;
     font-weight: 700;
+    white-space: nowrap;
+  }
+  /* Compact mobile rendering — keeps the NET DEBIT / MAX PROFIT /
+     MAX LOSS chips on one line by trimming font + padding + the
+     section gap so the row fits inside a ~360px viewport. */
+  @media (max-width: 600px) {
+    .opt-section-h { gap: 0.25rem; flex-wrap: nowrap; overflow-x: auto; }
+    .opt-section-tag { font-size: 0.5rem; padding: 1px 3px; letter-spacing: 0.02em; }
   }
   .tag-deriv  { color: #7dd3fc; background: rgba(125,211,252,0.10); }
   .tag-long   { color: #22c55e; background: rgba(34,197,94,0.10); }
