@@ -247,9 +247,6 @@ class OrdersController(Controller):
         if data.mode not in ("paper", "live"):
             raise HTTPException(status_code=400,
                 detail=f"unknown mode '{data.mode}'")
-        if data.mode == "live":
-            raise HTTPException(status_code=501,
-                detail="LIVE mode lands in phase 3.")
 
         side = (data.side or "").upper()
         if side not in ("BUY", "SELL"):
@@ -267,6 +264,50 @@ class OrdersController(Controller):
         account = data.account or (next(iter(conns.conn)) if conns.conn else "")
         if not account:
             raise HTTPException(status_code=400, detail="no broker accounts available")
+
+        # ─── LIVE branch ─────────────────────────────────────────────
+        # Two gates: branch + per-action setting flag. Both must be
+        # truthy. Order placement on the wire is a single-shot
+        # `kite.place_order` — no chase loop. Operators wanting chase
+        # semantics for a manual order should use the agent surface.
+        if data.mode == "live":
+            from backend.shared.helpers.utils import is_prod_branch
+            from backend.shared.helpers.settings import get_bool
+            if not is_prod_branch():
+                raise HTTPException(status_code=403,
+                    detail="LIVE mode is disabled on non-prod branches; use PAPER on dev.")
+            if not get_bool("execution.live.place_order", False):
+                raise HTTPException(status_code=403,
+                    detail="LIVE order placement is disabled in /admin/settings → execution.live.place_order")
+            try:
+                kite = _kite_for(account)
+                order_id = kite.place_order(
+                    variety=(data.variety or "regular"),
+                    exchange=(data.exchange or "NFO"),
+                    tradingsymbol=sym,
+                    transaction_type=side,
+                    quantity=qty,
+                    product=(data.product or "NRML"),
+                    order_type=(data.order_type or "LIMIT"),
+                    price=data.price,
+                    trigger_price=data.trigger_price,
+                    validity="DAY",
+                    tag="ramboq-ticket",
+                )
+                invalidate("orders")    # refresh /api/orders cache
+                masked = mask_column(pd.Series([account]))[0]
+                logger.info(f"Ticket LIVE order: {order_id} [{masked}] {side} {qty} {sym}")
+                return TicketOrderResponse(
+                    order_id=str(order_id),
+                    mode="live",
+                    status="OPEN",
+                    detail=f"Live broker order #{order_id} placed at {account}.",
+                )
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"[LIVE-TICKET] place_order failed: {e}")
+                raise HTTPException(status_code=400, detail=str(e))
 
         # Persist AlgoOrder row first so the engine has an id to
         # reference back into.

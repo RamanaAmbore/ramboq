@@ -105,6 +105,19 @@
 
   async function submit() {
     if (validationErr) return;
+    // LIVE confirmation — surfaces a hard-stop browser confirm so an
+    // accidental click doesn't put real money on the wire. The
+    // backend separately gates by branch + the
+    // execution.live.place_order setting flag, but that's silent;
+    // this dialog is the loud one.
+    if (_mode === 'live') {
+      const px = showLimit ? `@₹${_price}` : '@MARKET';
+      const ok = typeof window !== 'undefined' && window.confirm(
+        `Place LIVE broker order?\n\n${_side} ${_qty} ${symbol} ${px}\n\n` +
+        `This is a REAL trade. Click Cancel to stop.`
+      );
+      if (!ok) return;
+    }
     const payload = {
       mode:           _mode,
       action,
@@ -120,13 +133,11 @@
     };
     submitting = true; submitErr = '';
     try {
-      // PAPER routes through the backend (paper engine registers
-      // the order + chase loop runs the lifecycle). DRAFT and LIVE
-      // hand off to the caller's onSubmit (DRAFT goes onto local
-      // drafts; LIVE not wired until phase 3).
-      if (_mode === 'paper') {
+      // PAPER + LIVE both route through the backend. DRAFT hands off
+      // to the caller's onSubmit only (no API call).
+      if (_mode === 'paper' || _mode === 'live') {
         await placeTicketOrder({
-          mode:             'paper',
+          mode:             _mode,
           side:             _side,
           tradingsymbol:    symbol,
           exchange:         exchange || 'NFO',
@@ -138,9 +149,8 @@
           trigger_price:    showTrigger ? Number(_trigger) : null,
         });
       }
-      // Always notify the caller — DRAFT mode appends to drafts[];
-      // PAPER mode lets the caller refresh its local view if it
-      // wants to.
+      // Notify the caller — DRAFT mode appends to drafts[]; PAPER /
+      // LIVE let the caller refresh its local view if it wants to.
       await onSubmit(payload);
       onClose();
     } catch (e) {
@@ -251,8 +261,9 @@
         <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
                 title="Routes through the prod paper engine — real bid/ask, no broker hit"
                 onclick={() => _mode = 'paper'}>PAPER</button>
-        <button type="button" class="ot-mode-pill ot-mode-live" disabled
-                title="Live broker wiring lands in phase 3">LIVE</button>
+        <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
+                title="Real broker order — gated by branch (main only) + execution.live.place_order setting"
+                onclick={() => _mode = 'live'}>LIVE</button>
       </div>
     </div>
 
