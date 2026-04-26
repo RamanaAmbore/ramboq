@@ -644,30 +644,37 @@
 {/if}
 
 {#if strategy}
-  <div class="opt-grid">
-    <div class="opt-payoff">
-      <div class="opt-section-h">
-        Aggregate Payoff
-          <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
-          <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
-            {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
-            {fmtMoney(Math.abs(strategy.net_cost), false)}
-          </span>
-          <span class="opt-section-meta">
-            DTE {strategy.days_to_expiry.toFixed(1)} ·
-            σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
-            {strategy.legs.length} legs
-          </span>
-        </div>
-        <OptionsPayoff
-          payoff={strategy.payoff}
-          spot={strategy.spot}
-          strikes={strategy.legs.map(l => l.strike)}
-          breakevens={strategy.risk.breakevens}
-          height={320} />
-      </div>
+  <div class="opt-payoff opt-payoff-full mb-3">
+    <div class="opt-section-h">
+      Aggregate Payoff
+      <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
+      <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
+        {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
+        {fmtMoney(Math.abs(strategy.net_cost), false)}
+      </span>
+      <span class="opt-section-meta">
+        DTE {strategy.days_to_expiry.toFixed(1)} ·
+        σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
+        {strategy.legs.length} legs
+      </span>
+    </div>
+    <OptionsPayoff
+      payoff={strategy.payoff}
+      spot={strategy.spot}
+      strikes={strategy.legs.map(l => l.strike)}
+      breakevens={strategy.risk.breakevens}
+      height={320} />
+  </div>
+{/if}
 
-      <aside class="opt-side">
+<!-- ── Aggregate / Greeks / Risk cards — moved BELOW the Candidates
+     panel so the operator's reading order is: chart → which legs
+     fed it → what it adds up to. The three cards lay out in a
+     horizontal flex row on wide screens (each card = 1fr); items
+     inside each card flow as multiple kv-pairs per row when there's
+     space. -->
+{#if strategy}
+  <aside class="opt-side opt-side-row">
         <div class="opt-block">
           <div class="opt-block-h">Aggregate</div>
           <div class="opt-kv">
@@ -776,10 +783,13 @@
             {/if}
           </div>
         </div>
-      </aside>
-    </div>
-  {/if}
+  </aside>
+{/if}
 
+<!-- Candidates — sits between the payoff chart above and the
+     Aggregate / Greeks / Risk cards below. The reading order is
+     "what does the position look like" → "which legs are in it" →
+     "what does the math summarise to". -->
 <!-- Candidates — sits immediately under the payoff chart so the
      operator can scan the working set + uncheck rows to drop them
      from the payoff, all without scrolling away from the chart.
@@ -953,10 +963,21 @@
     margin-left: auto;
   }
 
+  /* Default: legacy stacked aside (column of cards). Used when the
+     side panel sat next to the chart. */
   .opt-side {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+  /* Row variant: the three cards (Aggregate / Greeks / Risk) sit
+     side by side under the candidates panel. Each card grows
+     proportionally; on narrower viewports the row wraps to a column. */
+  .opt-side-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
   }
   .opt-block {
     background: linear-gradient(180deg, #1d2a44 0%, #152033 100%);
@@ -976,12 +997,25 @@
     padding-bottom: 0.25rem;
     margin-bottom: 0.4rem;
   }
+  /* kv-pairs flow as TWO label/value pairs per row by default, three
+     when the card has space (container query). Earlier iteration was
+     a single 2-column grid (label | val, every pair on its own row)
+     which wasted horizontal space — every card left a wide blank
+     gutter on the right. The new layout packs pairs side by side. */
+  .opt-block {
+    container-type: inline-size;
+  }
   .opt-kv {
     display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.25rem 0.7rem;
+    grid-template-columns: repeat(2, max-content 1fr);
+    column-gap: 0.8rem;
+    row-gap: 0.25rem;
     font-family: monospace;
     font-size: 0.65rem;
+  }
+  /* Three pairs per row when the card is wide enough. */
+  @container (min-width: 360px) {
+    .opt-kv { grid-template-columns: repeat(3, max-content 1fr); }
   }
   .kv-k {
     color: #7e97b8;

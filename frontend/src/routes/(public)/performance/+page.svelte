@@ -215,17 +215,17 @@
   }
 
   /* Tab row — sits OUTSIDE the white panel, on the page's cream
-     background. Active tab gets a champagne BOTTOM border. A small
-     gap below the row (margin-bottom on `.market-tabs-row +
-     .bg-white`) separates the tab strip from the panel so they read
-     as related-but-distinct, not merged. */
+     background. Active tab gets a champagne BOTTOM border. The row
+     itself carries no bottom border so the only horizontal line is
+     the active tab's gold underline — no second hairline competing
+     with the indicator. A small gap (`margin-top` on the panel
+     beneath) separates the tabs from the card. */
   .market-tabs-row {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 0.6rem;
     margin-top: 1rem;
-    border-bottom: 1px solid #e7e0cf;
     padding: 0 0.25rem;
     flex-wrap: wrap;
   }
@@ -241,7 +241,6 @@
     border: 0;
     border-bottom: 2px solid transparent;
     padding: 0.45rem 0.9rem;
-    margin-bottom: -1px;          /* overlap row's bottom border */
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background-color 0.12s;
   }

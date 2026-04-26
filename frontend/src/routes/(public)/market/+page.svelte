@@ -230,17 +230,15 @@
   :global(.market-report strong) { font-weight: 700; color: #1a2744; }
   :global(.market-report em)     { font-style: italic; color: #1e3050; }
 
-  /* Tab row — sits OUTSIDE the white panel, on the page's cream
-     background. Active tab gets a champagne BOTTOM border; the
-     row's own border-bottom stitches the active tab to the panel
-     beneath. Same shape as /performance for visual continuity. */
+  /* Tab row — sits OUTSIDE the white panel. Active tab carries a
+     champagne BOTTOM border; the row itself has no border so the
+     gold indicator stands alone. */
   .market-tabs-row {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 0.6rem;
     margin-top: 0.5rem;
-    border-bottom: 1px solid #e7e0cf;
     padding: 0 0.25rem;
     flex-wrap: wrap;
   }
@@ -256,7 +254,6 @@
     border: 0;
     border-bottom: 2px solid transparent;
     padding: 0.45rem 0.9rem;
-    margin-bottom: -1px;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s, background-color 0.12s;
   }

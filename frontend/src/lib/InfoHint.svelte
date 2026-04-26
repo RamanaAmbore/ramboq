@@ -37,6 +37,8 @@
   let hovered = $state(false);
   /** @type {HTMLSpanElement | undefined} */
   let wrap;
+  /** @type {HTMLSpanElement | undefined} */
+  let popoutEl = $state();
 
   // Close on click-outside when in popup mode so the tooltip doesn't
   // get stranded mid-page after the operator's attention has moved on.
@@ -51,6 +53,34 @@
 
   // Whether to render the popout right now.
   const visible = $derived(popup ? (open || hovered) : open);
+
+  // Viewport-bound the popup — once it's mounted, measure its
+  // bounding rect; if either edge clips outside the viewport, shift
+  // it horizontally so it sits fully inside. Re-runs whenever the
+  // popup opens (or the window resizes while it's open).
+  $effect(() => {
+    if (!popup || !visible || !popoutEl || typeof window === 'undefined') return;
+    /** @type {number} */ let raf;
+    function fit() {
+      if (!popoutEl) return;
+      // Reset before measuring so the previous nudge doesn't bias the
+      // calculation (otherwise the popup snaps further every open).
+      popoutEl.style.transform = '';
+      const r = popoutEl.getBoundingClientRect();
+      const margin = 8;
+      const vw = window.innerWidth;
+      let dx = 0;
+      if (r.right > vw - margin)  dx -= (r.right - (vw - margin));
+      if (r.left + dx < margin)   dx += (margin - (r.left + dx));
+      popoutEl.style.transform = dx ? `translateX(${dx}px)` : '';
+    }
+    raf = requestAnimationFrame(fit);
+    window.addEventListener('resize', fit);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', fit);
+    };
+  });
 </script>
 
 <span class="info-wrap" class:align-right={align === 'right'}
@@ -69,7 +99,8 @@
     <span class="info-popout"
           class:info-popout-popup={popup}
           class:info-popout-pinned={popup && open}
-          style="max-width: {maxWidth}">
+          style="max-width: {maxWidth}"
+          bind:this={popoutEl}>
       {#if text}
         {@html text}
       {:else if children}
@@ -95,32 +126,38 @@
     flex-wrap: nowrap;
   }
 
+  /* Chip — subtle and small. Earlier iterations were a saturated
+     amber pill; toned down to slate-blue at low alpha so the chip
+     reads as "supplemental info available" without competing with
+     the labels it sits next to. The amber accent only appears on
+     hover / open so the chip lights up when intentionally invoked. */
   .info-btn {
-    width: 1.05rem;
-    height: 1.05rem;
+    width: 0.85rem;
+    height: 0.85rem;
     border-radius: 9999px;
-    border: 1px solid rgba(251,191,36,0.45);
-    background: rgba(251,191,36,0.10);
-    color: #fbbf24;
-    font-size: 0.6rem;
+    border: 1px solid rgba(125,151,184,0.35);
+    background: rgba(125,151,184,0.08);
+    color: #7e97b8;
+    font-size: 0.5rem;
     font-style: italic;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex: 0 0 auto;
-    transition: background 0.12s, border-color 0.12s;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
   }
   .info-btn:hover {
-    background: rgba(251,191,36,0.22);
-    border-color: rgba(251,191,36,0.7);
+    background: rgba(251,191,36,0.14);
+    border-color: rgba(251,191,36,0.5);
+    color: #fbbf24;
   }
   .info-btn.open {
-    background: #fbbf24;
-    color: #0c1830;
-    border-color: #fbbf24;
+    background: rgba(251,191,36,0.22);
+    color: #fbbf24;
+    border-color: rgba(251,191,36,0.6);
   }
 
   /* Popover — subtle dark-blue surface with a soft border. Earlier
@@ -142,10 +179,11 @@
     flex: 1 1 100%;
   }
   /* Popup variant — absolute-positioned so it floats above siblings
-     instead of pushing them. Width clamps to the viewport so a tiny
-     phone screen never gets a popup wider than the page; on a
-     desktop it caps at 32rem. min-width is also viewport-clamped so
-     a long popup on a 320px phone doesn't overflow horizontally. */
+     instead of pushing them. Width caps tightly to the viewport so
+     a popup never overflows on a narrow phone (`min(20rem, calc(100vw
+     - 1rem))` leaves at least 0.5 rem on each edge); JS in the
+     component nudges the popup horizontally after open so even a
+     chip near the right edge keeps the popup fully on-screen. */
   .info-popout-popup {
     position: absolute;
     top: calc(100% + 0.4rem);
@@ -153,8 +191,8 @@
     z-index: 50;
     flex: none;
     width: max-content;
-    min-width: min(13rem, 88vw);
-    max-width: min(32rem, 92vw);
+    min-width: min(12rem, calc(100vw - 1rem));
+    max-width: min(20rem, calc(100vw - 1rem));
     box-shadow: 0 4px 14px rgba(0,0,0,0.45);
   }
   /* Right-aligned variant — flips the popup to anchor on the right
