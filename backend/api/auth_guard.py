@@ -131,8 +131,5 @@ class NotAllowedInDemo(Exception):
     in route handlers).
     """
     def __init__(self, what: str = "operation"):
-        super().__init__(
-            f"{what} is not available in demo mode. "
-            f"Sign in as an admin to access this surface."
-        )
+        super().__init__(f"Demo: {what} not available.")
         self.what = what

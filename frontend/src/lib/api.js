@@ -79,43 +79,35 @@ function _logApiError(/** @type {string} */ path,
   console.warn(`[api] ${path}${status ? ` (${status})` : ' (network)'}:`, safe);
 }
 
-/** Translate a fetch failure into a friendly UI string. Pages render
- *  this verbatim (no HTML), so it must be self-contained text. The
- *  raw backend `detail` is logged separately by _logApiError. */
+// Strip HTTP-method boilerplate and clamp to one banner line. Full
+// detail still lives in the console — this is just for display.
+const _METHOD_PREFIX_RE = /^(GET|POST|PUT|PATCH|DELETE)\s+\S+\s+failed:\s*/i;
+function _trimDetail(/** @type {string} */ s) {
+  const cleaned = s.replace(_METHOD_PREFIX_RE, '');
+  return cleaned.length > 60 ? cleaned.slice(0, 57) + '…' : cleaned;
+}
+
+/** Translate a fetch failure into a short UI string. Pages render
+ *  this verbatim in a small banner — keep it terse (~25-35 chars) so
+ *  the layout doesn't shift. Full detail goes to the console via
+ *  _logApiError; operators open devtools for the long form. */
 function _friendlyError(/** @type {number|null} */ status,
                         /** @type {string|null} */ detail) {
   const isAnon = _isAnonymous();
-  // Prefer the backend's `detail` for 401/403 when present — it carries
-  // the real reason ("Invalid username or password" on a bad login,
-  // "Live order placement is not available in demo mode" on a demo
-  // chokepoint). Fall back to the generic only when the server didn't
-  // supply a body (e.g. token expired mid-poll).
   if (status === 401) {
-    if (detail) return detail;
-    return isAnon
-      ? 'Sign in to use this feature.'
-      : 'Your session has expired — please sign in again.';
+    if (detail) return _trimDetail(detail);
+    return isAnon ? 'Sign in required.' : 'Session expired.';
   }
   if (status === 403) {
-    if (detail) return detail;
-    return isAnon
-      ? 'This action is read-only in the demo. Sign in to enable it.'
-      : "You don't have permission for this action.";
+    if (detail) return _trimDetail(detail);
+    return isAnon ? 'Demo: read-only.' : 'Not allowed.';
   }
-  if (status === 404)              return 'That information is not available right now.';
-  if (status === 429)              return 'Slow down a moment, then retry.';
-  // Soft language deliberately — surfaces avoid the word "failed" and
-  // suggest a retry instead, matching the user request that errors
-  // read more like "still working" than "broke".
-  if (status && status >= 500)     return "We're having trouble reaching that — please try again in a moment.";
-  if (status == null || status === 0) {
-    return 'Connection trouble — please try again in a moment.';
-  }
-  // Backend-supplied detail for 4xx is usually already user-readable
-  // (e.g. validation errors). Surface it as-is, stripping any HTTP
-  // boilerplate that might have crept in.
-  if (detail) return detail.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+\S+\s+failed:\s*/i, '');
-  return 'The request was rejected — please try again.';
+  if (status === 404)              return 'Not available.';
+  if (status === 429)              return 'Too many requests.';
+  if (status && status >= 500)     return 'Server busy — retry.';
+  if (status == null || status === 0) return 'No connection.';
+  if (detail) return _trimDetail(detail);
+  return 'Request rejected.';
 }
 
 /** One fetch wrapper to rule them all. Replaces ~15 hand-rolled

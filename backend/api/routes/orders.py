@@ -209,7 +209,7 @@ class OrdersController(Controller):
     async def place_order(self, data: PlaceOrderRequest, request: Request) -> PlaceOrderResponse:
         if getattr(request.state, "is_demo", False):
             raise HTTPException(status_code=403,
-                detail="Live order placement is not available in demo mode. Use the OrderTicket → PAPER instead.")
+                detail="Demo: use OrderTicket → PAPER.")
         _validate_place(data)
         kite   = _kite_for(data.account)
         masked = mask_column(pd.Series([data.account]))[0]
@@ -390,7 +390,7 @@ class OrdersController(Controller):
     async def modify_order(self, order_id: str, data: ModifyOrderRequest, request: Request) -> ModifyOrderResponse:
         if getattr(request.state, "is_demo", False):
             raise HTTPException(status_code=403,
-                detail="Order modification is not available in demo mode.")
+                detail="Demo: cannot modify orders.")
         kite   = _kite_for(data.account)
         masked = mask_column(pd.Series([data.account]))[0]
         kwargs = {k: v for k, v in {
@@ -460,7 +460,7 @@ class OrdersController(Controller):
     ) -> CancelOrderResponse:
         if getattr(request.state, "is_demo", False):
             raise HTTPException(status_code=403,
-                detail="Order cancel is not available in demo mode.")
+                detail="Demo: cannot cancel orders.")
         kite   = _kite_for(account)
         masked = mask_column(pd.Series([account]))[0]
         try:
