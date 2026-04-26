@@ -35,55 +35,147 @@ function _handle401() {
   }
 }
 
-/** POST /api/auth/login */
-export async function login(username, password) {
-  const res = await fetch(`${BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || 'Login failed');
+// ── Error handling: friendly UI message + raw console log ────────────
+// Anonymous sessions on prod = demo. We treat them as such for two
+// reasons: (1) error messages should explain "this is read-only" rather
+// than "Unauthorized"; (2) raw console output must be masked so account
+// IDs / tokens don't leak to a recruiter who opens devtools.
+function _isAnonymous() { return !authStore.getToken(); }
+
+// Patterns we mask before printing to console in anonymous (demo)
+// sessions. Backend already masks accounts via mask_column() in row
+// data; this is a defence-in-depth net for stack traces or error
+// detail strings that might still carry the raw values.
+const _SECRET_PATTERNS = [
+  { re: /\bZ[A-Z]\d{4,8}\b/g, sub: 'Z#####' },                            // account IDs (ZG0790, ZJ6294, …)
+  { re: /\b[A-Z0-9]{32,}\b/g, sub: '<key>' },                             // long uppercase tokens / keys
+  { re: /\bbearer\s+[a-zA-Z0-9._-]{20,}\b/gi, sub: 'bearer <token>' },    // JWT-shaped strings
+  { re: /\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b/gi, sub: '<email>' }, // email addresses
+];
+
+function _maskForDemoLog(/** @type {unknown} */ value) {
+  if (typeof value === 'string') {
+    let out = value;
+    for (const { re, sub } of _SECRET_PATTERNS) out = out.replace(re, sub);
+    return out;
   }
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.parse(_maskForDemoLog(JSON.stringify(value)));
+    } catch (_) { return value; }
+  }
+  return value;
+}
+
+/** Log the raw error to the browser console for debugging. In an
+ *  anonymous (demo) session, account IDs and secrets are masked first
+ *  so accidental leaks via console.error never show real values. */
+function _logApiError(/** @type {string} */ path,
+                     /** @type {number|null} */ status,
+                     /** @type {unknown} */ raw) {
+  const safe = _isAnonymous() ? _maskForDemoLog(raw) : raw;
+  // Use console.warn rather than .error so a transient 5xx during a
+  // poll doesn't tag every page with the red-error glyph in devtools.
+  console.warn(`[api] ${path}${status ? ` (${status})` : ' (network)'}:`, safe);
+}
+
+/** Translate a fetch failure into a friendly UI string. Pages render
+ *  this verbatim (no HTML), so it must be self-contained text. The
+ *  raw backend `detail` is logged separately by _logApiError. */
+function _friendlyError(/** @type {number|null} */ status,
+                        /** @type {string|null} */ detail) {
+  const isAnon = _isAnonymous();
+  // Prefer the backend's `detail` for 401/403 when present — it carries
+  // the real reason ("Invalid username or password" on a bad login,
+  // "Live order placement is not available in demo mode" on a demo
+  // chokepoint). Fall back to the generic only when the server didn't
+  // supply a body (e.g. token expired mid-poll).
+  if (status === 401) {
+    if (detail) return detail;
+    return isAnon
+      ? 'Sign in to use this feature.'
+      : 'Your session has expired — please sign in again.';
+  }
+  if (status === 403) {
+    if (detail) return detail;
+    return isAnon
+      ? 'This action is read-only in the demo. Sign in to enable it.'
+      : "You don't have permission for this action.";
+  }
+  if (status === 404)              return 'That information is not available right now.';
+  if (status === 429)              return 'Slow down a moment, then retry.';
+  // Soft language deliberately — surfaces avoid the word "failed" and
+  // suggest a retry instead, matching the user request that errors
+  // read more like "still working" than "broke".
+  if (status && status >= 500)     return "We're having trouble reaching that — please try again in a moment.";
+  if (status == null || status === 0) {
+    return 'Connection trouble — please try again in a moment.';
+  }
+  // Backend-supplied detail for 4xx is usually already user-readable
+  // (e.g. validation errors). Surface it as-is, stripping any HTTP
+  // boilerplate that might have crept in.
+  if (detail) return detail.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+\S+\s+failed:\s*/i, '');
+  return 'The request was rejected — please try again.';
+}
+
+/** One fetch wrapper to rule them all. Replaces ~15 hand-rolled
+ *  fetch+401+error blocks, and routes every error through the
+ *  friendly-message + masked-log pipeline. */
+async function _request(/** @type {string} */ method,
+                        /** @type {string} */ path,
+                        /** @type {{auth?: boolean, body?: unknown}} */ opts = {}) {
+  const { auth = false, body } = opts;
+  /** @type {Record<string, string>} */
+  const headers = auth ? { ..._authHeaders() } : {};
+  /** @type {RequestInit} */
+  const init = { method, headers };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, init);
+  } catch (e) {
+    _logApiError(path, null, /** @type {any} */ (e)?.message || e);
+    throw new Error(_friendlyError(null, null));
+  }
+  if (res.status === 401) {
+    _handle401();
+    const friendly = _friendlyError(401, null);
+    _logApiError(path, 401, friendly);
+    throw new Error(friendly);
+  }
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    const detail = errBody?.detail || res.statusText || null;
+    _logApiError(path, res.status, detail);
+    throw new Error(_friendlyError(res.status, detail));
+  }
+  if (res.status === 204) return null;
   return res.json();
 }
+
+// Method-specific shortcuts over _request — same friendly-error +
+// masked-log pipeline as everything else.
+const _get   = (/** @type {string} */ path, /** @type {any} */ opts = {}) =>
+  _request('GET', path, opts);
+const _post  = (/** @type {string} */ path, /** @type {any} */ body, /** @type {any} */ opts = {}) =>
+  _request('POST', path, { ...opts, body });
+const _put   = (/** @type {string} */ path, /** @type {any} */ body, /** @type {any} */ opts = {}) =>
+  _request('PUT', path, { ...opts, body });
+const _patch = (/** @type {string} */ path, /** @type {any} */ body, /** @type {any} */ opts = {}) =>
+  _request('PATCH', path, { ...opts, body });
+const _del   = (/** @type {string} */ path, /** @type {any} */ opts = {}) =>
+  _request('DELETE', path, opts);
+
+/** POST /api/auth/login */
+export const login = (username, password) =>
+  _post('/auth/login', { username, password });
 
 /** POST /api/auth/register */
-export async function register(payload) {
-  const res = await fetch(`${BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.detail || 'Registration failed');
-  }
-  return res.json();
-}
-
-async function _get(path, { auth = false } = {}) {
-  const headers = auth ? _authHeaders() : {};
-  const res = await fetch(`${BASE}${path}`, { headers });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status} ${res.statusText}`);
-  return res.json();
-}
-
-async function _post(path, payload, { auth = false } = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(auth ? _authHeaders() : {}) },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `POST ${path} failed: ${res.status}`);
-  }
-  return res.json();
-}
+export const register = (payload) =>
+  _post('/auth/register', payload);
 
 // ── Public data endpoints (read-only — no JWT required) ──────────────────────
 // Pass auth header if available — backend masks accounts for non-admin
@@ -116,49 +208,20 @@ export const fetchAgents      = () => _get('/agents/', { auth: true });
 export const fetchGrammarTokens = (grammar) =>
   _get(`/admin/grammar/tokens${grammar ? `?grammar=${encodeURIComponent(grammar)}` : ''}`,
        { auth: true });
-export const patchGrammarToken = async (id, payload) => {
-  const res = await fetch(`${BASE}/admin/grammar/tokens/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-};
-export const createGrammarToken = async (payload) => {
-  const res = await fetch(`${BASE}/admin/grammar/tokens`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-};
-export const deleteGrammarToken = async (id) => {
-  const res = await fetch(`${BASE}/admin/grammar/tokens/${id}`, {
-    method: 'DELETE', headers: _authHeaders(),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok && res.status !== 204) {
-    const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed');
-  }
-};
+export const patchGrammarToken  = (id, payload) =>
+  _patch(`/admin/grammar/tokens/${id}`, payload, { auth: true });
+export const createGrammarToken = (payload) =>
+  _post('/admin/grammar/tokens', payload, { auth: true });
+export const deleteGrammarToken = (id) =>
+  _del(`/admin/grammar/tokens/${id}`, { auth: true });
 export const reloadGrammarRegistry = () => _post('/admin/grammar/reload', {}, { auth: true });
 
 // ── Settings (admin) ────────────────────────────────────────────────────
 export const fetchSettings     = () => _get('/admin/settings/', { auth: true });
-export const updateSetting     = async (key, value) => {
-  const res = await fetch(`${BASE}/admin/settings/${encodeURIComponent(key)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify({ value: String(value) }),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-};
+export const updateSetting     = (key, value) =>
+  _patch(`/admin/settings/${encodeURIComponent(key)}`,
+         { value: String(value) },
+         { auth: true });
 export const resetSetting      = (key) =>
   _post(`/admin/settings/${encodeURIComponent(key)}/reset`, {}, { auth: true });
 export const fetchAgentEvents = (slug, n = 50) => _get(`/agents/${slug}/events?n=${n}`, { auth: true });
@@ -222,103 +285,28 @@ export const fetchSimEvents       = (n = 50) => _get(`/simulator/events/recent?l
 export const fetchSimOrders       = (n = 50) => _get(`/simulator/orders/recent?limit=${n}`, { auth: true });
 export const fetchSimTicks        = (n = 100) => _get(`/simulator/ticks/recent?limit=${n}`, { auth: true });
 
-export async function updateAgent(slug, payload) {
-  const res = await fetch(`${BASE}/agents/${slug}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function activateAgent(slug) {
-  const res = await fetch(`${BASE}/agents/${slug}/activate`, { method: 'PUT', headers: _authHeaders() });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function deactivateAgent(slug) {
-  const res = await fetch(`${BASE}/agents/${slug}/deactivate`, { method: 'PUT', headers: _authHeaders() });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function deleteAgent(slug) {
-  const res = await fetch(`${BASE}/agents/${slug}`, { method: 'DELETE', headers: _authHeaders() });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function interpretAgent(command) {
-  return _post('/agents/interpret', { command }, { auth: true });
-}
+export const updateAgent     = (slug, payload) => _put(`/agents/${slug}`, payload, { auth: true });
+export const activateAgent   = (slug) => _put(`/agents/${slug}/activate`, undefined, { auth: true });
+export const deactivateAgent = (slug) => _put(`/agents/${slug}/deactivate`, undefined, { auth: true });
+export const deleteAgent     = (slug) => _del(`/agents/${slug}`, { auth: true });
+export const interpretAgent  = (command) => _post('/agents/interpret', { command }, { auth: true });
 
 // ── Order mutations (protected) ───────────────────────────────────────────────
-export async function placeOrder(payload) {
-  return _post('/orders/place', payload, { auth: true });
-}
-
-export async function modifyOrder(orderId, payload) {
-  const res = await fetch(`${BASE}/orders/${orderId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `Modify order failed: ${res.status}`);
-  }
-  return res.json();
-}
+export const placeOrder  = (payload)         => _post('/orders/place', payload, { auth: true });
+export const modifyOrder = (orderId, payload) => _put(`/orders/${orderId}`, payload, { auth: true });
 
 // ── Admin endpoints (require admin JWT) ──────────────────────────────────────
 export const fetchUsers = () => _get('/admin/users', { auth: true });
 export const createUser = (payload) => _post('/admin/users', payload, { auth: true });
 
-export async function approveUser(username) {
-  const res = await fetch(`${BASE}/admin/users/${username}/approve`, {
-    method: 'PUT', headers: _authHeaders(),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
+export const approveUser = (username) => _put(`/admin/users/${username}/approve`, undefined, { auth: true });
+export const rejectUser  = (username) => _put(`/admin/users/${username}/reject`,  undefined, { auth: true });
+export const updateUser  = (username, payload) => _put(`/admin/users/${username}`, payload, { auth: true });
 
-export async function rejectUser(username) {
-  const res = await fetch(`${BASE}/admin/users/${username}/reject`, {
-    method: 'PUT', headers: _authHeaders(),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function updateUser(username, payload) {
-  const res = await fetch(`${BASE}/admin/users/${username}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Failed'); }
-  return res.json();
-}
-
-export async function cancelOrder(orderId, account, variety = 'regular') {
+export const cancelOrder = (orderId, account, variety = 'regular') => {
   const params = new URLSearchParams({ account, variety });
-  const res = await fetch(`${BASE}/orders/${orderId}?${params}`, {
-    method: 'DELETE',
-    headers: _authHeaders(),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `Cancel order failed: ${res.status}`);
-  }
-  return res.json();
-}
+  return _del(`/orders/${orderId}?${params}`, { auth: true });
+};
 
 // ── Charts (admin-guarded) ────────────────────────────────────────────────────
 
@@ -405,33 +393,12 @@ export async function createBrokerAccount(payload) {
 /** PATCH /api/admin/brokers/{account} — partial update. Empty secrets
  *  fields mean "leave unchanged" so the operator can edit one credential
  *  without re-typing the rest. */
-export async function updateBrokerAccount(acct, payload) {
-  const res = await fetch(`${BASE}/admin/brokers/${encodeURIComponent(acct)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ..._authHeaders() },
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(e.detail || `Update failed: ${res.status}`);
-  }
-  return res.json();
-}
+export const updateBrokerAccount = (acct, payload) =>
+  _patch(`/admin/brokers/${encodeURIComponent(acct)}`, payload, { auth: true });
 
 /** DELETE /api/admin/brokers/{account}. */
-export async function deleteBrokerAccount(acct) {
-  const res = await fetch(`${BASE}/admin/brokers/${encodeURIComponent(acct)}`, {
-    method: 'DELETE',
-    headers: _authHeaders(),
-  });
-  if (res.status === 401) { _handle401(); throw new Error('Unauthorized'); }
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(e.detail || `Delete failed: ${res.status}`);
-  }
-  return res.json();
-}
+export const deleteBrokerAccount = (acct) =>
+  _del(`/admin/brokers/${encodeURIComponent(acct)}`, { auth: true });
 
 /** POST /api/admin/brokers/{account}/test — try profile() and report. */
 export async function testBrokerAccount(acct) {

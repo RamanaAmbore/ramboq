@@ -1186,6 +1186,20 @@ Pill-shaped, pulse 2.4 s. Existing full-width banners under the nav still surfac
 
 ---
 
+## Frontend API layer — friendly errors, masked logs
+
+[`frontend/src/lib/api.js`](frontend/src/lib/api.js) is the single chokepoint every page goes through to talk to the API. The legacy shape was 14 hand-rolled `fetch + 401 + throw` blocks each producing raw HTTP messages like `"GET /api/foo failed: 500 Internal Server Error"` directly into `{error}` text on the page. That's been replaced with a single `_request(method, path, opts)` wrapper that runs every call through three transforms:
+
+1. **Friendly UI message** — [`_friendlyError(status, detail)`](frontend/src/lib/api.js) translates the HTTP outcome into prose pages can render verbatim. Soft language by design (avoids the word "failed"): 5xx becomes `"We're having trouble reaching that — please try again in a moment."`, network errors become `"Connection trouble — please try again in a moment."`, 401/403 prefer the backend's `detail` when present (so the chokepoint message `"Live order placement is not available in demo mode. Use OrderTicket → PAPER instead."` flows through unchanged) and fall back to context-aware generics ("Sign in to use this feature." for anonymous, "Session expired" for previously-authenticated). 4xx with detail passes through, with HTTP boilerplate stripped.
+2. **Masked console log** — [`_logApiError(path, status, raw)`](frontend/src/lib/api.js) prints the raw error to `console.warn` (not `.error` — transient 5xx during a poll shouldn't paint every page red in devtools). Anonymous (demo) sessions run the raw value through [`_maskForDemoLog`](frontend/src/lib/api.js) first: `Z[A-Z]\d{4,8}` → `Z#####`, long uppercase tokens → `<key>`, `bearer …` → `bearer <token>`, `…@…` → `<email>`. Defence-in-depth: backend `mask_column()` already redacts row data, but error detail strings can still carry raw values from internal exceptions, and a recruiter opening devtools on demo shouldn't see real account IDs.
+3. **One throw path** — `throw new Error(_friendlyError(status, detail))`. Pages do `catch(e) { error = e.message }` and render the prose. No page edits were required; the migration was a refactor of api.js only.
+
+Method shortcuts (`_get / _post / _put / _patch / _del`) wrap `_request` for ergonomics; every endpoint export now collapses to a single line.
+
+`_handle401()` still clears the token + redirects to `/signin` — but only when a token actually existed (the `hadToken` guard), so anonymous demo visitors who hit a 401 don't get bounced. Stale-session logout still works as before.
+
+---
+
 ## Refactoring Notes
 
 | Area | Note |
