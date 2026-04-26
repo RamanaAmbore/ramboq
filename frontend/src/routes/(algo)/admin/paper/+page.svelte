@@ -61,7 +61,12 @@
       }
       error = '';
     } catch (e) {
-      error = e.message;
+      // Cold start = no status yet → surface the error so the operator
+      // sees something. Subsequent transient failures keep the last
+      // good banner / chart rendered to avoid a flicker on tab return.
+      if (!status?.branch) {
+        error = e.message;
+      }
     } finally {
       loading = false;
     }

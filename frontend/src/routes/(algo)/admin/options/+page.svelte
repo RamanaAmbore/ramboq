@@ -483,12 +483,22 @@
       strategy = null; strategyErr = '';
       return;
     }
-    loading = true; strategyErr = '';
+    loading = true;
     try {
       strategy = await fetchStrategyAnalytics(cleanLegs);
+      strategyErr = '';   // success — clear any stale error banner
     } catch (e) {
-      strategyErr = /** @type {any} */ (e).message || String(e);
-      strategy = null;
+      // Keep the last-good `strategy` rendered. Wiping it on every
+      // transient poll failure (slow network on tab-return, brief
+      // 5xx, etc.) blanks the chart and flashes a "No connection"
+      // banner even though the previous fetch was fine. Only surface
+      // the error when there's no prior chart to fall back to —
+      // the cold-start case where the operator genuinely sees nothing.
+      if (!strategy) {
+        strategyErr = /** @type {any} */ (e).message || String(e);
+      }
+      // The api layer already logged the raw error to the console;
+      // no need to repeat it here.
     } finally {
       loading = false;
     }
