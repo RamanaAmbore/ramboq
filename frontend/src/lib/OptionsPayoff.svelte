@@ -20,6 +20,8 @@
    *   breakevens?:  number[],
    *   height?:      number,
    *   currentPnl?:  number|null,
+   *   spanSigmas?:  number,
+   *   spanPct?:     number,
    * }} */
   let {
     payoff = [],
@@ -30,6 +32,8 @@
     breakevens = /** @type {number[]|undefined} */ (undefined),
     height     = 280,
     currentPnl = null,
+    spanSigmas = 0,
+    spanPct    = 0,
   } = $props();
 
   // Multi-leg charts pass `strikes` / `breakevens` arrays; single-leg
@@ -203,15 +207,42 @@
     });
   });
 
-  // X-axis ticks — 5 evenly spaced spot prices across the visible range.
-  // These render as faint vertical grid lines + labels along the bottom,
-  // making it easier to read off "what spot would I need for ₹X profit?".
+  // X-axis ticks — sigma marks at every 0.5σ across ±spanSigmas
+  // around the spot, when spanSigmas + spanPct are supplied (the API
+  // returns both for auto-derived ranges). Each k-σ point sits at
+  //   spot * (1 + k * spanPct / spanSigmas)
+  // since the chart's spot range is ±spanPct and that range maps
+  // 1-to-1 to ±spanSigmas. Falls back to evenly-spaced spot ticks
+  // when spanSigmas isn't provided (operator-overridden span_pct).
   const xTicks = $derived.by(() => {
     if (!payoff.length) return [];
+    if (spanSigmas > 0 && spanPct > 0 && spot > 0) {
+      const ticks = [];
+      // -spanSigmas → +spanSigmas in 0.5 steps. Round to single
+      // decimal so floating math doesn't push 0 to 0.0000001.
+      for (let k = -spanSigmas; k <= spanSigmas + 1e-9; k += 0.5) {
+        const kRounded = Math.round(k * 2) / 2;
+        const s = spot * (1 + (kRounded * spanPct) / spanSigmas);
+        if (s < sMin - 1e-6 || s > sMax + 1e-6) continue;
+        ticks.push({
+          s,
+          x: xOf(s),
+          sigma: kRounded,
+          label: kRounded === 0 ? '0' :
+                 (kRounded > 0 ? '+' : '−') +
+                 (Math.abs(kRounded) % 1 === 0
+                   ? Math.abs(kRounded).toFixed(0)
+                   : Math.abs(kRounded).toFixed(1)) + 'σ',
+        });
+      }
+      return ticks;
+    }
+    // Fallback — evenly spaced spot prices when sigma metadata is
+    // unavailable (custom span_pct).
     const n = 5;
     return Array.from({ length: n }, (_, i) => {
       const s = sMin + (sSpan * i) / (n - 1);
-      return { s, x: xOf(s) };
+      return { s, x: xOf(s), sigma: null, label: s.toFixed(0) };
     });
   });
 </script>
@@ -249,22 +280,29 @@
         </text>
       {/each}
 
-      <!-- X-axis grid + labels — faint verticals at 5 evenly spaced
-           spots PLUS spot-value labels in the bottom margin so the
-           operator can sight-read "what spot price would give me ₹X
-           profit" without dragging the hover crosshair. Sits between
-           the axis baseline (y = height-PAD_B) and the spot/strike/BE
-           marker labels (y = height-PAD_B+18) so nothing overlaps. -->
-      {#each xTicks as xt, i}
-        {#if i > 0 && i < xTicks.length - 1}
+      <!-- X-axis grid + labels — sigma marks at every 0.5σ across
+           ±spanSigmas (when the API returned span metadata), or
+           evenly spaced spot values otherwise. Whole-sigma ticks
+           (±1σ, ±2σ, …) get a stronger grid line + brighter label;
+           half-sigma ticks (±0.5σ, ±1.5σ, …) are subdued. Labels
+           sit between the axis baseline (y = height-PAD_B) and the
+           spot/strike/BE marker labels (y = height-PAD_B+18). -->
+      {#each xTicks as xt}
+        {@const wholeSigma = xt.sigma != null && xt.sigma % 1 === 0}
+        {@const isCenter   = xt.sigma === 0}
+        {#if !isCenter}
           <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(200,216,240,0.07)" stroke-width="1"/>
+                stroke="rgba(200,216,240,{wholeSigma ? 0.16 : 0.07})"
+                stroke-width="1"/>
         {/if}
-        {#if i > 0 && i < xTicks.length - 1}
+        {#if !isCenter}
           <text x={xt.x} y={height - PAD_B + 10}
-                text-anchor="middle" fill="#7e97b8"
-                font-size="9" font-family="monospace">
-            {xt.s.toFixed(0)}
+                text-anchor="middle"
+                fill={wholeSigma ? '#c8d8f0' : '#7e97b8'}
+                font-size={wholeSigma ? 10 : 9}
+                font-weight={wholeSigma ? 600 : 400}
+                font-family="monospace">
+            {xt.label}
           </text>
         {/if}
       {/each}

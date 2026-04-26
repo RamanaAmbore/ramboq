@@ -736,6 +736,8 @@
       spot={strategy.spot}
       strikes={strategy.legs.map(l => l.strike)}
       breakevens={strategy.risk.breakevens}
+      spanSigmas={strategy.span_sigmas}
+      spanPct={strategy.span_pct}
       height={320} />
   </div>
 {/if}
