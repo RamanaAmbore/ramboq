@@ -126,7 +126,7 @@
   <div class="algo-card">
     <!-- Top bar -->
     <header class="algo-navbar">
-      <div class="algo-nav-inner hidden md:flex items-center gap-1 h-12">
+      <div class="algo-nav-inner hidden lg:flex items-center gap-1 h-12">
         <!-- Vertical ALGO label, flush at the left edge. Bare text —
              no chip, no background, no border. -->
         <span class="algo-vert" aria-hidden="true">ALGO</span>
@@ -175,7 +175,7 @@
       </div>
 
       <!-- Mobile -->
-      <div class="algo-nav-inner md:hidden flex items-center justify-between h-12">
+      <div class="algo-nav-inner lg:hidden flex items-center justify-between h-12">
         <div class="flex items-center">
           <span class="algo-vert algo-vert-sm" aria-hidden="true">ALGO</span>
           <button onclick={() => goto('/about')} class="algo-brand">
@@ -431,40 +431,42 @@
      we in fake-money land right now?" indicator on every algo
      page. Pill-shaped (rounded ends) instead of circles since
      the labels are 3-5 characters. */
+  /* Outlined-pill style — subtle tinted bg with bright text + matching
+     dot accent. Dot pulses (not the whole pill) so a recruiter glance
+     catches the indicator without the loud full-badge throb the
+     earlier solid-fill version had. Same shape + sizing across all
+     three modes; only the colour changes. */
   .algo-mode-badge {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    height: 1.5rem;
-    padding: 0 0.55rem;
+    gap: 0.4rem;
+    height: 1.4rem;
+    padding: 0 0.6rem;
     border-radius: 9999px;
     font-family: ui-monospace, monospace;
     font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     line-height: 1;
     flex: 0 0 auto;
     margin-right: 0.35rem;
-    animation: algo-mode-pulse 2.4s ease-in-out infinite;
+    border: 1px solid currentColor;
   }
-  .algo-mode-demo {
-    background: #c084fc;     /* purple — distinct from sim red + paper blue */
-    color: #0c1830;
-    box-shadow: 0 0 0 1px rgba(192,132,252,0.55), 0 0 8px rgba(192,132,252,0.45);
+  .algo-mode-badge::before {
+    content: '';
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 9999px;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+    animation: algo-mode-dot 2s ease-in-out infinite;
   }
-  .algo-mode-sim {
-    background: #fb7185;
-    color: #0c1830;
-    box-shadow: 0 0 0 1px rgba(251,113,133,0.55), 0 0 8px rgba(251,113,133,0.45);
-  }
-  .algo-mode-paper {
-    background: #38bdf8;
-    color: #0c1830;
-    box-shadow: 0 0 0 1px rgba(56,189,248,0.55), 0 0 8px rgba(56,189,248,0.4);
-  }
-  @keyframes algo-mode-pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.78; }
+  .algo-mode-demo  { color: #c084fc; background: rgba(192,132,252,0.10); }
+  .algo-mode-sim   { color: #fb7185; background: rgba(251,113,133,0.10); }
+  .algo-mode-paper { color: #38bdf8; background: rgba(56,189,248,0.10); }
+  @keyframes algo-mode-dot {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.8); }
   }
 
   .algo-pub-link {

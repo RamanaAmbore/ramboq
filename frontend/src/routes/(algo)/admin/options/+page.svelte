@@ -755,53 +755,18 @@
 {/if}
 
 {#if strategy}
-  {@const _curveAtSpot = (() => {
-    if (!strategy.payoff?.length) return null;
-    let best = strategy.payoff[0];
-    let bestDiff = Math.abs(best.spot - strategy.spot);
-    for (const p of strategy.payoff) {
-      const d = Math.abs(p.spot - strategy.spot);
-      if (d < bestDiff) { bestDiff = d; best = p; }
-    }
-    return best;
-  })()}
   <div class="opt-payoff opt-payoff-full mb-3">
-    <!-- Two-row grid header. Row 1: title + Net debit/credit / Max
-         profit / Max loss chips. Row 2: DTE / σ-proxy / legs / today
-         + expiry P&L. Splitting them onto separate rows stops the
-         meta numbers from being squeezed against the chips when the
-         viewport is mid-width. -->
+    <!-- Single-row header — only the title + Net debit/credit chip
+         lives here. MAX P / MAX L chips and DTE / σ / legs / TDAY /
+         EXP all moved into the on-chart stat overlay; keeping them in
+         the header overlapped the chart's overlay box visually and
+         duplicated the same numbers in two places. -->
     <div class="opt-section-h opt-section-h-grid">
       <div class="opt-section-row">
         <span class="opt-section-title">Payoff</span>
         <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
           {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
           {fmtMoney(Math.abs(strategy.net_cost), false)}
-        </span>
-        <span class="opt-section-tag tag-long">
-          MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
-        </span>
-        <span class="opt-section-tag tag-short">
-          MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
-        </span>
-      </div>
-      <div class="opt-section-row opt-section-meta-row">
-        <span class="opt-section-meta">
-          DTE {Math.round(strategy.days_to_expiry)} ·
-          σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
-          {strategy.legs.length} legs
-          {#if _curveAtSpot}
-            {@const todayVal  = _curveAtSpot.today_value}
-            {@const expiryVal = _curveAtSpot.expiry_value}
-            · TDAY
-            <b class={todayVal >= 0 ? 'kv-pos' : 'kv-neg'}>
-              {todayVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(todayVal), false)}
-            </b>
-            · EXP
-            <b class={expiryVal >= 0 ? 'kv-pos' : 'kv-neg'}>
-              {expiryVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(expiryVal), false)}
-            </b>
-          {/if}
         </span>
       </div>
     </div>
@@ -814,6 +779,9 @@
       spanPct={strategy.span_pct}
       maxProfit={strategy.risk.max_profit}
       maxLoss={strategy.risk.max_loss}
+      dte={strategy.days_to_expiry}
+      ivProxy={strategy.iv_proxy}
+      legCount={strategy.legs.length}
       height={320} />
   </div>
 {/if}
@@ -1103,10 +1071,6 @@
     font-size: 0.7rem;          /* slightly larger than meta so the
                                    header reads as the section anchor */
     letter-spacing: 0.06em;
-  }
-  .opt-section-meta-row .opt-section-meta {
-    margin-left: 0;          /* meta no longer right-aligned in
-                                 the row — it's the only item */
   }
   .opt-section-tag {
     font-size: 0.55rem;

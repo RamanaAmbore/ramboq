@@ -37,6 +37,7 @@
 
   let logTab = $state(initialTab);
   let newsItems = $state(/** @type {Array<{title:string,link:string,source:string,timestamp:string}>} */ ([]));
+  let newsRefresh = $state('');
   let newsLoading = $state(false);
   let newsInterval;
 
@@ -44,7 +45,8 @@
     newsLoading = true;
     try {
       const data = await fetchNews();
-      newsItems = data?.items || [];
+      newsItems   = data?.items || [];
+      newsRefresh = data?.refreshed_at || '';
     } catch (_) { /* ignore */ }
     newsLoading = false;
   }
@@ -280,7 +282,8 @@
 <pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = _shortTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">${t}</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{@html newsItems.map(n => {
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{#if newsRefresh}<span class="log-news-head">Refreshed at {newsRefresh}</span>
+{/if}{@html newsItems.map(n => {
   const safeTitle = (n.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const safeLink  = (n.link || '').replace(/"/g,'&quot;');
   const safeSrc   = (n.source || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

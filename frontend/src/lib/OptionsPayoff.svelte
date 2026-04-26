@@ -24,6 +24,9 @@
    *   spanPct?:     number,
    *   maxProfit?:   number|null,
    *   maxLoss?:     number|null,
+   *   dte?:         number|null,
+   *   ivProxy?:     number|null,
+   *   legCount?:    number|null,
    * }} */
   let {
     payoff = [],
@@ -38,6 +41,9 @@
     spanPct    = 0,
     maxProfit  = /** @type {number|null|undefined} */ (null),
     maxLoss    = /** @type {number|null|undefined} */ (null),
+    dte        = /** @type {number|null|undefined} */ (null),
+    ivProxy    = /** @type {number|null|undefined} */ (null),
+    legCount   = /** @type {number|null|undefined} */ (null),
   } = $props();
 
   // Nearest curve point to current spot — drives the on-chart TDAY/EXP
@@ -310,6 +316,24 @@
           <span class="ps-v ps-neg">{fmtMoney(maxLoss)}</span>
         </div>
       {/if}
+      {#if dte != null}
+        <div class="ps-row">
+          <span class="ps-k">DTE</span>
+          <span class="ps-v">{Math.round(dte)}</span>
+        </div>
+      {/if}
+      {#if ivProxy != null}
+        <div class="ps-row">
+          <span class="ps-k">σ</span>
+          <span class="ps-v">{(ivProxy * 100).toFixed(1)}%</span>
+        </div>
+      {/if}
+      {#if legCount != null}
+        <div class="ps-row">
+          <span class="ps-k">LEGS</span>
+          <span class="ps-v">{legCount}</span>
+        </div>
+      {/if}
     </div>
     <svg viewBox="0 0 {W} {height}" preserveAspectRatio="none"
          class="payoff-svg" class:payoff-panning={pan !== null}
@@ -349,11 +373,11 @@
                 stroke-width="1"/>
         {/if}
         {#if !isCenter}
-          <text x={xt.x} y={height - PAD_B + 10}
+          <text x={xt.x} y={height - PAD_B + 12}
                 text-anchor="middle"
-                fill={wholeSigma ? '#c8d8f0' : '#7e97b8'}
-                font-size={wholeSigma ? 10 : 9}
-                font-weight={wholeSigma ? 600 : 400}
+                fill={wholeSigma ? '#fbbf24' : '#c8d8f0'}
+                font-size={wholeSigma ? 11 : 10}
+                font-weight={wholeSigma ? 700 : 500}
                 font-family="monospace">
             {xt.label}
           </text>

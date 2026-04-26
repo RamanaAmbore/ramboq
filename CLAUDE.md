@@ -791,6 +791,7 @@ where the chase fired" without any new persistent state.
 - [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) — hand-rolled SVG line + bid/ask shaded band + lifecycle markers (placed=amber / filled=emerald / unfilled=red). Polls `/api/charts/price-history` every 3 s. No chart library — keeps the bundle thin.
 - [`/admin/simulator`](frontend/src/routes/(algo)/admin/simulator/+page.svelte) embeds one mini chart per symbol returned by `GET /charts/symbols?mode=sim` directly under the position pills, so the operator sees the trajectory + chase markers live.
 - [`LogPanel`](frontend/src/lib/LogPanel.svelte) gained a **Chart** tab. Consumers pass `chartMode` (`sim` while a sim runs, otherwise `paper`) + `chartSymbols`. The `/agents` page wires both — its Chart tab tracks whichever surface is active.
+- The LogPanel **News** tab carries a `Refreshed at <ts>` heading line above the items (matching the public `/market` and `/performance` Market News card layout). `loadNews()` captures `refreshed_at` from the `/api/news` payload; the heading hides when no headlines have been seen yet (cold-start) so we don't render an orphan "Refreshed at " label. CSS class `.log-news-head` lives in [`app.css`](frontend/src/app.css) alongside the rest of the log palette.
 
 **Cleanup**: deque `maxlen=600` is the only retention mechanism — at the default tick rates (2 s sim / 5 s paper) that's ~20 min of history per symbol. Restart loses the history; operator monitoring the chase live doesn't need cross-restart continuity. If post-mortem replay becomes valuable, swap to a `price_ticks` table here.
 
@@ -932,7 +933,9 @@ Both endpoints surface position-level expected value and R:R alongside the exist
 
 **UI** — [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte) is the payoff-chart SVG. Two curves (today amber solid, expiry sky dashed), profit/loss zone shading, vertical markers for spot (cyan) / strike (white dashed) / breakeven (amber dashed), hover crosshair with a 3-line tooltip. Hand-rolled SVG, no chart lib.
 
-**On-chart stat overlay** — top-left HTML overlay (`pointer-events: none` so it never blocks SVG hover/zoom/pan) showing `SPOT / TDAY / EXP / MAX P / MAX L`. Color-coded values (sky for spot, green/red for P&L direction) and `tabular-nums` so right-aligned rupees stay column-aligned. The numerics are read off the chart's own props — no upstream coordination required — so the chart is self-contained and the operator doesn't have to glance at the Greeks / Risk cards just to read TDAY P&L. Tooltip + meta row labels match (`TDAY` / `EXP`); the bottom-of-chart "spot 9000" text label was retired (redundant with the overlay; legend identifies the cyan vertical).
+**On-chart stat overlay** — top-left HTML overlay (`pointer-events: none` so it never blocks SVG hover/zoom/pan) showing `SPOT / TDAY / EXP / MAX P / MAX L / DTE / σ / LEGS`. Color-coded values (sky for spot, green/red for P&L direction) and `tabular-nums` so right-aligned rupees stay column-aligned. Owns every key numeric for the strategy — the page header above the chart was previously two rows (title + chips, then meta row with DTE / σ-proxy / legs / TDAY / EXP) but every value duplicated either the overlay or another card, and the meta row was overlapping the overlay box visually on tight viewports. Now the header is a single row with just the title + NET DEBIT/CREDIT chip; the overlay carries all the numbers.
+
+**Sigma axis labels** on the payoff chart use the algo amber accent (`#fbbf24`, font-size 11, weight 700) for whole-σ ticks and light gray-blue (`#c8d8f0`, font-size 10, weight 500) for half-σ. Earlier the whole-σ labels were `#c8d8f0` and the half-σ `#7e97b8` — both too low-contrast against the navy chart background to be glanceable. The σ symbol (not "sigma" or "σ-proxy") is the canonical label everywhere it's referenced on the chart.
 
 **Page model (v4)** — the page is a single multi-leg payoff workspace; there's no Single-vs-Strategy mode any more. One leg renders the same chart + Greeks + risk panel as many. The picker bar is two dropdowns + a single `+` toggle:
 
@@ -1180,7 +1183,9 @@ The guard sets `connection.state.is_demo = True` for anonymous prod requests. Ev
 | non-`main` | paper engine has open orders | **PAPER** (blue) |
 | any | both | both stack |
 
-Pill-shaped, pulse 2.4 s. Existing full-width banners under the nav still surface scenario / chase detail.
+Outlined-pill style: subtle tinted background + bright text + matching colour border + a small leading dot that pulses (2 s). Earlier solid-fill DEMO/SIM/PAPER badges with whole-pill opacity-pulse animation read as too loud — the dot-only animation reads as a calmer "alive indicator" without the throb. Existing full-width banners under the nav still surface scenario / chase detail.
+
+**Navbar breakpoint**: hamburger menu shows for everything below the Tailwind `lg:` breakpoint (1024px), not `md:` (768px). The earlier `md:` cutoff left landscape phones (~640-900px) trying to render the full desktop nav, causing overflow and garbling. `lg:` is the cleaner cutoff: real tablets in landscape and desktops get the full nav, every phone (portrait + landscape) gets the hamburger.
 
 **No fixture maintenance**: there's no synthetic data file to keep in sync. Whatever positions / holdings / orders / agent fires the operator's prod book has, the demo session sees — masked. If demo looks empty, it's because prod is idle.
 
