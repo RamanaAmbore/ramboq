@@ -115,6 +115,14 @@
           {/each}
         </nav>
 
+        {#if simStatus?.active}
+          <span class="algo-mode-badge algo-mode-sim"
+                title="Simulator is running — fabricated market data">S</span>
+        {/if}
+        {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
+          <span class="algo-mode-badge algo-mode-paper"
+                title="Paper engine has {paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}">P</span>
+        {/if}
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
           <span class="algo-user-role">admin</span>
@@ -132,6 +140,12 @@
             <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
           </button>
         </div>
+        {#if simStatus?.active}
+          <span class="algo-mode-badge algo-mode-sim" title="Simulator running">S</span>
+        {/if}
+        {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
+          <span class="algo-mode-badge algo-mode-paper" title="Paper engine has open chase orders">P</span>
+        {/if}
         <span class="algo-user-pill">
           {$authStore.user?.display_name?.toLowerCase() ?? ''}
           <span class="algo-user-role">admin</span>
@@ -362,6 +376,42 @@
      the gold-pill "Algo Site" button on the public side. Both context-
      switch buttons carry equal visual weight; the operator never has
      to hunt for the way back. */
+  /* Mode badges (S = simulator, P = paper). Sit in the navbar so
+     they stay visible regardless of scroll position; the existing
+     full-width banners under the nav still surface scenario / chase
+     details. The badges are the at-a-glance "are we in fake-money
+     land right now?" indicator on every algo page. */
+  .algo-mode-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1;
+    flex: 0 0 auto;
+    margin-right: 0.35rem;
+    animation: algo-mode-pulse 2.4s ease-in-out infinite;
+  }
+  .algo-mode-sim {
+    background: #fb7185;
+    color: #0c1830;
+    box-shadow: 0 0 0 1px rgba(251,113,133,0.55), 0 0 8px rgba(251,113,133,0.45);
+  }
+  .algo-mode-paper {
+    background: #38bdf8;
+    color: #0c1830;
+    box-shadow: 0 0 0 1px rgba(56,189,248,0.55), 0 0 8px rgba(56,189,248,0.4);
+  }
+  @keyframes algo-mode-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.78; }
+  }
+
   .algo-pub-link {
     padding: 0.2rem 0.65rem;
     font-size: 0.65rem;
