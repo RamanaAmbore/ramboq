@@ -479,10 +479,11 @@
         placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
     </div>
     <button type="button"
-            class="sim-btn sim-btn-order opt-add-btn"
+            class="opt-add-btn"
             class:opt-add-btn-on={showAddPanel}
-            title="Open the option chain to add draft positions or place an order"
-            onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'} Add</button>
+            title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
+            aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
+            onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
   </div>
 </div>
 
@@ -539,73 +540,6 @@
         </div>
       {/each}
     </div>
-  </div>
-{/if}
-
-<!-- ───────────────────────── CANDIDATES (live / sim / strategy) ────────
-     Every option / future on the chosen underlying held in the chosen
-     accounts. Lives outside any mode-specific block so the same panel
-     serves three workflows:
-       - live / sim: click a row to analyse that single position;
-                     selected row is highlighted in amber.
-       - strategy:   checkbox per row; toggling rebuilds legs[] for the
-                     next Analyze click.
-     Hidden in hypothetical mode (operator types a symbol; no book to
-     scan). -->
-{#if selectedUnderlying || drafts.length}
-  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
-    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-      Candidates
-      <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
-      <span class="opt-section-meta">
-        {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
-        uncheck to drop a leg from the payoff
-      </span>
-    </div>
-    {#if candidatePositions.length}
-      <div class="cand-grid">
-        <div class="cand-headrow">
-          <span></span>
-          <span>Symbol</span>
-          <span>Account</span>
-          <span>Kind</span>
-          <span class="num">Qty</span>
-          <span class="num">Avg cost</span>
-          <span class="num">LTP</span>
-          <span class="num">P&amp;L</span>
-          <span>Source</span>
-        </div>
-        {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
-          {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
-          <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
-            <input type="checkbox"
-                   checked={enabledSymbols[c.symbol] !== false}
-                   onchange={(e) => {
-                     const next = { ...enabledSymbols };
-                     next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
-                     enabledSymbols = next;
-                   }} />
-            <span class="font-mono">{c.symbol}</span>
-            <span class="font-mono">{c.account}</span>
-            <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
-            <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-            <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-            <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
-            <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
-              {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </span>
-            <span class="leg-source leg-source-{c.source}">{c.source}</span>
-          </label>
-        {/each}
-      </div>
-    {:else}
-      <div class="text-[0.6rem] text-[#7e97b8] italic">
-        No options or futures on <b>{selectedUnderlying}</b> in
-        {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
-        Try a different underlying / account, or click <b>+ Add</b> to drop
-        a draft strike into the payoff.
-      </div>
-    {/if}
   </div>
 {/if}
 
@@ -846,64 +780,78 @@
     </div>
   {/if}
 
-  {#if strategy}
-    <!-- Per-leg breakdown table — what each leg contributes. -->
-    <div class="algo-status-card p-3 mb-3" data-status="inactive">
-      <div class="opt-section-h" style="padding-bottom: 0.5rem;">Per-leg breakdown</div>
-      <table class="leg-table">
-        <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Type</th>
-            <th class="num">Strike</th>
-            <th class="num">Qty</th>
-            <th class="num">Cost</th>
-            <th class="num">LTP</th>
-            <th>Src</th>
-            <th class="num">BS</th>
-            <th class="num">Diff</th>
-            <th class="num">IV</th>
-            <th class="num">Δ</th>
-            <th class="num">Θ/d</th>
-            <th class="num">𝒱/1%</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each strategy.legs as l}
-            <tr>
-              <td class="font-mono">{l.symbol}</td>
-              <td><span class="leg-type-{l.opt_type}">{l.opt_type}</span></td>
-              <td class="num">{l.strike.toFixed(0)}</td>
-              <td class="num {l.qty < 0 ? 'kv-neg' : 'kv-pos'}">{l.qty > 0 ? '+' : ''}{l.qty}</td>
-              <td class="num">₹{l.avg_cost.toFixed(2)}</td>
-              <td class="num">₹{l.ltp.toFixed(2)}</td>
-              <td>
-                {#if l.ltp_source === 'live' || l.ltp_source === 'override' || l.ltp_source === 'sim'}
-                  <span class="leg-src leg-src-fresh">{l.ltp_source}</span>
-                {:else}
-                  <span class="leg-src leg-src-stale" title="LTP came from a fallback — treat numbers with care">{l.ltp_source}</span>
-                {/if}
-              </td>
-              <td class="num">₹{l.theoretical.toFixed(2)}</td>
-              <td class="num {l.discrepancy >= 0 ? 'kv-pos' : 'kv-neg'}">{l.discrepancy >= 0 ? '+' : ''}{l.discrepancy.toFixed(2)}</td>
-              <td class="num">
-                {(l.iv * 100).toFixed(1)}%
-                {#if l.iv_source === 'default'}
-                  <span class="src-tag src-warn">·dflt</span>
-                {/if}
-              </td>
-              <td class="num">{l.greeks.delta.toFixed(3)}</td>
-              <td class="num kv-neg">{l.greeks.theta.toFixed(2)}</td>
-              <td class="num">{l.greeks.vega.toFixed(2)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+<!-- Candidates — sits immediately under the payoff chart so the
+     operator can scan the working set + uncheck rows to drop them
+     from the payoff, all without scrolling away from the chart.
+     Replaces the old Per-leg breakdown card (the same backend data
+     showed twice, once with checkboxes here and once read-only
+     below). Horizontal + vertical overflow scrolling so wide rows
+     and long lists never break the card layout. -->
+{#if selectedUnderlying || drafts.length}
+  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+      Candidates
+      {#if selectedUnderlying}
+        <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
+      {/if}
+      <span class="opt-section-meta">
+        {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
+        uncheck to drop a leg from the payoff
+      </span>
     </div>
-  {:else if !strategyErr && !legs.length}
+    {#if candidatePositions.length}
+      <div class="cand-scroll">
+        <div class="cand-grid">
+          <div class="cand-headrow">
+            <span></span>
+            <span>Symbol</span>
+            <span>Account</span>
+            <span>Kind</span>
+            <span class="num">Qty</span>
+            <span class="num">Avg cost</span>
+            <span class="num">LTP</span>
+            <span class="num">P&amp;L</span>
+            <span>Source</span>
+          </div>
+          {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
+            {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
+            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
+              <input type="checkbox"
+                     checked={enabledSymbols[c.symbol] !== false}
+                     onchange={(e) => {
+                       const next = { ...enabledSymbols };
+                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
+                       enabledSymbols = next;
+                     }} />
+              <span class="font-mono">{c.symbol}</span>
+              <span class="font-mono">{c.account}</span>
+              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
+              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
+              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
+              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span class="leg-source leg-source-{c.source}">{c.source}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+    {:else}
+      <div class="text-[0.6rem] text-[#7e97b8] italic">
+        No options or futures on <b>{selectedUnderlying}</b> in
+        {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
+        Try a different underlying / account, or click <b>+</b> to drop a
+        draft strike into the payoff.
+      </div>
+    {/if}
+  </div>
+{/if}
+
+  {#if !strategy && !strategyErr && !legs.length}
     <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
       No legs yet. Pick an underlying above to surface candidates, or click
-      <b>+ Add</b> to drop a draft strike into the payoff.
+      <b>+</b> to drop a draft strike into the payoff.
     </div>
   {/if}
 
@@ -931,6 +879,39 @@
      (~12 chars). Both controls grow proportionally so the row fills
      available width without forcing a wrap. */
   .opt-field-grow { flex: 1; min-width: 150px; }
+
+  /* "+" toggle button — fixed-width amber pill that sits flush at the
+     end of the picker row. Square aspect so the symbol reads as a
+     single glyph not a labelled button. Flips to "−" while the chain
+     panel is open. */
+  .opt-add-btn {
+    width: 1.9rem;
+    height: 1.9rem;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-bottom: 1px;          /* line up baseline with the Selects */
+    border-radius: 0.25rem;
+    border: 1px solid rgba(251,191,36,0.5);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .opt-add-btn:hover {
+    background: rgba(251,191,36,0.22);
+    border-color: rgba(251,191,36,0.75);
+  }
+  .opt-add-btn-on {
+    background: #fbbf24;
+    color: #0c1830;
+    border-color: #fbbf24;
+  }
 
   .opt-grid {
     display: grid;
@@ -1115,14 +1096,39 @@
     border-color: rgba(248,113,113,0.65);
   }
 
-  /* Candidate position toggle list — same monospace look as the leg
-     grid but read-only fields (no inputs). Checkbox on the left;
-     unchecking dims the row to signal "excluded from strategy". */
+  /* Candidate position toggle list — sits immediately under the
+     payoff chart. The wrapping `.cand-scroll` handles overflow:
+       - horizontal: when the row is wider than the card (narrow
+         viewport, long symbols), the table scrolls within the card
+         instead of breaking layout
+       - vertical: capped at ~16 rows; longer lists scroll inside
+   */
+  .cand-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 22rem;
+    margin-top: 0.4rem;
+    /* Compact scrollbar styling — works on WebKit; falls back to
+       browser default elsewhere. */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(251,191,36,0.4) transparent;
+  }
+  .cand-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+  .cand-scroll::-webkit-scrollbar-thumb {
+    background: rgba(251,191,36,0.35);
+    border-radius: 3px;
+  }
+  .cand-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(251,191,36,0.55);
+  }
   .cand-grid {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    margin-top: 0.4rem;
+    /* Min-width enforces a sensible row width; the wrapping
+       .cand-scroll handles the horizontal overflow when the viewport
+       is narrower than this. */
+    min-width: 720px;
   }
   .cand-headrow,
   .cand-row {

@@ -270,9 +270,7 @@
     border-bottom-color: #d4920c;
   }
   .market-tabs-row + .bg-white {
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-    border-top: 0;
+    margin-top: 0.6rem;
   }
   .market-tabs-meta {
     font-size: 0.7rem;

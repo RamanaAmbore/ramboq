@@ -123,25 +123,29 @@
     border-color: #fbbf24;
   }
 
-  /* Popover — same gradient + amber accent the Settings page row info
-     uses, so the affordance is consistent across the algo surface. */
+  /* Popover — subtle dark-blue surface with a soft border. Earlier
+     iterations used a gradient + amber-accent left border; the
+     accent shouted louder than the helper text it was framing. The
+     subtler look is a flat slate background, faint blue-grey border,
+     no left accent, and softer body type. Bold spans inside (b /
+     strong) keep amber so the information hierarchy is preserved. */
   .info-popout {
     display: inline-block;
     margin: 0;
     padding: 0.5rem 0.7rem;
-    border-radius: 0.25rem;
-    border: 1px solid rgba(251,191,36,0.35);
-    border-left: 3px solid #fbbf24;
-    background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
-    font-size: 0.7rem;
+    border-radius: 0.3rem;
+    border: 1px solid rgba(125,211,252,0.18);
+    background: rgba(15, 25, 45, 0.95);
+    font-size: 0.72rem;
     color: #c8d8f0;
     line-height: 1.5;
     flex: 1 1 100%;
   }
   /* Popup variant — absolute-positioned so it floats above siblings
-     instead of pushing them. Adds a drop-shadow so it reads as a
-     tooltip layer, not part of the content flow. min-width keeps a
-     tiny popup readable even when the content is short. */
+     instead of pushing them. Width clamps to the viewport so a tiny
+     phone screen never gets a popup wider than the page; on a
+     desktop it caps at 32rem. min-width is also viewport-clamped so
+     a long popup on a 320px phone doesn't overflow horizontally. */
   .info-popout-popup {
     position: absolute;
     top: calc(100% + 0.4rem);
@@ -149,8 +153,16 @@
     z-index: 50;
     flex: none;
     width: max-content;
-    min-width: 14rem;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+    min-width: min(13rem, 88vw);
+    max-width: min(32rem, 92vw);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+  }
+  /* Right-aligned variant — flips the popup to anchor on the right
+     edge of its trigger. Used when the chip sits at the right side
+     of a row and a left-anchored popup would clip off-screen. */
+  .info-wrap-popup.align-right .info-popout-popup {
+    left: auto;
+    right: 0;
   }
   .info-popout-pinned { pointer-events: auto; }
 

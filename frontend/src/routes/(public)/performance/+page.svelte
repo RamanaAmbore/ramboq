@@ -215,13 +215,10 @@
   }
 
   /* Tab row — sits OUTSIDE the white panel, on the page's cream
-     background. Active tab gets a champagne BOTTOM border (mirrors a
-     desktop-app document-tab affordance more naturally than the
-     earlier left-border indicator). The row's own bottom border
-     stitches the active tab to the panel below — the active tab's
-     bottom border meets the row's, the inactive tabs sit just above
-     it. Margin-top gives the tabs breathing room from the
-     PerformancePage grids above. */
+     background. Active tab gets a champagne BOTTOM border. A small
+     gap below the row (margin-bottom on `.market-tabs-row +
+     .bg-white`) separates the tab strip from the panel so they read
+     as related-but-distinct, not merged. */
   .market-tabs-row {
     display: flex;
     align-items: flex-end;
@@ -257,13 +254,9 @@
     font-weight: 700;
     border-bottom-color: #d4920c;
   }
-  /* Bridge between the tab row and the white panel — kill the panel's
-     top-left/right rounding so the active tab visually merges with
-     the panel beneath it. */
+  /* Small gap between the tab row and the panel beneath. */
   .market-tabs-row + .bg-white {
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-    border-top: 0;
+    margin-top: 0.6rem;
   }
   .market-tabs-meta {
     font-size: 0.7rem;
