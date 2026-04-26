@@ -563,6 +563,18 @@
     gap: 0.5rem;
     margin-bottom: 0.25rem;
   }
+  /* The h2 carries `margin-bottom: 0.5rem` from .section-heading,
+     which makes its box taller than the Refresh button — `align-items:
+     center` then centers the boxes, but the visible "Fund Balances"
+     text reads above the button text. Zero out the h2's margin in
+     this flex row + match line-height so the two elements share a
+     baseline. */
+  .funds-heading-row .section-heading {
+    margin-bottom: 0;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+  }
   .funds-heading-refresh { margin-left: auto; }
 
   /* ── Dark (algo) overrides ─────────────────────────────────────────────── */
