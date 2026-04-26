@@ -894,10 +894,12 @@ class OptionsController(Controller):
             # readable payoff curve when the broker is fully unreachable;
             # leg.ltp_source='estimated' tells the UI to treat absolute
             # numbers with care.
+            # NOTE: DEFAULT_IV + black_scholes are imported at module
+            # level — DON'T re-import here. A `from … import DEFAULT_IV`
+            # inside this branch makes Python flag DEFAULT_IV as a local
+            # for the WHOLE function, then the comparison further down
+            # raises UnboundLocalError when this branch never runs.
             if ltp_val is None or ltp_val <= 0:
-                from backend.api.algo.derivatives import (
-                    DEFAULT_IV, black_scholes
-                )
                 est = black_scholes(S, parsed["strike"], T_yrs,
                                     DEFAULT_RISK_FREE, DEFAULT_IV,
                                     parsed["opt_type"])
