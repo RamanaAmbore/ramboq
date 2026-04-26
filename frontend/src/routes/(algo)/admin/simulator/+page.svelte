@@ -1001,8 +1001,5 @@
   agentLog={events}
   {systemLog}
   {simLog}
-  chartMode="sim"
-  {chartSymbols}
-  {chartsBySymbol}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

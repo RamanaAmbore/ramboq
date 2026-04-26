@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { parseLogLineTime } from '$lib/stores';
   import { fetchNews } from '$lib/api';
-  import PriceChart from '$lib/PriceChart.svelte';
 
   /** @type {{
    *   heightClass?: string,
@@ -14,9 +13,6 @@
    *   agentLog?: Array<any>,
    *   systemLog?: string[],
    *   simLog?: Array<any>,
-   *   chartMode?: 'sim'|'paper'|'live',
-   *   chartSymbols?: string[],
-   *   chartsBySymbol?: Record<string, any>,
    *   initialTab?: string,
    *   onTabChange?: (tab: string) => void,
    * }} */
@@ -28,9 +24,6 @@
     agentLog = [],
     systemLog = [],
     simLog = [],
-    chartMode = 'sim',
-    chartSymbols = [],
-    chartsBySymbol = {},
     initialTab = 'order',
     onTabChange = () => {},
   } = $props();
@@ -62,7 +55,6 @@
     ['terminal',  'Terminal'],
     ['agent',     'Agent'],
     ['simulator', 'Simulator'],
-    ['chart',     'Chart'],
     ['system',    'System'],
     ['news',      'News'],
   ];
@@ -276,24 +268,7 @@
   {/each}
 </div>
 
-{#if logTab === 'chart'}
-  <div class="log-panel log-chart-panel {heightClass}">
-    {#if chartSymbols.length}
-      <div class="log-chart-grid">
-        {#each chartSymbols as sym (sym)}
-          <PriceChart mode={chartMode} symbol={sym} height={170}
-                      data={chartsBySymbol[sym]}
-                      {chartsBySymbol} />
-        {/each}
-      </div>
-    {:else}
-      <span class="log-debug">
-        No symbols with captured ticks yet. Charts populate once an order
-        is open against a symbol{chartMode === 'sim' ? ' or the simulator is running' : ''}.
-      </span>
-    {/if}
-  </div>
-{:else if logTab === 'news'}
+{#if logTab === 'news'}
   <!-- News tab — proper row layout (matches the public /performance
        Market News card structure: time / title / source per row) but
        in the algo dark palette. Pulled out of the shared <pre> so each
@@ -311,11 +286,8 @@
           <li class="log-news-row">
             <span class="log-news-time">{_newsTime(n.timestamp)}</span>
             <a class="log-news-title" href={n.link} target="_blank" rel="noopener">
-              {n.title}
+              {n.title}{#if n.source}<span class="log-news-src">{n.source}</span>{/if}
             </a>
-            {#if n.source}
-              <span class="log-news-src" title={n.source}>{n.source}</span>
-            {/if}
           </li>
         {/each}
       </ul>
@@ -409,16 +381,4 @@
     border-color: rgba(56,189,248,0.45);
   }
 
-  /* Chart-tab body — uses the .log-panel base for height + scroll, but
-     swaps the monospace pre look for a scrollable chart grid. */
-  :global(.log-chart-panel) {
-    overflow-y: auto;
-    padding: 0.4rem 0.5rem;
-    white-space: normal;
-  }
-  .log-chart-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-    gap: 0.5rem;
-  }
 </style>

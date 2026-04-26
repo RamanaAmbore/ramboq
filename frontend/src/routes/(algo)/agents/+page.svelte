@@ -5,7 +5,7 @@
   import {
     fetchAgents, activateAgent, deactivateAgent, updateAgent,
     fetchRecentAgentEvents, fetchSimTicks, fetchSimEvents, fetchSimStatus,
-    startSimForAgent, fetchAlgoOrdersRecent, fetchChartSymbols, fetchChartBatch,
+    startSimForAgent, fetchAlgoOrdersRecent,
   } from '$lib/api';
   import LogPanel from '$lib/LogPanel.svelte';
 
@@ -27,13 +27,6 @@
   // algo pages while the sim is running.
   let simActive   = $state(false);
   // Symbols with captured price-history ticks. Sourced from the active
-  // mode (sim while a sim runs, paper otherwise) so the LogPanel's Chart
-  // tab can render one mini chart per symbol that's been touched.
-  let chartMode    = $derived(/** @type {'sim'|'paper'|'live'} */ (simActive ? 'sim' : 'paper'));
-  let chartSymbols = $state(/** @type {string[]} */([]));
-  // Batched chart payload — see /admin/simulator + /admin/paper for the
-  // same pattern. Cuts N polls (one per chart) to one /charts/batch call.
-  let chartsBySymbol = $state(/** @type {Record<string, any>} */({}));
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
   let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
@@ -81,23 +74,6 @@
     } catch (_) { /* cap flag off — treat as idle */ }
   }
 
-  async function loadChartSymbols() {
-    try {
-      const r = await fetchChartSymbols(chartMode);
-      chartSymbols = r?.symbols || [];
-      if (chartSymbols.length) {
-        try {
-          const batch = await fetchChartBatch(chartMode, chartSymbols);
-          const map = /** @type {Record<string, any>} */ ({});
-          for (const c of (batch?.charts || [])) map[c.symbol] = c;
-          chartsBySymbol = map;
-        } catch (_) { /* fall back to per-chart polling */ }
-      } else {
-        chartsBySymbol = {};
-      }
-    } catch (_) { chartSymbols = []; chartsBySymbol = {}; }
-  }
-
   async function loadSystemLog() {
     try {
       const res = await fetch('/api/admin/logs?n=100', { headers: authHeaders() });
@@ -135,13 +111,12 @@
     else if (logTab === 'system') loadSystemLog();
     else if (logTab === 'order') loadOrderLog();
     else if (logTab === 'simulator') loadSimLog();
-    else if (logTab === 'chart') loadChartSymbols();
   }
 
   async function loadAll() {
     loading = true;
     await Promise.all([loadAgents(), loadAgentLog(), loadSystemLog(),
-                       loadSimLog(), loadChartSymbols()]);
+                       loadSimLog()]);
     loading = false;
   }
 
@@ -797,8 +772,5 @@
   agentLog={agentEvents}
   {systemLog}
   {simLog}
-  {chartMode}
-  {chartSymbols}
-  {chartsBySymbol}
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />

@@ -167,9 +167,6 @@
   agentLog={[]}
   systemLog={[]}
   simLog={[]}
-  chartMode="paper"
-  {chartSymbols}
-  {chartsBySymbol}
   onTabChange={(id) => { logTab = id; }}
 />
 

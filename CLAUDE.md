@@ -790,8 +790,8 @@ where the chase fired" without any new persistent state.
 
 - [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) — hand-rolled SVG line + bid/ask shaded band + lifecycle markers (placed=amber / filled=emerald / unfilled=red). Polls `/api/charts/price-history` every 3 s. No chart library — keeps the bundle thin.
 - [`/admin/simulator`](frontend/src/routes/(algo)/admin/simulator/+page.svelte) embeds one mini chart per symbol returned by `GET /charts/symbols?mode=sim` directly under the position pills, so the operator sees the trajectory + chase markers live.
-- [`LogPanel`](frontend/src/lib/LogPanel.svelte) gained a **Chart** tab. Consumers pass `chartMode` (`sim` while a sim runs, otherwise `paper`) + `chartSymbols`. The `/agents` page wires both — its Chart tab tracks whichever surface is active.
-- The LogPanel **News** tab carries a `Refreshed at <ts>` heading line above the items (matching the public `/market` and `/performance` Market News card layout). `loadNews()` captures `refreshed_at` from the `/api/news` payload; the heading hides when no headlines have been seen yet (cold-start) so we don't render an orphan "Refreshed at " label. CSS class `.log-news-head` lives in [`app.css`](frontend/src/app.css) alongside the rest of the log palette.
+- The LogPanel **News** tab is the operator's headline feed inside the algo dark UI. Pulled out of the shared `<pre>` (where every other tab still lives) and rendered as a proper `<ul class="log-news-list">` with one `<li class="log-news-row">` per headline: `[HH:MM]  [<a> title <span> · source </span></a> flexes]`. The source label sits inside the title link as a trailing tag (subtle leading "·" separator, sky-cyan small-caps) so the row is a single clickable element instead of three loose pieces. Carries a `Refreshed at <ts>` heading line above the list, matching the public `/market` and `/performance` Market News card layout. `loadNews()` captures `refreshed_at` from the `/api/news` payload; heading hides on cold-start. The dual-zone presentational `timestamp` is parsed by a news-specific `_newsTime()` helper (extracts the first `HH:MM` run) — `_shortTime()` only knows ISO/`HH:MM:SS` and was dumping the whole 60-char dual-zone string into the time column. CSS lives in [`app.css`](frontend/src/app.css) alongside the rest of the log palette.
+- The standalone **Chart** tab inside LogPanel was retired — never had a clear use case (the pages that need charts already render them inline alongside their own controls, see `/admin/simulator`, `/admin/paper`, `/admin/options`). Removed the tab + the `chartMode` / `chartSymbols` / `chartsBySymbol` props from LogPanel's API. The pages that were feeding those props for the tab dropped the dead fetch chain.
 
 **Cleanup**: deque `maxlen=600` is the only retention mechanism — at the default tick rates (2 s sim / 5 s paper) that's ~20 min of history per symbol. Restart loses the history; operator monitoring the chase live doesn't need cross-restart continuity. If post-mortem replay becomes valuable, swap to a `price_ticks` table here.
 
@@ -846,7 +846,7 @@ Visual surface for the prod paper-trade engine, pairing with the simulator page 
 - Status banner — green/sky `CHASING` (orders in flight on main), amber `IDLE` (engine enabled, no orders), grey `DEV` (engine gated on this branch).
 - Open-order pills — same shape as the sim page's chase pills (side / qty / symbol / current limit / attempt count).
 - Chart grid — one mini chart per symbol with captured ticks; underlyings rendered first (sky-blue `SPOT` tag), derivatives grouped by underlying with the spot overlaid as a dashed line.
-- Embedded LogPanel with `chartMode='paper'` so the Chart tab inside the panel mirrors the page's main chart grid.
+- Embedded LogPanel for order / agent / system / news streams; the page's main chart grid handles all chart rendering directly.
 
 **API**: [`/api/charts/paper-status`](backend/api/routes/charts.py) — admin-guarded. Returns `{enabled, branch, open_order_count, open_order_details, captured_symbols, captured_underlyings}`. `enabled = (deploy_branch == 'main')` — the engine still exists on dev branches but no `tick_loop` is running, so no orders register and the page banner explains the gate.
 
@@ -975,7 +975,7 @@ The chart panel's per-symbol polling could blow up to N+M requests every 3 s (N 
 
 **Frontend distribution**: [`PriceChart.svelte`](frontend/src/lib/PriceChart.svelte) gained a `data` prop. When the parent feeds it (and `chartsBySymbol` for underlying-overlay lookup), the chart skips its own poll timer (`stopPolling()` in a `$effect` triggered when `externalData` flips on). The simulator, paper, and agents pages all poll once and distribute via `chartsBySymbol`.
 
-Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviour change for charts shown without a parent (Chart tab on /orders, /console where it falls back to per-chart polling).
+Effect: a page with 10 charts goes from ~200 req/min to ~20 req/min, no behaviour change for charts shown without a parent (falls back to per-chart polling).
 
 ---
 

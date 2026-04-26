@@ -420,20 +420,23 @@
   color: #fbbf24;
   text-decoration: underline;
 }
+/* Source label sits inline at the tail of the title link — small,
+   muted, with a subtle leading separator dot so it reads as a
+   provenance tag rather than another piece of the headline text.
+   Inherits hover colour from the parent <a>. */
 .log-news-panel .log-news-src {
-  flex: 0 0 auto;
+  margin-left: 0.5rem;
   color: #7dd3fc;
-  font-size: 0.55rem;
+  font-size: 0.6rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0 0.35rem;
-  border-radius: 2px;
-  background: rgba(125,211,252,0.08);
-  border: 1px solid rgba(125,211,252,0.20);
   white-space: nowrap;
-  max-width: 8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.log-news-panel .log-news-src::before {
+  content: '·';
+  margin-right: 0.4rem;
+  color: rgba(125,211,252,0.45);
 }
 .log-panel .log-agent-triggered   { color: #fb923c; background: rgba(251,146,60,0.1); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-alert       { color: #facc15; background: rgba(250,204,21,0.08); display: block; padding: 0 4px; border-radius: 2px; }
