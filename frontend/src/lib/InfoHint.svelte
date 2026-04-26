@@ -156,13 +156,13 @@
      the labels it sits next to. The amber accent only appears on
      hover / open so the chip lights up when intentionally invoked. */
   .info-btn {
-    width: 0.85rem;
-    height: 0.85rem;
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 9999px;
-    border: 1px solid rgba(125,151,184,0.35);
-    background: rgba(125,151,184,0.08);
+    border: 1px solid rgba(125,151,184,0.32);
+    background: rgba(125,151,184,0.06);
     color: #7e97b8;
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     font-style: italic;
     font-weight: 600;
     line-height: 1;

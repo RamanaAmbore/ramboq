@@ -93,6 +93,17 @@
   /** @type {Array<{symbol:string, qty:any, avg_cost:any, ltp:any, source:string}>} */
   let legs = $state([]);
 
+  /** Lookup map: symbol → backend leg analytics (greeks, iv, …) from
+   *  the latest strategy response. Lets the Candidates panel show
+   *  per-row IV / Δ / Θ / 𝒱 without a second endpoint. */
+  const legAnalyticsBySymbol = $derived.by(() => {
+    /** @type {Record<string, any>} */
+    const out = {};
+    if (!strategy?.legs) return out;
+    for (const l of strategy.legs) out[l.symbol] = l;
+    return out;
+  });
+
   // Distinct underlyings + accounts derived from the loaded positions.
   // Falls back to the major indices when the operator hasn't loaded a
   // book yet so the dropdowns never appear empty.
@@ -643,6 +654,77 @@
   {/if}
 {/if}
 
+<!-- Candidates — sits ABOVE the payoff chart so the operator's
+     reading order is: pick what's in the basket → see the payoff
+     it draws → see the aggregate maths underneath. Each row carries
+     position info (qty / cost / LTP / P&L) plus per-leg analytics
+     (IV / Δ / Θ / 𝒱) joined from the latest strategy response by
+     symbol. Horizontal + vertical overflow scrolling; the row's
+     min-width keeps every column readable on narrow viewports. -->
+{#if selectedUnderlying || drafts.length}
+  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
+      Candidates
+      {#if selectedUnderlying}
+        <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
+      {/if}
+    </div>
+    {#if candidatePositions.length}
+      <div class="cand-scroll">
+        <div class="cand-grid">
+          <div class="cand-headrow">
+            <span></span>
+            <span>Symbol</span>
+            <span>Acct</span>
+            <span class="num">Qty</span>
+            <span class="num">Cost</span>
+            <span class="num">LTP</span>
+            <span class="num">P&amp;L</span>
+            <span class="num">IV</span>
+            <span class="num">Δ</span>
+            <span class="num">Θ</span>
+            <span class="num">𝒱</span>
+            <span>Src</span>
+          </div>
+          {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
+            {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
+            {@const lg = legAnalyticsBySymbol[c.symbol]}
+            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
+              <input type="checkbox"
+                     checked={enabledSymbols[c.symbol] !== false}
+                     onchange={(e) => {
+                       const next = { ...enabledSymbols };
+                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
+                       enabledSymbols = next;
+                     }} />
+              <span class="font-mono">{c.symbol}</span>
+              <span class="font-mono">{c.account}</span>
+              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
+              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
+              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span class="num">{lg ? (lg.iv * 100).toFixed(1) + '%' : '—'}</span>
+              <span class="num">{lg ? lg.greeks.delta.toFixed(2) : '—'}</span>
+              <span class="num {lg && lg.greeks.theta < 0 ? 'kv-neg' : ''}">{lg ? lg.greeks.theta.toFixed(0) : '—'}</span>
+              <span class="num">{lg ? lg.greeks.vega.toFixed(0) : '—'}</span>
+              <span class="leg-source leg-source-{c.source}">{c.source}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+    {:else}
+      <div class="text-[0.6rem] text-[#7e97b8] italic">
+        No options or futures on <b>{selectedUnderlying}</b> in
+        {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
+        Try a different underlying / account, or click <b>+</b> to drop a
+        draft strike into the payoff.
+      </div>
+    {/if}
+  </div>
+{/if}
+
 {#if strategy}
   <div class="opt-payoff opt-payoff-full mb-3">
     <div class="opt-section-h">
@@ -706,23 +788,23 @@
           </div>
           <div class="opt-kv">
             <div class="kv-pair">
-              <span class="kv-k">Δ <InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
+              <span class="kv-k kv-k-greek">Δ <InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k">Γ <InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
+              <span class="kv-k kv-k-greek">Γ <InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k">Θ <InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
+              <span class="kv-k kv-k-greek">Θ <InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
               <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k">𝒱 <InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
+              <span class="kv-k kv-k-greek">𝒱 <InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
               <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k">ρ <InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
+              <span class="kv-k kv-k-greek">ρ <InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
             </div>
           </div>
@@ -785,77 +867,6 @@
   </aside>
 {/if}
 
-<!-- Candidates — sits between the payoff chart above and the
-     Aggregate / Greeks / Risk cards below. The reading order is
-     "what does the position look like" → "which legs are in it" →
-     "what does the math summarise to". -->
-<!-- Candidates — sits immediately under the payoff chart so the
-     operator can scan the working set + uncheck rows to drop them
-     from the payoff, all without scrolling away from the chart.
-     Replaces the old Per-leg breakdown card (the same backend data
-     showed twice, once with checkboxes here and once read-only
-     below). Horizontal + vertical overflow scrolling so wide rows
-     and long lists never break the card layout. -->
-{#if selectedUnderlying || drafts.length}
-  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
-    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-      Candidates
-      {#if selectedUnderlying}
-        <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
-      {/if}
-      <span class="opt-section-meta">
-        {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
-        uncheck to drop a leg from the payoff
-      </span>
-    </div>
-    {#if candidatePositions.length}
-      <div class="cand-scroll">
-        <div class="cand-grid">
-          <div class="cand-headrow">
-            <span></span>
-            <span>Symbol</span>
-            <span>Account</span>
-            <span>Kind</span>
-            <span class="num">Qty</span>
-            <span class="num">Avg cost</span>
-            <span class="num">LTP</span>
-            <span class="num">P&amp;L</span>
-            <span>Source</span>
-          </div>
-          {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
-            {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
-            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
-              <input type="checkbox"
-                     checked={enabledSymbols[c.symbol] !== false}
-                     onchange={(e) => {
-                       const next = { ...enabledSymbols };
-                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
-                       enabledSymbols = next;
-                     }} />
-              <span class="font-mono">{c.symbol}</span>
-              <span class="font-mono">{c.account}</span>
-              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
-              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
-              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
-                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              <span class="leg-source leg-source-{c.source}">{c.source}</span>
-            </label>
-          {/each}
-        </div>
-      </div>
-    {:else}
-      <div class="text-[0.6rem] text-[#7e97b8] italic">
-        No options or futures on <b>{selectedUnderlying}</b> in
-        {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
-        Try a different underlying / account, or click <b>+</b> to drop a
-        draft strike into the payoff.
-      </div>
-    {/if}
-  </div>
-{/if}
 
   {#if !strategy && !strategyErr && !legs.length}
     <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
@@ -996,22 +1007,22 @@
     padding-bottom: 0.25rem;
     margin-bottom: 0.4rem;
   }
-  /* kv-pairs flow TWO per row, with label stacked vertically above
-     value inside each pair. This packs each card tightly while
-     keeping the label / value alignment clean: labels line up across
-     pairs in a row; values do too. */
+  /* kv-pairs flow TWO per row, with label and value SIDE BY SIDE
+     within each pair: "Underlying  CRUDE OIL", "Spot  ₹9000". Two
+     pairs per row keeps the cards compact; labels and values
+     align flush-left / flush-right so the eye scans cleanly across
+     pairs. */
   .opt-kv {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: 0.8rem;
-    row-gap: 0.45rem;
+    column-gap: 0.7rem;
+    row-gap: 0.3rem;
     font-family: monospace;
-    font-size: 0.65rem;
   }
   .kv-pair {
     display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
+    align-items: baseline;
+    gap: 0.45rem;
     min-width: 0;
   }
   .kv-k {
@@ -1019,16 +1030,23 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    font-size: 0.55rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 0.6rem;
+    flex: 0 0 auto;
     flex-wrap: nowrap;
   }
   .kv-v {
     color: #c8d8f0;
     font-size: 0.7rem;
     font-weight: 600;
+    margin-left: auto;          /* push value to the right of pair */
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  /* Greek symbols read better at a slightly larger size — they're
+     the label AND the visual identity of the row. */
+  .kv-k-greek { font-size: 0.95rem; font-weight: 700; color: #c8d8f0; }
   .kv-pos { color: #4ade80; }
   .kv-neg { color: #f87171; }
   .kv-sub { color: #7e97b8; font-size: 0.55rem; margin-left: 0.2rem; }
@@ -1161,10 +1179,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    /* Min-width enforces a sensible row width; the wrapping
-       .cand-scroll handles the horizontal overflow when the viewport
-       is narrower than this. */
-    min-width: 720px;
+    /* Min-width enforces a sensible row width — 12 columns now
+       (added IV / Δ / Θ / 𝒱 from the strategy response). The
+       wrapping `.cand-scroll` handles horizontal overflow when the
+       viewport is narrower than this. */
+    min-width: 980px;
   }
   .cand-headrow,
   .cand-row {
@@ -1172,14 +1191,17 @@
     grid-template-columns:
       auto                /* checkbox */
       minmax(0, 2.4fr)    /* symbol */
-      minmax(0, 0.9fr)    /* account */
-      minmax(0, 0.5fr)    /* kind */
-      minmax(0, 0.6fr)    /* qty */
-      minmax(0, 0.9fr)    /* avg cost */
-      minmax(0, 0.9fr)    /* ltp */
-      minmax(0, 1fr)      /* pnl */
-      minmax(0, 0.7fr);   /* source */
-    gap: 0.4rem;
+      minmax(0, 0.7fr)    /* account */
+      minmax(0, 0.5fr)    /* qty */
+      minmax(0, 0.8fr)    /* cost */
+      minmax(0, 0.8fr)    /* ltp */
+      minmax(0, 0.9fr)    /* pnl */
+      minmax(0, 0.55fr)   /* iv */
+      minmax(0, 0.55fr)   /* delta */
+      minmax(0, 0.55fr)   /* theta */
+      minmax(0, 0.55fr)   /* vega */
+      minmax(0, 0.6fr);   /* source */
+    gap: 0.35rem;
     align-items: center;
     font-size: 0.62rem;
     font-family: monospace;
