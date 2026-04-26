@@ -20,11 +20,9 @@
   import { goto } from '$app/navigation';
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
-    fetchPositions, fetchSimStatus, fetchOptionAnalytics, fetchOptionHistorical,
-    fetchStrategyAnalytics,
+    fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
-  import PriceChart    from '$lib/PriceChart.svelte';
   import Select        from '$lib/Select.svelte';
   import MultiSelect   from '$lib/MultiSelect.svelte';
   import InfoHint      from '$lib/InfoHint.svelte';
@@ -34,28 +32,30 @@
     listFutures,
   } from '$lib/data/instruments';
 
-  // Source card semantics (v3): collapsed from the old four-way (live /
-  // sim / hypothetical / strategy) into two analysis types. The data
-  // source for each leg (live / sim / draft) lives on the candidate row
-  // itself — operators can mix them freely in either analysis type.
-  /** @type {'single'|'strategy'} */
-  let mode = $state('single');
-  // Currently-picked candidate in single-leg mode. Stays in sync with
-  // the active row in the Candidates panel.
-  let symbol = $state('');
-  let account = $state('');
-  /** @type {'live'|'sim'|'draft'|''} */
-  let pickedSource = $state('');
-
-  /** @type {any} */ let analytics = $state(null);
-  /** @type {any} */ let historical = $state(null);
-  /** @type {any} */ let strategy = $state(null);
-  let analyticsErr  = $state('');
-  let historicalErr = $state('');
+  // Source card semantics (v4): no more single-vs-multi distinction.
+  // Everything is multi-leg. One leg analyses fine through the strategy
+  // endpoint; the operator just sees the same payoff + Greeks + risk
+  // panel regardless of how many legs are checked.
+  //
+  // Data source is auto-detected: when a sim is running, the page works
+  // off sim positions; otherwise it works off live broker positions.
+  // Drafts (operator-typed hypothetical positions) layer on top in
+  // either case.
+  /** @type {any} */ let strategy   = $state(null);
   let strategyErr   = $state('');
   let loading       = $state(false);
   let teardown;
   let posTeardown;
+  let simTeardown;
+
+  // Sim status — when true, the candidates panel shows sim positions
+  // instead of live. Polled every few seconds.
+  let simActive = $state(false);
+
+  // "+ Add" panel toggle — when on, the option-chain picker opens to
+  // let the operator browse strikes for the underlying and drop legs
+  // into Drafts.
+  let showAddPanel = $state(false);
 
   // Drafts — hypothetical positions the operator types in. They sit
   // beside live + sim positions in the Candidates panel and feed into
@@ -70,10 +70,6 @@
   }
   function removeDraft(/** @type {number} */ id) {
     drafts = drafts.filter(d => d.id !== id);
-    // If the removed draft was the picked single-leg position, clear it.
-    if (pickedSource === 'draft' && !drafts.some(d => d.symbol.toUpperCase() === symbol)) {
-      symbol = ''; account = ''; pickedSource = ''; analytics = null;
-    }
   }
 
   // Strategy mode v2 — pick (Account, Underlying) and the matching
@@ -90,13 +86,12 @@
   /** @type {Record<string, boolean>} symbol → enabled flag */
   let enabledSymbols = $state({});
 
-  // Manual / chain-picker / hypothetical legs — separate from the
-  // book-derived candidates. These persist regardless of the dropdown
-  // filter so an operator can build "what if I add NIFTY24500CE that
-  // I don't own" alongside their real positions.
-  /** @type {Array<{symbol:string, qty:string|number, avg_cost:string|number, ltp:string|number, source:string}>} */
+  // Legs sent to the strategy endpoint — built from candidate positions
+  // (live or sim, depending on simActive) plus drafts that match the
+  // selected underlying, intersected with the operator's checked rows
+  // in the Candidates panel.
+  /** @type {Array<{symbol:string, qty:any, avg_cost:any, ltp:any, source:string}>} */
   let legs = $state([]);
-  let legPickerValue = $state('');
 
   // Distinct underlyings + accounts derived from the loaded positions.
   // Falls back to the major indices when the operator hasn't loaded a
@@ -132,8 +127,11 @@
     const acctFilter = selectedAccounts.length ? selectedAccounts : [];
     /** @type {any[]} */
     const out = [];
-    // Live + sim positions
+    // Source filter — when a sim is active, work off the sim book only;
+    // otherwise the live book. Drafts are always visible regardless.
+    const wantedSource = simActive ? 'sim' : 'live';
     for (const p of positions) {
+      if (p.source !== wantedSource) continue;
       if (acctFilter.length && !acctFilter.includes(p.account)) continue;
       const sym = p.symbol;
       if (!new RegExp(`^${target}\\d`, 'i').test(sym)) continue;
@@ -197,30 +195,29 @@
     });
   });
 
-  // When candidates change OR toggle changes, rebuild the book-derived
-  // portion of `legs`. Manual / chain rows (source='manual'/'chain')
-  // are preserved verbatim. Live + sim sourced legs are replaced from
-  // the current candidates × enabled-flag combination.
-  // ── untrack the read of `legs` so this effect doesn't trigger itself
-  //    via the `legs.filter` access on the line below.
+  // Rebuild legs from the current candidates × enabled-flag combination.
+  // Drafts already live in candidatePositions (with source='draft'),
+  // so this single derivation covers live + sim + draft uniformly.
   $effect(() => {
     void candidatePositions; void enabledSymbols;
-    if (mode !== 'strategy') return;
     untrack(() => {
-      const nonBook = legs.filter(l =>
-        l.source === 'manual' || l.source === 'chain'
-      );
-      const book = candidatePositions
+      legs = candidatePositions
         .filter(c => enabledSymbols[c.symbol] !== false)
         .map(c => ({
           symbol:   c.symbol,
           qty:      c.qty,
           avg_cost: c.avg_cost ?? '',
           ltp:      c.ltp ?? '',
-          source:   c.source,   // 'live' or 'sim'
+          source:   c.source,
         }));
-      legs = [...book, ...nonBook];
     });
+  });
+
+  // Auto-trigger strategy analytics whenever the leg set changes — no
+  // explicit Analyze button needed.
+  $effect(() => {
+    void legs;
+    untrack(() => loadStrategy());
   });
 
   // ── Option-chain picker (Strategy mode) ───────────────────────────
@@ -267,21 +264,7 @@
     return all.slice(0, 3);
   });
 
-  function addFutureLeg(/** @type {string} */ symbol,
-                        /** @type {number} */ lotSize) {
-    if (!symbol) return;
-    const lot = Number(lotSize || 1);
-    const signedQty = chainSide === 'long' ? lot : -lot;
-    legs = [...legs, {
-      symbol,
-      qty:      signedQty,
-      avg_cost: '',
-      ltp:      '',
-      source:   'chain',
-    }];
-  }
-
-  // Auto-pick first expiry when underlying changes.
+  // Auto-pick first expiry when chain underlying changes.
   $effect(() => {
     void chainUnderlying;
     if (chainExpiries.length && !chainExpiries.includes(chainExpiry)) {
@@ -289,48 +272,33 @@
     }
   });
 
-  function addChainLeg(/** @type {number} */ strike,
-                       /** @type {'CE'|'PE'} */ optType) {
+  // Chain "+" button handlers — drop the picked contract into Drafts.
+  // The Drafts panel surfaces editable rows; whatever lands here can be
+  // fine-tuned (qty / cost / ltp) before the next strategy refresh.
+  function addChainDraft(/** @type {number} */ strike,
+                         /** @type {'CE'|'PE'} */ optType) {
     if (!chainUnderlying || !chainExpiry) return;
     const inst = findOption(chainUnderlying.toUpperCase(), optType, strike, chainExpiry);
     if (!inst) return;
     const lot = Number(inst.ls || 1);
     const signedQty = chainSide === 'long' ? lot : -lot;
-    legs = [...legs, {
-      symbol:   inst.s,
-      qty:      signedQty,
-      avg_cost: '',
-      ltp:      '',
-      source:   'chain',
+    drafts = [...drafts, {
+      id: ++_draftSeq, symbol: inst.s, qty: signedQty, avg_cost: '', ltp: '',
     }];
+    // Auto-align the page underlying so the new draft shows in
+    // candidates immediately.
+    if (!selectedUnderlying) selectedUnderlying = chainUnderlying.toUpperCase();
   }
-
-  function addLegRow() {
-    legs = [...legs, { symbol: '', qty: '', avg_cost: '', ltp: '', source: 'manual' }];
-  }
-  function removeLegRow(/** @type {number} */ i) {
-    legs = legs.filter((_, idx) => idx !== i);
-  }
-  function clearLegs() { legs = []; strategy = null; strategyErr = ''; }
-
-  // When the operator picks an existing position from the leg picker,
-  // append it as a new leg with ltp + avg_cost captured at click-time
-  // (sim positions need this because the backend can't fetch their ltp).
-  $effect(() => {
-    const v = legPickerValue;
-    if (!v) return;
-    const [src, acct, sym] = v.split('|');
-    const found = positions.find(p => p.source === src && p.account === acct && p.symbol === sym);
-    if (!found) return;
-    legs = [...legs, {
-      symbol:   found.symbol,
-      qty:      found.qty,
-      avg_cost: found.avg_cost ?? '',
-      ltp:      found.ltp ?? '',
-      source:   src,
+  function addFutureDraft(/** @type {string} */ sym,
+                          /** @type {number} */ lotSize) {
+    if (!sym) return;
+    const lot = Number(lotSize || 1);
+    const signedQty = chainSide === 'long' ? lot : -lot;
+    drafts = [...drafts, {
+      id: ++_draftSeq, symbol: sym, qty: signedQty, avg_cost: '', ltp: '',
     }];
-    legPickerValue = '';   // reset picker for next add
-  });
+    if (!selectedUnderlying) selectedUnderlying = chainUnderlying.toUpperCase();
+  }
 
   // Position lists for the picker. Carries avg_cost + ltp so that
   // the strategy leg-builder can ship them inline (sim legs need this
@@ -385,23 +353,6 @@
     positions = merged;
   }
 
-  // Click-to-pick handler for single-leg analysis. The candidates panel
-  // calls this when the operator clicks a row in `mode === 'single'`.
-  // Future rows are disabled (single-leg analytics endpoint rejects FUT).
-  /** @type {any} Reference to the picked candidate row (used by loadAnalytics
-   *   to pull qty/avg_cost/ltp for draft rows). */
-  let pickedCandidate = $state(null);
-  function pickCandidate(/** @type {any} */ c) {
-    if (!c) return;
-    if (c.kind === 'fut') return;
-    pickedCandidate = c;
-    account = c.account || '';
-    symbol  = c.symbol  || '';
-    pickedSource = /** @type {any} */ (c.source);
-    loadAnalytics();
-    loadHistorical();
-  }
-
   async function loadStrategy() {
     const cleanLegs = legs
       .map(l => ({
@@ -426,46 +377,11 @@
     }
   }
 
-  async function loadAnalytics() {
-    if (!symbol) { analytics = null; return; }
-    loading = true; analyticsErr = '';
+  async function loadSimStatus() {
     try {
-      // Backend's `mode` param is the data source: live / sim / hypothetical.
-      // Drafts map to hypothetical (the operator typed the symbol; broker
-      // doesn't know about it). Live + sim pull from the corresponding book.
-      const apiMode = pickedSource === 'draft' ? 'hypothetical' : pickedSource || 'live';
-      const opts = { mode: apiMode, symbol };
-      if (account && pickedSource !== 'draft') opts.account = account;
-      // Drafts ship qty + avg_cost + (optional) ltp inline so the backend
-      // can compute analytics without finding the position in any book.
-      if (pickedSource === 'draft' && pickedCandidate) {
-        if (pickedCandidate.qty != null) opts.qty = Number(pickedCandidate.qty);
-        if (pickedCandidate.avg_cost != null) opts.avg_cost = Number(pickedCandidate.avg_cost);
-        if (pickedCandidate.ltp      != null) opts.ltp      = Number(pickedCandidate.ltp);
-      }
-      analytics = await fetchOptionAnalytics(opts);
-    } catch (e) {
-      analyticsErr = /** @type {any} */ (e).message || String(e);
-      analytics = null;
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function loadHistorical() {
-    if (!symbol) { historical = null; return; }
-    historicalErr = '';
-    if (pickedSource === 'sim') {
-      historicalErr = 'Historical data unavailable for sim positions.';
-      historical = null;
-      return;
-    }
-    try {
-      historical = await fetchOptionHistorical(symbol, 30, 'day', 'NFO');
-    } catch (e) {
-      historicalErr = /** @type {any} */ (e).message || String(e);
-      historical = null;
-    }
+      const s = await fetchSimStatus();
+      simActive = !!s?.active;
+    } catch (_) { simActive = false; }
   }
 
   onMount(async () => {
@@ -508,13 +424,12 @@
     //     for no operator-visible benefit.
     // Historical refreshes only on symbol change (daily candles don't
     // change intra-day).
-    teardown = visibleInterval(() => {
-      if (mode === 'strategy') loadStrategy();
-      else                     loadAnalytics();
-    }, 5000);
+    loadSimStatus();
+    teardown    = visibleInterval(loadStrategy,  5000);
     posTeardown = visibleInterval(loadPositions, 30000);
+    simTeardown = visibleInterval(loadSimStatus,  5000);
   });
-  onDestroy(() => { teardown?.(); posTeardown?.(); });
+  onDestroy(() => { teardown?.(); posTeardown?.(); simTeardown?.(); });
 
   // ── Helpers ──────────────────────────────────────────────────────
   function fmtMoney(/** @type {number|null|undefined} */ v, /** @type {boolean} */ signed = true) {
@@ -531,45 +446,24 @@
     return v.toFixed(dp);
   }
 
-  // Ad-hoc historical chart payload — adapter to the PriceChart component
-  // shape. Each daily bar becomes a tick of `close` price.
-  const historicalChartData = $derived.by(() => {
-    if (!historical?.bars?.length) return null;
-    return {
-      mode:       'live',
-      symbol:     historical.symbol,
-      kind:       'derivative',
-      underlying: analytics?.underlying || null,
-      ticks:      historical.bars.map(/** @param {any} b */ (b) => ({
-        ts: b.ts, ltp: b.close, bid: null, ask: null,
-      })),
-      events:     [],
-    };
-  });
 </script>
 
 <svelte:head><title>Options Analytics | RamboQuant Analytics</title></svelte:head>
 
 <div class="page-header">
   <h1 class="page-title-chip">Options Analytics</h1>
-  <InfoHint text={'Pick a position from your live or sim book, or type any option symbol to analyze it as a hypothetical trade. The payoff diagram shows how the position pays at <span class="font-mono">today</span> (Black-Scholes with current DTE/IV) vs <span class="font-mono">expiry</span> (intrinsic only). Side panel: Greeks, IV, theoretical-vs-market gap, max profit / max loss / breakeven / probability of profit. Switch source to <span class="font-mono">Strategy</span> for multi-leg analytics (vertical / iron condor / butterfly).'} />
+  <InfoHint text={'Pick an underlying to load every option / future on it from your ' + (simActive ? '<b>simulator</b> book' : '<b>live</b> book') + '. The payoff diagram below charts the aggregated position; uncheck a row in the Candidates panel to drop it from the payoff. Click <b>+ Add</b> to open the option chain and pick draft strikes (modelled as hypothetical positions). Stats below the chart explain themselves — click any <span class="font-mono">(i)</span> chip for a definition.'} />
   <span class="algo-ts">{clientTimestamp()}</span>
+  {#if simActive}
+    <span class="opt-mode-pill opt-mode-sim" title="A simulator run is active. Candidates and analytics are sourced from the sim book.">SIMULATOR</span>
+  {/if}
 </div>
 
-<!-- Picker bar — Source picks the analysis type (Single Leg / Strategy);
-     Account + Underlying scopes the candidate set. Drafts add via the
-     "+ Add draft" button (rows appear in the Candidates panel). -->
+<!-- Picker bar — two dropdowns + a "+" toggle for the option-chain
+     picker. Strategy auto-recomputes whenever the leg set changes;
+     no Analyze button needed. -->
 <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
   <div class="opt-picker">
-    <div class="opt-field">
-      <label class="field-label" for="opt-mode">Source</label>
-      <Select id="opt-mode"
-        bind:value={mode}
-        options={[
-          { value: 'single',   label: 'Single Leg' },
-          { value: 'strategy', label: 'Strategy (multi-leg)' },
-        ]} />
-    </div>
     <div class="opt-field opt-field-grow">
       <label class="field-label" for="opt-acct">Account</label>
       <MultiSelect id="opt-acct"
@@ -584,33 +478,22 @@
         options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
         placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
     </div>
-    <button type="button" class="sim-btn sim-btn-order"
-            title="Add a hypothetical position to evaluate alongside your live + sim book"
-            onclick={addDraft}>+ Add draft</button>
-    {#if mode === 'strategy'}
-      <button type="button" class="sim-btn sim-btn-order"
-              title="Compute aggregate analytics + payoff for the checked candidates"
-              onclick={loadStrategy}>Analyze</button>
-      {#if legs.length}
-        <button type="button" class="sim-btn sim-btn-order opt-clear"
-                title="Discard every leg and reset"
-                onclick={clearLegs}>Clear</button>
-      {/if}
-    {/if}
+    <button type="button"
+            class="sim-btn sim-btn-order opt-add-btn"
+            class:opt-add-btn-on={showAddPanel}
+            title="Open the option chain to add draft positions or place an order"
+            onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'} Add</button>
   </div>
 </div>
 
-{#if analyticsErr && mode === 'single'}
-  <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{analyticsErr}</div>
-{/if}
-{#if strategyErr && mode === 'strategy'}
+{#if strategyErr}
   <div class="mb-3 p-2 rounded bg-red-500/15 text-red-300 text-[0.65rem] border border-red-500/40">{strategyErr}</div>
 {/if}
 
-{#if mode === 'single' && !analytics && !analyticsErr && !loading && !selectedUnderlying && !drafts.length}
+{#if !strategy && !strategyErr && !loading && !selectedUnderlying && !drafts.length}
   <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
-    Pick an underlying to surface live + sim candidates, or click <b>+ Add draft</b>
-    to start with a hypothetical position.
+    Pick an underlying to surface {simActive ? 'sim' : 'live'} candidates, or click
+    <b>+ Add</b> to drop a draft strike into the payoff.
   </div>
 {/if}
 
@@ -676,7 +559,7 @@
       <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
       <span class="opt-section-meta">
         {candidatePositions.length} matching {selectedAccounts.length ? 'in chosen accounts' : 'across all accounts'} ·
-        {mode === 'strategy' ? 'uncheck to drop a leg from the strategy' : 'click a row to analyse it'}
+        uncheck to drop a leg from the payoff
       </span>
     </div>
     {#if candidatePositions.length}
@@ -694,115 +577,44 @@
         </div>
         {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
           {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
-          {#if mode === 'strategy'}
-            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
-              <input type="checkbox"
-                     checked={enabledSymbols[c.symbol] !== false}
-                     onchange={(e) => {
-                       const next = { ...enabledSymbols };
-                       next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
-                       enabledSymbols = next;
-                     }} />
-              <span class="font-mono">{c.symbol}</span>
-              <span class="font-mono">{c.account}</span>
-              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
-              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
-              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
-                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              <span class="leg-source leg-source-{c.source}">{c.source}</span>
-            </label>
-          {:else}
-            <button type="button"
-                    class="cand-row cand-row-btn"
-                    class:cand-row-active={symbol === c.symbol && account === c.account}
-                    class:cand-row-disabled={c.kind === 'fut'}
-                    title={c.kind === 'fut' ? 'Futures are not supported by single-leg analytics — switch to Strategy mode to include this contract' : 'Click to analyse this position'}
-                    onclick={() => pickCandidate(c)}>
-              <span class="cand-bullet">{symbol === c.symbol && account === c.account ? '●' : '○'}</span>
-              <span class="font-mono">{c.symbol}</span>
-              <span class="font-mono">{c.account}</span>
-              <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
-              <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
-              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
-                {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              <span class="leg-source leg-source-{c.source}">{c.source}</span>
-            </button>
-          {/if}
+          <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
+            <input type="checkbox"
+                   checked={enabledSymbols[c.symbol] !== false}
+                   onchange={(e) => {
+                     const next = { ...enabledSymbols };
+                     next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
+                     enabledSymbols = next;
+                   }} />
+            <span class="font-mono">{c.symbol}</span>
+            <span class="font-mono">{c.account}</span>
+            <span class="cand-kind cand-kind-{c.kind}">{c.kind === 'fut' ? 'FUT' : (/CE$/i.test(c.symbol) ? 'CE' : 'PE')}</span>
+            <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
+            <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
+            <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+            <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+              {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+            <span class="leg-source leg-source-{c.source}">{c.source}</span>
+          </label>
         {/each}
       </div>
     {:else}
       <div class="text-[0.6rem] text-[#7e97b8] italic">
         No options or futures on <b>{selectedUnderlying}</b> in
         {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
-        Try a different underlying / account, or click <b>+ Add draft</b>
-        to enter a hypothetical position.
+        Try a different underlying / account, or click <b>+ Add</b> to drop
+        a draft strike into the payoff.
       </div>
     {/if}
   </div>
 {/if}
 
-<!-- ───────────────────────── STRATEGY (multi-leg) ───────────────────── -->
-{#if mode === 'strategy'}
-  <!-- Leg-builder table — operator's working set. Each row carries the
-       full leg state (symbol/qty/avg_cost/ltp) and ships verbatim to the
-       backend on Analyze. Sim-sourced legs already have LTP filled; live
-       legs can leave LTP blank and the backend pulls it from broker. -->
-  <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
-    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-      Legs <span class="opt-section-meta">({legs.length})</span>
-    </div>
-    {#if !legs.length}
-      <div class="text-[0.6rem] text-[#7e97b8] italic">
-        No legs yet. Pick from <b>Add leg from book</b> above (live or sim
-        positions) or click <b>+ Add row</b> for a blank line you can fill
-        manually.
-      </div>
-    {:else}
-      <div class="leg-grid">
-        <div class="leg-headrow">
-          <span>Symbol</span>
-          <span>Qty</span>
-          <span>Avg cost</span>
-          <span>LTP</span>
-          <span>Source</span>
-          <span></span>
-        </div>
-        {#each legs as _l, i (i)}
-          <div class="leg-row">
-            <input type="text" class="field-input"
-              placeholder="NIFTY25APR22000CE"
-              bind:value={legs[i].symbol} />
-            <input type="number" class="field-input"
-              placeholder="±qty"
-              bind:value={legs[i].qty} />
-            <input type="number" class="field-input"
-              placeholder="₹"
-              step="0.05"
-              bind:value={legs[i].avg_cost} />
-            <input type="number" class="field-input"
-              placeholder={legs[i].source === 'sim' ? '₹ (required for sim)' : '₹ (auto from broker)'}
-              step="0.05"
-              bind:value={legs[i].ltp} />
-            <span class="leg-source leg-source-{legs[i].source}">{legs[i].source}</span>
-            <button type="button" class="leg-del"
-                    title="Remove this leg"
-                    onclick={() => removeLegRow(i)}>×</button>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
-
-  <!-- Option-chain picker — browse strikes for one underlying / expiry
-       and click CE / PE to drop a leg into the basket. Sourced from the
-       cached instruments dump (already loaded by /console autocomplete),
-       so no extra round-trips. Hidden until instruments finish loading. -->
+<!-- ───── Option-chain picker — opens via "+ Add" button ───────────────
+     Browse strikes for the chosen underlying and click +CE / +PE / a
+     futures pill to drop a draft into the Drafts panel. Drafts that
+     match the page's selected underlying then auto-show in Candidates,
+     re-running the strategy analytics with the new leg included. -->
+{#if showAddPanel}
   {#if instrumentsReady && underlyingChoices.length}
     <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
       <div class="opt-section-h" style="padding-bottom: 0.5rem;">
@@ -847,7 +659,7 @@
             <button type="button"
                     class="chain-fut-pill"
                     title="Add {f.s} as a {chainSide} leg ({f.ls} lot)"
-                    onclick={() => addFutureLeg(f.s, f.ls)}>
+                    onclick={() => addFutureDraft(f.s, f.ls)}>
               + {f.s}
               <span class="chain-fut-meta">lot {f.ls}</span>
             </button>
@@ -870,7 +682,7 @@
                   <td class="chain-td-ce">
                     <button type="button" class="chain-btn chain-btn-ce"
                             title="Add {k} CE as a {chainSide} leg"
-                            onclick={() => addChainLeg(k, 'CE')}>
+                            onclick={() => addChainDraft(k, 'CE')}>
                       + CE
                     </button>
                   </td>
@@ -878,7 +690,7 @@
                   <td class="chain-td-pe">
                     <button type="button" class="chain-btn chain-btn-pe"
                             title="Add {k} PE as a {chainSide} leg"
-                            onclick={() => addChainLeg(k, 'PE')}>
+                            onclick={() => addChainDraft(k, 'PE')}>
                       + PE
                     </button>
                   </td>
@@ -895,12 +707,13 @@
       {/if}
     </div>
   {/if}
+{/if}
 
-  {#if strategy}
-    <div class="opt-grid">
-      <div class="opt-payoff">
-        <div class="opt-section-h">
-          Aggregate Payoff
+{#if strategy}
+  <div class="opt-grid">
+    <div class="opt-payoff">
+      <div class="opt-section-h">
+        Aggregate Payoff
           <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
           <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
             {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
@@ -1089,217 +902,11 @@
     </div>
   {:else if !strategyErr && !legs.length}
     <div class="text-[0.65rem] text-[#7e97b8] italic mb-3">
-      Add at least one leg above, then click <b>Analyze</b>. All legs must
-      share the same underlying and same expiry (calendar / diagonal
-      spreads aren't supported in this version).
+      No legs yet. Pick an underlying above to surface candidates, or click
+      <b>+ Add</b> to drop a draft strike into the payoff.
     </div>
   {/if}
-{/if}
 
-{#if mode === 'single' && analytics}
-  <div class="opt-grid">
-    <!-- Payoff diagram (large) -->
-    <div class="opt-payoff">
-      <div class="opt-section-h">
-        Payoff
-        <span class="opt-section-tag tag-deriv">{analytics.symbol}</span>
-        <span class="opt-section-tag tag-{analytics.risk.long_short}">
-          {analytics.risk.long_short.toUpperCase()} {Math.abs(analytics.qty)}
-        </span>
-        <span class="opt-section-meta">
-          DTE {analytics.days_to_expiry.toFixed(1)} ·
-          IV {(analytics.iv * 100).toFixed(1)}%
-          {#if analytics.span_sigmas > 0}
-            · ±{analytics.span_sigmas.toFixed(1)}σ ({(analytics.span_pct * 100).toFixed(1)}%)
-          {:else}
-            · ±{(analytics.span_pct * 100).toFixed(1)}%
-          {/if}
-        </span>
-      </div>
-      <OptionsPayoff
-        payoff={analytics.payoff}
-        spot={analytics.spot}
-        strike={analytics.strike}
-        breakeven={analytics.risk.breakeven}
-        currentPnl={(analytics.ltp - analytics.avg_cost) * analytics.qty}
-        height={320} />
-    </div>
-
-    <!-- Side panel: pricing + Greeks + risk -->
-    <aside class="opt-side">
-      <div class="opt-block">
-        <div class="opt-block-h">
-          Pricing
-          {#if analytics.ltp_source === 'estimated'}
-            <span class="src-chip src-warn" title="Broker market-data unreachable — payoff drawn against an estimated LTP at default IV. Treat absolute numbers with care.">
-              estimated
-            </span>
-          {:else if analytics.ltp_source !== 'live' && analytics.ltp_source !== 'override' && analytics.ltp_source !== 'sim'}
-            <span class="src-chip src-stale" title="Live LTP unavailable — using {analytics.ltp_source}">
-              stale: {analytics.ltp_source}
-            </span>
-          {/if}
-          {#if analytics.spot_source === 'fallback'}
-            <span class="src-chip src-warn" title="Underlying spot unavailable — using strike as synthetic spot. Payoff shape is preserved; absolute P&L is not reliable.">
-              spot: synthetic
-            </span>
-          {/if}
-        </div>
-        <div class="opt-kv">
-          <span class="kv-k">Spot</span>
-          <span class="kv-v">
-            ₹{analytics.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-            {#if analytics.spot_source !== 'live' && analytics.spot_source !== 'override' && analytics.spot_source !== 'sim'}
-              <span class="src-tag" title="spot source = {analytics.spot_source}">·{analytics.spot_source}</span>
-            {/if}
-          </span>
-          <span class="kv-k">LTP</span>
-          <span class="kv-v">
-            ₹{analytics.ltp.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-            <span class="src-tag" title="ltp source = {analytics.ltp_source}">·{analytics.ltp_source}</span>
-          </span>
-          <span class="kv-k">BS theo</span>  <span class="kv-v">₹{analytics.theoretical.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          <span class="kv-k">Diff</span>
-          <span class="kv-v {analytics.discrepancy >= 0 ? 'kv-pos' : 'kv-neg'}">
-            {analytics.discrepancy >= 0 ? '+' : ''}₹{analytics.discrepancy.toFixed(2)}
-            <span class="kv-sub">({analytics.discrepancy_pct.toFixed(1)}%)</span>
-          </span>
-          <span class="kv-k">IV</span>
-          <span class="kv-v">
-            {(analytics.iv * 100).toFixed(2)}%
-            {#if analytics.iv_source === 'default'}
-              <span class="src-tag src-warn" title="Calibration fell back to default 15% — LTP/spot data was insufficient">·default</span>
-            {/if}
-          </span>
-        </div>
-      </div>
-
-      <div class="opt-block">
-        <div class="opt-block-h">Greeks</div>
-        <table class="opt-table">
-          <thead>
-            <tr><th></th><th>per share</th><th>position</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                Δ delta
-                <InfoHint popup text={'<b>Delta</b> — change in option value per ₹1 change in spot. <br>Long calls: 0 (deep OTM) → 1 (deep ITM). Long puts: 0 → −1. <br>Position-scaled = Δ × signed qty (a short call has negative position-delta). <br>Use it as a directional exposure proxy: position-delta +50 means the book gains ₹50 per ₹1 spot rise.'} />
-              </td>
-              <td class="num">{fmtNum(analytics.greeks_per_share.delta, 4)}</td>
-              <td class="num">{fmtNum(analytics.greeks_position.delta, 1)}</td>
-            </tr>
-            <tr>
-              <td>
-                Γ gamma
-                <InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta per ₹1 spot move. <br>Long options have positive gamma (delta accelerates in your favour as spot moves); short options negative. <br>ATM near expiry has the highest gamma — small spot moves whip P&L.'} />
-              </td>
-              <td class="num">{fmtNum(analytics.greeks_per_share.gamma, 6)}</td>
-              <td class="num">{fmtNum(analytics.greeks_position.gamma, 4)}</td>
-            </tr>
-            <tr>
-              <td>
-                Θ theta /d
-                <InfoHint popup text={'<b>Theta</b> — daily time-decay in rupees. <br>Long options: negative (you bleed premium each day). Short options: positive (you collect time value). <br>Position theta of −150 means "this position loses ₹150 per calendar day, holding spot + IV constant".'} />
-              </td>
-              <td class="num kv-neg">{fmtNum(analytics.greeks_per_share.theta, 2)}</td>
-              <td class="num kv-neg">{fmtNum(analytics.greeks_position.theta, 0)}</td>
-            </tr>
-            <tr>
-              <td>
-                𝒱 vega /1%IV
-                <InfoHint popup text={'<b>Vega</b> — change in option value per <b>1 percentage point</b> of IV. <br>Long options: positive vega (you benefit when IV expands). Short: negative. <br>Position vega of +200 means "if IV rises 1 % across the curve, this position gains ₹200".'} />
-              </td>
-              <td class="num">{fmtNum(analytics.greeks_per_share.vega, 2)}</td>
-              <td class="num">{fmtNum(analytics.greeks_position.vega, 0)}</td>
-            </tr>
-            <tr>
-              <td>
-                ρ rho /1%r
-                <InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % change in the risk-free rate. <br>Mostly cosmetic for short-dated index options; matters for long-dated single-stock options where carry has time to compound.'} />
-              </td>
-              <td class="num">{fmtNum(analytics.greeks_per_share.rho, 2)}</td>
-              <td class="num">{fmtNum(analytics.greeks_position.rho, 0)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="opt-block">
-        <div class="opt-block-h">
-          Risk &amp; expected value
-          <InfoHint popup text={'Probability-weighted outcome metrics. POP tells you how often you win; EV captures the win/loss magnitudes; R:R is the asymmetry. All evaluated against the lognormal distribution of underlying spot at expiry, using the IV calibrated above.'} />
-        </div>
-        <div class="opt-kv">
-          <span class="kv-k">
-            Max profit
-            <InfoHint popup text={'Largest possible payoff for this position at expiry. ∞ for long calls and short puts (one side is unbounded).'} />
-          </span>
-          <span class="kv-v kv-pos">{analytics.risk.max_profit == null ? '∞' : fmtMoney(analytics.risk.max_profit, false)}</span>
-          <span class="kv-k">
-            Max loss
-            <InfoHint popup text={'Largest possible loss at expiry. ∞ for short calls and long futures-like positions. Always shown as a negative rupee figure.'} />
-          </span>
-          <span class="kv-v kv-neg">{analytics.risk.max_loss == null ? '∞' : fmtMoney(-analytics.risk.max_loss)}</span>
-          <span class="kv-k">
-            R:R
-            <InfoHint popup text={'<b>Risk-to-reward ratio</b> — max_profit / |max_loss|, displayed as <code>1 : N</code>. "1 : 0.5" means you risk ₹100 to make ₹50. "1 : 3" means risk ₹100 to make ₹300. Shown as <b>—</b> when one side is unbounded.'} />
-          </span>
-          <span class="kv-v">{analytics.risk.rr_ratio == null ? '—' : `1 : ${analytics.risk.rr_ratio.toFixed(2)}`}</span>
-          <span class="kv-k">
-            Breakeven
-            <InfoHint popup text={'Spot price at expiry where the position\'s P&L is zero. Above (CE) or below (PE) breakeven, you\'re in profit.'} />
-          </span>
-          <span class="kv-v">₹{analytics.risk.breakeven.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-          <span class="kv-k">
-            POP
-            <InfoHint popup text={'<b>Probability of profit</b> — the chance the position lands in the green at expiry, computed from the lognormal distribution of spot using the calibrated IV. <br>Green when &gt; 60 %, red when &lt; 40 %. <br>POP alone is misleading without EV — a 95 % POP that risks ₹50k to make ₹500 is worse than a 40 % POP that risks ₹10k to make ₹50k.'} />
-          </span>
-          <span class="kv-v {analytics.risk.pop > 0.6 ? 'kv-pos' : analytics.risk.pop < 0.4 ? 'kv-neg' : ''}">{fmtPct(analytics.risk.pop)}</span>
-          <span class="kv-k">
-            EV
-            <InfoHint popup text={'<b>Expected value</b> — what the position is worth on average, weighting every spot outcome at expiry by its lognormal probability density. POP × win-magnitude − (1−POP) × loss-magnitude, integrated over the curve. <br>Positive EV = the trade has edge in expectation. Negative EV = it doesn\'t, even if POP is high.'} />
-          </span>
-          <span class="kv-v {analytics.risk.ev > 0 ? 'kv-pos' : analytics.risk.ev < 0 ? 'kv-neg' : ''}">{fmtMoney(analytics.risk.ev)}</span>
-          {#if analytics.risk.ev_pct != null}
-            <span class="kv-k">
-              EV / cost
-              <InfoHint popup text={'EV expressed as a percentage of the absolute cost basis — return-on-capital expectation. +5 % = "on average, my ₹100 outlay returns ₹5".'} />
-            </span>
-            <span class="kv-v {analytics.risk.ev_pct > 0 ? 'kv-pos' : analytics.risk.ev_pct < 0 ? 'kv-neg' : ''}">
-              {analytics.risk.ev_pct > 0 ? '+' : ''}{analytics.risk.ev_pct.toFixed(1)}%
-            </span>
-          {/if}
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <!-- Historical chart (full width below) -->
-  <div class="opt-historical">
-    <div class="opt-section-h">
-      Historical · last 30 days
-      {#if historical}<span class="opt-section-meta">{historical.bars.length} daily bars · token {historical.instrument_token}</span>{/if}
-    </div>
-    {#if historicalErr}
-      <div class="text-[0.6rem] text-amber-300 px-1">{historicalErr}</div>
-    {:else if historicalChartData}
-      <PriceChart mode="live"
-                  symbol={analytics.symbol}
-                  height={200}
-                  data={historicalChartData}
-                  autoPoll={false} />
-    {:else if historical && !historical.bars.length}
-      <div class="text-[0.6rem] text-[#7e97b8] px-1 italic">
-        No historical bars available for {analytics.symbol}
-        — this contract may be too new, illiquid, or outside the
-        broker's instrument cache. Payoff above is unaffected.
-      </div>
-    {:else}
-      <div class="text-[0.6rem] text-[#7e97b8] px-1 italic">Loading historical bars…</div>
-    {/if}
-  </div>
-{/if}
 
 <style>
   .opt-picker {
