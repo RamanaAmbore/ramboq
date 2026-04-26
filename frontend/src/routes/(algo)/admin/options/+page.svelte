@@ -468,6 +468,7 @@
     } catch (_) { /* ignore */ }
 
     positions = merged;
+    _saveCache();
   }
 
   // Consecutive-failure counter for loadStrategy. Suppresses the
@@ -494,6 +495,7 @@
       strategy = await fetchStrategyAnalytics(cleanLegs);
       strategyErr = '';
       _stratFails = 0;
+      _saveCache();
     } catch (e) {
       _stratFails += 1;
       // Banner shows only when (a) we have no prior chart to fall
@@ -517,9 +519,56 @@
     } catch (_) { simActive = false; }
   }
 
+  // ── Stale-while-revalidate cache ──────────────────────────────────
+  // sessionStorage-backed snapshot of the page's data + operator
+  // selections so a tab reopen / SPA back-nav comes up with the
+  // previous view (chart, dropdowns, leg toggles, drafts) instead of
+  // a blank page. The first fresh fetch overwrites the snapshot;
+  // entries > 5 minutes old are discarded so the operator never sees
+  // a wildly stale chart.
+  const _CACHE_KEY = 'ramboq:options-state';
+  const _CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+  function _saveCache() {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      sessionStorage.setItem(_CACHE_KEY, JSON.stringify({
+        ts: Date.now(),
+        positions, strategy, drafts,
+        selectedAccounts, selectedUnderlying, selectedExpiry,
+        enabledSymbols,
+      }));
+    } catch (_) { /* quota / private mode — silent */ }
+  }
+  function _loadCache() {
+    if (typeof sessionStorage === 'undefined') return false;
+    try {
+      const raw = sessionStorage.getItem(_CACHE_KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      if (!d || (Date.now() - (d.ts || 0)) > _CACHE_MAX_AGE_MS) return false;
+      // Restore data first, then selections — derived state (candidates,
+      // legs) recomputes off the restored positions + drafts.
+      if (Array.isArray(d.positions)) positions = d.positions;
+      if (d.strategy)                  strategy  = d.strategy;
+      if (Array.isArray(d.drafts))     drafts    = d.drafts;
+      if (Array.isArray(d.selectedAccounts)) selectedAccounts = d.selectedAccounts;
+      if (typeof d.selectedUnderlying === 'string') selectedUnderlying = d.selectedUnderlying;
+      if (typeof d.selectedExpiry === 'string')      selectedExpiry    = d.selectedExpiry;
+      if (d.enabledSymbols && typeof d.enabledSymbols === 'object') {
+        enabledSymbols = d.enabledSymbols;
+      }
+      return true;
+    } catch (_) { return false; }
+  }
+
   onMount(async () => {
     // Auth/redirect handled by the algo layout; demo visitors view
     // this page read-only.
+    // Stale-while-revalidate: paint the previous session's view first
+    // (positions populate the dropdowns, strategy renders the chart)
+    // so the page never shows up empty on a tab reopen. Background
+    // fetches below replace the snapshot once the broker responds.
+    _loadCache();
     loadPositions();
     // Load the instruments cache so the option-chain picker has data.
     // Already cached in IndexedDB after the first /console autocomplete
