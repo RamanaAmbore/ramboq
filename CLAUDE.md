@@ -1187,6 +1187,8 @@ Outlined-pill style: subtle tinted background + bright text + matching colour bo
 
 **Navbar breakpoint**: hamburger menu shows for everything below the Tailwind `lg:` breakpoint (1024px), not `md:` (768px). The earlier `md:` cutoff left landscape phones (~640-900px) trying to render the full desktop nav, causing overflow and garbling. `lg:` is the cleaner cutoff: real tablets in landscape and desktops get the full nav, every phone (portrait + landscape) gets the hamburger.
 
+**Branch labels in the UI**: every user-visible mention of the branch surfaces as `prod` (when raw value is `main`) or the literal name (any other branch). Implemented as the [`branchLabel(name)`](frontend/src/lib/stores.js) helper — operators think in "prod / dev" terms, not "main / non-main", so the page banners and tooltips speak that vocabulary. Internal predicates (`paperStatus.branch === 'main'`, the `cap_in_<branch>` config dict, the database name selection in [`database.py`](backend/api/database.py)) keep using the raw git branch name — `branchLabel` is presentation-only and never feeds back into program logic.
+
 **No fixture maintenance**: there's no synthetic data file to keep in sync. Whatever positions / holdings / orders / agent fires the operator's prod book has, the demo session sees — masked. If demo looks empty, it's because prod is idle.
 
 ---

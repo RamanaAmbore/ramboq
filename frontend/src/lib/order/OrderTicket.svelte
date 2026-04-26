@@ -262,7 +262,7 @@
                 title="Routes through the prod paper engine — real bid/ask, no broker hit"
                 onclick={() => _mode = 'paper'}>PAPER</button>
         <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
-                title="Real broker order — gated by branch (main only) + execution.live.place_order setting"
+                title="Real broker order — gated by branch (prod only) + execution.live.place_order setting"
                 onclick={() => _mode = 'live'}>LIVE</button>
       </div>
     </div>

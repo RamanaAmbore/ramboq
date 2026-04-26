@@ -114,6 +114,18 @@ export function visibleInterval(fn, ms) {
   };
 }
 
+/** Display label for a git branch name. The `main` branch is the
+ *  prod deployment target — operators think in "prod / dev" terms,
+ *  not "main / non-main", so the UI surfaces the branch as `prod`
+ *  whenever the raw value is `main`. Any other branch name flows
+ *  through unchanged (dev branches keep their working name).
+ *  Internal predicates (`paperStatus.branch === 'main'`, etc.) keep
+ *  using the raw value — this helper is presentation-only. */
+export function branchLabel(/** @type {string|null|undefined} */ name) {
+  if (!name) return '';
+  return name === 'main' ? 'prod' : name;
+}
+
 export function clientTimestamp() {
   const now = new Date();
   const fmt = (tz) => {

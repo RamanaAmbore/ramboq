@@ -14,7 +14,7 @@
 
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
+  import { authStore, clientTimestamp, visibleInterval, branchLabel } from '$lib/stores';
   import {
     fetchPaperStatus, fetchChartSymbols, fetchChartBatch,
     fetchAlgoOrdersRecent,
@@ -98,23 +98,23 @@
   {#if !status?.enabled}
     <span class="paper-banner-tag">DEV</span>
     <span>
-      Paper engine is gated on this branch (<span class="font-mono">{status?.branch || '?'}</span>).
+      Paper engine is gated on this branch (<span class="font-mono">{branchLabel(status?.branch) || '?'}</span>).
       It exists in memory but no tick_loop is running. Promote your branch to
-      <span class="font-mono">main</span> to see live paper activity here.
+      <span class="font-mono">prod</span> to see live paper activity here.
     </span>
   {:else if (status?.open_order_count ?? 0) > 0}
     <span class="paper-banner-tag tag-active">CHASING</span>
     <span>
       <b>{status.open_order_count}</b>
       open paper order{status.open_order_count === 1 ? '' : 's'} on
-      <span class="font-mono">{status.branch}</span> ·
+      <span class="font-mono">{branchLabel(status.branch)}</span> ·
       {status.captured_symbols.length} symbol{status.captured_symbols.length === 1 ? '' : 's'}
       tracked, {status.captured_underlyings.length} underlying{status.captured_underlyings.length === 1 ? '' : 's'}
     </span>
   {:else}
     <span class="paper-banner-tag tag-idle">IDLE</span>
     <span>
-      Paper engine is enabled on <span class="font-mono">{status?.branch}</span>
+      Paper engine is enabled on <span class="font-mono">{branchLabel(status?.branch)}</span>
       but no orders are currently in flight. Charts populate as soon as
       an agent fires a broker action.
     </span>
