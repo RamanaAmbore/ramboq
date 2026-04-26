@@ -473,7 +473,12 @@
 <!-- Picker bar — two dropdowns + a "+" toggle for the option-chain
      picker. Strategy auto-recomputes whenever the leg set changes;
      no Analyze button needed. -->
-<div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
+<!-- Picker card has NO data-status — `data-status="inactive"` sets
+     opacity 0.82, which creates a stacking context that traps the
+     Select dropdown panel below sibling cards. Plain card here so
+     the Underlying dropdown floats above the chart / candidates
+     panels beneath. -->
+<div class="algo-status-card cmd-surface p-3 mb-3 opt-picker-card">
   <div class="opt-picker">
     <div class="opt-field opt-field-grow">
       <label class="field-label" for="opt-acct">Account</label>
@@ -687,7 +692,7 @@
 {#if selectedUnderlying || drafts.length}
   <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
     <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-      Candidates
+      Leg breakdown
       {#if selectedUnderlying}
         <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
       {/if}
@@ -710,8 +715,10 @@
             <span>Src</span>
           </div>
           {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
-            {@const pnl = (c.ltp != null && c.avg_cost != null) ? (c.ltp - c.avg_cost) * c.qty : null}
             {@const lg = legAnalyticsBySymbol[c.symbol]}
+            {@const ltp = c.ltp != null ? c.ltp : (lg ? lg.ltp : null)}
+            {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
+            {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
             <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
               <input type="checkbox"
                      checked={enabledSymbols[c.symbol] !== false}
@@ -723,8 +730,8 @@
               <span class="font-mono">{c.symbol}</span>
               <span class="font-mono">{c.account}</span>
               <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{c.avg_cost != null ? '₹' + c.avg_cost.toFixed(2) : '—'}</span>
-              <span class="num">{c.ltp != null ? '₹' + c.ltp.toFixed(2) : '—'}</span>
+              <span class="num">{cost != null ? '₹' + cost.toFixed(2) : '—'}</span>
+              <span class="num">{ltp != null ? '₹' + ltp.toFixed(2) : '—'}</span>
               <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
                 {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
@@ -783,24 +790,24 @@
             <InfoHint popup text={'Sum of every leg\'s signed-qty Greeks. Δ = net directional exposure; Θ = daily decay (positive when net short premium); 𝒱 = sensitivity to a 1 % IV move.'} />
           </div>
           <div class="opt-kv opt-kv-greeks">
-            <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Δ<InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
+            <div class="kv-pair" title="Delta — net directional exposure. +50 ≈ ₹50 gained per ₹1 spot rise.">
+              <span class="kv-k kv-k-greek">Δ</span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
             </div>
-            <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Γ<InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
+            <div class="kv-pair" title="Gamma — rate-of-change of delta as spot moves.">
+              <span class="kv-k kv-k-greek">Γ</span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
             </div>
-            <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Θ<InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
+            <div class="kv-pair" title="Theta — daily decay in rupees. Positive when net short premium.">
+              <span class="kv-k kv-k-greek">Θ</span>
               <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
             </div>
-            <div class="kv-pair">
-              <span class="kv-k kv-k-greek">𝒱<InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
+            <div class="kv-pair" title="Vega — P&L change per 1 % IV move. Positive = long volatility.">
+              <span class="kv-k kv-k-greek">𝒱</span>
               <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
             </div>
-            <div class="kv-pair">
-              <span class="kv-k kv-k-greek">ρ<InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
+            <div class="kv-pair" title="Rho — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options.">
+              <span class="kv-k kv-k-greek">ρ</span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
             </div>
           </div>
@@ -1218,12 +1225,13 @@
       minmax(0, 0.8fr)    /* cost */
       minmax(0, 0.8fr)    /* ltp */
       minmax(0, 0.9fr)    /* pnl */
-      minmax(0, 0.5fr)    /* iv */
-      minmax(0, 0.5fr)    /* delta */
-      minmax(0, 0.5fr)    /* theta */
-      minmax(0, 0.5fr)    /* vega */
+      minmax(0, 0.45fr)   /* iv */
+      minmax(0, 0.45fr)   /* delta */
+      minmax(0, 0.45fr)   /* theta */
+      minmax(0, 0.45fr)   /* vega */
       minmax(0, 0.55fr);  /* source */
-    gap: 0.2rem;
+    gap: 0.15rem;          /* tighter than before — minimal whitespace */
+    padding: 0.1rem 0.2rem;
     align-items: center;
     font-size: 0.62rem;
     font-family: monospace;
