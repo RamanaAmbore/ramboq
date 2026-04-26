@@ -148,7 +148,12 @@ class OrdersController(Controller):
     guards = [auth_or_demo_guard]
 
     @get("/")
-    async def list_orders(self) -> OrdersResponse:
+    async def list_orders(self, request: Request) -> OrdersResponse:
+        # Demo session: live broker is never reached; return empty
+        # rows + the standard refreshed_at stamp so the UI renders
+        # without errors.
+        if getattr(request.state, "is_demo", False):
+            return OrdersResponse(rows=[], refreshed_at=timestamp_display())
         try:
             return await get_or_fetch("orders", _fetch_orders, ttl_seconds=_ORDERS_TTL)
         except Exception as e:
@@ -156,7 +161,7 @@ class OrdersController(Controller):
             raise HTTPException(status_code=500, detail=str(e))
 
     @get("/algo/recent")
-    async def list_algo_orders(self, n: int = 100, mode: str = "all") -> list[AlgoOrderInfo]:
+    async def list_algo_orders(self, request: Request, n: int = 100, mode: str = "all") -> list[AlgoOrderInfo]:
         """
         Recent agent-generated orders from the algo_orders table.
 
@@ -178,6 +183,11 @@ class OrdersController(Controller):
             q = sql_select(AlgoOrder).order_by(desc(AlgoOrder.id)).limit(max(1, min(n, 500)))
             if mode in ("live", "sim", "paper"):
                 q = q.where(AlgoOrder.mode == mode)
+            # Demo session: only return rows for DEMO* accounts so real
+            # paper orders placed by the operator aren't surfaced to a
+            # recruiter / visitor session.
+            if getattr(request.state, "is_demo", False):
+                q = q.where(AlgoOrder.account.like("DEMO%"))
             rows = (await s.execute(q)).scalars().all()
         return [
             AlgoOrderInfo(

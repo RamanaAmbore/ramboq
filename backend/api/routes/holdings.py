@@ -7,7 +7,7 @@ from litestar.exceptions import HTTPException
 
 from litestar import Request
 
-from backend.api.auth_guard import is_admin_request
+from backend.api.auth_guard import is_admin_request, is_demo_request
 from backend.api.cache import get_or_fetch, invalidate
 from backend.api.schemas import HoldingsResponse, HoldingRow, HoldingsSummaryRow
 from backend.shared.helpers import broker_apis
@@ -71,6 +71,11 @@ class HoldingsController(Controller):
     @get("/")
     async def get_holdings(self, request: Request, fresh: bool = False) -> HoldingsResponse:
         try:
+            # Demo session: serve curated synthetic holdings — never
+            # hits the broker, never leaks real positions.
+            if is_demo_request(request):
+                from backend.api.algo.demo import get_holdings_response
+                return get_holdings_response()
             # `?fresh=1` — Refresh button bypasses the TTL cache and
             # forces a live broker fetch. The cache's per-key lock still
             # coalesces multiple simultaneous refresh clicks into one
