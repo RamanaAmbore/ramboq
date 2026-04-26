@@ -83,6 +83,21 @@
     return m ? m[0] : s;
   }
 
+  // News-specific time slicer — the /api/news payload's `timestamp`
+  // field is a presentational dual-zone string ("Mon, April 20, 2026,
+  // 09:30 AM IST | Mon, April 20, 2026, 12:00 AM EDT"), NOT an ISO
+  // string. _shortTime() can't parse it (no HH:MM:SS, no T@10), so
+  // it would fall through and dump the full string into the time
+  // column, eating the row and pushing the title out of view. Match
+  // the public Market-News card's parser: ISO → HH:MM, otherwise the
+  // first HH:MM run, otherwise the raw value.
+  function _newsTime(/** @type {string} */ ts) {
+    if (!ts) return '';
+    if (ts.length >= 19 && ts[10] === 'T') return ts.slice(11, 16);
+    const m = ts.match(/\d\d:\d\d/);
+    return m ? m[0] : ts;
+  }
+
   // Shared SIM / LIVE pills — amber for simulated (matches the page-top
   // "SIMULATOR ACTIVE" banner), emerald for live. Replaces the pink
   // badge that was making the Order log look like an error list.
@@ -294,7 +309,7 @@
       <ul class="log-news-list">
         {#each newsItems as n}
           <li class="log-news-row">
-            <span class="log-news-time">{_shortTime(n.timestamp)}</span>
+            <span class="log-news-time">{_newsTime(n.timestamp)}</span>
             <a class="log-news-title" href={n.link} target="_blank" rel="noopener">
               {n.title}
             </a>
