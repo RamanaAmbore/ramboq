@@ -29,7 +29,7 @@
   import {
     loadInstruments, suggestUnderlyings,
     listExpiries, listStrikes, findOption,
-    listFutures,
+    listFutures, getInstrument,
   } from '$lib/data/instruments';
 
   // Source card semantics (v4): no more single-vs-multi distinction.
@@ -83,6 +83,12 @@
   let selectedAccounts = $state([]);
   /** @type {string} Underlying name (e.g. NIFTY); '' = pick required */
   let selectedUnderlying = $state('');
+  /** @type {string} Expiry filter (YYYY-MM-DD); '' = all expiries.
+   *  When the underlying has options across multiple expiries, the
+   *  strategy endpoint rejects mixed-expiry baskets — so the picker
+   *  forces the operator to nominate one expiry. Auto-picked to the
+   *  nearest available expiry when the underlying changes. */
+  let selectedExpiry = $state('');
   /** @type {Record<string, boolean>} symbol → enabled flag */
   let enabledSymbols = $state({});
 
@@ -131,6 +137,39 @@
     return Array.from(set).sort();
   });
 
+  /** Distinct expiries (YYYY-MM-DD) available on the chosen
+   *  underlying — derived by looking up each loaded position's
+   *  symbol in the instruments cache. Drafts contribute too. */
+  const expiryChoicesForUnderlying = $derived.by(() => {
+    if (!instrumentsReady || !selectedUnderlying) return [];
+    const target = selectedUnderlying.toUpperCase();
+    const set = new Set();
+    const consider = /** @param {string} sym */ (sym) => {
+      const upper = String(sym || '').toUpperCase();
+      if (!upper) return;
+      if (!new RegExp(`^${target}\\d`, 'i').test(upper)) return;
+      const inst = getInstrument(upper);
+      if (inst?.x) set.add(inst.x);
+    };
+    for (const p of positions) consider(p.symbol);
+    for (const d of drafts)    consider(d.symbol);
+    return Array.from(set).sort();
+  });
+
+  /** Auto-pick the first expiry when the underlying changes (and
+   *  drop the picked expiry if it disappears from the list). */
+  $effect(() => {
+    void selectedUnderlying;
+    untrack(() => {
+      const list = expiryChoicesForUnderlying;
+      if (!list.length) {
+        if (selectedExpiry) selectedExpiry = '';
+        return;
+      }
+      if (!list.includes(selectedExpiry)) selectedExpiry = list[0];
+    });
+  });
+
   // Candidate positions matching the filter. Live + sim positions on
   // the chosen underlying held in one of the chosen accounts, plus all
   // drafts whose symbol matches the underlying prefix. Source is a
@@ -145,7 +184,15 @@
     const out = [];
     // Source filter — when a sim is active, work off the sim book only;
     // otherwise the live book. Drafts are always visible regardless.
+    // Expiry filter — when an expiry is selected, only legs whose
+    // contract expires on that date appear (strategy endpoint
+    // rejects mixed-expiry baskets).
     const wantedSource = simActive ? 'sim' : 'live';
+    const matchExpiry = /** @param {string} sym */ (sym) => {
+      if (!selectedExpiry) return true;
+      const inst = getInstrument(String(sym || '').toUpperCase());
+      return inst?.x === selectedExpiry;
+    };
     for (const p of positions) {
       if (p.source !== wantedSource) continue;
       if (acctFilter.length && !acctFilter.includes(p.account)) continue;
@@ -154,6 +201,7 @@
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
       if (!isFut && !isOpt) continue;
+      if (!matchExpiry(sym)) continue;
       out.push({
         ...p,
         kind: isFut ? 'fut' : 'opt',
@@ -168,6 +216,7 @@
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
       if (!isFut && !isOpt) continue;
+      if (!matchExpiry(sym)) continue;
       const qty = d.qty === '' || d.qty == null ? 0 : Number(d.qty);
       const cost = d.avg_cost === '' || d.avg_cost == null ? null : Number(d.avg_cost);
       const ltp  = d.ltp      === '' || d.ltp      == null ? null : Number(d.ltp);
@@ -478,34 +527,37 @@
 <!-- Picker bar — two dropdowns + a "+" toggle for the option-chain
      picker. Strategy auto-recomputes whenever the leg set changes;
      no Analyze button needed. -->
-<!-- Picker card has NO data-status — `data-status="inactive"` sets
-     opacity 0.82, which creates a stacking context that traps the
-     Select dropdown panel below sibling cards. Plain card here so
-     the Underlying dropdown floats above the chart / candidates
-     panels beneath. -->
-<div class="algo-status-card cmd-surface p-3 mb-3 opt-picker-card">
-  <div class="opt-picker">
-    <div class="opt-field opt-field-grow">
-      <label class="field-label" for="opt-acct">Account</label>
-      <MultiSelect id="opt-acct"
-        bind:value={selectedAccounts}
-        options={accountChoices.map(a => ({ value: a, label: a }))}
-        placeholder={accountChoices.length ? 'All accounts' : 'No accounts loaded'} />
-    </div>
-    <div class="opt-field opt-field-grow">
-      <label class="field-label" for="opt-und">Underlying</label>
-      <Select id="opt-und"
-        bind:value={selectedUnderlying}
-        options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
-        placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
-    </div>
-    <button type="button"
-            class="opt-add-btn"
-            class:opt-add-btn-on={showAddPanel}
-            title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
-            aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
-            onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
+<!-- Picker bar — no card wrapper. Account + Underlying + + sit
+     directly on the page so they read as inline page-level
+     controls rather than as content inside a panel. -->
+<div class="opt-picker mb-3">
+  <div class="opt-field opt-field-grow">
+    <label class="field-label" for="opt-acct">Account</label>
+    <MultiSelect id="opt-acct"
+      bind:value={selectedAccounts}
+      options={accountChoices.map(a => ({ value: a, label: a }))}
+      placeholder={accountChoices.length ? 'All accounts' : 'No accounts loaded'} />
   </div>
+  <div class="opt-field opt-field-grow">
+    <label class="field-label" for="opt-und">Underlying</label>
+    <Select id="opt-und"
+      bind:value={selectedUnderlying}
+      options={underlyingChoicesFromBook.map(u => ({ value: u, label: u }))}
+      placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
+  </div>
+  <div class="opt-field">
+    <label class="field-label" for="opt-exp">Expiry</label>
+    <Select id="opt-exp"
+      bind:value={selectedExpiry}
+      options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
+      placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
+  </div>
+  <button type="button"
+          class="opt-add-btn"
+          class:opt-add-btn-on={showAddPanel}
+          title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
+          aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
+          onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
 </div>
 
 {#if strategyErr}
@@ -667,7 +719,7 @@
 {#if strategy}
   <div class="opt-payoff opt-payoff-full mb-3">
     <div class="opt-section-h">
-      Aggregate Payoff
+      Payoff
       <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
       <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
         {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
@@ -701,7 +753,7 @@
             aria-expanded={legsOpen}
             title={legsOpen ? 'Collapse leg list' : 'Expand leg list'}
             onclick={() => legsOpen = !legsOpen}>
-      <span class="legs-chevron" class:legs-chevron-open={legsOpen}>▸</span>
+      <span class="legs-chevron">{legsOpen ? '▾' : '▸'}</span>
       <span>Legs</span>
       {#if selectedUnderlying}
         <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
@@ -792,6 +844,14 @@
                 {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
               </span>
             </div>
+            <div class="kv-pair">
+              <span class="kv-k">Max profit</span>
+              <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
+            </div>
+            <div class="kv-pair">
+              <span class="kv-k">Max loss</span>
+              <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
+            </div>
           </div>
         </div>
 
@@ -830,14 +890,6 @@
             <InfoHint popup text={'Aggregate risk + expected value across all legs. Probability-weighted outcomes integrated against the lognormal pdf of the underlying using a qty-weighted IV proxy. POP × magnitudes captures the asymmetry that POP alone misses.'} />
           </div>
           <div class="opt-kv">
-            <div class="kv-pair">
-              <span class="kv-k">Max profit* <InfoHint popup text={'<b>Max profit</b> — largest possible payoff at expiry within the charted spot range (±2.5σ default). Asterisk because unbounded legs (long calls, short puts) clip at the chart edge.'} /></span>
-              <span class="kv-v kv-pos">{fmtMoney(strategy.risk.max_profit, false)}</span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Max loss* <InfoHint popup text={'<b>Max loss</b> — largest loss at expiry within the charted spot range. Asterisk for the same reason as Max profit.'} /></span>
-              <span class="kv-v kv-neg">{fmtMoney(strategy.risk.max_loss, true)}</span>
-            </div>
             <div class="kv-pair">
               <span class="kv-k">R:R <InfoHint popup text={'<b>Risk-to-reward</b> = max_profit / |max_loss|. "1 : 0.5" = risk ₹100 to make ₹50. "1 : 3" = risk ₹100 to make ₹300. <b>—</b> when one side is unbounded.'} /></span>
               <span class="kv-v">{strategy.risk.rr_ratio == null ? '—' : `1 : ${strategy.risk.rr_ratio.toFixed(2)}`}</span>
@@ -1091,39 +1143,6 @@
   .kv-neg { color: #f87171; }
   .kv-sub { color: #7e97b8; font-size: 0.55rem; margin-left: 0.2rem; }
 
-  .opt-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: monospace;
-    font-size: 0.6rem;
-  }
-  .opt-table th {
-    text-align: right;
-    color: #7e97b8;
-    font-weight: 700;
-    padding: 0.15rem 0.25rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    font-size: 0.55rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .opt-table th:first-child { text-align: left; }
-  .opt-table td {
-    padding: 0.18rem 0.25rem;
-    color: #c8d8f0;
-  }
-  /* Allow popup InfoHint chips to sit inline next to Greek labels in
-     the per-share/position table without breaking the row baseline. */
-  .opt-table td:first-child {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .opt-table td.num { text-align: right; }
-  .opt-table tbody tr:not(:last-child) td {
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-
   .opt-payoff {
     display: flex;
     flex-direction: column;
@@ -1240,33 +1259,19 @@
   .legs-chevron {
     font-size: 0.6rem;
     color: #7e97b8;
-    transition: transform 0.18s;
     width: 0.7rem;
     text-align: center;
   }
-  .legs-chevron-open { transform: rotate(90deg); }
 
+  /* Parent grid — defines column tracks once. Children (`.cand-headrow`
+     and each `.cand-row`) consume the same tracks via `subgrid` so
+     headers + data cells line up precisely. */
   .cand-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    /* Min-width enforces a sensible row width — 12 columns now
-       (added IV / Δ / Θ / 𝒱 from the strategy response). The
-       wrapping `.cand-scroll` handles horizontal overflow when the
-       viewport is narrower than this. */
-    min-width: 980px;
-  }
-  /* Columns sized so the Symbol cell hugs its content (max-content)
-     instead of stealing fr space — earlier `2.4fr` symbol left a
-     wide gutter between symbol and account. The remaining columns
-     share leftover space proportionally. */
-  .cand-headrow,
-  .cand-row {
     display: grid;
     grid-template-columns:
       auto                /* checkbox */
-      max-content         /* symbol — hugs its text */
-      max-content         /* account — hugs its text */
+      max-content         /* symbol */
+      max-content         /* account */
       minmax(0, 0.6fr)    /* qty */
       minmax(0, 0.9fr)    /* cost */
       minmax(0, 0.9fr)    /* ltp */
@@ -1276,8 +1281,24 @@
       minmax(0, 0.55fr)   /* theta */
       minmax(0, 0.55fr)   /* vega */
       minmax(0, 0.6fr);   /* source */
-    gap: 0.5rem;            /* small uniform gap; symbol-acct gutter
-                               no longer dominated by fr math */
+    row-gap: 0.2rem;
+    /* Min-width enforces a sensible row width — 12 columns. The
+       wrapping `.cand-scroll` handles horizontal overflow when the
+       viewport is narrower than this. */
+    min-width: 980px;
+  }
+  /* Single parent grid via subgrid. Each row inherits the parent's
+     column tracks — so headers and data cells line up exactly,
+     regardless of which row has the longest content per column.
+     Earlier each row was its own `display: grid` with `max-content`
+     which sized columns per-row → header columns drifted out of
+     alignment with data columns. */
+  .cand-headrow,
+  .cand-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    gap: 0.5rem;
     padding: 0.1rem 0.2rem;
     align-items: center;
     font-size: 0.62rem;
@@ -1346,34 +1367,6 @@
     line-height: 1;
   }
 
-  /* Per-leg breakdown table — same monospace look as the Greeks table on
-     the single-leg view, but wider (more columns to read). */
-  .leg-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: monospace;
-    font-size: 0.6rem;
-  }
-  .leg-table th {
-    text-align: left;
-    color: #7e97b8;
-    font-weight: 700;
-    padding: 0.2rem 0.35rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    font-size: 0.55rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background: rgba(251,191,36,0.04);
-  }
-  .leg-table th.num,
-  .leg-table td.num { text-align: right; }
-  .leg-table td {
-    padding: 0.22rem 0.35rem;
-    color: #c8d8f0;
-  }
-  .leg-table tbody tr:not(:last-child) td {
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
   .leg-type-CE {
     color: #22c55e;
     background: rgba(34,197,94,0.10);

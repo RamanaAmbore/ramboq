@@ -124,7 +124,7 @@
           aria-expanded={open}
           aria-label={open ? 'Hide details' : 'Show details'}
           title={open ? 'Hide details' : 'Show details'}
-          onclick={() => open = !open}
+          onclick={() => { open = !open; if (!open) hovered = false; }}
           onmouseenter={() => hovered = true}
           onmouseleave={() => hovered = false}>{label}</button>
   {#if visible}
