@@ -21,10 +21,18 @@ function _authHeaders() {
 
 function _hasToken() { return !!authStore.getToken(); }
 
-/** Handle 401 — clear token and redirect to signin. */
+/** Handle 401 — clear the token and (only if there was one) redirect
+ *  to signin. An anonymous demo session can hit endpoints that 401
+ *  for unauthenticated requests; those shouldn't bounce the visitor
+ *  to /signin (they're browsing the public algo demo, not a stale
+ *  admin session). The redirect now fires only when a token actually
+ *  existed — i.e., a session expired. */
 function _handle401() {
+  const hadToken = !!authStore.getToken();
   authStore.logout();
-  if (typeof window !== 'undefined') window.location.href = '/signin';
+  if (hadToken && typeof window !== 'undefined') {
+    window.location.href = '/signin';
+  }
 }
 
 /** POST /api/auth/login */
