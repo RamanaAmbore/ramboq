@@ -29,7 +29,7 @@ from sqlalchemy import desc, select
 
 from backend.api.algo.paper import get_prod_paper_engine
 from backend.api.algo.sim.driver import get_driver
-from backend.api.auth_guard import admin_guard
+from backend.api.auth_guard import admin_guard, auth_or_demo_guard
 from backend.api.database import async_session
 from backend.api.models import AlgoOrder
 from backend.shared.helpers.ramboq_logger import get_logger
@@ -172,7 +172,7 @@ def _algo_order_events(rows: list[AlgoOrder]) -> list[OrderEvent]:
 
 class ChartsController(Controller):
     path   = "/api/charts"
-    guards = [admin_guard]
+    guards = [auth_or_demo_guard]
 
     @get("/paper-status")
     async def paper_status(self) -> PaperStatus:

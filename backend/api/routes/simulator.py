@@ -40,7 +40,7 @@ from backend.api.algo.sim.driver import (
     load_scenarios,
 )
 from backend.api.algo.sim.synthesize import synthesize_for_agent, SynthesizeError
-from backend.api.auth_guard import admin_guard
+from backend.api.auth_guard import admin_guard, auth_or_demo_guard
 from backend.api.database import async_session
 from backend.api.models import Agent, AgentEvent, AlgoOrder
 from backend.shared.helpers.ramboq_logger import get_logger
@@ -155,7 +155,7 @@ class SimulatorController(Controller):
             ))
         return out
 
-    @get("/status")
+    @get("/status", guards=[auth_or_demo_guard])
     async def status(self) -> dict:
         """
         Snapshot + per-branch capability flag. The `enabled` key lets the

@@ -9,12 +9,19 @@
 
   const bullSrc = "/bull.png";
 
-  // All algo pages require admin
-  $effect(() => {
-    if (!$authStore.user || $authStore.user.role !== 'admin') {
-      goto('/signin');
-    }
-  });
+  // ── Activity polling state ─────────────────────────────────────────
+  // Declared early so the demo derivation + nav filter below can
+  // read `paperStatus.branch`. Pollers themselves run from onMount.
+  let simStatus   = $state(/** @type {any} */ ({ active: false }));
+  let paperStatus = $state(/** @type {any} */ ({ enabled: false, open_order_count: 0 }));
+
+  // Demo mode == anonymous visitor on the prod (main) branch. The
+  // `paperStatus.branch` flag arrives via the poll; before the
+  // first response lands, `isDemo` is conservatively false so the
+  // page doesn't flicker.
+  const isDemo = $derived(
+    !$authStore.user && paperStatus?.branch === 'main'
+  );
 
   function isActive(/** @type {string} */ href) {
     // Longest-match semantics so sub-pages (e.g. /admin/tokens) don't light up
@@ -45,7 +52,7 @@
   //   4. Configuration    — Settings, Brokers. Touched per quarter,
   //      not per session.
   //   5. User admin       — partner / KYC management. Last.
-  const algoLinks = [
+  const _algoLinksAll = [
     { href: '/dashboard',        label: 'Dashboard' },
     { href: '/agents',           label: 'Agents'    },
     { href: '/orders',           label: 'Orders'    },
@@ -54,21 +61,26 @@
     { href: '/admin/simulator',  label: 'Simulator' },
     { href: '/console',          label: 'Terminal'  },
     { href: '/admin/tokens',     label: 'Tokens'    },
-    { href: '/admin/settings',   label: 'Settings'  },
-    { href: '/admin/brokers',    label: 'Brokers'   },
-    { href: '/admin',            label: 'Users'     },
+    { href: '/admin/settings',   label: 'Settings', adminOnly: true },
+    { href: '/admin/brokers',    label: 'Brokers',  adminOnly: true },
+    { href: '/admin',            label: 'Users',    adminOnly: true },
   ];
+  // Demo visitors see the analytics surface but not the ops surface
+  // (Settings / Brokers / Users). Each adminOnly entry drops out of
+  // the nav when we're in demo mode; the corresponding endpoints
+  // already 401 on backend admin_guard, so the guard is duplicated
+  // (UI hide + backend refuse) by design.
+  const algoLinks = $derived(
+    _algoLinksAll.filter(l => !l.adminOnly || !isDemo)
+  );
 
   let menuOpen = $state(false);
   const closeMenu = () => { menuOpen = false; };
 
-  // ── Global activity status (sim + paper) ────────────────────────────
-  // Polled every 4 seconds so the activity banners appear/disappear on
-  // every algo page without each page tracking status on its own.
-  // Errors silently no-op — the capability flag may be off, or the
-  // operator may not yet have admin auth on the dev branch.
-  let simStatus   = $state(/** @type {any} */ ({ active: false }));
-  let paperStatus = $state(/** @type {any} */ ({ enabled: false, open_order_count: 0 }));
+  // ── Polling pipeline ───────────────────────────────────────────────
+  // The state vars are declared at the top of the script so the
+  // `isDemo` derivation + nav filter can read them; the actual
+  // pollers + lifecycle live here.
   let simTeardown;
   let paperTeardown;
   async function pollSim() {
@@ -84,6 +96,24 @@
     pollPaper(); paperTeardown = visibleInterval(pollPaper, 4000);
   });
   onDestroy(() => { simTeardown?.(); paperTeardown?.(); });
+
+  // ── Demo / signin redirect ─────────────────────────────────────────
+  //   - Logged-in admin       → free pass.
+  //   - Anonymous on main     → demo mode (no redirect, isDemo = true).
+  //   - Anonymous on non-main → /signin (devs are expected to log in).
+  //   - Logged in non-admin   → /signin.
+  // While the paper-status poll is still pending the branch is
+  // unknown — we stay put rather than flicker the user away.
+  $effect(() => {
+    const branchKnown = paperStatus?.branch !== undefined;
+    if (!$authStore.user && branchKnown && paperStatus.branch !== 'main') {
+      goto('/signin');
+      return;
+    }
+    if ($authStore.user && $authStore.user.role !== 'admin') {
+      goto('/signin');
+    }
+  });
 </script>
 
 <!-- Algo-side favicon — a circled "algo" mark so the browser tab visually
@@ -115,19 +145,32 @@
           {/each}
         </nav>
 
-        {#if simStatus?.active}
+        <!-- Mode badges — env-aware:
+             prod (main)  → DEMO (anonymous) | PAPER (paper engine has open orders) | nothing
+             dev (non-main) → SIM (sim active) | PAPER (paper engine has open orders) | both
+             Word labels (DEMO / PAPER / SIM) instead of single letters
+             so the affordance is unambiguous on every page. -->
+        {#if isDemo}
+          <span class="algo-mode-badge algo-mode-demo"
+                title="Demo mode — anonymous visitor, paper-only, no broker connection">DEMO</span>
+        {/if}
+        {#if paperStatus?.branch !== 'main' && simStatus?.active}
           <span class="algo-mode-badge algo-mode-sim"
-                title="Simulator is running — fabricated market data">S</span>
+                title="Simulator is running — fabricated market data">SIM</span>
         {/if}
         {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
           <span class="algo-mode-badge algo-mode-paper"
-                title="Paper engine has {paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}">P</span>
+                title="Paper engine has {paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}">PAPER</span>
         {/if}
-        <span class="algo-user-pill">
-          {$authStore.user?.display_name?.toLowerCase() ?? ''}
-          <span class="algo-user-role">admin</span>
-        </span>
-        <button onclick={signOut} class="algo-nav-btn">Sign Out</button>
+        {#if $authStore.user}
+          <span class="algo-user-pill">
+            {$authStore.user.display_name?.toLowerCase() ?? ''}
+            <span class="algo-user-role">admin</span>
+          </span>
+          <button onclick={signOut} class="algo-nav-btn">Sign Out</button>
+        {:else if isDemo}
+          <button onclick={() => goto('/signin')} class="algo-nav-btn">Sign In</button>
+        {/if}
         <button onclick={() => goto('/about')} class="algo-pub-link">↙ Investor site</button>
       </div>
 
@@ -140,16 +183,21 @@
             <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
           </button>
         </div>
-        {#if simStatus?.active}
-          <span class="algo-mode-badge algo-mode-sim" title="Simulator running">S</span>
+        {#if isDemo}
+          <span class="algo-mode-badge algo-mode-demo" title="Demo mode — paper-only">DEMO</span>
+        {/if}
+        {#if paperStatus?.branch !== 'main' && simStatus?.active}
+          <span class="algo-mode-badge algo-mode-sim" title="Simulator running">SIM</span>
         {/if}
         {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
-          <span class="algo-mode-badge algo-mode-paper" title="Paper engine has open chase orders">P</span>
+          <span class="algo-mode-badge algo-mode-paper" title="Paper engine has open chase orders">PAPER</span>
         {/if}
-        <span class="algo-user-pill">
-          {$authStore.user?.display_name?.toLowerCase() ?? ''}
-          <span class="algo-user-role">admin</span>
-        </span>
+        {#if $authStore.user}
+          <span class="algo-user-pill">
+            {$authStore.user.display_name?.toLowerCase() ?? ''}
+            <span class="algo-user-role">admin</span>
+          </span>
+        {/if}
         <button
           onclick={() => menuOpen = !menuOpen}
           class="algo-hamburger"
@@ -376,26 +424,33 @@
      the gold-pill "Algo Site" button on the public side. Both context-
      switch buttons carry equal visual weight; the operator never has
      to hunt for the way back. */
-  /* Mode badges (S = simulator, P = paper). Sit in the navbar so
-     they stay visible regardless of scroll position; the existing
-     full-width banners under the nav still surface scenario / chase
-     details. The badges are the at-a-glance "are we in fake-money
-     land right now?" indicator on every algo page. */
+  /* Mode badges — env-aware short word labels (DEMO / PAPER / SIM).
+     Sit in the navbar so they stay visible regardless of scroll;
+     the existing full-width banners under the nav still surface
+     scenario / chase detail. The badges are the at-a-glance "are
+     we in fake-money land right now?" indicator on every algo
+     page. Pill-shaped (rounded ends) instead of circles since
+     the labels are 3-5 characters. */
   .algo-mode-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.5rem;
     height: 1.5rem;
+    padding: 0 0.55rem;
     border-radius: 9999px;
     font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
+    font-size: 0.6rem;
     font-weight: 800;
-    letter-spacing: 0;
+    letter-spacing: 0.06em;
     line-height: 1;
     flex: 0 0 auto;
     margin-right: 0.35rem;
     animation: algo-mode-pulse 2.4s ease-in-out infinite;
+  }
+  .algo-mode-demo {
+    background: #c084fc;     /* purple — distinct from sim red + paper blue */
+    color: #0c1830;
+    box-shadow: 0 0 0 1px rgba(192,132,252,0.55), 0 0 8px rgba(192,132,252,0.45);
   }
   .algo-mode-sim {
     background: #fb7185;

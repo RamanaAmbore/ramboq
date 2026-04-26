@@ -18,7 +18,7 @@ from litestar.exceptions import HTTPException
 from litestar.params import Parameter
 from litestar.status_codes import HTTP_200_OK
 
-from backend.api.auth_guard import jwt_guard
+from backend.api.auth_guard import jwt_guard, auth_or_demo_guard
 from backend.api.cache import get_or_fetch, invalidate
 from backend.api.routes.ws import broadcast
 from backend.api.schemas import (
@@ -145,7 +145,7 @@ class AlgoOrderInfo(msgspec.Struct):
 
 class OrdersController(Controller):
     path = "/api/orders"
-    guards = [jwt_guard]
+    guards = [auth_or_demo_guard]
 
     @get("/")
     async def list_orders(self) -> OrdersResponse:
@@ -194,7 +194,10 @@ class OrdersController(Controller):
         ]
 
     @post("/place")
-    async def place_order(self, data: PlaceOrderRequest) -> PlaceOrderResponse:
+    async def place_order(self, data: PlaceOrderRequest, request: Request) -> PlaceOrderResponse:
+        if getattr(request.state, "is_demo", False):
+            raise HTTPException(status_code=403,
+                detail="Live order placement is not available in demo mode. Use the OrderTicket → PAPER instead.")
         _validate_place(data)
         kite   = _kite_for(data.account)
         masked = mask_column(pd.Series([data.account]))[0]
@@ -221,7 +224,7 @@ class OrdersController(Controller):
             raise HTTPException(status_code=400, detail=str(e))
 
     @post("/ticket")
-    async def ticket_order(self, data: TicketOrderRequest) -> TicketOrderResponse:
+    async def ticket_order(self, data: TicketOrderRequest, request: Request) -> TicketOrderResponse:
         """
         Operator-initiated order from the reusable <OrderTicket> on
         any algo page. Routes by `mode`:
@@ -247,6 +250,15 @@ class OrdersController(Controller):
         if data.mode not in ("paper", "live"):
             raise HTTPException(status_code=400,
                 detail=f"unknown mode '{data.mode}'")
+
+        # Demo mode chokepoint: silently downgrade LIVE → PAPER. Rather
+        # than 403-ing, we let the visitor's order land as paper so the
+        # "click Submit, see something happen" flow keeps working — the
+        # ticket UI still warns this is a real trade with the LIVE
+        # confirmation dialog, but the backend won't actually let the
+        # order touch a broker.
+        if getattr(request.state, "is_demo", False):
+            data = msgspec.structs.replace(data, mode="paper")
 
         side = (data.side or "").upper()
         if side not in ("BUY", "SELL"):
@@ -363,7 +375,10 @@ class OrdersController(Controller):
         )
 
     @put("/{order_id:str}")
-    async def modify_order(self, order_id: str, data: ModifyOrderRequest) -> ModifyOrderResponse:
+    async def modify_order(self, order_id: str, data: ModifyOrderRequest, request: Request) -> ModifyOrderResponse:
+        if getattr(request.state, "is_demo", False):
+            raise HTTPException(status_code=403,
+                detail="Order modification is not available in demo mode.")
         kite   = _kite_for(data.account)
         masked = mask_column(pd.Series([data.account]))[0]
         kwargs = {k: v for k, v in {
@@ -427,9 +442,13 @@ class OrdersController(Controller):
     async def cancel_order(
         self,
         order_id: str,
+        request:  Request,
         account:  str = Parameter(query="account"),
         variety:  str = Parameter(query="variety", default="regular"),
     ) -> CancelOrderResponse:
+        if getattr(request.state, "is_demo", False):
+            raise HTTPException(status_code=403,
+                detail="Order cancel is not available in demo mode.")
         kite   = _kite_for(account)
         masked = mask_column(pd.Series([account]))[0]
         try:

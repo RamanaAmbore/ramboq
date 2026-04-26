@@ -19,7 +19,7 @@ from litestar import Controller, delete, get, post, put
 from litestar.exceptions import HTTPException
 from sqlalchemy import select
 
-from backend.api.auth_guard import admin_guard
+from backend.api.auth_guard import admin_guard, auth_or_demo_guard
 from backend.api.database import async_session
 from backend.api.models import Agent, AgentEvent
 from backend.shared.helpers.ramboq_logger import get_logger
@@ -116,8 +116,13 @@ def _agent_to_info(a: Agent) -> AgentInfo:
 # ---------------------------------------------------------------------------
 
 class AgentController(Controller):
+    # Controller-level guard allows anonymous demo on prod; the
+    # write endpoints (POST/PUT/DELETE) override with admin_guard
+    # so demo visitors get 401 on any mutation. Reads (GET) flow
+    # through auth_or_demo_guard so the /agents page populates for
+    # an anonymous visitor.
     path = "/api/agents"
-    guards = [admin_guard]
+    guards = [auth_or_demo_guard]
 
     @get("/")
     async def list_agents(self) -> list[AgentInfo]:
@@ -159,7 +164,7 @@ class AgentController(Controller):
             raise HTTPException(status_code=404, detail=f"Agent '{slug}' not found")
         return _agent_to_info(agent)
 
-    @post("/")
+    @post("/", guards=[admin_guard])
     async def create_agent(self, data: AgentCreateRequest) -> dict:
         async with async_session() as session:
             existing = await session.execute(select(Agent).where(Agent.slug == data.slug))
@@ -176,7 +181,7 @@ class AgentController(Controller):
         logger.info(f"Agent created: {data.slug}")
         return {"detail": f"Agent '{data.slug}' created"}
 
-    @put("/{slug:str}")
+    @put("/{slug:str}", guards=[admin_guard])
     async def update_agent(self, slug: str, data: AgentUpdateRequest) -> dict:
         async with async_session() as session:
             result = await session.execute(select(Agent).where(Agent.slug == slug))
@@ -192,7 +197,7 @@ class AgentController(Controller):
         logger.info(f"Agent updated: {slug}")
         return {"detail": f"Agent '{slug}' updated"}
 
-    @put("/{slug:str}/activate", status_code=200)
+    @put("/{slug:str}/activate", status_code=200, guards=[admin_guard])
     async def activate_agent(self, slug: str) -> dict:
         async with async_session() as session:
             result = await session.execute(select(Agent).where(Agent.slug == slug))
@@ -203,7 +208,7 @@ class AgentController(Controller):
             await session.commit()
         return {"detail": f"Agent '{slug}' activated"}
 
-    @put("/{slug:str}/deactivate", status_code=200)
+    @put("/{slug:str}/deactivate", status_code=200, guards=[admin_guard])
     async def deactivate_agent(self, slug: str) -> dict:
         async with async_session() as session:
             result = await session.execute(select(Agent).where(Agent.slug == slug))
@@ -214,7 +219,7 @@ class AgentController(Controller):
             await session.commit()
         return {"detail": f"Agent '{slug}' deactivated"}
 
-    @delete("/{slug:str}", status_code=200)
+    @delete("/{slug:str}", status_code=200, guards=[admin_guard])
     async def delete_agent(self, slug: str) -> dict:
         async with async_session() as session:
             result = await session.execute(select(Agent).where(Agent.slug == slug))

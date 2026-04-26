@@ -12,7 +12,7 @@ from litestar import Controller, get
 from litestar.exceptions import HTTPException
 from litestar.params import Parameter
 
-from backend.api.auth_guard import jwt_guard
+from backend.api.auth_guard import auth_or_demo_guard
 from backend.shared.helpers.connections import Connections
 from backend.shared.helpers.ramboq_logger import get_logger
 
@@ -91,7 +91,7 @@ def _fetch_ltp(exchange: str, tradingsymbol: str) -> QuoteResponse:
 
 class QuoteController(Controller):
     path = "/api/quote"
-    guards = [jwt_guard]
+    guards = [auth_or_demo_guard]
 
     @get("/")
     async def get_quote(

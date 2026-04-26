@@ -46,7 +46,7 @@ from backend.api.algo.derivatives import (
     risk_reward_ratio,
     underlying_ltp_key,
 )
-from backend.api.auth_guard import admin_guard
+from backend.api.auth_guard import admin_guard, auth_or_demo_guard
 from backend.shared.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
@@ -458,7 +458,12 @@ def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
 
 class OptionsController(Controller):
     path   = "/api/options"
-    guards = [admin_guard]
+    # auth_or_demo: demo visitors on prod browse the analytics
+    # surface read-only. The endpoints don't touch the broker
+    # write path, so leakage risk is per-row data only — and
+    # everything in a strategy response is computed (Greeks /
+    # payoff curves), not account-tagged.
+    guards = [auth_or_demo_guard]
 
     @get("/analytics")
     async def analytics(self, mode: str = "live", symbol: str = "",

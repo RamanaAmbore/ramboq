@@ -29,7 +29,7 @@ import msgspec
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
 
-from backend.api.auth_guard import jwt_guard
+from backend.api.auth_guard import auth_or_demo_guard
 from backend.api.cache import get_or_fetch
 from backend.shared.helpers.connections import Connections
 from backend.shared.helpers.ramboq_logger import get_logger
@@ -96,7 +96,7 @@ def _fetch_instruments() -> InstrumentsResponse:
 
 class InstrumentsController(Controller):
     path = "/api/instruments"
-    guards = [jwt_guard]
+    guards = [auth_or_demo_guard]
 
     @get("/")
     async def get_instruments(self) -> InstrumentsResponse:
