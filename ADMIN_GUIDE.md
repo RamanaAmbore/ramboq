@@ -391,34 +391,43 @@ You'll see:
 
 ## Options analytics (`/admin/options`)
 
-A separate workspace from the tick-chart pages — this is for **options research**: pick a position, see what it'd be worth at any spot price today vs at expiry, with all the Greeks and risk metrics on the side.
+A separate workspace from the tick-chart pages — this is for **options research**: pick an underlying, see the aggregated payoff for everything you hold on it, plus the Greeks and risk metrics on the side. One leg or twenty — same view; the page doesn't distinguish single-leg from multi-leg.
+
+### Picker bar
+
+Two dropdowns and a `+` toggle. That's it.
+
+| Control | Purpose |
+|---|---|
+| **Account** (multi-select) | Scopes which broker accounts the candidates pull from. Blank = all accounts. |
+| **Underlying** (single-select) | NIFTY / BANKNIFTY / FINNIFTY / … — derived from your loaded book. Picks the universe. |
+| **+ / −** (toggle pill) | Opens an **option-chain** picker; clicks land as **drafts** (hypothetical positions) you can edit. |
+
+Live vs sim is auto-detected. While a simulator is running the page works off sim positions and the header carries a `SIMULATOR` chip; otherwise it works off your live broker book. No mode switch — just pick the underlying.
 
 ### What you see
 
 ```
 ┌──────────────────────────────────────────────┬────────────────────┐
-│  Payoff diagram                              │  Pricing           │
-│   - amber line: today (BS, current DTE/IV)   │    Spot / LTP /    │
-│   - sky dashed: expiry (intrinsic)           │    BS / Diff / IV  │
-│   - green zone: profit                       │                    │
-│   - red zone:   loss                         │  Greeks            │
-│   - vertical markers: spot · strike · BE     │    Δ Γ Θ V ρ       │
-│                                              │                    │
-│                                              │  Risk              │
-│                                              │    max profit      │
-│                                              │    max loss        │
-│                                              │    breakeven       │
-│                                              │    POP             │
+│  Aggregate payoff diagram                    │  Aggregate         │
+│   - amber line: today (BS, current DTE/IV)   │    Spot / Net cost │
+│   - sky dashed: expiry (intrinsic)           │  Greeks (position) │
+│   - green zone: profit                       │    Δ Γ Θ V ρ       │
+│   - red zone:   loss                         │  Risk + EV         │
+│   - vertical markers: spot · strikes · BEs   │    max P / L       │
+│                                              │    R:R             │
+│                                              │    breakevens      │
+│                                              │    POP / EV        │
 └──────────────────────────────────────────────┴────────────────────┘
-│  Historical · last 30 days (full-width)                           │
+│  Candidates (checkbox list — uncheck to drop a leg from payoff)   │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### Three input sources
+### Adding draft positions
 
-- **Live position** — every option/future in your real broker book is in the picker. Click one, the page loads its Greeks, payoff, risk metrics in under a second. This is the "show me what NIFTY25APR22000CE looks like for me right now" workflow.
-- **Sim position** — same picker, but for the active simulator's positions. Useful while a sim is running and you want to drill into one contract's analytics.
-- **Hypothetical** — type any option symbol (e.g. `NIFTY25APR21500PE`), pick a quantity (negative = short), optionally an entry price (defaults to current LTP). The page computes everything as if you'd just taken the trade. **Use this before you place an order** — see the breakeven, max loss, and POP before committing capital.
+Click `+` to open the option-chain picker. Pick an expiry, browse strikes, click `+ CE` / `+ PE` next to any row (or a futures pill above the strike grid) to drop the contract into **Drafts**. Drafts whose symbol matches the selected underlying surface in Candidates immediately and feed the strategy analytics like any other leg. Edit qty / avg cost / LTP inline; hit `×` to drop a draft.
+
+Drafts are how you model contracts you don't own — "what if I add NIFTY24500CE to my book?". They sit beside live + sim positions in Candidates and the chart re-renders on every checkbox toggle.
 
 ### Key metrics — what they mean
 
@@ -442,8 +451,8 @@ The page (and the paper-trading underlying-spot fetch) routes shared market-data
 
 ### Caveats
 
-- **Options only**. Futures show in your position list but the analytics endpoint will reject them — they're linear-payoff, no Greeks needed.
-- **Sim historical isn't possible**. Sim runs are forward-only (no recorded history before the run started). For sim positions the historical chart shows a clear "unavailable" message; live + hypothetical work normally.
+- **Single underlying per chart**. All checked candidates must share the same underlying — the page rejects mixed underlyings (would be unplottable on one x-axis). Pick a different Underlying to see a different book.
+- **Single expiry per chart**. All legs must share the same expiry. Calendar / diagonal spreads aren't supported yet — uncheck the off-expiry leg in Candidates.
 - **IV is locked at the moment of the call**. The page polls every 5 s so a fast-moving market refreshes the IV calibration; the payoff curve uses whatever σ the latest poll resolved.
 
 ### Stale prices — what to do when the broker has nothing to say
@@ -458,30 +467,22 @@ When you're looking at an option that's illiquid, off-hours, or just had a stale
 
 The payoff curve still draws regardless. The Greeks and POP computed off a stale price are best treated as "shape-of-position" — directionally right, but don't rely on the absolute rupee numbers when the chip is yellow.
 
-### Strategy mode — multi-leg payoff (vertical, iron condor, butterfly, strangle)
+### Building a complex strategy
 
-Source dropdown → **Strategy (multi-leg)**. Two ways to build the basket:
+Picking an underlying loads every option + future you hold on it into Candidates. To model a hypothetical strategy on top:
 
-1. **Add leg from book** — picks any open live or sim position and appends it as a leg. Avg cost + current LTP are captured at click time, so a sim leg ships its own LTP and the backend doesn't need to round-trip to the broker.
-2. **+ Add row** — empty row for a hypothetical leg. Fill in the symbol + qty (negative = short); leave Avg cost blank to use LTP, leave LTP blank to have the backend pull it from Kite.
+1. Click `+` to open the option-chain picker.
+2. Pick the expiry from the chain dropdown, optionally toggle Long / Short.
+3. Click `+ CE` / `+ PE` next to a strike (or a futures pill) to drop a draft into your basket. The contract appears in Drafts (editable) and Candidates (checkable) immediately.
+4. Tick / untick rows in Candidates to include / exclude legs from the payoff. The chart auto-updates.
 
-Click **Analyze** → the page renders:
+The chart marks every leg's strike and every breakeven (an iron condor draws 2; a butterfly 2; a vertical 1). The side panel surfaces:
 
-- **Aggregate payoff chart** with the same colour scheme as the single-leg view, but every leg's strike marker shows up plus *every* breakeven (an iron condor draws 2; a butterfly 2; a vertical 1).
-- **Aggregate side panel**:
-  - Net cost (debit / credit) — sign tells you whether you paid or collected
-  - Position-level Greeks (Δ Γ Θ V ρ) — summed across legs, signed by qty
-  - Max profit / max loss — numerical, within the spot range you're charting
-  - Breakevens — multiple, comma-separated
-  - POP — probability the strategy lands in any profitable region at expiry, computed from a qty-weighted-IV log-normal
-- **Per-leg breakdown table** — every leg with its own theo / LTP / discrepancy / IV / Δ / Θ / V
+- **Net cost** — debit / credit; sign tells you whether you paid or collected.
+- **Position Greeks** (Δ Γ Θ V ρ) — summed across legs, signed by qty.
+- **Risk + EV** — max profit / loss within the charted spot range, R:R, every breakeven, POP, expected value.
 
-Constraints (v1):
-- All legs must share the **same underlying** (the page rejects mixed underlyings — would be unplottable on a single x-axis anyway).
-- All legs must share the **same expiry** (calendar + diagonal spreads need separate per-leg expiry handling and aren't supported yet).
-- Sim legs must supply LTP inline (the leg picker captures it automatically; manual rows have to fill it in).
-
-Use it before you put on a complex trade — spread the legs out, hit Analyze, look at the BE markers and POP, *then* hit the broker. The numbers won't lie.
+Use it before you put on a complex trade — pick the legs, look at the BE markers and POP, *then* hit the broker. The numbers won't lie.
 
 
 

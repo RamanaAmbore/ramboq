@@ -361,7 +361,9 @@ Summary agents (`nse_open_summary`, `nse_close_summary`, `mcx_open_summary`, `mc
 **Loss agents** (prefix `loss-`) cover the 14 static + rate loss rules plus 2 fund negatives. They now ship **active** by default — `alert_utils.check_and_alert` is retired. Toggle individually from the `/agents` page.
 
 ### SvelteKit Pages (routes under `frontend/src/routes/(algo)/`)
-- **`+layout.svelte`** — algo-site top nav, ordered by usage frequency: Dashboard · Agents · Orders (live monitoring) → Options · Paper · Simulator (analysis surfaces) → Terminal · Tokens (build / extend) → Settings · Brokers (configuration) → Users (admin). The "go back to public" button reads "Investor site" so it's clear what context-switch the link triggers; the public site's reverse link reads "Algo Site". Both render with **pill emphasis** at equal visual weight — Investor site is an amber pill on the dark navbar (`rgba(251,191,36,0.18)` bg + `#fbbf24` text), Algo Site is a gold pill on the cream navbar (`rgba(200,168,75,0.18)` bg + `#b27908` text). Symmetric design: neither side gets lost; the operator always sees the way back to the other surface. Polls `/api/simulator/status` and renders the sticky red **SIMULATOR ACTIVE** banner on every algo page while a sim is running.
+- **`+layout.svelte`** — algo-site top nav, ordered by usage frequency: Dashboard · Agents · Orders (live monitoring) → Options · Paper · Simulator (analysis surfaces) → Terminal · Tokens (build / extend) → Settings · Brokers (configuration) → Users (admin). The "Investor site" cross-link is mellowed (font-weight 500, alpha 0.10 bg, alpha 0.32 border) — same amber colour as the public side's "Algo Site" pill, lower visual intensity so it reads as a context-switch affordance rather than a CTA.
+  - Polls `/api/simulator/status` (4 s) and renders the sticky red **SIMULATOR** banner on every algo page while a sim is running.
+  - Polls `/api/charts/paper-status` (4 s) and renders a sticky sky-blue **PAPER** banner whenever the prod paper engine has open chase orders. Both banners can stack — sim sits on top, paper underneath. Stickiness pins them just under the navbar so they never scroll out of view.
 - **`performance/`** (public) and **`dashboard/`** (admin, same `PerformancePage.svelte` component). The public page uses the default two-row header (timestamp + Refresh on top, tabs + account picker below). The admin dashboard passes `compactHeader={true}` to collapse into one toolbar row: `[Positions | Holdings] [Account ▼] [Refresh]`. Either way, selecting a specific account scopes **every** grid (Holdings summary + detail, Positions summary + detail, Funds) to that account — sibling accounts AND the TOTAL aggregate are filtered out, and the Account column hides across those grids since it would render identical values. Performance **always** shows real Kite data; the background refresh keeps going even while the simulator is active. The algo theme (`ag-theme-algo`) is the dark navy-gradient variant; long positions render a cyan row tint with a left accent border, short positions a warm-orange row tint.
 - **`market/`** — AI market report with timestamp
 - **`signin/`** — Sign In / Register (name, email, phone)
@@ -930,17 +932,31 @@ Both endpoints surface position-level expected value and R:R alongside the exist
 
 **UI** — [`frontend/src/lib/OptionsPayoff.svelte`](frontend/src/lib/OptionsPayoff.svelte) is the payoff-chart SVG. Two curves (today amber solid, expiry sky dashed), profit/loss zone shading, vertical markers for spot (cyan) / strike (white dashed) / breakeven (amber dashed), hover crosshair with a 3-line tooltip. Hand-rolled SVG, no chart lib.
 
-[`frontend/src/routes/(algo)/admin/options/+page.svelte`](frontend/src/routes/(algo)/admin/options/+page.svelte) wires four input modes: live position / sim position / hypothetical (single-leg) / **strategy** (multi-leg). Single-leg modes render the payoff chart on the left + Pricing / Greeks / Risk blocks on the right + historical chart full-width below.
+**Page model (v4)** — the page is a single multi-leg payoff workspace; there's no Single-vs-Strategy mode any more. One leg renders the same chart + Greeks + risk panel as many. The picker bar is two dropdowns + a single `+` toggle:
 
-**Strategy mode picker (v2)** — replaces the old single-symbol Select with two dropdowns: an **Account** MultiSelect (default: all accounts) and an **Underlying** Select (NIFTY / BANKNIFTY / FINNIFTY / …, derived from the loaded book). Below the payoff chart, a **Candidates** panel lists every option + future on the chosen underlying held in any of the chosen accounts — each row carries the symbol, account, kind (CE/PE/FUT), qty, avg cost, LTP, P&L, and a checkbox. Toggling a checkbox rebuilds `legs[]` via `$effect` so the next Analyze click reflects the operator's selection. Hypothetical legs (operator wants to model a contract they don't own) still go through the option-chain picker / + Add row paths beneath. The picker bar therefore becomes "what's the universe?" (Account + Underlying); the Candidates panel is "which of those am I including?". This means an operator can scan their NIFTY book, untick a hedge they want to ignore, and re-Analyze in two clicks.
+| Control | Purpose |
+|---|---|
+| **Account** (MultiSelect) | Scopes which broker accounts the candidates pull from. Empty = all. |
+| **Underlying** (Select) | NIFTY / BANKNIFTY / … derived from the loaded book. Sets the universe. |
+| **+ / −** (toggle pill) | Opens an option-chain picker; clicks land as drafts. |
 
-The strategy display still renders the payoff chart (with multiple breakeven markers + every leg's strike marked) plus an Aggregate / Greeks / Risk side panel; the Candidates panel sits below the chart, and the per-leg breakdown table follows.
+Live vs sim is **auto-detected** from `/api/simulator/status`. When a sim is active the page works off sim positions and the header carries a `SIMULATOR` badge; otherwise it works off live broker positions. Polled every 5 s.
+
+**Drafts** replace the old "hypothetical" mode — operator-typed positions appear as editable rows above the candidates list. Drafts whose symbol matches the selected underlying surface in Candidates and feed the strategy analytics like any other leg. The `+` button opens the chain picker (browse strikes for the chosen underlying, click +CE / +PE / a futures pill to drop a leg into Drafts).
+
+**Candidates panel** sits immediately below the payoff chart — replaces the older Per-leg breakdown card (the same backend data was shown twice, once with checkboxes, once read-only). Rows are scrollable horizontally + vertically (`.cand-scroll` wraps the grid; max-height 22rem; rows have a 720px min-width so the layout never breaks on narrow viewports). Toggling a checkbox rebuilds `legs[]` via `$effect`, which auto-triggers the strategy analytics endpoint — no Analyze button.
+
+**Historical chart removed** — when the page collapsed to multi-leg-only, the per-symbol historical chart lost its anchor (a single picked symbol). The historical endpoint stays on the backend (`GET /api/options/historical`) for any future re-introduction; the frontend no longer calls it.
 
 **Historical-bars endpoint is graceful** — `GET /api/options/historical?symbol=…` no longer 404s when the instrument isn't in the cached dump for the first exchange tried. It walks NFO → BFO → NSE → BSE in sequence and returns an empty `bars: []` (200 OK) when nothing matches, rather than bubbling a 4xx that crashes the page's chart panel. Same pattern when the broker is unreachable — empty bars instead of 502.
 
+**Strategy 500 traps** — two separate bugs caused 500s on the strategy endpoint and were fixed together:
+1. `parse_tradingsymbol("…FUT")` returns a dict without a `strike` key. `sorted_strikes = sorted({parse_tradingsymbol(l.symbol)["strike"] for ...})` crashed with KeyError when a futures leg was in the basket. Guarded with `(p := parse_tradingsymbol(l.symbol)) and "strike" in p`.
+2. An inner `from backend.api.algo.derivatives import DEFAULT_IV, black_scholes` inside an LTP-fallback branch made Python flag `DEFAULT_IV` as a function-local for the whole `_strategy_analytics_impl` scope. When that branch didn't execute, the later `sig == DEFAULT_IV` raised `UnboundLocalError`. Removed the redundant inner import (DEFAULT_IV is already imported at module level). The endpoint also now wraps in a try/except that calls `logger.exception(...)` so future 500s leave a traceback (Litestar's default 500 handler swallowed them silently).
+
 `OptionsPayoff` accepts either scalar `strike` / `breakeven` props (single-leg) or arrays `strikes` / `breakevens` (multi-leg) — same SVG, same palette.
 
-Polling: analytics every 5 s while a symbol is set; historical only on symbol change (daily candles don't move intra-day). Strategy mode polls the same cadence so Greeks + IV stay live while the operator stares at the page.
+Polling: strategy analytics auto-refreshes whenever the leg set changes (an `$effect` on `legs`), plus a 5 s visibleInterval to keep Greeks + IV live while the operator stares at the page. Sim status polled at 5 s; positions list at 30 s.
 
 ---
 
@@ -968,15 +984,22 @@ The grid colors are deliberately low-saturation cool-blue rather than amber — 
 
 ## Public-theme row indicators
 
-`.ag-theme-ramboq .ag-row.pos-long / .pos-short` carry a `box-shadow inset -4px` indicator on the **right edge** of the row plus a `:last-child` cell-level rule as a belt-and-suspenders for any future column set that might put a solid-bg cell at the rightmost position.
+Long/short indicator on `.ag-theme-ramboq` performance grids:
 
-Indicator started on the LEFT edge (`inset 4px`) using a `:first-child` cell rule because the public theme's `ag-col-fill` Account/Symbol cells covered the row-level shadow on the leftmost cell. That worked unfiltered, but the moment the operator picked an account (which hides the Account column), the leftmost-visible cell changed and the indicator visually jumped. Moved to the right edge — that side is consistently uncovered by any of our column sets, so the row's box-shadow is always visible without per-cell help. Stays in the same place across filter states.
+- **bars** (left + right edges, 4px box-shadow) are scoped to the symbol cell only (`.ag-col-sym`). Earlier iterations tinted the whole row + put a single-edge bar; the bars-on-the-symbol-cell-only treatment reads as "this is THE symbol of this row" rather than "the entire row is direction-tinted".
+- **background tint** extends to BOTH symbol AND account cells (the two `ag-col-fill` columns) so the symbol+account pair reads as one direction-tinted block while the rest of the row stays clean. LONG = sage-teal `rgba(91,142,149,0.14)`; SHORT = warm-terracotta `rgba(196,122,61,0.14)` — desaturated so they sit alongside the cream + champagne palette without shouting.
+
+To make the bars symbol-only, [`PerformancePage.svelte`](frontend/src/lib/PerformancePage.svelte) tags symbol cells with an extra `ag-col-sym` class via `cellClass: 'ag-col-fill ag-col-sym'`. Account cells keep just `ag-col-fill` (background tint, no bars). The Account column hides automatically when a specific account is picked (`setColumnsVisible(['account'], false)`).
 
 ---
 
 ## InfoHint popup variant
 
-[`InfoHint.svelte`](frontend/src/lib/InfoHint.svelte) gained a `popup` prop. When `popup=true` the popout is absolutely-positioned (z-index 50, drop-shadow) instead of the default inline expansion — best for compact stats on the options page where pushing siblings down would feel disruptive. Click toggles "pinned" mode (allows text selection); hover shows a soft preview that disappears on mouse-leave. Click-outside closes the pinned popup.
+[`InfoHint.svelte`](frontend/src/lib/InfoHint.svelte) gained a `popup` prop. When `popup=true` the popout is absolutely-positioned (z-index 50) instead of the default inline expansion — best for compact stats where pushing siblings down would feel disruptive. Click toggles "pinned" mode (allows text selection); hover shows a soft preview that disappears on mouse-leave. Click-outside closes the pinned popup.
+
+**Subtle styling.** Earlier iterations used a navy-gradient background with an amber-left-accent border that competed with the helper text it framed. Toned down to a flat slate-blue surface (`rgba(15,25,45,0.95)`), faint sky-blue border, no left accent, smaller drop shadow. Bold spans (`<b>` / `<strong>`) inside still render in amber so the information hierarchy is preserved.
+
+**Responsive width.** `min-width: min(13rem, 88vw)` and `max-width: min(32rem, 92vw)` — viewport-clamped so the popup never overflows on a narrow phone (88 vw cap) and never gets unreadably wide on a desktop (32 rem cap). `align="right"` on the wrapper flips the popup to anchor on the right edge of its trigger when a left-anchored popup would clip off-screen.
 
 **Content delivery — `text` prop preferred over children snippet.** The component supports two ways of supplying the popout body: `text="…"` (string, may include HTML — rendered via `{@html}`) and a children snippet (`<InfoHint popup>…</InfoHint>`). The `text` prop wins when both are present. **Always prefer `text`** — children snippets occasionally lose their content during the SSR → CSR handoff in this codebase, leaving the chip clickable but the popout empty. Every InfoHint on `/admin/options` (and the simulator / paper / settings / brokers admin pages) was migrated to the `text` form for that reason.
 
@@ -1036,7 +1059,7 @@ OptionsPayoff resets back to the auto `±span_sigmas × σ × √T` range that t
 
 Both `/market` and `/performance` consolidate the AI summary and news feed into a single tabbed card with `[Market Summary | Market News]`. Only one panel is visible at a time so the page stays compact; flipping tabs is a paint, not a fetch (both feeds load on mount). Same UX shape on both surfaces — operators get the same affordance whether they're viewing the dedicated Market page or the Performance dashboard.
 
-Tab styling matches the algo navbar's idiom — each tab carries a **left-border indicator** that turns champagne when active or hovered (the same affordance the algo navbar uses for its menu items, so the public and algo surfaces feel like cousins). The tab strip sits above a thin bottom border (`#e7e0cf`) that separates it from the panel content. Tab labels are short ("Summary" / "News feed") — the page title already supplies the "Market" qualifier. Right side of the tab row carries a "Loading…" / "Refreshing…" indicator. **Below the tab row** a "Refreshed at <ts>" line uses the same Tailwind triplet as `PerformancePage`'s page-level timestamp (`text-[0.65rem] text-muted perf-ts`) so the timestamp shape is consistent everywhere on the public site. `nowrap` keeps the dual-timezone string on a single line; the card's horizontal padding absorbs any overflow on narrow viewports. Routes:
+Tab styling — the tab strip sits **outside** the white card, on the page's cream background. Active tab carries a champagne **bottom** border (`#d4920c`); the row's own `border-bottom: 1px solid #e7e0cf` stitches the strip together. The active tab's bottom border merges flush with the row's via `margin-bottom: -1px`, then a small `margin-top: 0.6rem` on the panel beneath gives the two regions visual separation. Earlier iterations used a left-border indicator with a tinted background; the bottom-border + outside-the-card treatment reads more naturally as a desktop-app document-tab. Right side of the tab row carries a "Loading…" / "Refreshing…" indicator. **Inside the panel**, a "Refreshed at <ts>" line uses the same Tailwind triplet as `PerformancePage`'s page-level timestamp (`text-[0.65rem] text-muted perf-ts`) so the timestamp shape is consistent everywhere on the public site. `nowrap` keeps the dual-timezone string on a single line; the card's horizontal padding absorbs any overflow on narrow viewports. Routes:
 
 - [`/market`](frontend/src/routes/(public)/market/+page.svelte) — page-level `lastRefresh` timestamp at the top, then a tabbed card.
 - [`/performance`](frontend/src/routes/(public)/performance/+page.svelte) — performance grids first, then the same tabbed card below.

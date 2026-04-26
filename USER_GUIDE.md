@@ -178,24 +178,23 @@ Hover over any dot to see what side / quantity / price.
 
 ### Options analytics — the payoff diagram
 
-`/admin/options` is the dedicated options-research page. For any single option (live position, sim position, or hypothetical you typed in), you get:
+`/admin/options` is the dedicated options-research page. Pick an underlying (NIFTY / BANKNIFTY / …) and the page surfaces every option + future you hold on it as **Candidates**. Tick / untick rows to include / exclude legs from the payoff — the chart re-renders on every toggle.
 
-- **Payoff diagram** — your P&L as a function of where the underlying ends up. Two curves on the same chart: today's value (Black-Scholes with current IV) and expiry value (intrinsic only). Profit zone shaded green, loss zone red. Vertical markers show current spot, strike, breakeven.
-- **Side panel** — Greeks (Δ Γ Θ V ρ) per share AND scaled by your position size, plus theoretical-vs-market discrepancy and risk metrics (max profit, max loss, breakeven, probability of profit).
-- **Historical chart** below — last 30 days of OHLC bars from Kite.
+- **Payoff diagram** — your aggregated P&L as a function of where the underlying ends up. Two curves: today's value (Black-Scholes with current IV) and expiry value (intrinsic only). Profit zone shaded green, loss zone red. Vertical markers show current spot, every strike, every breakeven (iron condors draw 2!).
+- **Side panel** — Position Greeks (Δ Γ Θ V ρ) summed across all checked legs, plus risk metrics (max profit, max loss, R:R, breakevens, POP, expected value).
+- **Candidates panel** below — checkboxes for every position. Source badge tells you whether each row is live, sim, or draft.
 
 The chart x-axis is **always ±2.5 standard deviations from current spot** at expiry — so a 7-DTE option charts a tighter range (~5%) than a 60-DTE option (~15%). You see exactly the "where it could plausibly land" zone, not arbitrary fixed percentages. Wheel to zoom further into the money / out of the money; reset to come back.
 
-### Multi-leg strategy mode
+### Adding draft (hypothetical) positions
 
-Source dropdown → **Strategy (multi-leg)**. Two ways to build a basket:
+Click the `+` button next to the dropdowns. The option chain opens — pick an expiry, click `+ CE` / `+ PE` next to a strike to drop a contract into **Drafts**. Drafts are editable: change the qty, avg cost, or LTP inline. They show up as a candidate row immediately so you can include / exclude them like any other leg.
 
-1. **Add leg from book** — picks any open live or sim position, captures avg cost + LTP at click time.
-2. **+ Add row** — a blank line for a hypothetical leg.
+Use this when you're modelling a trade you don't own yet — "what if I add a 24500 PE here?". The draft appears alongside your live + sim positions, the chart re-renders, and you can see the breakevens + POP before placing the order.
 
-Then **Analyze** — the page renders the aggregate payoff curve with every leg's strike marked, every breakeven (iron condors have 2!), and aggregated Greeks. Use this **before** you put on a complex trade — see the breakevens, see the POP, *then* hit the broker.
+Live vs sim is **auto-detected**. While a simulator is running the page works off the sim book and shows a `SIMULATOR` chip in the header; otherwise it works off your real broker positions.
 
-Constraint for v1: all legs share the same underlying and same expiry (calendar / diagonal spreads need different math).
+Constraint for v1: all legs in the chart share the same underlying and same expiry (calendar / diagonal spreads need different math). The page warns you if a checked draft conflicts.
 
 ### When prices look "stale"
 
