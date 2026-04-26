@@ -654,13 +654,36 @@
   {/if}
 {/if}
 
-<!-- Candidates — sits ABOVE the payoff chart so the operator's
-     reading order is: pick what's in the basket → see the payoff
-     it draws → see the aggregate maths underneath. Each row carries
-     position info (qty / cost / LTP / P&L) plus per-leg analytics
-     (IV / Δ / Θ / 𝒱) joined from the latest strategy response by
-     symbol. Horizontal + vertical overflow scrolling; the row's
-     min-width keeps every column readable on narrow viewports. -->
+{#if strategy}
+  <div class="opt-payoff opt-payoff-full mb-3">
+    <div class="opt-section-h">
+      Aggregate Payoff
+      <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
+      <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
+        {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
+        {fmtMoney(Math.abs(strategy.net_cost), false)}
+      </span>
+      <span class="opt-section-meta">
+        DTE {strategy.days_to_expiry.toFixed(1)} ·
+        σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
+        {strategy.legs.length} legs
+      </span>
+    </div>
+    <OptionsPayoff
+      payoff={strategy.payoff}
+      spot={strategy.spot}
+      strikes={strategy.legs.map(l => l.strike)}
+      breakevens={strategy.risk.breakevens}
+      height={320} />
+  </div>
+{/if}
+
+<!-- Candidates — sits between the payoff chart above and the
+     Aggregate / Greeks / Risk cards below. Reading order: see the
+     chart → see which legs feed it → see the maths beneath. Each
+     row carries position info (qty / cost / LTP / P&L) plus per-leg
+     analytics (IV / Δ / Θ / 𝒱) joined from the latest strategy
+     response by symbol. Horizontal + vertical overflow scrolling. -->
 {#if selectedUnderlying || drafts.length}
   <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
     <div class="opt-section-h" style="padding-bottom: 0.5rem;">
@@ -725,36 +748,9 @@
   </div>
 {/if}
 
-{#if strategy}
-  <div class="opt-payoff opt-payoff-full mb-3">
-    <div class="opt-section-h">
-      Aggregate Payoff
-      <span class="opt-section-tag tag-deriv">{strategy.underlying}</span>
-      <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
-        {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
-        {fmtMoney(Math.abs(strategy.net_cost), false)}
-      </span>
-      <span class="opt-section-meta">
-        DTE {strategy.days_to_expiry.toFixed(1)} ·
-        σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
-        {strategy.legs.length} legs
-      </span>
-    </div>
-    <OptionsPayoff
-      payoff={strategy.payoff}
-      spot={strategy.spot}
-      strikes={strategy.legs.map(l => l.strike)}
-      breakevens={strategy.risk.breakevens}
-      height={320} />
-  </div>
-{/if}
-
-<!-- ── Aggregate / Greeks / Risk cards — moved BELOW the Candidates
-     panel so the operator's reading order is: chart → which legs
-     fed it → what it adds up to. The three cards lay out in a
-     horizontal flex row on wide screens (each card = 1fr); items
-     inside each card flow as multiple kv-pairs per row when there's
-     space. -->
+<!-- Aggregate / Greeks / Risk cards — three cards in a horizontal
+     flex row under the candidates panel. Each card has its own
+     internal kv-pair flow. -->
 {#if strategy}
   <aside class="opt-side opt-side-row">
         <div class="opt-block">
@@ -786,25 +782,25 @@
             Greeks (position)
             <InfoHint popup text={'Sum of every leg\'s signed-qty Greeks. Δ = net directional exposure; Θ = daily decay (positive when net short premium); 𝒱 = sensitivity to a 1 % IV move.'} />
           </div>
-          <div class="opt-kv">
+          <div class="opt-kv opt-kv-greeks">
             <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Δ <InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
+              <span class="kv-k kv-k-greek">Δ<InfoHint popup text={'<b>Delta</b> — net directional exposure. +50 ≈ "₹50 gained per ₹1 spot rise". 0 ≈ delta-neutral.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Γ <InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
+              <span class="kv-k kv-k-greek">Γ<InfoHint popup text={'<b>Gamma</b> — rate-of-change of delta as spot moves. Positive = delta helps you on big moves either way; negative = delta hurts more as spot drifts.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k kv-k-greek">Θ <InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
+              <span class="kv-k kv-k-greek">Θ<InfoHint popup text={'<b>Theta</b> — daily decay in rupees. Credit spreads / iron condors show positive theta (you collect time value); debit spreads / long premium negative.'} /></span>
               <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k kv-k-greek">𝒱 <InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
+              <span class="kv-k kv-k-greek">𝒱<InfoHint popup text={'<b>Vega</b> — P&L change per 1 % IV move. Long volatility (straddles, calendar spreads) = positive; short volatility (iron condors, naked shorts) = negative.'} /></span>
               <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
             </div>
             <div class="kv-pair">
-              <span class="kv-k kv-k-greek">ρ <InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
+              <span class="kv-k kv-k-greek">ρ<InfoHint popup text={'<b>Rho</b> — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options; matters for long-dated singles.'} /></span>
               <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
             </div>
           </div>
@@ -1044,9 +1040,35 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Greek symbols read better at a slightly larger size — they're
-     the label AND the visual identity of the row. */
-  .kv-k-greek { font-size: 0.95rem; font-weight: 700; color: #c8d8f0; }
+  /* Greek symbols — clean, slightly heavier than other labels but
+     not oversize. The visual identity of each Greek pair without
+     overpowering the value next to it. */
+  .kv-k-greek {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #c8d8f0;
+  }
+  /* Greeks card — all five pairs in a single row. The narrow
+     `max-content auto` per slot lets each pair size to its own
+     content; column-gap stays tight so the row feels uniform. */
+  .opt-kv-greeks {
+    display: grid;
+    grid-template-columns: repeat(5, max-content auto);
+    column-gap: 0.45rem;
+    row-gap: 0;
+  }
+  .opt-kv-greeks .kv-pair {
+    /* Each pair contributes label + value into two adjacent grid
+       cells via `display: contents` — the pair wrapper itself
+       doesn't take a grid slot. */
+    display: contents;
+  }
+  .opt-kv-greeks .kv-v {
+    font-size: 0.65rem;
+    margin-left: 0.15rem;
+    margin-right: 0.5rem;
+    text-align: left;
+  }
   .kv-pos { color: #4ade80; }
   .kv-neg { color: #f87171; }
   .kv-sub { color: #7e97b8; font-size: 0.55rem; margin-left: 0.2rem; }
@@ -1196,12 +1218,12 @@
       minmax(0, 0.8fr)    /* cost */
       minmax(0, 0.8fr)    /* ltp */
       minmax(0, 0.9fr)    /* pnl */
-      minmax(0, 0.55fr)   /* iv */
-      minmax(0, 0.55fr)   /* delta */
-      minmax(0, 0.55fr)   /* theta */
-      minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr);   /* source */
-    gap: 0.35rem;
+      minmax(0, 0.5fr)    /* iv */
+      minmax(0, 0.5fr)    /* delta */
+      minmax(0, 0.5fr)    /* theta */
+      minmax(0, 0.5fr)    /* vega */
+      minmax(0, 0.55fr);  /* source */
+    gap: 0.2rem;
     align-items: center;
     font-size: 0.62rem;
     font-family: monospace;

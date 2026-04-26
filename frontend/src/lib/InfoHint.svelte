@@ -69,25 +69,27 @@
     /** @type {number} */ let raf;
     function fit() {
       if (!popoutEl || !wrap) return;
-      // Reset positional styles before measuring so the prior fit
-      // doesn't bias the popup's natural width.
-      popoutEl.style.left = '';
-      popoutEl.style.top = '';
-      popoutEl.style.right = '';
-      const chipRect = wrap.getBoundingClientRect();
-      const popRect  = popoutEl.getBoundingClientRect();
       const margin = 8;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // Default — anchor under the chip's left edge.
+      // Width clamp first — JS-side guarantee that the popup never
+      // exceeds viewport width regardless of CSS / max-content
+      // calculations. Setting maxWidth as inline style overrides
+      // any CSS rule.
+      popoutEl.style.maxWidth = `${Math.max(120, vw - margin * 2)}px`;
+      // Reset position before measuring so the previous fit doesn't
+      // bias the natural rect.
+      popoutEl.style.left = '';
+      popoutEl.style.top  = '';
+      const chipRect = wrap.getBoundingClientRect();
+      const popRect  = popoutEl.getBoundingClientRect();
+      // Anchor at chip's left, clamp to viewport with 8px gutters.
       let left = chipRect.left;
-      // Clamp to viewport. If popup is wider than viewport, just pin
-      // it at the left margin (max-width CSS clamps width to fit).
       if (left + popRect.width > vw - margin) {
         left = vw - margin - popRect.width;
       }
       if (left < margin) left = margin;
-      // Top — under the chip; flip above if no room below.
+      // Vertical: under chip; flip above if no room.
       let top = chipRect.bottom + 6;
       if (top + popRect.height > vh - margin) {
         const above = chipRect.top - 6 - popRect.height;
@@ -95,10 +97,16 @@
       }
       popoutEl.style.left = `${left}px`;
       popoutEl.style.top  = `${top}px`;
+      // Reveal AFTER positioning to avoid the brief flash at top-left
+      // that an unpositioned `position:fixed` element shows on mount.
+      popoutEl.style.visibility = 'visible';
     }
+    // Hide before measurement so the unpositioned mount frame
+    // doesn't paint at top-left of the viewport.
+    if (popoutEl) popoutEl.style.visibility = 'hidden';
     raf = requestAnimationFrame(fit);
     window.addEventListener('resize', fit);
-    window.addEventListener('scroll', fit, true);   // capture-phase to catch nested scroll
+    window.addEventListener('scroll', fit, true);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', fit);
