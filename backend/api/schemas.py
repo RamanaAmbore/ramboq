@@ -191,6 +191,35 @@ class PlaceOrderRequest(msgspec.Struct):
     tag: Optional[str] = None
 
 
+class TicketOrderRequest(msgspec.Struct):
+    """
+    Operator-initiated order from the reusable <OrderTicket>.
+    `mode` selects the destination:
+      - "paper" → register with the prod paper engine; lifecycle
+        runs through the same chase loop agent fires use.
+      - "live"  → real broker order via Kite (phase 3).
+    Drafts never reach the backend (handled client-side).
+    """
+    mode: str               # "paper" | "live"
+    side: str               # "BUY" | "SELL"
+    tradingsymbol: str
+    quantity: int
+    exchange: str = "NFO"
+    product: str = "NRML"
+    order_type: str = "LIMIT"
+    variety: str = "regular"
+    price: Optional[float] = None
+    trigger_price: Optional[float] = None
+    account: str = ""       # leave blank → first available
+
+
+class TicketOrderResponse(msgspec.Struct):
+    order_id: str
+    mode: str
+    status: str
+    detail: str
+
+
 class ModifyOrderRequest(msgspec.Struct):
     account: str
     variety: str = "regular"

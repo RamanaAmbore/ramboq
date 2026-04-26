@@ -26,6 +26,7 @@
 
   import { onMount } from 'svelte';
   import OrderDepth from './OrderDepth.svelte';
+  import { placeTicketOrder } from '$lib/api';
 
   /** @type {{
    *   symbol:    string,
@@ -119,6 +120,27 @@
     };
     submitting = true; submitErr = '';
     try {
+      // PAPER routes through the backend (paper engine registers
+      // the order + chase loop runs the lifecycle). DRAFT and LIVE
+      // hand off to the caller's onSubmit (DRAFT goes onto local
+      // drafts; LIVE not wired until phase 3).
+      if (_mode === 'paper') {
+        await placeTicketOrder({
+          mode:             'paper',
+          side:             _side,
+          tradingsymbol:    symbol,
+          exchange:         exchange || 'NFO',
+          quantity:         Number(_qty),
+          product:          _product,
+          order_type:       _type,
+          variety:          _variety,
+          price:            showLimit   ? Number(_price)   : null,
+          trigger_price:    showTrigger ? Number(_trigger) : null,
+        });
+      }
+      // Always notify the caller — DRAFT mode appends to drafts[];
+      // PAPER mode lets the caller refresh its local view if it
+      // wants to.
       await onSubmit(payload);
       onClose();
     } catch (e) {
@@ -226,9 +248,10 @@
       <div class="ot-mode-pills">
         <button type="button" class="ot-mode-pill ot-mode-draft" class:on={_mode === 'draft'}
                 onclick={() => _mode = 'draft'}>DRAFT</button>
-        <button type="button" class="ot-mode-pill ot-mode-paper" disabled
-                title="Paper-trade endpoint lands in phase 2">PAPER</button>
-        <button type="button" class="ot-mode-pill ot-mode-live"  disabled
+        <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
+                title="Routes through the prod paper engine — real bid/ask, no broker hit"
+                onclick={() => _mode = 'paper'}>PAPER</button>
+        <button type="button" class="ot-mode-pill ot-mode-live" disabled
                 title="Live broker wiring lands in phase 3">LIVE</button>
       </div>
     </div>

@@ -1,34 +1,76 @@
 <script>
-  // Top-of-book depth ladder for an order ticket.
+  // Top-of-book depth ladder for the order ticket.
   //
-  // Phase 1: placeholder UI only — shows a 5-row x 4-col scaffold
-  // (bid qty / bid / ask / ask qty) with em-dashes, plus a hint
-  // line explaining that the live ladder lands in phase 2 once
-  // /api/quote/depth is wired.
-  //
-  // Phase 2: poll `/api/quote/depth?symbol=…&exchange=…` every 1 s
-  // while the parent ticket is mounted. Backend is a thin wrapper
-  // around the existing broker.quote() depth field.
+  // Polls `GET /api/quote?exchange=…&tradingsymbol=…` every 1.2 s
+  // while mounted. Backend wraps `kite.quote()` and returns LTP +
+  // top-5 buy/sell depth (already shipped before phase 2). When
+  // the broker call fails (off-hours, illiquid), the row falls
+  // back to em-dashes — the ticket still functions, the ladder
+  // just shows "no depth".
+
+  import { onMount, onDestroy } from 'svelte';
+  import { fetchQuote } from '$lib/api';
 
   /** @type {{ symbol: string, exchange?: string }} */
-  let { symbol, exchange = '' } = $props();
+  let { symbol, exchange = 'NFO' } = $props();
+
+  /** @type {{ ltp: number, bid: number|null, ask: number|null, depth_buy: any[], depth_sell: any[] } | null} */
+  let q = $state(null);
+  /** @type {string} */
+  let err = $state('');
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let timer = null;
+
+  async function poll() {
+    if (!symbol) return;
+    try {
+      q   = await fetchQuote(exchange || 'NFO', symbol);
+      err = '';
+    } catch (e) {
+      err = /** @type {any} */ (e)?.message || 'depth unavailable';
+    }
+  }
+
+  onMount(() => {
+    poll();
+    timer = setInterval(poll, 1200);
+  });
+  onDestroy(() => { if (timer) clearInterval(timer); });
+
+  // 5-row scaffold filled from the response. Shorter arrays pad
+  // with `null` so the rows stay aligned visually.
+  /** @param {any[]} arr */
+  function pad(arr) {
+    const out = [];
+    for (let i = 0; i < 5; i++) out.push(arr?.[i] || null);
+    return out;
+  }
+  const buyRows  = $derived(pad(q?.depth_buy));
+  const sellRows = $derived(pad(q?.depth_sell));
 </script>
 
 <div class="ot-depth">
   <div class="ot-depth-h">
     Depth · {symbol}{exchange ? ' · ' + exchange : ''}
-    <span class="ot-depth-meta">live ladder lands in phase 2</span>
+    {#if q && q.ltp}
+      <span class="ot-depth-ltp">LTP ₹{q.ltp.toFixed(2)}</span>
+    {:else if err}
+      <span class="ot-depth-meta">{err}</span>
+    {:else}
+      <span class="ot-depth-meta">loading…</span>
+    {/if}
   </div>
   <div class="ot-depth-grid">
     <span class="ot-depth-label">Bid qty</span>
     <span class="ot-depth-label">Bid</span>
     <span class="ot-depth-label">Ask</span>
     <span class="ot-depth-label">Ask qty</span>
-    {#each Array(5) as _, i (i)}
-      <span class="ot-depth-cell ot-depth-bid-qty">—</span>
-      <span class="ot-depth-cell ot-depth-bid">—</span>
-      <span class="ot-depth-cell ot-depth-ask">—</span>
-      <span class="ot-depth-cell ot-depth-ask-qty">—</span>
+    {#each buyRows as b, i (i)}
+      {@const a = sellRows[i]}
+      <span class="ot-depth-cell ot-depth-bid-qty">{b ? b.quantity.toLocaleString('en-IN') : '—'}</span>
+      <span class="ot-depth-cell ot-depth-bid">{b ? '₹' + b.price.toFixed(2) : '—'}</span>
+      <span class="ot-depth-cell ot-depth-ask">{a ? '₹' + a.price.toFixed(2) : '—'}</span>
+      <span class="ot-depth-cell ot-depth-ask-qty">{a ? a.quantity.toLocaleString('en-IN') : '—'}</span>
     {/each}
   </div>
 </div>
@@ -59,6 +101,13 @@
     text-transform: none;
     letter-spacing: 0;
     opacity: 0.7;
+  }
+  .ot-depth-ltp {
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 0.62rem;
+    text-transform: none;
+    letter-spacing: 0;
   }
   .ot-depth-grid {
     display: grid;

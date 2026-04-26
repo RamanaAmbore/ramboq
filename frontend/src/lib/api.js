@@ -331,6 +331,22 @@ export async function fetchPaperStatus() {
   return _get('/charts/paper-status', { auth: true });
 }
 
+/** GET /api/quote — single-symbol quote with top-5 depth. Used by
+ *  OrderTicket / OrderDepth to render the bid/ask ladder while the
+ *  ticket is open. Polls every ~1 s for live depth. */
+export async function fetchQuote(exchange, tradingsymbol) {
+  const p = new URLSearchParams({ exchange, tradingsymbol });
+  return _get(`/quote/?${p}`, { auth: true });
+}
+
+/** POST /api/orders/ticket — operator-initiated order from the
+ *  reusable <OrderTicket>. Phase 2: only mode='paper' is wired —
+ *  routes through the prod paper engine. mode='live' returns 501
+ *  until phase 3. mode='draft' is client-side, never reaches here. */
+export async function placeTicketOrder(payload) {
+  return _post('/orders/ticket', payload, { auth: true });
+}
+
 /** GET /api/charts/batch — N charts in one round-trip. Returns
  *  `{mode, charts: [ChartResponse, …]}` in the order of `symbols`. */
 export async function fetchChartBatch(mode, symbols, since = null, limit = 600) {

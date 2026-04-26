@@ -31,6 +31,8 @@ from backend.api.schemas import (
     OrdersResponse,
     PlaceOrderRequest,
     PlaceOrderResponse,
+    TicketOrderRequest,
+    TicketOrderResponse,
 )
 from backend.shared.helpers.connections import Connections
 from backend.shared.helpers.date_time_utils import timestamp_display
@@ -217,6 +219,107 @@ class OrdersController(Controller):
         except Exception as e:
             logger.error(f"Place order failed [{masked}]: {e}")
             raise HTTPException(status_code=400, detail=str(e))
+
+    @post("/ticket")
+    async def ticket_order(self, data: TicketOrderRequest) -> TicketOrderResponse:
+        """
+        Operator-initiated order from the reusable <OrderTicket> on
+        any algo page. Routes by `mode`:
+          - paper → AlgoOrder row + register_open_order on the prod
+                    paper engine. The engine's 5-second tick runs
+                    fill / modify / unfilled lifecycle off real bid/
+                    ask via LiveQuoteSource. Same chase loop agent
+                    fires use, just operator-triggered.
+          - live  → phase 3 (real broker placement).
+
+        Returns the AlgoOrder row id; UI tracks it via the existing
+        `/api/orders/algo/recent?mode=paper` endpoint or the live
+        Order tab in the LogPanel.
+        """
+        from datetime import datetime
+        from backend.api.algo.paper import get_prod_paper_engine
+        from backend.api.database import async_session
+        from backend.api.models import AlgoOrder
+
+        if data.mode == "draft":
+            raise HTTPException(status_code=400,
+                detail="Drafts are client-side; the backend doesn't track them.")
+        if data.mode not in ("paper", "live"):
+            raise HTTPException(status_code=400,
+                detail=f"unknown mode '{data.mode}'")
+        if data.mode == "live":
+            raise HTTPException(status_code=501,
+                detail="LIVE mode lands in phase 3.")
+
+        side = (data.side or "").upper()
+        if side not in ("BUY", "SELL"):
+            raise HTTPException(status_code=400, detail="side must be BUY or SELL")
+        sym = (data.tradingsymbol or "").upper().strip()
+        qty = int(data.quantity or 0)
+        if not sym or qty <= 0:
+            raise HTTPException(status_code=400,
+                detail="tradingsymbol and quantity > 0 are required")
+
+        # Resolve account — caller may leave blank; pick the first
+        # available connection (mirrors what the agent paper-trade
+        # path does for total-scope actions).
+        conns = Connections()
+        account = data.account or (next(iter(conns.conn)) if conns.conn else "")
+        if not account:
+            raise HTTPException(status_code=400, detail="no broker accounts available")
+
+        # Persist AlgoOrder row first so the engine has an id to
+        # reference back into.
+        algo_order_id = None
+        detail = (f"[PAPER-TICKET] manual {side} {qty} {sym} "
+                  f"@₹{data.price:.2f}" if data.price is not None
+                  else f"[PAPER-TICKET] manual {side} {qty} {sym} @MARKET")
+        try:
+            async with async_session() as s:
+                row = AlgoOrder(
+                    account=account, symbol=sym, exchange=(data.exchange or "NFO"),
+                    transaction_type=side, quantity=qty,
+                    initial_price=(float(data.price) if data.price is not None else None),
+                    status="OPEN", engine="paper", mode="paper",
+                    detail=detail,
+                )
+                s.add(row)
+                await s.commit()
+                algo_order_id = row.id
+        except Exception as e:
+            logger.error(f"[PAPER-TICKET] DB write failed: {e}")
+            raise HTTPException(status_code=500, detail=f"DB write failed: {e}")
+
+        # Register with the paper engine so the chase loop picks
+        # it up. Skip when no limit price (MARKET orders fill at
+        # next bid/ask immediately on first tick).
+        if data.price is not None and qty > 0:
+            try:
+                engine = get_prod_paper_engine()
+                engine.register_open_order({
+                    "algo_order_id": algo_order_id,
+                    "account":       account,
+                    "symbol":        sym,
+                    "side":          side,
+                    "qty":           qty,
+                    "limit_price":   float(data.price),
+                    "initial_price": float(data.price),
+                    "exchange":      (data.exchange or "NFO"),
+                    "agent_slug":    "manual-ticket",
+                    "action_type":   "place_order",
+                })
+            except Exception as e:
+                logger.warning(f"[PAPER-TICKET] engine register failed: {e}")
+                # Row is persisted; engine can be restarted to re-pick-up.
+
+        masked = mask_column(pd.Series([account]))[0]
+        logger.info(f"Ticket paper order: {algo_order_id} [{masked}] {side} {qty} {sym}")
+        return TicketOrderResponse(
+            order_id=str(algo_order_id),
+            mode="paper",
+            status="OPEN",
+            detail=f"Paper order #{algo_order_id} placed — chase loop will fill it on the next bid/ask cross.",
+        )
 
     @put("/{order_id:str}")
     async def modify_order(self, order_id: str, data: ModifyOrderRequest) -> ModifyOrderResponse:
