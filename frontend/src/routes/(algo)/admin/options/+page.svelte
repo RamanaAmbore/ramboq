@@ -945,28 +945,28 @@
 
 
 <style>
-  /* Picker bar — Account + Underlying + + Add fit on a single row at
-     all reasonable viewport widths. Account values are short (ZG####
-     codes, 6 chars) and Underlying values are short (NIFTY, BANKNIFTY,
-     up to ~12 chars), so each control claims a modest min-width. The
-     row only wraps below ~520px viewport, where mobile layout takes
-     over anyway. */
+  /* Picker bar — Account / Underlying / Expiry / + always on a
+     single row, even on narrow viewports. flex-wrap: nowrap forces
+     the row; min-width: 0 on each field lets the Selects shrink to
+     fit (their content scrolls / truncates inside the trigger).
+     Equal `flex: 1 1 0` on the three Selects so they share the
+     available width proportionally. */
   .opt-picker {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 0.5rem;
+    flex-wrap: nowrap;
+    gap: 0.4rem 0.4rem;
     align-items: flex-end;
   }
   .opt-field {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    min-width: 110px;
+    flex: 1 1 0;
+    min-width: 0;          /* allow shrink past content size */
   }
-  /* Account: short codes (~6 chars). Underlying: index/stock names
-     (~12 chars). Both controls grow proportionally so the row fills
-     available width without forcing a wrap. */
-  .opt-field-grow { flex: 1; min-width: 150px; }
+  /* All three Select fields share the same flex weight so each gets
+     a third of the leftover space after the + button. */
+  .opt-field-grow { flex: 1 1 0; min-width: 0; }
 
   /* "+" toggle button — fixed-width amber pill that sits flush at the
      end of the picker row. Square aspect so the symbol reads as a
