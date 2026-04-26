@@ -365,23 +365,23 @@
   .algo-pub-link {
     padding: 0.2rem 0.65rem;
     font-size: 0.65rem;
-    font-weight: 700;
+    font-weight: 500;
     border-radius: 0.25rem;
-    background: rgba(251,191,36,0.18);
+    background: rgba(251,191,36,0.10);
     color: #fbbf24;
-    border: 1px solid rgba(251,191,36,0.55);
+    border: 1px solid rgba(251,191,36,0.32);
     cursor: pointer;
     font-family: ui-monospace, monospace;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     transition: color 0.08s, border-color 0.08s, background-color 0.08s;
     outline: none !important;
     margin-left: 0.5rem;
     white-space: nowrap;
   }
   .algo-pub-link:hover {
-    background: rgba(251,191,36,0.32);
-    border-color: rgba(251,191,36,0.8);
-    color: #fde047;
+    background: rgba(251,191,36,0.20);
+    border-color: rgba(251,191,36,0.5);
+    color: #fbbf24;
   }
 
   /* User pill */
@@ -462,9 +462,9 @@
   .algo-mobile-site {
     color: #fbbf24;
     font-size: 0.75rem;
-    font-weight: 700;
-    background: rgba(251,191,36,0.18);
-    border-top: 1px solid rgba(251,191,36,0.5);
+    font-weight: 500;
+    background: rgba(251,191,36,0.10);
+    border-top: 1px solid rgba(251,191,36,0.32);
     margin-top: 0.3rem;
     padding-top: 0.55rem;
     letter-spacing: 0.02em;

@@ -909,6 +909,12 @@
 
 
 <style>
+  /* Picker bar — Account + Underlying + + Add fit on a single row at
+     all reasonable viewport widths. Account values are short (ZG####
+     codes, 6 chars) and Underlying values are short (NIFTY, BANKNIFTY,
+     up to ~12 chars), so each control claims a modest min-width. The
+     row only wraps below ~520px viewport, where mobile layout takes
+     over anyway. */
   .opt-picker {
     display: flex;
     flex-wrap: wrap;
@@ -919,9 +925,12 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    min-width: 140px;
+    min-width: 110px;
   }
-  .opt-field-grow { flex: 1; min-width: 220px; }
+  /* Account: short codes (~6 chars). Underlying: index/stock names
+     (~12 chars). Both controls grow proportionally so the row fills
+     available width without forcing a wrap. */
+  .opt-field-grow { flex: 1; min-width: 150px; }
 
   .opt-grid {
     display: grid;

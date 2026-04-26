@@ -790,9 +790,15 @@ class OptionsController(Controller):
         # data is fully unreachable. The response carries no spot_source
         # field today, but the per-leg ltp_source='estimated' or 'fallback'
         # downstream gives the operator the right "treat with care" signal.
-        sorted_strikes = sorted({parse_tradingsymbol(l.symbol)["strike"]
-                                 for l in data.legs
-                                 if parse_tradingsymbol(l.symbol)})
+        # Only options have strikes — futures contribute no strike anchor
+        # to the synthetic-spot fallback. parse_tradingsymbol() returns a
+        # dict without `strike` for kind=fut, so guard the access here
+        # (otherwise KeyError → 500 when a futures leg is in the basket).
+        sorted_strikes = sorted({
+            p["strike"]
+            for l in data.legs
+            if (p := parse_tradingsymbol(l.symbol)) and "strike" in p
+        })
         median_strike = (sorted_strikes[len(sorted_strikes) // 2]
                          if sorted_strikes else None)
         S, _spot_src = _resolve_spot(underlying, data.spot,

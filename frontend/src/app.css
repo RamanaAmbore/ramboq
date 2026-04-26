@@ -179,24 +179,30 @@
 .ag-theme-ramboq .qty-long  { color: #0f766e !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-short { color: #b45309 !important; font-weight: 700 !important; }
 .ag-theme-ramboq .qty-flat  { color: #64748b !important; }
-/* Long/short indicator on the symbol cell only — left + right edges.
+/* Long/short indicator on the public-theme performance grids:
+     - bars (left+right edges) are scoped to the symbol cell only
+     - background tint extends to BOTH symbol AND account cells (the
+       two `ag-col-fill` columns), so the symbol+account pair reads as
+       a single direction-tinted block while the rest of the row stays
+       clean.
    LONG = sage-teal, SHORT = warm-terracotta — both desaturated so they
-   sit alongside the cream + champagne palette without shouting.
-   Scoped to the symbol cell (not the whole row) so the rest of the
-   row stays clean and the bar reads as "this is THE symbol of this
-   row" rather than "this whole row is direction-tinted". */
-.ag-theme-ramboq .ag-row.pos-long .ag-col-sym {
+   sit alongside the cream + champagne palette without shouting. */
+.ag-theme-ramboq .ag-row.pos-long .ag-col-fill {
   background-color: rgba(91,142,149,0.14) !important;
+}
+.ag-theme-ramboq .ag-row.pos-short .ag-col-fill {
+  background-color: rgba(196,122,61,0.14) !important;
+}
+.ag-theme-ramboq .ag-row.pos-long .ag-col-sym {
   box-shadow: inset 4px 0 0 rgba(91,142,149,0.85),
               inset -4px 0 0 rgba(91,142,149,0.85) !important;
 }
 .ag-theme-ramboq .ag-row.pos-short .ag-col-sym {
-  background-color: rgba(196,122,61,0.14) !important;
   box-shadow: inset 4px 0 0 rgba(196,122,61,0.85),
               inset -4px 0 0 rgba(196,122,61,0.85) !important;
 }
-.ag-theme-ramboq .ag-row.pos-long.ag-row-hover .ag-col-sym,
-.ag-theme-ramboq .ag-row.pos-short.ag-row-hover .ag-col-sym {
+.ag-theme-ramboq .ag-row.pos-long.ag-row-hover .ag-col-fill,
+.ag-theme-ramboq .ag-row.pos-short.ag-row-hover .ag-col-fill {
   background-color: rgba(200,168,75,0.28) !important;
 }
 /* Totals row cells inherit the header color regardless of +/-/0 */
