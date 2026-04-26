@@ -278,18 +278,41 @@
       </span>
     {/if}
   </div>
+{:else if logTab === 'news'}
+  <!-- News tab — proper row layout (matches the public /performance
+       Market News card structure: time / title / source per row) but
+       in the algo dark palette. Pulled out of the shared <pre> so each
+       row gets real padding + a hairline separator instead of being
+       squashed onto a single monospace line. -->
+  <div class="log-panel log-news-panel {heightClass}">
+    {#if newsRefresh}
+      <div class="log-news-head">Refreshed at {newsRefresh}</div>
+    {/if}
+    {#if newsLoading && !newsItems.length}
+      <div class="log-debug">Loading headlines…</div>
+    {:else if newsItems.length}
+      <ul class="log-news-list">
+        {#each newsItems as n}
+          <li class="log-news-row">
+            <span class="log-news-time">{_shortTime(n.timestamp)}</span>
+            <a class="log-news-title" href={n.link} target="_blank" rel="noopener">
+              {n.title}
+            </a>
+            {#if n.source}
+              <span class="log-news-src" title={n.source}>{n.source}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <div class="log-debug">No headlines.</div>
+    {/if}
+  </div>
 {:else}
 <pre class="log-panel {heightClass}">{#if logTab === 'order'}{@html _orderLogHtml()}{:else if logTab === 'terminal'}{@html _terminalHtml()}{:else if logTab === 'agent'}{#if agentLog.length}{@html agentLog.map(e => {
   const t = _shortTime(e.timestamp);
   return `<span class="log-agent-default"><span class="log-ts">${t}</span> ${e.event_type||''} ${e.trigger_condition||''}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else if logTab === 'news'}{#if newsLoading && !newsItems.length}<span class="log-debug">Loading headlines…</span>{:else if newsItems.length}{#if newsRefresh}<span class="log-news-head">Refreshed at {newsRefresh}</span>
-{/if}{@html newsItems.map(n => {
-  const safeTitle = (n.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const safeLink  = (n.link || '').replace(/"/g,'&quot;');
-  const safeSrc   = (n.source || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const src = safeSrc ? ` <span class="log-chip"><span class="log-chip-key">src:</span>${safeSrc}</span>` : '';
-  return `<span class="log-info"><span class="log-ts">${_shortTime(n.timestamp)}</span> <a href="${safeLink}" target="_blank" rel="noopener">${safeTitle}</a>${src}</span>`;
-}).join('\n')}{:else}<span class="log-debug">No headlines.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
+}).join('\n')}{:else}<span class="log-debug">No agent events.</span>{/if}{:else if logTab === 'simulator'}{#if simLog.length}{@html simLog.map(_renderSimLine).join('\n')}{:else}<span class="log-debug">No simulator ticks. Start a scenario at /admin/simulator to stream price changes here.</span>{/if}{:else}{#if systemLog.length}{@html systemLog.map(l => {
   const t = parseLogLineTime(l);
   const rest = t ? stripTs(l) : l;
   return `<span class="${sysClass(l)}">${t ? `<span class="log-ts">${t}</span> ` : ''}${rest}</span>`;

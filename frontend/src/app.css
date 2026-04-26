@@ -370,6 +370,71 @@
   margin-bottom: 0.35rem;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
+
+/* News tab — row layout shaped after the public Market News card,
+   but using the algo dark palette tokens so the look stays
+   consistent. Time chip on the left (yellow #fde047, matches
+   .log-ts), title flexes, source tag aligns right. Hairline
+   separator between rows; subtle row hover. */
+.log-news-panel {
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: #e2e8f0;
+  background: #0c1830;
+  padding: 0.5rem 0.65rem;
+  overflow-y: auto;
+}
+.log-news-panel .log-news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.log-news-panel .log-news-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.32rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  line-height: 1.35;
+}
+.log-news-panel .log-news-row:last-child { border-bottom: 0; }
+.log-news-panel .log-news-row:hover { background: rgba(255,255,255,0.02); }
+.log-news-panel .log-news-time {
+  flex: 0 0 auto;
+  color: #fde047;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.log-news-panel .log-news-title {
+  flex: 1 1 auto;
+  color: #e2e8f0;
+  font-weight: 500;
+  text-decoration: none;
+  word-break: break-word;
+}
+.log-news-panel .log-news-title:hover {
+  color: #fbbf24;
+  text-decoration: underline;
+}
+.log-news-panel .log-news-src {
+  flex: 0 0 auto;
+  color: #7dd3fc;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0.35rem;
+  border-radius: 2px;
+  background: rgba(125,211,252,0.08);
+  border: 1px solid rgba(125,211,252,0.20);
+  white-space: nowrap;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .log-panel .log-agent-triggered   { color: #fb923c; background: rgba(251,146,60,0.1); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-alert       { color: #facc15; background: rgba(250,204,21,0.08); display: block; padding: 0 4px; border-radius: 2px; }
 .log-panel .log-agent-success     { color: #4ade80; background: rgba(74,222,128,0.08); display: block; padding: 0 4px; border-radius: 2px; }
