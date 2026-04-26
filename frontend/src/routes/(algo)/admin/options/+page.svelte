@@ -728,35 +728,44 @@
     return best;
   })()}
   <div class="opt-payoff opt-payoff-full mb-3">
-    <div class="opt-section-h">
-      Payoff
-      <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
-        {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
-        {fmtMoney(Math.abs(strategy.net_cost), false)}
-      </span>
-      <span class="opt-section-tag tag-long">
-        MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
-      </span>
-      <span class="opt-section-tag tag-short">
-        MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
-      </span>
-      <span class="opt-section-meta">
-        DTE {strategy.days_to_expiry.toFixed(1)} ·
-        σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
-        {strategy.legs.length} legs
-        {#if _curveAtSpot}
-          {@const todayVal  = _curveAtSpot.today_value}
-          {@const expiryVal = _curveAtSpot.expiry_value}
-          · today
-          <b class={todayVal >= 0 ? 'kv-pos' : 'kv-neg'}>
-            {todayVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(todayVal), false)}
-          </b>
-          · expiry
-          <b class={expiryVal >= 0 ? 'kv-pos' : 'kv-neg'}>
-            {expiryVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(expiryVal), false)}
-          </b>
-        {/if}
-      </span>
+    <!-- Two-row grid header. Row 1: title + Net debit/credit / Max
+         profit / Max loss chips. Row 2: DTE / σ-proxy / legs / today
+         + expiry P&L. Splitting them onto separate rows stops the
+         meta numbers from being squeezed against the chips when the
+         viewport is mid-width. -->
+    <div class="opt-section-h opt-section-h-grid">
+      <div class="opt-section-row">
+        <span class="opt-section-title">Payoff</span>
+        <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
+          {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
+          {fmtMoney(Math.abs(strategy.net_cost), false)}
+        </span>
+        <span class="opt-section-tag tag-long">
+          MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
+        </span>
+        <span class="opt-section-tag tag-short">
+          MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
+        </span>
+      </div>
+      <div class="opt-section-row opt-section-meta-row">
+        <span class="opt-section-meta">
+          DTE {Math.round(strategy.days_to_expiry)} ·
+          σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
+          {strategy.legs.length} legs
+          {#if _curveAtSpot}
+            {@const todayVal  = _curveAtSpot.today_value}
+            {@const expiryVal = _curveAtSpot.expiry_value}
+            · today
+            <b class={todayVal >= 0 ? 'kv-pos' : 'kv-neg'}>
+              {todayVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(todayVal), false)}
+            </b>
+            · expiry
+            <b class={expiryVal >= 0 ? 'kv-pos' : 'kv-neg'}>
+              {expiryVal >= 0 ? '+' : '−'}{fmtMoney(Math.abs(expiryVal), false)}
+            </b>
+          {/if}
+        </span>
+      </div>
     </div>
     <OptionsPayoff
       payoff={strategy.payoff}
@@ -884,23 +893,23 @@
           <div class="opt-kv opt-kv-greeks">
             <div class="kv-pair" title="Delta — net directional exposure. +50 ≈ ₹50 gained per ₹1 spot rise.">
               <span class="kv-k kv-k-greek">Δ</span>
-              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 1)}</span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.delta, 2)}</span>
             </div>
             <div class="kv-pair" title="Gamma — rate-of-change of delta as spot moves.">
               <span class="kv-k kv-k-greek">Γ</span>
-              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 4)}</span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.gamma, 2)}</span>
             </div>
             <div class="kv-pair" title="Theta — daily decay in rupees. Positive when net short premium.">
               <span class="kv-k kv-k-greek">Θ</span>
-              <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 0)}</span>
+              <span class="kv-v {strategy.aggregate_greeks.theta < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.theta, 2)}</span>
             </div>
             <div class="kv-pair" title="Vega — P&L change per 1 % IV move. Positive = long volatility.">
               <span class="kv-k kv-k-greek">𝒱</span>
-              <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 0)}</span>
+              <span class="kv-v {strategy.aggregate_greeks.vega < 0 ? 'kv-neg' : 'kv-pos'}">{fmtNum(strategy.aggregate_greeks.vega, 2)}</span>
             </div>
             <div class="kv-pair" title="Rho — sensitivity to a 1 % rate change. Mostly cosmetic for short-dated index options.">
               <span class="kv-k kv-k-greek">ρ</span>
-              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 0)}</span>
+              <span class="kv-v">{fmtNum(strategy.aggregate_greeks.rho, 2)}</span>
             </div>
           </div>
         </div>
@@ -1042,6 +1051,28 @@
     color: #fbbf24;
     padding: 0 0.25rem 0.4rem;
     flex-wrap: wrap;
+  }
+  /* Two-row variant — title + chips on row 1, meta line on row 2.
+     Each row independently flex-wraps so chips squeeze together
+     before pushing the meta line down. */
+  .opt-section-h-grid {
+    display: grid;
+    grid-template-rows: auto auto;
+    row-gap: 0.3rem;
+  }
+  .opt-section-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .opt-section-title {
+    color: #fbbf24;
+    font-weight: 700;
+  }
+  .opt-section-meta-row .opt-section-meta {
+    margin-left: 0;          /* meta no longer right-aligned in
+                                 the row — it's the only item */
   }
   .opt-section-tag {
     font-size: 0.55rem;
