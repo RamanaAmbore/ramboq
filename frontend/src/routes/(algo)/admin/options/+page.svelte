@@ -470,6 +470,12 @@
     positions = merged;
   }
 
+  // Consecutive-failure counter for loadStrategy. Suppresses the
+  // error banner on a single transient hiccup (page reopen during
+  // a backend redeploy, slow first response on a cold connection,
+  // etc.) — only escalates after 2+ failures in a row so the user
+  // sees the chart appear cleanly when the next poll succeeds.
+  let _stratFails = 0;
   async function loadStrategy() {
     const cleanLegs = legs
       .map(l => ({
@@ -480,25 +486,25 @@
       }))
       .filter(l => l.symbol && l.qty);
     if (!cleanLegs.length) {
-      strategy = null; strategyErr = '';
+      strategy = null; strategyErr = ''; _stratFails = 0;
       return;
     }
     loading = true;
     try {
       strategy = await fetchStrategyAnalytics(cleanLegs);
-      strategyErr = '';   // success — clear any stale error banner
+      strategyErr = '';
+      _stratFails = 0;
     } catch (e) {
-      // Keep the last-good `strategy` rendered. Wiping it on every
-      // transient poll failure (slow network on tab-return, brief
-      // 5xx, etc.) blanks the chart and flashes a "No connection"
-      // banner even though the previous fetch was fine. Only surface
-      // the error when there's no prior chart to fall back to —
-      // the cold-start case where the operator genuinely sees nothing.
-      if (!strategy) {
+      _stratFails += 1;
+      // Banner shows only when (a) we have no prior chart to fall
+      // back on AND (b) we've failed at least twice in a row. A
+      // first-load transient — common on tab reopen during a deploy
+      // or after a wifi reconnect — stays silent and the next poll
+      // brings the chart in cleanly. The api-layer logger still
+      // records the raw error in the browser console for debugging.
+      if (!strategy && _stratFails >= 2) {
         strategyErr = /** @type {any} */ (e).message || String(e);
       }
-      // The api layer already logged the raw error to the console;
-      // no need to repeat it here.
     } finally {
       loading = false;
     }

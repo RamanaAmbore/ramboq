@@ -36,6 +36,11 @@
   let logTab         = $state('order');
   let refreshTeardown;
 
+  // Consecutive-failure counter — same idea as /admin/options. Hides
+  // the error banner on a single transient hiccup (cold-start during
+  // a redeploy, fresh wifi reconnect, etc.). Banner only surfaces
+  // after 2+ in a row when no prior status to fall back on.
+  let _loadFails = 0;
   async function load() {
     try {
       const [stat, syms, rows] = await Promise.all([
@@ -60,11 +65,10 @@
         chartsBySymbol = {};
       }
       error = '';
+      _loadFails = 0;
     } catch (e) {
-      // Cold start = no status yet → surface the error so the operator
-      // sees something. Subsequent transient failures keep the last
-      // good banner / chart rendered to avoid a flicker on tab return.
-      if (!status?.branch) {
+      _loadFails += 1;
+      if (!status?.branch && _loadFails >= 2) {
         error = e.message;
       }
     } finally {
