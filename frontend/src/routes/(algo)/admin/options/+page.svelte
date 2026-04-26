@@ -782,6 +782,7 @@
       </div>
       <div class="opt-section-row opt-section-meta-row">
         <span class="opt-section-meta">
+          Spot ₹{Math.round(strategy.spot).toLocaleString('en-IN')} ·
           DTE {Math.round(strategy.days_to_expiry)} ·
           σ-proxy {(strategy.iv_proxy * 100).toFixed(1)}% ·
           {strategy.legs.length} legs
@@ -894,29 +895,6 @@
      internal kv-pair flow. -->
 {#if strategy}
   <aside class="opt-side opt-side-row">
-        <div class="opt-block">
-          <div class="opt-block-h">Aggregate</div>
-          <div class="opt-kv">
-            <div class="kv-pair">
-              <span class="kv-k">Underlying</span>
-              <span class="kv-v">{strategy.underlying}</span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Spot</span>
-              <span class="kv-v">₹{strategy.spot.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Expiry</span>
-              <span class="kv-v">{strategy.expiry}</span>
-            </div>
-            <div class="kv-pair">
-              <span class="kv-k">Net cost</span>
-              <span class="kv-v {strategy.net_cost > 0 ? 'kv-neg' : strategy.net_cost < 0 ? 'kv-pos' : ''}">
-                {strategy.net_cost > 0 ? '−' : '+'}{fmtMoney(Math.abs(strategy.net_cost), false)}
-              </span>
-            </div>
-          </div>
-        </div>
 
         <div class="opt-block">
           <div class="opt-block-h">
@@ -1116,6 +1094,9 @@
   .opt-section-title {
     color: #fbbf24;
     font-weight: 700;
+    font-size: 0.7rem;          /* slightly larger than meta so the
+                                   header reads as the section anchor */
+    letter-spacing: 0.06em;
   }
   .opt-section-meta-row .opt-section-meta {
     margin-left: 0;          /* meta no longer right-aligned in
