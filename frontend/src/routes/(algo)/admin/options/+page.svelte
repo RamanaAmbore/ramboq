@@ -93,6 +93,11 @@
   /** @type {Array<{symbol:string, qty:any, avg_cost:any, ltp:any, source:string}>} */
   let legs = $state([]);
 
+  // Legs panel collapsed/expanded — operator may want to fold it
+  // away once they've vetted the basket so the chart + cards have
+  // more vertical room.
+  let legsOpen = $state(true);
+
   /** Lookup map: symbol → backend leg analytics (greeks, iv, …) from
    *  the latest strategy response. Lets the Candidates panel show
    *  per-row IV / Δ / Θ / 𝒱 without a second endpoint. */
@@ -691,13 +696,19 @@
      response by symbol. Horizontal + vertical overflow scrolling. -->
 {#if selectedUnderlying || drafts.length}
   <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
-    <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-      Leg breakdown
+    <button type="button"
+            class="legs-header"
+            aria-expanded={legsOpen}
+            title={legsOpen ? 'Collapse leg list' : 'Expand leg list'}
+            onclick={() => legsOpen = !legsOpen}>
+      <span class="legs-chevron" class:legs-chevron-open={legsOpen}>▸</span>
+      <span>Legs</span>
       {#if selectedUnderlying}
         <span class="opt-section-tag tag-deriv">{selectedUnderlying}</span>
       {/if}
-    </div>
-    {#if candidatePositions.length}
+      <span class="opt-section-meta">{candidatePositions.length}</span>
+    </button>
+    {#if legsOpen && candidatePositions.length}
       <div class="cand-scroll">
         <div class="cand-grid">
           <div class="cand-headrow">
@@ -744,7 +755,7 @@
           {/each}
         </div>
       </div>
-    {:else}
+    {:else if legsOpen}
       <div class="text-[0.6rem] text-[#7e97b8] italic">
         No options or futures on <b>{selectedUnderlying}</b> in
         {selectedAccounts.length ? 'the chosen accounts' : 'any account'}.
@@ -1204,6 +1215,37 @@
   .cand-scroll::-webkit-scrollbar-thumb:hover {
     background: rgba(251,191,36,0.55);
   }
+  /* Legs panel header — collapsable. Reset button defaults so it
+     still picks up the .opt-section-h typography but with a click
+     affordance + a rotating chevron on the left. */
+  .legs-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 0 0.25rem 0.5rem;
+    cursor: pointer;
+    color: #fbbf24;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    flex-wrap: wrap;
+  }
+  .legs-header:hover { color: #fde047; }
+  .legs-chevron {
+    font-size: 0.6rem;
+    color: #7e97b8;
+    transition: transform 0.18s;
+    width: 0.7rem;
+    text-align: center;
+  }
+  .legs-chevron-open { transform: rotate(90deg); }
+
   .cand-grid {
     display: flex;
     flex-direction: column;
@@ -1214,23 +1256,28 @@
        viewport is narrower than this. */
     min-width: 980px;
   }
+  /* Columns sized so the Symbol cell hugs its content (max-content)
+     instead of stealing fr space — earlier `2.4fr` symbol left a
+     wide gutter between symbol and account. The remaining columns
+     share leftover space proportionally. */
   .cand-headrow,
   .cand-row {
     display: grid;
     grid-template-columns:
       auto                /* checkbox */
-      minmax(0, 2.4fr)    /* symbol */
-      minmax(0, 0.7fr)    /* account */
-      minmax(0, 0.5fr)    /* qty */
-      minmax(0, 0.8fr)    /* cost */
-      minmax(0, 0.8fr)    /* ltp */
-      minmax(0, 0.9fr)    /* pnl */
-      minmax(0, 0.45fr)   /* iv */
-      minmax(0, 0.45fr)   /* delta */
-      minmax(0, 0.45fr)   /* theta */
-      minmax(0, 0.45fr)   /* vega */
-      minmax(0, 0.55fr);  /* source */
-    gap: 0.15rem;          /* tighter than before — minimal whitespace */
+      max-content         /* symbol — hugs its text */
+      max-content         /* account — hugs its text */
+      minmax(0, 0.6fr)    /* qty */
+      minmax(0, 0.9fr)    /* cost */
+      minmax(0, 0.9fr)    /* ltp */
+      minmax(0, 1fr)      /* pnl */
+      minmax(0, 0.55fr)   /* iv */
+      minmax(0, 0.55fr)   /* delta */
+      minmax(0, 0.55fr)   /* theta */
+      minmax(0, 0.55fr)   /* vega */
+      minmax(0, 0.6fr);   /* source */
+    gap: 0.5rem;            /* small uniform gap; symbol-acct gutter
+                               no longer dominated by fr math */
     padding: 0.1rem 0.2rem;
     align-items: center;
     font-size: 0.62rem;
