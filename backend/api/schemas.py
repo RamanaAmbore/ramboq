@@ -211,6 +211,23 @@ class TicketOrderRequest(msgspec.Struct):
     price: Optional[float] = None
     trigger_price: Optional[float] = None
     account: str = ""       # leave blank → first available
+    # Chase the order to closure — re-quote the limit each tick
+    # until filled, capped by `simulator.chase_max_attempts`. PAPER
+    # orders honour this via the paper engine's tick loop; the flag
+    # is also a hook for future LIVE chase wiring. MARKET / SL-M
+    # orders ignore the flag (no limit to chase).
+    chase: bool = True
+    # Chase aggressiveness — controls how the engine re-quotes the
+    # limit on each tick. Industry analogue: IBKR Adaptive Algo's
+    # Patient / Normal / Urgent.
+    #   "low"  → passive: SELL pegs to ASK, BUY pegs to BID (sit
+    #            on your own side, wait for the market to come)
+    #   "med"  → midpoint: (bid + ask) / 2
+    #   "high" → aggressive: SELL pegs to BID, BUY pegs to ASK
+    #            (cross the spread to take liquidity — current
+    #            default behaviour)
+    # Default `high` keeps existing tickets behaving identically.
+    chase_aggressiveness: str = "high"
 
 
 class TicketOrderResponse(msgspec.Struct):

@@ -92,6 +92,17 @@ class PayoffPoint(msgspec.Struct):
     expiry_value: float
 
 
+class SpotResponse(msgspec.Struct):
+    """Lightweight spot lookup — used by the chain picker to anchor
+    its ATM highlight + auto-scroll on whichever underlying the
+    operator picked, regardless of whether it matches the page's
+    primary strategy underlying."""
+    underlying:       str
+    spot:             float
+    spot_source:      str            # 'sim' | 'live' | 'close' | 'depth' | 'futures' | 'fallback'
+    spot_prev_close:  float | None
+
+
 class OptionAnalyticsResponse(msgspec.Struct):
     # Identification
     mode:          str
@@ -758,6 +769,42 @@ class OptionsController(Controller):
             span_pct=span_pct_resolved,
             span_sigmas=float(span_sigmas) if span_pct is None else 0.0,
             spot_prev_close=spot_prev_close,
+        )
+
+    @get("/spot")
+    async def spot(self, underlying: str = "",
+                   expiry: Optional[str] = None) -> SpotResponse:
+        """Lightweight spot for `underlying`, optionally hinted by an
+        expiry date (used to pick the matching monthly futures
+        contract for MCX commodities). Returns the value + provenance
+        + yesterday's close so the UI can anchor the chain picker's
+        ATM highlight on any underlying the operator switches to,
+        not just the page's primary one.
+
+        Reuses `_resolve_spot()` so the resolution order matches
+        every other surface (sim → spot ticker → futures fallback).
+        """
+        und = (underlying or "").upper().strip()
+        if not und:
+            raise HTTPException(status_code=400,
+                                detail="underlying is required")
+        expiry_d: Optional[date] = None
+        if expiry:
+            try:
+                expiry_d = date.fromisoformat(expiry)
+            except (TypeError, ValueError):
+                pass
+        # No fallback — let the resolver 502 if there's no real data.
+        # The chain picker handles the failure by leaving chainSpot
+        # null (suppresses the ATM highlight + spot pill); we don't
+        # want to anchor the UI on a synthetic median-strike value
+        # here.
+        px, src, prev = _resolve_spot(und, None, expiry_hint=expiry_d)
+        return SpotResponse(
+            underlying=und,
+            spot=px,
+            spot_source=src,
+            spot_prev_close=prev,
         )
 
     @get("/historical")

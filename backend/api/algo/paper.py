@@ -160,19 +160,37 @@ class PaperTradeEngine:
                 self._quote.on_fill(order)
                 continue
 
-            # Not fillable — chase by re-quoting at the opposite side.
+            # Not fillable — chase by re-quoting. The new limit
+            # depends on the order's `chase_agg` setting:
+            #   high (default): peg to the marketable side — SELL→
+            #     bid, BUY→ ask — so the next tick fills immediately
+            #     (cross the spread to take liquidity).
+            #   med: peg to the midpoint of bid+ask. Fills only when
+            #     the inside moves halfway in our favour.
+            #   low: peg to the passive side — SELL→ ask, BUY→ bid.
+            #     Order rests on our own side and waits for the
+            #     market to lift it.
+            # Unknown values fall back to 'high' so legacy callers
+            # (existing agents using register_open_order without the
+            # field) keep their current behaviour.
             if order.get("attempts", 0) >= max_attempts:
                 order["status"] = "UNFILLED"
                 self._record_event(order, kind="unfilled",
                                    note=f"gave up after {max_attempts} chase attempts")
                 continue
-            new_limit  = bid if side == "SELL" else ask
+            agg = str(order.get("chase_agg") or "high").lower()
+            if agg == "low":
+                new_limit = ask if side == "SELL" else bid
+            elif agg == "med":
+                new_limit = (bid + ask) / 2.0
+            else:  # 'high' — current default
+                new_limit = bid if side == "SELL" else ask
             prev_limit = limit
             order["limit_price"] = new_limit
             order["attempts"]    = int(order.get("attempts", 0)) + 1
             self._record_event(
                 order, kind="modify",
-                note=(f"chase #{order['attempts']} {side} "
+                note=(f"chase #{order['attempts']} [{agg}] {side} "
                       f"₹{prev_limit:,.2f} → ₹{new_limit:,.2f}"),
             )
 

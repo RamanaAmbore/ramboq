@@ -91,6 +91,18 @@
   let _trigger = $state(trigger ?? '');
   let _product = $state(productVal);
   let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ ('draft'));
+  // Chase toggle — when on, the backend's paper engine re-quotes
+  // the limit each tick until the order fills (or hits the chase-
+  // attempt cap). Default ON: industry-standard "fire and forget"
+  // workflow. When off, the order rests at the initial limit and
+  // only fills if the market naturally crosses it. MARKET / SL-M
+  // ignore the toggle (no limit to chase).
+  let _chase    = $state(true);
+  // Chase aggressiveness — analogous to IBKR Adaptive Algo's
+  // Patient / Normal / Urgent. 'high' = cross the spread (current
+  // default behaviour); 'med' = midpoint peg; 'low' = passive,
+  // sit on your own side and wait. Ignored when chase is off.
+  let _chaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('high'));
 
   // Auto-fill plumbing — the OrderDepth child polls the quote
   // every 1.2 s and bubbles each fresh response here via
@@ -248,6 +260,11 @@
       price:          showLimit   ? Number(_price)   : null,
       trigger_price:  showTrigger ? Number(_trigger) : null,
       account:        _account,
+      // Chase only carries on price-bearing order types; MARKET /
+      // SL-M ignore it on the backend, but we still ship the flag
+      // so the AlgoOrder row records the intent for replay.
+      chase:               showLimit ? _chase : false,
+      chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'high',
     };
     submitting = true; submitErr = ''; submitOk = '';
     try {
@@ -266,6 +283,8 @@
           price:            showLimit   ? Number(_price)   : null,
           trigger_price:    showTrigger ? Number(_trigger) : null,
           account:          _account,
+          chase:                showLimit ? _chase : false,
+          chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'high',
         });
         // Show inline confirmation so the operator sees the order
         // landed before the modal closes. Backend returns
@@ -454,6 +473,43 @@
                 title="Real broker order — gated by branch (prod only) + execution.live.place_order setting"
                 onclick={() => _mode = 'live'}>LIVE</button>
       </div>
+
+      <!-- Chase toggle — only meaningful for limit-bearing orders.
+           When ON, the engine re-quotes the limit each tick until
+           the order fills. The aggressiveness pills below set HOW
+           it re-quotes:
+             L (patient) — sit on your own side, wait for the market
+             M (balanced) — peg to the midpoint
+             H (urgent) — cross the spread to take liquidity
+           Mirrors IBKR's Adaptive Algo Patient / Normal / Urgent. -->
+      {#if showLimit}
+        <label class="ot-chase-toggle"
+               title={_chase
+                 ? 'Chase ON — re-quote the limit each tick until filled'
+                 : 'Chase OFF — order rests at the initial limit; fills only if the market crosses'}>
+          <input type="checkbox" bind:checked={_chase} />
+          <span class="ot-chase-label" class:on={_chase}>CHASE</span>
+        </label>
+        {#if _chase}
+          <div class="ot-chase-agg" role="group" aria-label="Chase aggressiveness">
+            <button type="button"
+                    class="ot-chase-agg-pill ot-chase-agg-low"
+                    class:on={_chaseAgg === 'low'}
+                    title="Low — patient. SELL pegs to ASK, BUY pegs to BID. Order rests on your own side; fills only if the market lifts it."
+                    onclick={() => _chaseAgg = 'low'}>L</button>
+            <button type="button"
+                    class="ot-chase-agg-pill ot-chase-agg-med"
+                    class:on={_chaseAgg === 'med'}
+                    title="Medium — peg to midpoint of bid+ask. Fills when the inside moves halfway in your favour."
+                    onclick={() => _chaseAgg = 'med'}>M</button>
+            <button type="button"
+                    class="ot-chase-agg-pill ot-chase-agg-high"
+                    class:on={_chaseAgg === 'high'}
+                    title="High — urgent. SELL pegs to BID, BUY pegs to ASK. Crosses the spread to take liquidity on the next tick."
+                    onclick={() => _chaseAgg = 'high'}>H</button>
+          </div>
+        {/if}
+      {/if}
     </div>
 
     {#if validationErr}
@@ -673,6 +729,77 @@
   .ot-mode-draft.on { background: rgba(192,132,252,0.18); border-color: rgba(192,132,252,0.55); color: #c084fc; }
   .ot-mode-paper.on { background: rgba(125,211,252,0.18); border-color: rgba(125,211,252,0.55); color: #7dd3fc; }
   .ot-mode-live.on  { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.55);  color: #4ade80; }
+
+  /* Chase toggle — pushed to the row's far right (margin-left: auto)
+     so it sits opposite the mode pills. Native checkbox + label
+     pill; the label tints amber when ON to match the rest of the
+     ticket's "active state" treatment. */
+  .ot-chase-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ot-chase-toggle input[type="checkbox"] {
+    accent-color: #fbbf24;
+    width: 0.85rem;
+    height: 0.85rem;
+    cursor: pointer;
+  }
+  .ot-chase-label {
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #7e97b8;
+    background: rgba(255,255,255,0.04);
+  }
+  .ot-chase-label.on {
+    background: rgba(251,191,36,0.18);
+    border-color: rgba(251,191,36,0.55);
+    color: #fbbf24;
+  }
+
+  /* Aggressiveness segment — three square pills (L · M · H) sitting
+     immediately right of the CHASE checkbox. Color graduates from
+     sky-blue (low/patient) → amber (med) → red (high/urgent) so
+     the operator's eye lands on the urgency level without reading
+     the glyph. Only the active pill carries the filled bg. */
+  .ot-chase-agg {
+    display: inline-flex;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-left: 0.3rem;
+  }
+  .ot-chase-agg-pill {
+    width: 1.4rem;
+    height: 1.1rem;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: #7e97b8;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+  .ot-chase-agg-pill:last-child { border-right: 0; }
+  .ot-chase-agg-pill:hover { color: #c8d8f0; background: rgba(255,255,255,0.08); }
+  .ot-chase-agg-low.on  { background: rgba(125,211,252,0.20); color: #7dd3fc; }
+  .ot-chase-agg-med.on  { background: rgba(251,191,36,0.20);  color: #fbbf24; }
+  .ot-chase-agg-high.on { background: rgba(248,113,113,0.20); color: #f87171; }
 
   .ot-err {
     background: rgba(248,113,113,0.10);

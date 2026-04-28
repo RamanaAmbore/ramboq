@@ -21,7 +21,7 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
-    fetchAccounts,
+    fetchAccounts, fetchOptionsSpot,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import OrderTicket   from '$lib/order/OrderTicket.svelte';
@@ -361,17 +361,63 @@
     return listStrikes(chainUnderlying.toUpperCase(), 'CE', chainExpiry);
   });
 
-  /** Spot for the chain underlying, when we already know it. The
-   *  strategy response carries an authoritative spot for the page's
-   *  underlying — when chainUnderlying matches that, reuse it for
-   *  free. Different underlyings would need a separate fetch; for
-   *  the common operator flow (open chain right after picking an
-   *  underlying) the match is guaranteed. */
+  /** Spot fetched directly via /api/options/spot for the current
+   *  (chainUnderlying, chainExpiry) pair. Lets the chain picker
+   *  anchor the ATM highlight + spot pill on whatever underlying
+   *  the operator switches to, even when it doesn't match the
+   *  page's primary underlying. Refreshes on every chain pivot
+   *  (effect below). Stays null until the first fetch lands; the
+   *  derived `chainSpot` falls back to strategy.spot when this is
+   *  unavailable. */
+  /** @type {{spot:number, source:string, prevClose:number|null} | null} */
+  let chainSpotFetched = $state(null);
+  let chainSpotKey = ''; // last-fetched cache key — skip duplicate calls
+  $effect(() => {
+    void chainUnderlying; void chainExpiry; void showAddPanel;
+    untrack(() => {
+      if (!showAddPanel || !chainUnderlying) {
+        chainSpotFetched = null;
+        chainSpotKey = '';
+        return;
+      }
+      const key = `${chainUnderlying.toUpperCase()}|${chainExpiry || ''}`;
+      if (key === chainSpotKey) return;
+      chainSpotKey = key;
+      const u = chainUnderlying;
+      const e = chainExpiry || null;
+      fetchOptionsSpot(u, e).then((r) => {
+        // Race guard — operator may have flipped the picker between
+        // the request and this resolution.
+        if (chainSpotKey !== key) return;
+        chainSpotFetched = r ? {
+          spot:      Number(r.spot) || 0,
+          source:    String(r.spot_source || ''),
+          prevClose: r.spot_prev_close != null ? Number(r.spot_prev_close) : null,
+        } : null;
+      }).catch(() => {
+        if (chainSpotKey !== key) return;
+        // 502 / 4xx — broker unreachable. Suppress the highlight
+        // rather than anchoring on a synthetic value.
+        chainSpotFetched = null;
+      });
+    });
+  });
+
+  /** Spot for the chain underlying. Prefers the strategy response's
+   *  spot when chainUnderlying matches the page's primary underlying
+   *  (free, no extra round-trip); otherwise uses whatever the
+   *  /options/spot fetch returned. Null when neither is available
+   *  — the picker collapses the ATM highlight + spot pill rather
+   *  than anchoring on a synthetic value. */
   const chainSpot = $derived.by(() => {
-    if (!chainUnderlying || !strategy) return null;
-    const sUnd = String(strategy.underlying || '').toUpperCase();
-    if (sUnd && sUnd === chainUnderlying.toUpperCase()) {
-      return Number(strategy.spot) || null;
+    if (!chainUnderlying) return null;
+    const cU = chainUnderlying.toUpperCase();
+    if (strategy) {
+      const sUnd = String(strategy.underlying || '').toUpperCase();
+      if (sUnd && sUnd === cU) return Number(strategy.spot) || null;
+    }
+    if (chainSpotFetched && chainSpotFetched.spot > 0) {
+      return chainSpotFetched.spot;
     }
     return null;
   });
@@ -1789,47 +1835,52 @@
      Account · Qty · P&L · Cost · LTP · IV · Δ · Θ · 𝒱 · Source.
      P&L sits between Qty and Cost so the operator's eye scans
      "what I have → what I'm making/losing → what I paid". */
+  /* Content-sized tracks across the board so the row reads dense
+     instead of stretched. Numeric columns (qty / P&L / cost / LTP /
+     greeks) use `max-content` so each cell sizes to its widest
+     value; the row keeps a tight 0.6 rem gap. Earlier `fr` units
+     stretched columns to fill the wrapper width, leaving lots of
+     empty space between cells when the panel sat in a wide card. */
   .cand-grid {
     display: grid;
     grid-template-columns:
-      auto                /* trade (+/−) — leading */
-      auto                /* checkbox */
-      max-content         /* symbol */
-      max-content         /* account */
-      minmax(0, 0.6fr)    /* qty */
-      minmax(0, 1fr)      /* pnl */
-      minmax(0, 0.9fr)    /* cost */
-      minmax(0, 0.9fr)    /* ltp */
-      minmax(0, 0.55fr)   /* iv */
-      minmax(0, 0.55fr)   /* delta */
-      minmax(0, 0.55fr)   /* theta */
-      minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr);   /* source */
+      auto         /* trade (+/−) — leading */
+      auto         /* checkbox */
+      max-content  /* symbol */
+      max-content  /* account */
+      max-content  /* qty */
+      max-content  /* pnl */
+      max-content  /* cost */
+      max-content  /* ltp */
+      max-content  /* iv */
+      max-content  /* delta */
+      max-content  /* theta */
+      max-content  /* vega */
+      max-content; /* source */
+    column-gap: 0.6rem;
     row-gap: 0.2rem;
-    /* Min-width enforces a sensible row width — 13 columns. The
-       wrapping `.cand-scroll` handles horizontal overflow when the
-       viewport is narrower than this. */
-    min-width: 1040px;
+    /* No min-width — the grid is naturally as wide as its content.
+       The wrapping .cand-scroll still handles overflow when the
+       viewport is narrower than the row. */
+    width: max-content;
   }
   /* When the operator filters to a single account, the Account
      column is implicit (every row carries the same value) — drop
-     the column entirely to conserve horizontal space. The grid
-     definition mirrors `.cand-grid` minus the account track. */
+     the column entirely. */
   .cand-grid-noacct {
     grid-template-columns:
-      auto                /* trade (+/−) — leading */
-      auto                /* checkbox */
-      max-content         /* symbol */
-      minmax(0, 0.6fr)    /* qty */
-      minmax(0, 1fr)      /* pnl */
-      minmax(0, 0.9fr)    /* cost */
-      minmax(0, 0.9fr)    /* ltp */
-      minmax(0, 0.55fr)   /* iv */
-      minmax(0, 0.55fr)   /* delta */
-      minmax(0, 0.55fr)   /* theta */
-      minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr);   /* source */
-    min-width: 940px;
+      auto         /* trade (+/−) — leading */
+      auto         /* checkbox */
+      max-content  /* symbol */
+      max-content  /* qty */
+      max-content  /* pnl */
+      max-content  /* cost */
+      max-content  /* ltp */
+      max-content  /* iv */
+      max-content  /* delta */
+      max-content  /* theta */
+      max-content  /* vega */
+      max-content; /* source */
   }
   /* Single parent grid via subgrid. Each row inherits the parent's
      column tracks — so headers and data cells line up exactly,
@@ -1842,11 +1893,14 @@
     display: grid;
     grid-template-columns: subgrid;
     grid-column: 1 / -1;
-    gap: 0.5rem;
+    /* Subgrid inherits column-gap from .cand-grid (0.6rem). Don't
+       set `gap` here — that overrides the parent and decouples the
+       rows' spacing from the header's. */
     padding: 0.1rem 0.2rem;
     align-items: center;
     font-size: 0.62rem;
     font-family: monospace;
+    font-variant-numeric: tabular-nums;
   }
   .cand-headrow {
     font-size: 0.55rem;
@@ -1855,6 +1909,16 @@
     letter-spacing: 0.04em;
     padding-bottom: 0.15rem;
     border-bottom: 1px solid rgba(251,191,36,0.18);
+  }
+  /* Numeric column cells — right-aligned (industry-standard for
+     trade panels) so digits in different rows line up cleanly under
+     each column header. tabular-nums on the row already keeps glyph
+     widths even, so a "+12,500" lands directly above a "−300" with
+     digits stacked in the same columns. */
+  .cand-headrow > .num,
+  .cand-row > .num {
+    text-align: right;
+    justify-self: end;
   }
   .cand-row {
     padding: 0.2rem 0.3rem;

@@ -378,9 +378,18 @@ class OrdersController(Controller):
 
         # Register with the paper engine so the chase loop picks
         # it up. Skip when no limit price (MARKET orders fill at
-        # next bid/ask immediately on first tick).
-        if data.price is not None and qty > 0:
+        # next bid/ask immediately on first tick) OR when the
+        # operator explicitly opted out of chase via `chase=False`
+        # (the order then sits OPEN at the initial limit until the
+        # market crosses it naturally).
+        if data.price is not None and qty > 0 and data.chase:
             try:
+                # Validate + normalise aggressiveness so an out-of-
+                # band value silently downgrades to 'high' (the
+                # safe default) rather than blowing up the engine.
+                agg = (data.chase_aggressiveness or "high").lower()
+                if agg not in ("low", "med", "high"):
+                    agg = "high"
                 engine = get_prod_paper_engine()
                 engine.register_open_order({
                     "algo_order_id": algo_order_id,
@@ -393,10 +402,14 @@ class OrdersController(Controller):
                     "exchange":      (data.exchange or "NFO"),
                     "agent_slug":    "manual-ticket",
                     "action_type":   "place_order",
+                    "chase_agg":     agg,
                 })
             except Exception as e:
                 logger.warning(f"[PAPER-TICKET] engine register failed: {e}")
                 # Row is persisted; engine can be restarted to re-pick-up.
+        elif not data.chase:
+            logger.info(f"[PAPER-TICKET] chase opted out — order #{algo_order_id} "
+                        f"resting at limit ₹{data.price}")
 
         masked = mask_column(pd.Series([account]))[0]
         logger.info(f"Ticket paper order: {algo_order_id} [{masked}] {side} {qty} {sym}")

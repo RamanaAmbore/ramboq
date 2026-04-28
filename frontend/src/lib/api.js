@@ -408,10 +408,24 @@ export async function fetchStrategyAnalytics(legs, opts = {}) {
         avg_cost: l.avg_cost == null || l.avg_cost === '' ? null : Number(l.avg_cost),
         ltp:      l.ltp      == null || l.ltp      === '' ? null : Number(l.ltp),
         iv:       l.iv       == null || l.iv       === '' ? null : Number(l.iv),
+        // ISO expiry override from the instruments cache — wins over
+        // the parser's last-Thursday inference. Critical for MCX
+        // commodities (GOLDM expires on the 5th, CRUDEOIL on 19-20).
+        expiry:   l.expiry   == null || l.expiry === '' ? null : String(l.expiry),
       })),
       spot:     opts.spot     ?? null,
-      span_pct: opts.span_pct ?? 0.10,
+      span_pct: opts.span_pct ?? null,
       points:   opts.points   ?? 51,
     },
     { auth: true });
+}
+
+/** GET /api/options/spot — lightweight underlying spot for the chain
+ *  picker's ATM highlight + auto-scroll. Returns spot, source tag,
+ *  and yesterday's close. Falls through to a 502 when the broker is
+ *  unreachable; callers swallow and skip the highlight. */
+export async function fetchOptionsSpot(underlying, expiry = null) {
+  const u = encodeURIComponent(String(underlying || '').toUpperCase());
+  const e = expiry ? `&expiry=${encodeURIComponent(expiry)}` : '';
+  return _get(`/options/spot?underlying=${u}${e}`, { auth: true });
 }
