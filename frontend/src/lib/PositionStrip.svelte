@@ -85,21 +85,31 @@
   /** Per-row chip data — merged positions + holdings, sorted by
    *  |day P&L| descending so the movers come first. Each chip
    *  carries enough to identify the symbol + read the day's
-   *  direction at a glance. */
+   *  direction at a glance.
+   *
+   *  IMPORTANT: only include rows with NON-ZERO quantity. Kite's
+   *  /positions returns closed intraday positions with quantity=0
+   *  (so callers can still read realised P&L), and stale holdings
+   *  fully sold off mid-day surface the same way. Showing them as
+   *  chips makes the strip look like it's tracking ghosts. The
+   *  aggregate (DAY / TOTAL above) DOES keep their P&L — closed
+   *  positions still contributed to the day's move. */
   const chips = $derived.by(() => {
     const out = [];
     for (const p of positions) {
+      const qty = Number(p?.quantity || 0);
+      if (qty === 0) continue;        // closed intraday — history only
       const dayChg = Number(p?.pnl || 0);
       const ltp    = Number(p?.close_price || 0);
       // Position day-pct ≈ pnl / (avg × |qty|). Avg can be 0 on a
       // freshly-opened intraday — fall back to ltp so we still get
       // a magnitude.
-      const denom  = Math.abs(Number(p?.average_price || ltp || 0) * Number(p?.quantity || 0));
+      const denom  = Math.abs(Number(p?.average_price || ltp || 0) * qty);
       const dayPct = denom > 0 ? (dayChg / denom) * 100 : 0;
       out.push({
         kind:    'position',
         symbol:  String(p?.tradingsymbol || ''),
-        qty:     Number(p?.quantity || 0),
+        qty,
         ltp,
         dayChg,
         dayPct,
@@ -107,10 +117,12 @@
       });
     }
     for (const h of holdings) {
+      const qty = Number(h?.quantity || 0);
+      if (qty === 0) continue;        // sold-off holding — no live exposure
       out.push({
         kind:    'holding',
         symbol:  String(h?.tradingsymbol || ''),
-        qty:     Number(h?.quantity || 0),
+        qty,
         ltp:     Number(h?.close_price || 0),
         dayChg:  Number(h?.day_change_val || 0),
         dayPct:  Number(h?.day_change_percentage || 0),
@@ -120,6 +132,11 @@
     out.sort((a, b) => Math.abs(b.dayChg) - Math.abs(a.dayChg));
     return out;
   });
+
+  // Counts shown in the meta pill — only LIVE rows (qty != 0).
+  // Mismatch with chips.length is impossible by construction.
+  const livePositionCount = $derived(positions.filter(p => Number(p?.quantity || 0) !== 0).length);
+  const liveHoldingCount  = $derived(holdings.filter(h => Number(h?.quantity || 0) !== 0).length);
 
   const hasContent = $derived(chips.length > 0);
 
@@ -166,7 +183,7 @@
         </span>
       </span>
       <span class="ps-agg ps-agg-meta">
-        <span class="ps-agg-k">{positions.length}P · {holdings.length}H</span>
+        <span class="ps-agg-k">{livePositionCount}P · {liveHoldingCount}H</span>
       </span>
       {#if !expanded && chips.length > 0}
         <!-- Inline preview of the top 3 movers when collapsed —
