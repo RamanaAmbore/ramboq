@@ -237,8 +237,8 @@
   // Event markers — one circle per AlgoOrder lifecycle transition.
   const markerColors = /** @type {Record<string,string>} */ ({
     placed:   '#fbbf24',  // amber
-    filled:   '#22c55e',  // emerald
-    unfilled: '#ef4444',  // red
+    filled:   '#4ade80',  // emerald
+    unfilled: '#f87171',  // red
     chased:   '#7dd3fc',  // sky
   });
 
@@ -509,7 +509,7 @@
   }
   .chart-mode-sim   { color: #fbbf24; }
   .chart-mode-paper { color: #7dd3fc; }
-  .chart-mode-live  { color: #22c55e; }
+  .chart-mode-live  { color: #4ade80; }
   /* Kind tag — distinguishes spot vs F&O at a glance, complementary to
      the mode tag. Subtler than the mode pill so it doesn't dominate. */
   .chart-tag {
@@ -556,7 +556,7 @@
     margin-left: auto;
     font-family: monospace;
   }
-  .chart-error { color: #ef4444; }
+  .chart-error { color: #f87171; }
   .chart-reset {
     font-family: monospace;
     font-size: 0.5rem;

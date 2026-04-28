@@ -873,16 +873,16 @@
     transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   }
   :global(.algo-status-card[data-status="active"]) {
-    border-color: rgba(34,197,94,0.6);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(34,197,94,0.18);
+    border-color: rgba(74,222,128,0.6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(74,222,128,0.18);
   }
   :global(.algo-status-card[data-status="inactive"]) {
     border-color: rgba(180,200,230,0.18);
     opacity: 0.82;
   }
   :global(.algo-status-card[data-status="triggered"]) {
-    border-color: rgba(239,68,68,0.75);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(239,68,68,0.22);
+    border-color: rgba(248,113,113,0.75);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(248,113,113,0.22);
   }
   :global(.algo-status-card[data-status="running"]) {
     border-color: rgba(251,191,36,0.65);

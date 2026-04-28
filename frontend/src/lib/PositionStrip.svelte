@@ -165,21 +165,21 @@
   <a class="ps-strip" href="/dashboard"
      aria-label="Open the dashboard — full positions, holdings, and funds grids">
     <span class="ps-agg" title="Positions P/L — open + closed intraday">
-      <span class="ps-agg-k">Pos</span>
+      <span class="ps-agg-k">Positions</span>
       <span class={'ps-agg-v ' + (positionsPnl > 0 ? 'ps-pos' : positionsPnl < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(positionsPnl)}
       </span>
     </span>
-    <span class="ps-agg" title="Holdings — today's move (day_change_val)">
-      <span class="ps-agg-k">Tday</span>
-      <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
-        {fmtMoney(holdingsToday)}
-      </span>
-    </span>
     <span class="ps-agg" title="Holdings — total unrealised P/L from entry">
-      <span class="ps-agg-k">Hold</span>
+      <span class="ps-agg-k">Holdings</span>
       <span class={'ps-agg-v ' + (holdingsTotal > 0 ? 'ps-pos' : holdingsTotal < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsTotal)}
+      </span>
+    </span>
+    <span class="ps-agg" title="Holdings — today's move (day_change_val)">
+      <span class="ps-agg-k">Today</span>
+      <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(holdingsToday)}
       </span>
     </span>
     <span class="ps-agg ps-agg-meta">

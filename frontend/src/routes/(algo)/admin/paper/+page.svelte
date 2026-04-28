@@ -251,7 +251,7 @@
     border-radius: 2px;
     font-size: 0.55rem;
   }
-  .paper-pill-side-buy  { color: #22c55e; background: rgba(34,197,94,0.15); }
+  .paper-pill-side-buy  { color: #4ade80; background: rgba(74,222,128,0.15); }
   .paper-pill-side-sell { color: #f87171; background: rgba(248,113,113,0.15); }
   .paper-pill-sym  { color: #c8d8f0; }
   .paper-pill-qty  { color: #fbbf24; font-weight: 700; }

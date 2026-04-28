@@ -847,10 +847,10 @@
     background: rgba(251,191,36,0.25); border-color: #fbbf24;
   }
   :global(.sim-btn-danger) {
-    background: rgba(239,68,68,0.1); color: #fca5a5; border-color: rgba(239,68,68,0.5);
+    background: rgba(248,113,113,0.1); color: #fca5a5; border-color: rgba(248,113,113,0.5);
   }
   :global(.sim-btn-danger:hover) {
-    background: rgba(239,68,68,0.2); border-color: #ef4444;
+    background: rgba(248,113,113,0.2); border-color: #f87171;
   }
 
   /* Sim status pills — one row per position / chase. Compact enough to

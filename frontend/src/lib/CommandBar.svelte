@@ -490,8 +490,8 @@
     border: 1px solid transparent;
   }
   .pair-filled {
-    background: rgba(34,197,94,0.1);
-    border-color: rgba(34,197,94,0.25);
+    background: rgba(74,222,128,0.1);
+    border-color: rgba(74,222,128,0.25);
   }
   .pair-filled .pair-key { color: #4ade80; }
   .pair-current {

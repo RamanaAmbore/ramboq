@@ -413,7 +413,7 @@
     border: 1px solid currentColor;
     letter-spacing: 0.04em;
   }
-  .status-loaded   { color: #22c55e; background: rgba(34,197,94,0.10); }
+  .status-loaded   { color: #4ade80; background: rgba(74,222,128,0.10); }
   .status-pending  { color: #fbbf24; background: rgba(251,191,36,0.10); }
   .status-inactive { color: #7e97b8; background: rgba(126,151,184,0.10); }
 
@@ -424,7 +424,7 @@
     line-height: 1;
     cursor: help;
   }
-  .test-result.ok   { color: #22c55e; }
+  .test-result.ok   { color: #4ade80; }
   .test-result.fail { color: #f87171; }
 
   :global(.brokers-table .destructive) {

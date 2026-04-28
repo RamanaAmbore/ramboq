@@ -459,6 +459,62 @@
 .log-panel .log-chip              { display: inline-block; font-size: 0.6rem; padding: 0 0.3rem; margin: 0 0.1rem; border-radius: 0.2rem; background: rgba(39,53,82,0.55); border: 1px solid rgba(255,255,255,0.08); }
 .log-panel .log-chip-key          { color: #7dd3fc; font-weight: 600; text-transform: uppercase; margin-right: 0.15rem; font-size: 0.5rem; }
 
+/* ── Button design tokens ─────────────────────────────────────────────────── */
+/*
+ * Palette + structural rules every button class on the algo platform
+ * must derive its colors from. Standardises four semantic accents:
+ *
+ *   --btn-buy-*   : green   (BUY / long / positive / CE / add)
+ *   --btn-sell-*  : red     (SELL / short / negative / PE / close)
+ *   --btn-amber-* : amber   (algo-platform primary accent — submit,
+ *                            mode-on, refresh-zoom, run, etc.)
+ *   --btn-sky-*   : cyan    (utility / refresh / neutral-action)
+ *
+ * Each accent has FIVE tones used uniformly across every button:
+ *   --btn-{x}        : the signal color (text + 1px border)
+ *   --btn-{x}-bg     : 10% alpha background (idle outlined state)
+ *   --btn-{x}-bg-hi  : 22% alpha background (hover state)
+ *   --btn-{x}-border : 55% alpha border (idle outlined state)
+ *   --btn-{x}-on-fg  : foreground when the button is filled (active)
+ *
+ * Plus two structural tokens:
+ *   --btn-radius     : border-radius for every algo button (3px)
+ *   --btn-transition : transition timing (matches platform feel)
+ *
+ * Refactor pattern: components keep their existing class names + sizes,
+ * but resolve all colors through these properties. Adding a new button
+ * now means picking a semantic accent, not picking new colors.
+ */
+:root {
+  --btn-buy:           #4ade80;
+  --btn-buy-bg:        rgba(74,222,128,0.10);
+  --btn-buy-bg-hi:     rgba(74,222,128,0.22);
+  --btn-buy-border:    rgba(74,222,128,0.55);
+  --btn-buy-on-fg:     #0c1830;
+
+  --btn-sell:          #f87171;
+  --btn-sell-bg:       rgba(248,113,113,0.10);
+  --btn-sell-bg-hi:    rgba(248,113,113,0.22);
+  --btn-sell-border:   rgba(248,113,113,0.55);
+  --btn-sell-on-fg:    #0c1830;
+
+  --btn-amber:         #fbbf24;
+  --btn-amber-bg:      rgba(251,191,36,0.10);
+  --btn-amber-bg-hi:   rgba(251,191,36,0.22);
+  --btn-amber-border:  rgba(251,191,36,0.55);
+  --btn-amber-on-fg:   #0c1830;
+
+  --btn-sky:           #7dd3fc;
+  --btn-sky-bg:        rgba(125,211,252,0.10);
+  --btn-sky-bg-hi:     rgba(125,211,252,0.22);
+  --btn-sky-border:    rgba(125,211,252,0.55);
+  --btn-sky-on-fg:     #0c1830;
+
+  --btn-radius:        3px;
+  --btn-transition:    background-color 0.1s, border-color 0.1s, color 0.1s;
+  --btn-disabled-opacity: 0.45;
+}
+
 /* ── Shared button styles ─────────────────────────────────────────────────── */
 @layer components {
   .btn-primary {

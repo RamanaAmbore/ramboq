@@ -740,7 +740,7 @@
     cursor: pointer;
     flex: 1 1 0;
   }
-  .ot-side-buy.on  { background: rgba(34,197,94,0.18);  color: #4ade80; }
+  .ot-side-buy.on  { background: rgba(74,222,128,0.18);  color: #4ade80; }
   .ot-side-sell.on { background: rgba(248,113,113,0.18); color: #f87171; }
   /* Locked side toggle (action='modify') — Kite doesn't support
      flipping side on a working order; the button visibly reads as
@@ -809,7 +809,7 @@
   .ot-mode-pill:disabled { opacity: 0.4; cursor: not-allowed; }
   .ot-mode-draft.on { background: rgba(192,132,252,0.18); border-color: rgba(192,132,252,0.55); color: #c084fc; }
   .ot-mode-paper.on { background: rgba(125,211,252,0.18); border-color: rgba(125,211,252,0.55); color: #7dd3fc; }
-  .ot-mode-live.on  { background: rgba(34,197,94,0.18);  border-color: rgba(34,197,94,0.55);  color: #4ade80; }
+  .ot-mode-live.on  { background: rgba(74,222,128,0.18);  border-color: rgba(74,222,128,0.55);  color: #4ade80; }
 
   /* Chase toggle — pushed to the row's far right (margin-left: auto)
      so it sits opposite the mode pills. Native checkbox + label
@@ -892,8 +892,8 @@
     margin: 0.4rem 0;
   }
   .ot-ok {
-    background: rgba(34,197,94,0.10);
-    border: 1px solid rgba(34,197,94,0.45);
+    background: rgba(74,222,128,0.10);
+    border: 1px solid rgba(74,222,128,0.45);
     color: #4ade80;
     padding: 0.35rem 0.55rem;
     border-radius: 3px;

@@ -1520,7 +1520,7 @@
     .opt-section-tag { font-size: 0.5rem; padding: 1px 3px; letter-spacing: 0.02em; }
   }
   .tag-deriv  { color: #7dd3fc; background: rgba(125,211,252,0.10); }
-  .tag-long   { color: #22c55e; background: rgba(34,197,94,0.10); }
+  .tag-long   { color: #4ade80; background: rgba(74,222,128,0.10); }
   .tag-short  { color: #f87171; background: rgba(248,113,113,0.10); }
   .opt-section-meta {
     color: #7e97b8;
@@ -1678,7 +1678,7 @@
     color: #7e97b8;
     text-align: center;
   }
-  .leg-source-live   { color: #22c55e; }
+  .leg-source-live   { color: #4ade80; }
   .leg-source-sim    { color: #fbbf24; }
   .leg-source-manual { color: #7dd3fc; }
   .leg-source-draft  { color: #f0abfc; }
@@ -1935,9 +1935,9 @@
   }
 
   .leg-type-CE {
-    color: #22c55e;
-    background: rgba(34,197,94,0.10);
-    border: 1px solid rgba(34,197,94,0.4);
+    color: #4ade80;
+    background: rgba(74,222,128,0.10);
+    border: 1px solid rgba(74,222,128,0.4);
     border-radius: 2px;
     padding: 0 4px;
     font-weight: 700;
@@ -2106,7 +2106,7 @@
     padding: 0.25rem 0.4rem;
     border-bottom: 1px solid rgba(251,191,36,0.25);
   }
-  .chain-th-ce     { text-align: left; color: #22c55e; }
+  .chain-th-ce     { text-align: left; color: #4ade80; }
   .chain-th-pe     { text-align: right; color: #f87171; }
   .chain-th-strike { text-align: center; color: #c8d8f0; }
   .chain-grid td {
@@ -2174,9 +2174,9 @@
     letter-spacing: 0.04em;
     transition: background 0.12s;
   }
-  .chain-btn-ce { color: #22c55e; }
+  .chain-btn-ce { color: #4ade80; }
   .chain-btn-pe { color: #f87171; }
-  .chain-btn-ce:hover { background: rgba(34,197,94,0.10); }
+  .chain-btn-ce:hover { background: rgba(74,222,128,0.10); }
   .chain-btn-pe:hover { background: rgba(248,113,113,0.10); }
   /* "chain" source pill on legs added via the chain picker — sky-blue
      to distinguish from manual / live / sim. */

@@ -393,7 +393,7 @@
          onpointermove={onPointerMove}
          onpointerleave={onPointerLeave}>
       <!-- Profit / loss shading (under the curves so the lines pop) -->
-      <path d={fillProfit} fill="rgba(34,197,94,0.10)" stroke="none"/>
+      <path d={fillProfit} fill="rgba(74,222,128,0.10)" stroke="none"/>
       <path d={fillLoss}   fill="rgba(248,113,113,0.10)" stroke="none"/>
 
       <!-- Y-axis grid + labels -->
@@ -709,6 +709,6 @@
   .ps-v.ps-spot-pos  { color: #4ade80; }
   .ps-v.ps-spot-neg  { color: #f87171; }
   .ps-v.ps-spot-flat { color: #7dd3fc; }
-  .ps-v.ps-pos  { color: #22c55e; }
+  .ps-v.ps-pos  { color: #4ade80; }
   .ps-v.ps-neg  { color: #f87171; }
 </style>
