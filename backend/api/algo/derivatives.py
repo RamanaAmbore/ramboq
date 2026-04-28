@@ -247,12 +247,51 @@ _INDEX_LTP_KEY = {
     "BANKEX":     "BSE:BANKEX",
 }
 
+# MCX-traded commodity underlyings — these have NO NSE/BSE spot ticker.
+# `underlying_ltp_key("CRUDEOIL")` would return "NSE:CRUDEOIL" which is
+# bogus, so the spot resolver falls through to the median-strike fallback
+# and the chart anchors at the wrong number (9000 instead of the actual
+# 9106 May futures price). For commodities the option's underlying IS
+# the matching monthly futures contract on MCX, so we re-route the spot
+# lookup to the futures quote.
+_MCX_COMMODITIES = frozenset({
+    "CRUDEOIL", "CRUDEOILM", "NATURALGAS", "NATGASMINI",
+    "GOLD", "GOLDM", "GOLDMINI", "GOLDPETAL", "GOLDGUINEA",
+    "SILVER", "SILVERM", "SILVERMINI", "SILVERMIC",
+    "COPPER", "ZINC", "ZINCMINI", "LEAD", "LEADMINI",
+    "ALUMINIUM", "ALUMINI", "NICKEL",
+    "MENTHAOIL", "COTTON", "CASTORSEED", "KAPAS", "CARDAMOM",
+})
+
+
+def is_mcx_underlying(underlying: str) -> bool:
+    """True when the underlying is an MCX-traded commodity whose
+    "spot" is the matching monthly futures contract, not an
+    NSE/BSE index ticker."""
+    return (underlying or "").upper() in _MCX_COMMODITIES
+
 
 def underlying_ltp_key(underlying: str) -> str:
     """Kite quote/ltp key for an underlying's spot. Indices use their
-    special tickers; stocks use NSE:<underlying>."""
+    special tickers; stocks use NSE:<underlying>. Commodities have no
+    spot key — callers should detect via `is_mcx_underlying()` and
+    look up the matching futures contract instead."""
     name = (underlying or "").upper()
     return _INDEX_LTP_KEY.get(name, f"NSE:{name}")
+
+
+_FUT_MONTH_CODES = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+
+def futures_symbol_for_expiry(underlying: str, expiry: date) -> str:
+    """Build the Kite monthly-futures tradingsymbol matching `expiry`'s
+    month. CRUDEOIL + 2025-05-19 → CRUDEOIL25MAYFUT. Used as the
+    underlying-spot proxy for commodities and as a sanity-check fallback
+    for index/stock options when the spot ticker fails."""
+    yy  = expiry.year % 100
+    mon = _FUT_MONTH_CODES[expiry.month - 1]
+    return f"{(underlying or '').upper()}{yy:02d}{mon}FUT"
 
 
 def calibrate_iv_for_row(row: dict, spot: float,

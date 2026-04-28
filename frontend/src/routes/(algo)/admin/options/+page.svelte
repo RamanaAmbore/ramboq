@@ -671,21 +671,23 @@
       placeholder={underlyingChoicesFromBook.length ? 'Pick underlying…' : 'No options in book'} />
   </div>
   <div class="opt-field">
-    <label class="field-label" for="opt-exp">Expiry</label>
+    <div class="opt-field-label-row">
+      <label class="field-label" for="opt-exp">Expiry</label>
+      <button type="button"
+              class="opt-refresh-btn"
+              class:opt-refresh-btn-busy={loading}
+              disabled={loading}
+              title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
+              aria-label="Refresh prices"
+              onclick={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}>
+        {#if loading}Refreshing…{:else}↻ Refresh{/if}
+      </button>
+    </div>
     <Select id="opt-exp"
       bind:value={selectedExpiry}
       options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
       placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
   </div>
-  <button type="button"
-          class="opt-refresh-btn"
-          class:opt-refresh-btn-busy={loading}
-          disabled={loading}
-          title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
-          aria-label="Refresh prices"
-          onclick={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}>
-    {#if loading}Refreshing…{:else}↻ Refresh{/if}
-  </button>
   <button type="button"
           class="opt-add-btn"
           class:opt-add-btn-on={showAddPanel}
@@ -1128,25 +1130,30 @@
     border-color: #fbbf24;
   }
 
-  /* Refresh button — sits between Expiry and the chain-picker toggle.
-     Same height (1.55rem) and 3px radius as the rest of the picker
-     so the row reads as one consistent control bar. Wider than the
-     +/− pill to fit the "↻ Refresh" / "Refreshing…" labels without
-     wrapping. Disabled state dims the button while a request is in
-     flight; the label flips to "Refreshing…" so the operator knows
-     the click registered. */
+  /* Refresh button — lives on the SAME ROW as the "Expiry" label
+     (above the Select trigger) so the affordance sits in the
+     header strip rather than next to the dropdown. Compact pill —
+     small caps, label flips to "Refreshing…" while a request is in
+     flight. Disabled state dims while the call is pending. */
+  .opt-field-label-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* Reserve a tiny minimum height so an absent / hidden refresh
+       button doesn't squash the row out of vertical alignment with
+       its siblings. */
+    min-height: 0.85rem;
+  }
   .opt-refresh-btn {
-    height: 1.55rem;
-    min-height: 1.55rem;
-    flex: 0 0 auto;
-    align-self: flex-end;
-    padding: 0 0.55rem;
-    border-radius: 3px;
+    margin-left: auto;          /* push to the right edge of the field */
+    height: 0.95rem;
+    padding: 0 0.4rem;
+    border-radius: 2px;
     border: 1px solid rgba(125,211,252,0.55);
     background: rgba(125,211,252,0.10);
     color: #7dd3fc;
     font-family: monospace;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     line-height: 1;

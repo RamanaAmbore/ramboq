@@ -34,8 +34,10 @@ from backend.api.algo.derivatives import (
     days_to_expiry,
     expected_value,
     find_breakevens,
+    futures_symbol_for_expiry,
     greeks,
     implied_vol,
+    is_mcx_underlying,
     multileg_extremes,
     multileg_greeks,
     multileg_payoff_curve,
@@ -332,17 +334,27 @@ def _ltp_from_quote(q: dict) -> tuple[Optional[float], str]:
 
 
 def _resolve_spot(underlying: str, override: Optional[float],
-                  *, fallback: Optional[float] = None
+                  *, fallback: Optional[float] = None,
+                  expiry_hint: Optional[date] = None
                   ) -> tuple[float, str]:
     """Spot for the underlying. Returns `(spot, source)` so the UI can
     flag stale data. Sources: 'override' | 'sim' | 'live' | 'close' |
-    'depth' | 'fallback'.
+    'depth' | 'futures' | 'fallback'.
 
-    When the broker is unreachable AND no `fallback` is provided, raises
-    502. With `fallback` (typically the strike of the option being
-    analysed), uses that and tags `source='fallback'` so the page can
-    still render a useful payoff diagram even when market-data is
-    completely down.
+    Resolution order:
+      1. Operator override
+      2. Active sim driver state
+      3. Spot ticker (NSE:NIFTY 50, NSE:RELIANCE, …) — but skipped for
+         MCX commodities since they have no NSE spot
+      4. Matching monthly **futures** contract (MCX:CRUDEOIL25MAYFUT,
+         NFO:RELIANCE25MAYFUT, …). Required for commodities; serves as
+         a real-data fallback for indices/stocks when the spot fails.
+      5. Operator-supplied `fallback` (typically the median strike) —
+         last-resort sanity anchor when every quote path fails.
+
+    When even the fallback isn't supplied AND every quote path fails,
+    raises 502 — without `expiry_hint` we have no way to pick a
+    futures contract for commodities.
     """
     if override is not None and override > 0:
         return (float(override), "override")
@@ -355,18 +367,57 @@ def _resolve_spot(underlying: str, override: Optional[float],
         pass
 
     from backend.shared.brokers.registry import get_price_broker
-    key = underlying_ltp_key(underlying)
-    px: Optional[float] = None
-    src: str = "none"
-    try:
-        resp = get_price_broker().quote([key]) or {}
-        px, src = _ltp_from_quote(resp.get(key) or {})
-    except Exception as e:
-        # Broker unreachable — log + try fallback below.
-        logger.warning(f"options spot quote for {underlying} failed: {e}")
+    broker = get_price_broker()
+    is_commodity = is_mcx_underlying(underlying)
 
-    if px is not None:
-        return (px, src)
+    # 3. Spot ticker — only meaningful for indices/stocks. Commodities
+    #    have no NSE spot, so skip straight to step 4 instead of
+    #    spending a round-trip on a key that's guaranteed to miss.
+    if not is_commodity:
+        key = underlying_ltp_key(underlying)
+        try:
+            resp = broker.quote([key]) or {}
+            px, src = _ltp_from_quote(resp.get(key) or {})
+            if px is not None:
+                return (px, src)
+        except Exception as e:
+            logger.warning(f"options spot quote for {underlying} failed: {e}")
+
+    # 4. Futures fallback. For commodities this is the canonical path;
+    #    for indices/stocks it's a defensive secondary when the spot
+    #    ticker miss-fires. Try MCX first for commodities, NFO first
+    #    otherwise — saves a wasted round-trip in the common case.
+    #
+    #    The matched-month futures may already have rolled off — e.g.
+    #    a CRUDEOIL option expiring April 28 uses MAY futures as its
+    #    underlying because April futures expired ~April 19. So we
+    #    walk forward up to 3 months: matched month → next → next+1,
+    #    returning the first quote that comes back populated.
+    if expiry_hint is not None:
+        exchanges = ("MCX", "NFO") if is_commodity else ("NFO", "MCX")
+        from datetime import timedelta
+        cursor = expiry_hint
+        for _step in range(3):
+            fut_sym = futures_symbol_for_expiry(underlying, cursor)
+            for ex in exchanges:
+                full_key = f"{ex}:{fut_sym}"
+                try:
+                    resp = broker.quote([full_key]) or {}
+                    px, _src = _ltp_from_quote(resp.get(full_key) or {})
+                    if px is not None:
+                        # Tag uniformly as 'futures' regardless of which
+                        # leg of the quote produced the value — the UI
+                        # just needs to know the spot came from the
+                        # futures proxy, not the index.
+                        return (px, "futures")
+                except Exception as e:
+                    logger.warning(
+                        f"options futures-spot quote for {underlying} "
+                        f"({full_key}) failed: {e}"
+                    )
+            # Walk to the first day of the following month so the YY
+            # rolls correctly across year boundaries.
+            cursor = (cursor.replace(day=1) + timedelta(days=32)).replace(day=1)
 
     if fallback is not None and fallback > 0:
         # Last resort: use the option's strike as a degenerate spot. The
@@ -377,6 +428,18 @@ def _resolve_spot(underlying: str, override: Optional[float],
 
     raise HTTPException(status_code=502,
                         detail=f"spot for {underlying} unavailable from any source")
+
+
+def _option_quote_key(symbol: str) -> str:
+    """Kite quote key for an F&O contract. Stock and index derivatives
+    live on NFO/BFO; commodity derivatives live on MCX. We pick the
+    exchange off the parsed underlying so commodity options like
+    CRUDEOIL25MAY9000CE route to `MCX:…` instead of the (always-empty)
+    `NFO:…`."""
+    parsed = parse_tradingsymbol(symbol)
+    if parsed and is_mcx_underlying(parsed.get("underlying", "")):
+        return f"MCX:{symbol}"
+    return f"NFO:{symbol}"
 
 
 def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
@@ -417,7 +480,7 @@ def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
         # the sim is paused but real-data analytics are still useful).
 
     from backend.shared.brokers.registry import get_price_broker
-    key = f"NFO:{symbol}"
+    key = _option_quote_key(symbol)
     try:
         resp = get_price_broker().quote([key]) or {}
     except Exception as e:
@@ -502,8 +565,13 @@ class OptionsController(Controller):
         # Spot first, with the strike as a synthetic-spot fallback so
         # the page never 502s when broker market-data is down. The
         # response carries spot_source='fallback' in that case.
+        # Pass `expiry_hint` so the resolver can fall through to the
+        # matching monthly futures contract for commodities (MCX
+        # underlyings have no NSE spot ticker — index lookup misses
+        # silently and we'd otherwise anchor on the strike).
         S, spot_src = _resolve_spot(parsed["underlying"], spot,
-                                    fallback=parsed["strike"])
+                                    fallback=parsed["strike"],
+                                    expiry_hint=parsed["expiry"])
         T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
         # Pass avg_cost AND estimated-BS inputs as last-resort fallbacks
         # so a stale broker quote on an illiquid contract still produces
@@ -777,7 +845,10 @@ class OptionsController(Controller):
             # (sim picker that copied a stale last_price=0 would otherwise
             # bypass the fetch and fall straight to avg_cost).
             if leg.ltp is None or leg.ltp <= 0:
-                need_quote[f"NFO:{sym}"] = sym
+                # Route commodity contracts to MCX, everything else to
+                # NFO. `_option_quote_key()` parses the underlying and
+                # picks the exchange — keeps this in one place.
+                need_quote[_option_quote_key(sym)] = sym
 
         if len(underlyings) > 1:
             raise HTTPException(
@@ -820,8 +891,15 @@ class OptionsController(Controller):
         })
         median_strike = (sorted_strikes[len(sorted_strikes) // 2]
                          if sorted_strikes else None)
+        # Pull the shared expiry off any leg for the futures-fallback
+        # path. v1 already guards against mixed-expiry baskets so any
+        # leg works as a representative; option legs and futures legs
+        # both carry an `expiry` field on the parser dict.
+        first_parsed = parse_tradingsymbol(data.legs[0].symbol)
+        expiry_hint  = first_parsed.get("expiry") if first_parsed else None
         S, _spot_src = _resolve_spot(underlying, data.spot,
-                                     fallback=median_strike)
+                                     fallback=median_strike,
+                                     expiry_hint=expiry_hint)
 
         # ── 3. Build resolved-leg list with σ calibrated per leg ──────
         T_yrs_shared = 0.0
@@ -849,7 +927,7 @@ class OptionsController(Controller):
                 if leg.ltp is not None and leg.ltp > 0:
                     fut_ltp, fut_src = float(leg.ltp), "override"
                 else:
-                    q = quote_resp.get(f"NFO:{sym}") or {}
+                    q = quote_resp.get(_option_quote_key(sym)) or {}
                     fut_ltp, fut_src = _ltp_from_quote(q)
                 if fut_ltp is None and leg.avg_cost is not None and leg.avg_cost > 0:
                     fut_ltp, fut_src = float(leg.avg_cost), "avg_cost"
@@ -889,7 +967,7 @@ class OptionsController(Controller):
             if leg.ltp is not None and leg.ltp > 0:
                 ltp_val, ltp_source = float(leg.ltp), "override"
             else:
-                q = quote_resp.get(f"NFO:{sym}") or {}
+                q = quote_resp.get(_option_quote_key(sym)) or {}
                 ltp_val, ltp_source = _ltp_from_quote(q)
             # Fallback to operator's avg_cost if no broker price was usable.
             if ltp_val is None and leg.avg_cost is not None and leg.avg_cost > 0:
