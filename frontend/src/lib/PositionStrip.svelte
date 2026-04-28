@@ -29,8 +29,6 @@
   /** @type {ReturnType<typeof visibleInterval> | null} */
   let teardown = null;
 
-  let expanded = $state(false);
-
   // Demo / anonymous sessions still get real data (with masked
   // accounts) — same path as /performance. The strip only hides
   // when the operator hasn't loaded yet AND the cache is empty.
@@ -65,19 +63,26 @@
   onDestroy(() => { teardown?.(); });
 
   // ── Aggregates ────────────────────────────────────────────────
-  // Day P&L: positions.pnl (positions are intraday — pnl IS the day
-  // change) + holdings.day_change_val. Total P&L: positions.pnl +
-  // holdings.pnl. Two distinct numbers because holdings carry an
-  // unrealised P&L from the entry price, separate from today's move.
-  const dayPnl = $derived.by(() => {
+  // Three single-letter buckets so each number tells one story:
+  //   P  → Positions P/L           (intraday positions; pnl IS the
+  //                                  day's number — open + closed)
+  //   T  → Holdings Today          (holdings.day_change_val — what
+  //                                  the spot moved today)
+  //   H  → Holdings Total          (holdings.pnl — total unrealised
+  //                                  P/L from entry price)
+  // P + T = "today's full P&L". H is the long-running carry.
+  const positionsPnl = $derived.by(() => {
     let s = 0;
     for (const p of positions) s += Number(p?.pnl || 0);
+    return s;
+  });
+  const holdingsToday = $derived.by(() => {
+    let s = 0;
     for (const h of holdings)  s += Number(h?.day_change_val || 0);
     return s;
   });
-  const totalPnl = $derived.by(() => {
+  const holdingsTotal = $derived.by(() => {
     let s = 0;
-    for (const p of positions) s += Number(p?.pnl || 0);
     for (const h of holdings)  s += Number(h?.pnl || 0);
     return s;
   });
@@ -140,14 +145,6 @@
 
   const hasContent = $derived(chips.length > 0);
 
-  // How many chips fit in the collapsed strip without expanding?
-  // We show the top 6 movers by default; "+N more" links to the
-  // dashboard for the full picture. 6 is enough to cover a typical
-  // multi-account book without dominating the navbar zone.
-  const TOP_N = 6;
-  const topChips      = $derived(chips.slice(0, TOP_N));
-  const overflowCount = $derived(Math.max(0, chips.length - TOP_N));
-
   function fmtMoney(/** @type {number} */ v) {
     if (!isFinite(v)) return '—';
     const sign = v > 0 ? '+' : v < 0 ? '−' : '';
@@ -161,119 +158,79 @@
 </script>
 
 {#if hasContent}
-  <div class="ps-strip" class:ps-strip-expanded={expanded}>
-    <!-- Aggregates row — always visible. Click anywhere on this row
-         (except the dashboard link) to toggle the per-position
-         drawer. -->
-    <button type="button" class="ps-row ps-row-summary"
-            aria-expanded={expanded}
-            aria-label="{expanded ? 'Collapse' : 'Expand'} position list"
-            onclick={() => expanded = !expanded}>
-      <span class="ps-chevron">{expanded ? '▾' : '▸'}</span>
-      <span class="ps-agg">
-        <span class="ps-agg-k">DAY</span>
-        <span class={'ps-agg-v ' + (dayPnl > 0 ? 'ps-pos' : dayPnl < 0 ? 'ps-neg' : 'ps-flat')}>
-          {fmtMoney(dayPnl)}
-        </span>
+  <!-- Whole strip is one link to /dashboard — single click target,
+       no expand-collapse interaction to learn. The top-3 movers
+       still surface inline so the strip stays glanceable; the
+       dashboard remains the place for the full grid. -->
+  <a class="ps-strip" href="/dashboard"
+     aria-label="Open the dashboard — full positions, holdings, and funds grids">
+    <span class="ps-agg" title="Positions P/L — open + closed intraday">
+      <span class="ps-agg-k">P</span>
+      <span class={'ps-agg-v ' + (positionsPnl > 0 ? 'ps-pos' : positionsPnl < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(positionsPnl)}
       </span>
-      <span class="ps-agg">
-        <span class="ps-agg-k">TOTAL</span>
-        <span class={'ps-agg-v ' + (totalPnl > 0 ? 'ps-pos' : totalPnl < 0 ? 'ps-neg' : 'ps-flat')}>
-          {fmtMoney(totalPnl)}
-        </span>
+    </span>
+    <span class="ps-agg" title="Holdings — today's move (day_change_val)">
+      <span class="ps-agg-k">T</span>
+      <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(holdingsToday)}
       </span>
-      <span class="ps-agg ps-agg-meta">
-        <span class="ps-agg-k">{livePositionCount}P · {liveHoldingCount}H</span>
+    </span>
+    <span class="ps-agg" title="Holdings — total unrealised P/L from entry">
+      <span class="ps-agg-k">H</span>
+      <span class={'ps-agg-v ' + (holdingsTotal > 0 ? 'ps-pos' : holdingsTotal < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(holdingsTotal)}
       </span>
-      {#if !expanded && chips.length > 0}
-        <!-- Inline preview of the top 3 movers when collapsed —
-             gives a glanceable cue without expanding. -->
-        <span class="ps-preview">
-          {#each chips.slice(0, 3) as c (c.kind + '|' + c.symbol)}
-            <span class={'ps-preview-chip ' + (c.dayChg > 0 ? 'ps-pos-bg' : c.dayChg < 0 ? 'ps-neg-bg' : '')}>
-              <span class="ps-preview-sym">{c.symbol}</span>
-              <span class="ps-preview-pct">{fmtPct(c.dayPct)}</span>
-            </span>
-          {/each}
-        </span>
-      {/if}
-      {#if lastRefresh}
-        <span class="ps-refresh" title="Last refreshed (auto every 30 s)">{lastRefresh}</span>
-      {/if}
-    </button>
-
-    {#if expanded}
-      <!-- Per-position drawer — top N movers as chips, "+N more"
-           link to /dashboard for the full grid. -->
-      <div class="ps-drawer" role="region" aria-label="Position chips by day P&L">
-        {#each topChips as c (c.kind + '|' + c.account + '|' + c.symbol)}
-          <span class="ps-chip" class:ps-chip-pos={c.dayChg > 0} class:ps-chip-neg={c.dayChg < 0}
-                title={`${c.kind === 'position' ? 'Position' : 'Holding'} · ${c.account || '—'} · ${c.qty} · LTP ₹${c.ltp || 0}`}>
-            <span class="ps-chip-sym">{c.symbol}</span>
-            <span class="ps-chip-qty">×{c.qty}</span>
-            <span class="ps-chip-pct">{fmtPct(c.dayPct)}</span>
-            <span class="ps-chip-money">{fmtMoney(c.dayChg)}</span>
+    </span>
+    <span class="ps-agg ps-agg-meta">
+      <span class="ps-agg-k">{livePositionCount}P · {liveHoldingCount}H</span>
+    </span>
+    {#if chips.length > 0}
+      <!-- Inline top-3 movers — stays glanceable without an expand
+           toggle. Tap-through still goes to /dashboard. -->
+      <span class="ps-preview">
+        {#each chips.slice(0, 3) as c (c.kind + '|' + c.symbol)}
+          <span class={'ps-preview-chip ' + (c.dayChg > 0 ? 'ps-pos-bg' : c.dayChg < 0 ? 'ps-neg-bg' : '')}>
+            <span class="ps-preview-sym">{c.symbol}</span>
+            <span class="ps-preview-pct">{fmtPct(c.dayPct)}</span>
           </span>
         {/each}
-        {#if overflowCount > 0}
-          <a class="ps-more" href="/dashboard"
-             title="See the full {chips.length}-row dashboard">
-            +{overflowCount} more →
-          </a>
-        {/if}
-      </div>
+      </span>
     {/if}
-  </div>
+    {#if lastRefresh}
+      <span class="ps-refresh" title="Last refreshed (auto every 30 s)">{lastRefresh}</span>
+    {/if}
+  </a>
 {/if}
 
 <style>
-  /* Strip — pinned full-width just under the navbar (parent
-     layout's ordering puts us between <header> and <main>).
-     Single dark row matching the algo nav palette so the strip
-     reads as part of the chrome, not the page content. */
+  /* Strip — single full-width <a> link to /dashboard, pinned just
+     under the navbar (parent layout slot puts us between <header>
+     and <main>). Dark palette matches the algo nav so the strip
+     reads as chrome, not page content. Whole element is one click
+     target — no expand, no nested buttons. */
   .ps-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.25rem 0.85rem;
     background: linear-gradient(180deg, #0a1020 0%, #131c33 100%);
     border-bottom: 1px solid rgba(251,191,36,0.18);
     color: #c8d8f0;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.6rem;
     letter-spacing: 0.04em;
+    text-decoration: none;
     user-select: none;
-  }
-
-  /* Summary row — clickable, full-width. Reset button defaults so
-     it inherits the strip's dark background instead of the OS
-     button chrome. */
-  .ps-row-summary {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    width: 100%;
-    padding: 0.3rem 0.85rem;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
     transition: background 0.08s;
   }
-  .ps-row-summary:hover {
-    background: rgba(251,191,36,0.06);
-  }
-  .ps-strip-expanded .ps-row-summary {
-    border-bottom: 1px dashed rgba(251,191,36,0.18);
+  .ps-strip:hover {
+    background: linear-gradient(180deg, #0a1020 0%, #1a2746 100%);
   }
 
-  .ps-chevron {
-    color: #fbbf24;
-    font-size: 0.6rem;
-    width: 0.9rem;
-    text-align: center;
-  }
-
-  /* Aggregates — DAY / TOTAL labels in muted grey, values bigger
-     and color-coded vs zero. */
+  /* Aggregates — single-letter labels (P / T / H) in muted grey,
+     values color-coded vs zero. */
   .ps-agg {
     display: inline-flex;
     align-items: baseline;
@@ -305,7 +262,8 @@
     margin-left: 0.5rem;
   }
 
-  /* Inline preview chips when collapsed — top 3 movers. */
+  /* Inline preview chips — top 3 movers, glanceable without
+     expand. */
   .ps-preview {
     display: inline-flex;
     gap: 0.35rem;
@@ -337,64 +295,10 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Drawer — full chip list, sorted, with "+N more" overflow. */
-  .ps-drawer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    padding: 0.35rem 0.85rem 0.45rem;
-    background: rgba(10,16,32,0.6);
-  }
-  .ps-chip {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 3px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.03);
-    font-size: 0.6rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .ps-chip-sym  { color: #fbbf24; font-weight: 700; }
-  .ps-chip-qty  { color: #7e97b8; font-size: 0.55rem; }
-  .ps-chip-pct  { color: #c8d8f0; font-weight: 700; }
-  .ps-chip-money { color: #c8d8f0; }
-  .ps-chip-pos {
-    border-color: rgba(74,222,128,0.35);
-    background: rgba(74,222,128,0.08);
-  }
-  .ps-chip-pos .ps-chip-pct,
-  .ps-chip-pos .ps-chip-money { color: #4ade80; }
-  .ps-chip-neg {
-    border-color: rgba(248,113,113,0.35);
-    background: rgba(248,113,113,0.08);
-  }
-  .ps-chip-neg .ps-chip-pct,
-  .ps-chip-neg .ps-chip-money { color: #f87171; }
-
-  .ps-more {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.15rem 0.55rem;
-    border-radius: 3px;
-    border: 1px dashed rgba(251,191,36,0.45);
-    color: #fbbf24;
-    text-decoration: none;
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-  }
-  .ps-more:hover {
-    background: rgba(251,191,36,0.10);
-    border-color: rgba(251,191,36,0.7);
-  }
-
   @media (max-width: 640px) {
-    .ps-row-summary { gap: 0.45rem; padding: 0.3rem 0.55rem; }
-    .ps-preview { display: none; }   /* drawer is the read on mobile */
+    .ps-strip   { gap: 0.45rem; padding: 0.25rem 0.55rem; }
+    .ps-preview { display: none; }  /* mobile reads aggregates only */
     .ps-refresh { display: none; }
     .ps-agg-meta { display: none; }
-    .ps-drawer  { padding: 0.35rem 0.55rem 0.45rem; }
   }
 </style>

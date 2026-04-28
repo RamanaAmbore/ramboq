@@ -744,15 +744,18 @@
     justify-content: space-between;
     gap: 0.5rem;
     flex-wrap: wrap;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
   }
   /* Every algo page gets the full-width amber underline that dashboard
      already had — keeps the headline visually separated from the
-     content cards below without crowding the title chip itself. */
+     content cards below without crowding the title chip itself.
+     Tighter spacing below the underline so the page content sits
+     close to the title (was 0.35rem padding + 1rem margin = ~22px
+     of empty zone). */
   :global(.algo-content .page-header) {
     border-bottom: 1px solid rgba(251,191,36,0.25);
-    padding-bottom: 0.35rem;
-    margin-bottom: 1rem;
+    padding-bottom: 0.2rem;
+    margin-bottom: 0.45rem;
   }
 
   /* Page-level timestamp (cyan, matches log timestamps). Works inline

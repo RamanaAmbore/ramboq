@@ -587,63 +587,11 @@
     });
   }
 
-  /**
-   * Per-row trade launchers — wired to the +/− buttons in the legs
-   * grid. Unlike the picker bar's generic launcher, these are
-   * scoped to a specific position row:
-   *
-   *   addToPosition(c)   — open a ticket to BUY/SELL one more lot
-   *                        in the SAME direction as the existing
-   *                        position. Long row → BUY +1 lot, short
-   *                        row → SELL +1 lot.
-   *   closePosition(c)   — open a ticket to square off the existing
-   *                        qty. Long row → SELL abs(qty), short row
-   *                        → BUY abs(qty).
-   *
-   * Both pre-select the row's account when the operator hasn't
-   * already filtered to one (so a multi-account book lands the
-   * order on the right Kite handle without manual picking).
-   */
-  function _rowTicketAccount(/** @type {{account?: string}} */ c) {
-    // Use the row's own account when it's a real (un-masked) value;
-    // otherwise fall through to the page default. A masked account
-    // (ZG####) on the row would otherwise pre-fill an unroutable
-    // value into the ticket.
-    const fromRow = String(c.account || '').trim();
-    if (_isRealAccount(fromRow)) return fromRow;
-    return _ticketAccountDefault();
-  }
-  function addToPosition(/** @type {any} */ c) {
-    if (!c?.symbol || c.source === 'draft') return;
-    const inst = getInstrument(String(c.symbol).toUpperCase());
-    const lot  = Number(inst?.ls || 1);
-    openTicket({
-      symbol:   c.symbol,
-      exchange: inst?.e || 'NFO',
-      side:     c.qty < 0 ? 'SELL' : 'BUY',
-      qty:      lot,
-      lotSize:  lot,
-      accounts: accountChoices.map(String),
-      account:  _rowTicketAccount(c),
-    });
-  }
-  function closePosition(/** @type {any} */ c) {
-    if (!c?.symbol || c.source === 'draft') return;
-    const qty  = Math.abs(Number(c.qty || 0));
-    if (!qty) return;
-    const inst = getInstrument(String(c.symbol).toUpperCase());
-    const lot  = Number(inst?.ls || 1);
-    openTicket({
-      symbol:   c.symbol,
-      exchange: inst?.e || 'NFO',
-      // Opposite of the held direction → squares the position off.
-      side:     c.qty < 0 ? 'BUY' : 'SELL',
-      qty,
-      lotSize:  lot,
-      accounts: accountChoices.map(String),
-      account:  _rowTicketAccount(c),
-    });
-  }
+  // Per-row +/− trade launchers (addToPosition / closePosition) and
+  // the _rowTicketAccount helper they used were dropped — the
+  // legs grid no longer carries a Trade column. Operators add /
+  // close from the chain picker (+CE / +PE / + futures buttons in
+  // the option chain panel) or use the picker bar's BUY/SELL pair.
 
   // Ticket → drafts: signed qty (BUY = +qty, SELL = −qty) so the
   // existing payoff math keeps working. Auto-aligns the page
@@ -1244,7 +1192,6 @@
       <div class="cand-scroll">
         <div class="cand-grid" class:cand-grid-noacct={hideAcct}>
           <div class="cand-headrow">
-            <span>Trade</span>
             <span></span>
             <span>Symbol</span>
             {#if !hideAcct}<span>Acct</span>{/if}
@@ -1264,30 +1211,8 @@
             {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
             {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
             {@const dir = c.qty < 0 ? 'short' : c.qty > 0 ? 'long' : 'flat'}
-            {@const isDraft = c.source === 'draft'}
             <label class="cand-row cand-row-{dir}"
                    class:cand-disabled={enabledSymbols[c.symbol] === false}>
-              <!-- Per-row +/− buttons — leading column. + adds another
-                   lot in the row's direction; − closes the held qty
-                   (opposite side, full qty). Hidden on draft rows
-                   since they aren't real positions. preventDefault on
-                   click so the wrapping <label>'s checkbox doesn't
-                   toggle. Empty placeholder span keeps the column
-                   width stable on draft rows. -->
-              <span class="cand-trade">
-                {#if !isDraft}
-                  <button type="button"
-                          class="cand-trade-btn cand-trade-buy"
-                          title="{c.qty < 0 ? 'Sell' : 'Buy'} 1 more lot of {c.symbol}"
-                          aria-label="Add to position"
-                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); addToPosition(c); }}>+</button>
-                  <button type="button"
-                          class="cand-trade-btn cand-trade-sell"
-                          title="Close {Math.abs(c.qty)} {c.symbol} ({c.qty < 0 ? 'cover short' : 'sell long'})"
-                          aria-label="Close position"
-                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); closePosition(c); }}>−</button>
-                {/if}
-              </span>
               <input type="checkbox"
                      checked={enabledSymbols[c.symbol] !== false}
                      onchange={(e) => {
@@ -1844,7 +1769,6 @@
   .cand-grid {
     display: grid;
     grid-template-columns:
-      auto         /* trade (+/−) — leading */
       auto         /* checkbox */
       max-content  /* symbol */
       max-content  /* account */
@@ -1869,7 +1793,6 @@
      the column entirely. */
   .cand-grid-noacct {
     grid-template-columns:
-      auto         /* trade (+/−) — leading */
       auto         /* checkbox */
       max-content  /* symbol */
       max-content  /* qty */
@@ -1963,51 +1886,6 @@
     background-color: rgba(248,113,113,0.10);
   }
 
-  /* Per-row trade pills — paired +/− that pre-fill the OrderTicket
-     for THIS row's symbol. Mirrors the picker bar's BUY/SELL pair
-     palette but at row-density (smaller, tighter) so the column
-     doesn't dominate. */
-  .cand-trade {
-    display: inline-flex;
-    gap: 1px;
-  }
-  .cand-trade-btn {
-    width: 1.05rem;
-    height: 1.05rem;
-    padding: 0;
-    border-radius: 2px;
-    font-family: monospace;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.1s, border-color 0.1s, color 0.1s;
-  }
-  .cand-trade-buy {
-    border: 1px solid rgba(74,222,128,0.55);
-    background: rgba(74,222,128,0.10);
-    color: #4ade80;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-  .cand-trade-buy:hover {
-    background: rgba(74,222,128,0.22);
-    border-color: rgba(74,222,128,0.85);
-  }
-  .cand-trade-sell {
-    border: 1px solid rgba(248,113,113,0.55);
-    background: rgba(248,113,113,0.10);
-    color: #f87171;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-  }
-  .cand-trade-sell:hover {
-    background: rgba(248,113,113,0.22);
-    border-color: rgba(248,113,113,0.85);
-  }
   .cand-row input[type="checkbox"] {
     accent-color: #fbbf24;
     width: 0.9rem;

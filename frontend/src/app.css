@@ -76,8 +76,8 @@
   font-weight: 600;
   color: #e8d9a8 !important;
   background-color: transparent !important;
-  padding-left: 4px !important;
-  padding-right: 4px !important;
+  padding-left: 3px !important;
+  padding-right: 3px !important;
   border-right: 1px solid rgba(255,255,255,0.12) !important;
 }
 /* Hide header menu/filter icons */
@@ -87,8 +87,8 @@
   display: none !important;
 }
 .ag-theme-ramboq .ag-cell {
-  padding-left: 4px !important;
-  padding-right: 4px !important;
+  padding-left: 3px !important;
+  padding-right: 3px !important;
   border-right: 1px solid #e4ddd0 !important;
 }
 .ag-theme-ramboq .ag-row {
@@ -306,8 +306,8 @@
   font-weight: 700;
   color: #fbbf24 !important;
   background-color: transparent !important;
-  padding-left: 6px !important;
-  padding-right: 6px !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
   border-right: 1px solid rgba(251,191,36,0.18) !important;
 }
 .ag-theme-algo .ag-header-cell-menu-button,
@@ -316,8 +316,8 @@
   display: none !important;
 }
 .ag-theme-algo .ag-cell {
-  padding-left: 6px !important;
-  padding-right: 6px !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
   color: #c8d8f0 !important;
   border-right: 1px solid rgba(255,255,255,0.06) !important;
 }
@@ -376,8 +376,10 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   display: block;
-  padding-bottom: 0.25rem;
-  margin-bottom: 0.35rem;
+  /* Tight: just enough room for the underline to read as a divider
+     without a visible empty zone between it and the first row. */
+  padding-bottom: 0.15rem;
+  margin-bottom: 0.15rem;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
@@ -391,7 +393,7 @@
   font-size: 0.7rem;
   color: #e2e8f0;
   background: #0c1830;
-  padding: 0.5rem 0.65rem;
+  padding: 0.3rem 0.6rem;
   overflow-y: auto;
 }
 .log-news-panel .log-news-list {
