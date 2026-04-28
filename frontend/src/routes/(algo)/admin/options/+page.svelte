@@ -912,16 +912,17 @@
       <span class="opt-section-meta">{candidatePositions.length}</span>
     </button>
     {#if legsOpen && candidatePositions.length}
+      {@const hideAcct = selectedAccounts.length === 1}
       <div class="cand-scroll">
-        <div class="cand-grid">
+        <div class="cand-grid" class:cand-grid-noacct={hideAcct}>
           <div class="cand-headrow">
             <span></span>
             <span>Symbol</span>
-            <span>Acct</span>
+            {#if !hideAcct}<span>Acct</span>{/if}
             <span class="num">Qty</span>
+            <span class="num">P&amp;L</span>
             <span class="num">Cost</span>
             <span class="num">LTP</span>
-            <span class="num">P&amp;L</span>
             <span class="num">IV</span>
             <span class="num">Δ</span>
             <span class="num">Θ</span>
@@ -933,7 +934,9 @@
             {@const ltp = lg && lg.ltp != null ? lg.ltp : c.ltp}
             {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
             {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
-            <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
+            {@const dir = c.qty < 0 ? 'short' : c.qty > 0 ? 'long' : 'flat'}
+            <label class="cand-row cand-row-{dir}"
+                   class:cand-disabled={enabledSymbols[c.symbol] === false}>
               <input type="checkbox"
                      checked={enabledSymbols[c.symbol] !== false}
                      onchange={(e) => {
@@ -942,13 +945,13 @@
                        enabledSymbols = next;
                      }} />
               <span class="font-mono">{c.symbol}</span>
-              <span class="font-mono">{c.account}</span>
+              {#if !hideAcct}<span class="font-mono">{c.account}</span>{/if}
               <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
-              <span class="num">{cost != null ? '₹' + cost.toFixed(2) : '—'}</span>
-              <span class="num">{ltp != null ? '₹' + ltp.toFixed(2) : '—'}</span>
-              <span class="num {pnl == null ? '' : pnl >= 0 ? 'kv-pos' : 'kv-neg'}">
+              <span class="num cand-pnl {pnl == null ? '' : pnl >= 0 ? 'cand-pnl-pos' : 'cand-pnl-neg'}">
                 {pnl == null ? '—' : (pnl >= 0 ? '+' : '−') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
+              <span class="num">{cost != null ? '₹' + cost.toFixed(2) : '—'}</span>
+              <span class="num">{ltp != null ? '₹' + ltp.toFixed(2) : '—'}</span>
               <span class="num">{lg ? (lg.iv * 100).toFixed(1) + '%' : '—'}</span>
               <span class="num">{lg ? lg.greeks.delta.toFixed(2) : '—'}</span>
               <span class="num {lg && lg.greeks.theta < 0 ? 'kv-neg' : ''}">{lg ? lg.greeks.theta.toFixed(0) : '—'}</span>
@@ -1432,7 +1435,11 @@
 
   /* Parent grid — defines column tracks once. Children (`.cand-headrow`
      and each `.cand-row`) consume the same tracks via `subgrid` so
-     headers + data cells line up precisely. */
+     headers + data cells line up precisely.
+     Column order (post-Apr-2026 reshuffle): checkbox · Symbol ·
+     Account · Qty · P&L · Cost · LTP · IV · Δ · Θ · 𝒱 · Source.
+     P&L sits between Qty and Cost so the operator's eye scans
+     "what I have → what I'm making/losing → what I paid". */
   .cand-grid {
     display: grid;
     grid-template-columns:
@@ -1440,9 +1447,9 @@
       max-content         /* symbol */
       max-content         /* account */
       minmax(0, 0.6fr)    /* qty */
+      minmax(0, 1fr)      /* pnl */
       minmax(0, 0.9fr)    /* cost */
       minmax(0, 0.9fr)    /* ltp */
-      minmax(0, 1fr)      /* pnl */
       minmax(0, 0.55fr)   /* iv */
       minmax(0, 0.55fr)   /* delta */
       minmax(0, 0.55fr)   /* theta */
@@ -1453,6 +1460,25 @@
        wrapping `.cand-scroll` handles horizontal overflow when the
        viewport is narrower than this. */
     min-width: 980px;
+  }
+  /* When the operator filters to a single account, the Account
+     column is implicit (every row carries the same value) — drop
+     the column entirely to conserve horizontal space. The grid
+     definition mirrors `.cand-grid` minus the account track. */
+  .cand-grid-noacct {
+    grid-template-columns:
+      auto                /* checkbox */
+      max-content         /* symbol */
+      minmax(0, 0.6fr)    /* qty */
+      minmax(0, 1fr)      /* pnl */
+      minmax(0, 0.9fr)    /* cost */
+      minmax(0, 0.9fr)    /* ltp */
+      minmax(0, 0.55fr)   /* iv */
+      minmax(0, 0.55fr)   /* delta */
+      minmax(0, 0.55fr)   /* theta */
+      minmax(0, 0.55fr)   /* vega */
+      minmax(0, 0.6fr);   /* source */
+    min-width: 880px;
   }
   /* Single parent grid via subgrid. Each row inherits the parent's
      column tracks — so headers and data cells line up exactly,
@@ -1486,6 +1512,41 @@
     transition: background 0.1s;
   }
   .cand-row:hover { background: rgba(251,191,36,0.05); }
+
+  /* Long / short row tint — mirrors the /dashboard ag-theme-algo
+     palette: sky-cyan for long positions, warm-orange for short.
+     Faint left + right inset bars on the row scope the direction
+     cue to the row body without flooding the whole table. */
+  .cand-row-long {
+    background-color: rgba(56,189,248,0.08);
+    box-shadow: inset 3px 0 0 rgba(56,189,248,0.75),
+                inset -3px 0 0 rgba(56,189,248,0.75);
+  }
+  .cand-row-short {
+    background-color: rgba(251,146,60,0.08);
+    box-shadow: inset 3px 0 0 rgba(251,146,60,0.75),
+                inset -3px 0 0 rgba(251,146,60,0.75);
+  }
+  .cand-row-long:hover  { background-color: rgba(56,189,248,0.16); }
+  .cand-row-short:hover { background-color: rgba(251,146,60,0.16); }
+
+  /* P&L cell — same green/red scheme as /dashboard's pnl-gain /
+     pnl-loss classes. Subtle background tint for a glanceable
+     "win or lose?" cue at row-scan speed; bold weight so the
+     numbers pop alongside the otherwise-muted row content. */
+  .cand-pnl {
+    border-radius: 2px;
+    padding: 0 0.25rem;
+    font-weight: 700;
+  }
+  .cand-pnl-pos {
+    color: #4ade80;
+    background-color: rgba(74,222,128,0.10);
+  }
+  .cand-pnl-neg {
+    color: #f87171;
+    background-color: rgba(248,113,113,0.10);
+  }
   .cand-row input[type="checkbox"] {
     accent-color: #fbbf24;
     width: 0.9rem;
