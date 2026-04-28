@@ -170,16 +170,16 @@
         {fmtMoney(positionsPnl)}
       </span>
     </span>
+    <span class="ps-agg" title="Holdings — today's mark-to-market move (day_change_val)">
+      <span class="ps-agg-k">DayΔ</span>
+      <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(holdingsToday)}
+      </span>
+    </span>
     <span class="ps-agg" title="Holdings — total unrealised P/L from entry">
       <span class="ps-agg-k">Holdings</span>
       <span class={'ps-agg-v ' + (holdingsTotal > 0 ? 'ps-pos' : holdingsTotal < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsTotal)}
-      </span>
-    </span>
-    <span class="ps-agg" title="Holdings — today's move (day_change_val)">
-      <span class="ps-agg-k">Today</span>
-      <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
-        {fmtMoney(holdingsToday)}
       </span>
     </span>
     <span class="ps-agg ps-agg-meta">
@@ -212,11 +212,10 @@
   .ps-strip {
     display: flex;
     align-items: center;
-    /* Center the metrics cluster horizontally — preview + meta sit
-       to the right of centre but the row reads as a centered group
-       at typical viewport widths (Pos / Tday / Hold are visually
-       balanced about the middle). */
-    justify-content: center;
+    /* Left-align the cluster so it lines up with the page-content
+       margin below. Centering pushed the numbers off the operator's
+       primary scan column. */
+    justify-content: flex-start;
     gap: 0.9rem;
     width: 100%;
     padding: 0.2rem 0.85rem;
