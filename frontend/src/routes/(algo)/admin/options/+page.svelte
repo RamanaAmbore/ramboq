@@ -1198,6 +1198,7 @@
       <div class="cand-scroll">
         <div class="cand-grid" class:cand-grid-noacct={hideAcct}>
           <div class="cand-headrow">
+            <span>Trade</span>
             <span></span>
             <span>Symbol</span>
             {#if !hideAcct}<span>Acct</span>{/if}
@@ -1210,7 +1211,6 @@
             <span class="num">Θ</span>
             <span class="num">𝒱</span>
             <span>Src</span>
-            <span>Trade</span>
           </div>
           {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
             {@const lg = legAnalyticsBySymbol[c.symbol]}
@@ -1221,6 +1221,27 @@
             {@const isDraft = c.source === 'draft'}
             <label class="cand-row cand-row-{dir}"
                    class:cand-disabled={enabledSymbols[c.symbol] === false}>
+              <!-- Per-row +/− buttons — leading column. + adds another
+                   lot in the row's direction; − closes the held qty
+                   (opposite side, full qty). Hidden on draft rows
+                   since they aren't real positions. preventDefault on
+                   click so the wrapping <label>'s checkbox doesn't
+                   toggle. Empty placeholder span keeps the column
+                   width stable on draft rows. -->
+              <span class="cand-trade">
+                {#if !isDraft}
+                  <button type="button"
+                          class="cand-trade-btn cand-trade-buy"
+                          title="{c.qty < 0 ? 'Sell' : 'Buy'} 1 more lot of {c.symbol}"
+                          aria-label="Add to position"
+                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); addToPosition(c); }}>+</button>
+                  <button type="button"
+                          class="cand-trade-btn cand-trade-sell"
+                          title="Close {Math.abs(c.qty)} {c.symbol} ({c.qty < 0 ? 'cover short' : 'sell long'})"
+                          aria-label="Close position"
+                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); closePosition(c); }}>−</button>
+                {/if}
+              </span>
               <input type="checkbox"
                      checked={enabledSymbols[c.symbol] !== false}
                      onchange={(e) => {
@@ -1241,26 +1262,6 @@
               <span class="num {lg && lg.greeks.theta < 0 ? 'kv-neg' : ''}">{lg ? lg.greeks.theta.toFixed(0) : '—'}</span>
               <span class="num">{lg ? lg.greeks.vega.toFixed(0) : '—'}</span>
               <span class="leg-source leg-source-{c.source}">{c.source}</span>
-              <!-- Per-row +/− buttons — pre-fill the OrderTicket for
-                   THIS specific position. + adds another lot in the
-                   row's direction; − closes the held qty (opposite
-                   side, full qty). Hidden on draft rows since they
-                   aren't real positions. preventDefault on click so
-                   the wrapping <label>'s checkbox doesn't toggle. -->
-              <span class="cand-trade">
-                {#if !isDraft}
-                  <button type="button"
-                          class="cand-trade-btn cand-trade-buy"
-                          title="{c.qty < 0 ? 'Sell' : 'Buy'} 1 more lot of {c.symbol}"
-                          aria-label="Add to position"
-                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); addToPosition(c); }}>+</button>
-                  <button type="button"
-                          class="cand-trade-btn cand-trade-sell"
-                          title="Close {Math.abs(c.qty)} {c.symbol} ({c.qty < 0 ? 'cover short' : 'sell long'})"
-                          aria-label="Close position"
-                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); closePosition(c); }}>−</button>
-                {/if}
-              </span>
             </label>
           {/each}
         </div>
@@ -1791,6 +1792,7 @@
   .cand-grid {
     display: grid;
     grid-template-columns:
+      auto                /* trade (+/−) — leading */
       auto                /* checkbox */
       max-content         /* symbol */
       max-content         /* account */
@@ -1802,8 +1804,7 @@
       minmax(0, 0.55fr)   /* delta */
       minmax(0, 0.55fr)   /* theta */
       minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr)    /* source */
-      auto;               /* trade (+/−) */
+      minmax(0, 0.6fr);   /* source */
     row-gap: 0.2rem;
     /* Min-width enforces a sensible row width — 13 columns. The
        wrapping `.cand-scroll` handles horizontal overflow when the
@@ -1816,6 +1817,7 @@
      definition mirrors `.cand-grid` minus the account track. */
   .cand-grid-noacct {
     grid-template-columns:
+      auto                /* trade (+/−) — leading */
       auto                /* checkbox */
       max-content         /* symbol */
       minmax(0, 0.6fr)    /* qty */
@@ -1826,8 +1828,7 @@
       minmax(0, 0.55fr)   /* delta */
       minmax(0, 0.55fr)   /* theta */
       minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr)    /* source */
-      auto;               /* trade (+/−) */
+      minmax(0, 0.6fr);   /* source */
     min-width: 940px;
   }
   /* Single parent grid via subgrid. Each row inherits the parent's

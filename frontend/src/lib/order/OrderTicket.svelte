@@ -26,7 +26,7 @@
 
   import { onMount } from 'svelte';
   import OrderDepth from './OrderDepth.svelte';
-  import { placeTicketOrder } from '$lib/api';
+  import { placeTicketOrder, fetchAccounts } from '$lib/api';
 
   /** @type {{
    *   symbol:    string,
@@ -91,12 +91,55 @@
   let _trigger = $state(trigger ?? '');
   let _product = $state(productVal);
   let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ ('draft'));
+
+  // Self-fetched real account list — backstop for when the caller
+  // didn't (or couldn't) supply one. /api/accounts/ is jwt-guarded
+  // but doesn't mask, so any signed-in user gets real account_ids
+  // even if the page's positions came back masked.
+  /** @type {string[]} */
+  let _selfAccounts = $state([]);
+
+  // Account list shown by the picker — caller's `accounts` prop
+  // wins when populated; otherwise we use whatever we self-fetched.
+  // A masked-only list (e.g. ZG####) is treated as empty so we
+  // don't pre-pick an unroutable value.
+  function _isRealAcct(/** @type {string|null|undefined} */ a) {
+    return !!(a && !String(a).includes('#'));
+  }
+  const _accounts = $derived.by(() => {
+    const fromProp = (accounts || []).filter(_isRealAcct);
+    if (fromProp.length) return fromProp;
+    return _selfAccounts.filter(_isRealAcct);
+  });
+
   // Account — explicit operator choice for which Kite handle the
-  // order routes through. Default to the only account when there's
-  // exactly one available; force a pick otherwise so the operator
-  // can never accidentally route to the wrong handle. Required for
-  // PAPER and LIVE; ignored in DRAFT.
-  let _account = $state(account || (accounts.length === 1 ? accounts[0] : ''));
+  // order routes through. Required for PAPER and LIVE; ignored in
+  // DRAFT. Initialized empty and reactively seeded from the prop /
+  // picker via the effect below — this lets a late-arriving caller
+  // account list (the common race: /api/accounts/ resolves AFTER
+  // the operator clicks +) auto-select once it lands. A masked
+  // ZG#### is unroutable so we never seed it as a default.
+  let _account = $state('');
+
+  // Reactive seed:
+  //   1. Caller-supplied `account` prop wins when it's a real value.
+  //   2. Otherwise, single real account in the picker → pre-pick it.
+  //   3. If the seeded value disappears from the picker (caller
+  //      flips symbol / picker reloads), reset.
+  $effect(() => {
+    const propPick = _isRealAcct(account) ? String(account) : '';
+    if (!_account && propPick && _accounts.includes(propPick)) {
+      _account = propPick;
+      return;
+    }
+    if (!_account && _accounts.length === 1) {
+      _account = _accounts[0];
+      return;
+    }
+    if (_account && _accounts.length && !_accounts.includes(_account)) {
+      _account = _accounts.length === 1 ? _accounts[0] : '';
+    }
+  });
 
   // Field visibility derived from order type + variety.
   const showLimit   = $derived(_type === 'LIMIT' || _type === 'SL');
@@ -205,12 +248,29 @@
     }
   }
 
-  // Esc to close.
+  // Esc to close + backstop /api/accounts/ self-fetch. Runs when
+  // the caller didn't supply real accounts (the chain picker pre-
+  // /accounts/ load, the per-row buttons before the page poll
+  // landed, generic order surfaces that don't know about Kite at
+  // all). /accounts is jwt-guarded but doesn't mask, so we get the
+  // real account_ids for any signed-in operator. 401 / 403 leaves
+  // _selfAccounts empty and the picker collapses gracefully.
   onMount(() => {
     const onKey = (/** @type {KeyboardEvent} */ e) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
+    const propRealCount = (accounts || []).filter(_isRealAcct).length;
+    if (!propRealCount) {
+      fetchAccounts()
+        .then(/** @param {any} r */ (r) => {
+          const list = (r?.accounts || [])
+            .map(/** @param {any} a */ (a) => String(a?.account_id || ''))
+            .filter(Boolean);
+          _selfAccounts = list;
+        })
+        .catch(() => { /* silent — picker just stays empty */ });
+    }
     return () => window.removeEventListener('keydown', onKey);
   });
 </script>
@@ -251,22 +311,22 @@
     </div>
 
     <!-- Account selector — required for PAPER + LIVE so the operator
-         picks WHICH Kite handle the order routes to. Skipped only
-         when there's no account list at all (caller didn't supply
-         one) — the backend will then default to the first available,
-         but the operator should always be told. -->
-    {#if accounts.length}
+         picks WHICH Kite handle the order routes to. Reads from the
+         derived `_accounts` list so a late-arriving caller account
+         list (or the self-fetch backstop) auto-populates without
+         remounting the ticket. -->
+    {#if _accounts.length}
       <div class="ot-row">
         <div class="ot-label-block">
           <label class="ot-label" for="ot-account">Account</label>
-          {#if accounts.length === 1}
+          {#if _accounts.length === 1}
             <input id="ot-account" type="text" class="ot-input ot-account-readonly"
                    value={_account} readonly />
           {:else}
             <select id="ot-account" class="ot-input ot-account-select"
                     bind:value={_account}>
               <option value="" disabled>Pick an account…</option>
-              {#each accounts as a}
+              {#each _accounts as a}
                 <option value={a}>{a}</option>
               {/each}
             </select>
