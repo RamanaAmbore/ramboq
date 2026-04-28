@@ -523,6 +523,59 @@
     });
   }
 
+  /**
+   * Per-row trade launchers — wired to the +/− buttons in the legs
+   * grid. Unlike the picker bar's generic launcher, these are
+   * scoped to a specific position row:
+   *
+   *   addToPosition(c)   — open a ticket to BUY/SELL one more lot
+   *                        in the SAME direction as the existing
+   *                        position. Long row → BUY +1 lot, short
+   *                        row → SELL +1 lot.
+   *   closePosition(c)   — open a ticket to square off the existing
+   *                        qty. Long row → SELL abs(qty), short row
+   *                        → BUY abs(qty).
+   *
+   * Both pre-select the row's account when the operator hasn't
+   * already filtered to one (so a multi-account book lands the
+   * order on the right Kite handle without manual picking).
+   */
+  function _rowTicketAccount(/** @type {{account?: string}} */ c) {
+    const fromRow = String(c.account || '').trim();
+    return fromRow || _ticketAccountDefault();
+  }
+  function addToPosition(/** @type {any} */ c) {
+    if (!c?.symbol || c.source === 'draft') return;
+    const inst = getInstrument(String(c.symbol).toUpperCase());
+    const lot  = Number(inst?.ls || 1);
+    openTicket({
+      symbol:   c.symbol,
+      exchange: inst?.e || 'NFO',
+      side:     c.qty < 0 ? 'SELL' : 'BUY',
+      qty:      lot,
+      lotSize:  lot,
+      accounts: accountChoices.map(String),
+      account:  _rowTicketAccount(c),
+    });
+  }
+  function closePosition(/** @type {any} */ c) {
+    if (!c?.symbol || c.source === 'draft') return;
+    const qty  = Math.abs(Number(c.qty || 0));
+    if (!qty) return;
+    const inst = getInstrument(String(c.symbol).toUpperCase());
+    const lot  = Number(inst?.ls || 1);
+    openTicket({
+      symbol:   c.symbol,
+      exchange: inst?.e || 'NFO',
+      // Opposite of the held direction → squares the position off.
+      side:     c.qty < 0 ? 'BUY' : 'SELL',
+      qty,
+      lotSize:  lot,
+      accounts: accountChoices.map(String),
+      account:  _rowTicketAccount(c),
+    });
+  }
+
   // Ticket → drafts: signed qty (BUY = +qty, SELL = −qty) so the
   // existing payoff math keeps working. Auto-aligns the page
   // underlying so the new draft surfaces in candidates immediately.
@@ -799,12 +852,29 @@
       options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
       placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
   </div>
-  <button type="button"
-          class="opt-add-btn"
-          class:opt-add-btn-on={showAddPanel}
-          title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
-          aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
-          onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
+  <!-- Generic BUY / SELL launcher — paired pair of pills; click +
+       to open the chain picker pre-set to LONG, click − for SHORT.
+       Re-clicking the active button collapses the panel. -->
+  <div class="opt-trade" role="group" aria-label="Open chain picker (buy or sell)">
+    <button type="button"
+            class="opt-add-btn opt-add-btn-buy"
+            class:opt-add-btn-on={showAddPanel && chainSide === 'long'}
+            title="Open the chain picker to BUY (long)"
+            aria-label="Open picker — buy"
+            onclick={() => {
+              if (showAddPanel && chainSide === 'long') { showAddPanel = false; return; }
+              chainSide = 'long'; showAddPanel = true;
+            }}>+</button>
+    <button type="button"
+            class="opt-add-btn opt-add-btn-sell"
+            class:opt-add-btn-on={showAddPanel && chainSide === 'short'}
+            title="Open the chain picker to SELL (short)"
+            aria-label="Open picker — sell"
+            onclick={() => {
+              if (showAddPanel && chainSide === 'short') { showAddPanel = false; return; }
+              chainSide = 'short'; showAddPanel = true;
+            }}>−</button>
+  </div>
 </div>
 
 {#if strategyErr}
@@ -1076,6 +1146,7 @@
             <span class="num">Θ</span>
             <span class="num">𝒱</span>
             <span>Src</span>
+            <span>Trade</span>
           </div>
           {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
             {@const lg = legAnalyticsBySymbol[c.symbol]}
@@ -1083,6 +1154,7 @@
             {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
             {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
             {@const dir = c.qty < 0 ? 'short' : c.qty > 0 ? 'long' : 'flat'}
+            {@const isDraft = c.source === 'draft'}
             <label class="cand-row cand-row-{dir}"
                    class:cand-disabled={enabledSymbols[c.symbol] === false}>
               <input type="checkbox"
@@ -1105,6 +1177,26 @@
               <span class="num {lg && lg.greeks.theta < 0 ? 'kv-neg' : ''}">{lg ? lg.greeks.theta.toFixed(0) : '—'}</span>
               <span class="num">{lg ? lg.greeks.vega.toFixed(0) : '—'}</span>
               <span class="leg-source leg-source-{c.source}">{c.source}</span>
+              <!-- Per-row +/− buttons — pre-fill the OrderTicket for
+                   THIS specific position. + adds another lot in the
+                   row's direction; − closes the held qty (opposite
+                   side, full qty). Hidden on draft rows since they
+                   aren't real positions. preventDefault on click so
+                   the wrapping <label>'s checkbox doesn't toggle. -->
+              <span class="cand-trade">
+                {#if !isDraft}
+                  <button type="button"
+                          class="cand-trade-btn cand-trade-buy"
+                          title="{c.qty < 0 ? 'Sell' : 'Buy'} 1 more lot of {c.symbol}"
+                          aria-label="Add to position"
+                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); addToPosition(c); }}>+</button>
+                  <button type="button"
+                          class="cand-trade-btn cand-trade-sell"
+                          title="Close {Math.abs(c.qty)} {c.symbol} ({c.qty < 0 ? 'cover short' : 'sell long'})"
+                          aria-label="Close position"
+                          onclick={(e) => { e.preventDefault(); e.stopPropagation(); closePosition(c); }}>−</button>
+                {/if}
+              </span>
             </label>
           {/each}
         </div>
@@ -1251,10 +1343,19 @@
      a third of the leftover space after the + button. */
   .opt-field-grow { flex: 1 1 0; min-width: 0; }
 
-  /* "+" toggle button — square pill matching the Select trigger
-     height (Select uses min-height: 1.55rem) so the row reads as
-     one consistent control bar. Flips to "−" while the chain panel
-     is open. */
+  /* Trade-launcher group — pairs the BUY (+) and SELL (−) buttons
+     into a segmented pill aligned with the Select-trigger row. */
+  .opt-trade {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    gap: 1px;
+  }
+  /* Square BUY/SELL pills matching the Select trigger height
+     (Select uses min-height: 1.55rem) so the row reads as one
+     consistent control bar. Color-coded — green for BUY, red for
+     SELL — so the operator's eye lands on the right one without
+     reading the glyph. */
   .opt-add-btn {
     width: 1.55rem;
     height: 1.55rem;
@@ -1282,6 +1383,41 @@
     background: #fbbf24;
     color: #0c1830;
     border-color: #fbbf24;
+  }
+  /* BUY (+) — green; SELL (−) — red. Active state inverts the
+     palette (filled bg + dark glyph) so the chosen side is
+     unmistakable while the chain panel is open. */
+  .opt-add-btn-buy {
+    border-color: rgba(74,222,128,0.55);
+    background: rgba(74,222,128,0.10);
+    color: #4ade80;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .opt-add-btn-buy:hover {
+    background: rgba(74,222,128,0.22);
+    border-color: rgba(74,222,128,0.85);
+  }
+  .opt-add-btn-buy.opt-add-btn-on {
+    background: #4ade80;
+    color: #0c1830;
+    border-color: #4ade80;
+  }
+  .opt-add-btn-sell {
+    border-color: rgba(248,113,113,0.55);
+    background: rgba(248,113,113,0.10);
+    color: #f87171;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .opt-add-btn-sell:hover {
+    background: rgba(248,113,113,0.22);
+    border-color: rgba(248,113,113,0.85);
+  }
+  .opt-add-btn-sell.opt-add-btn-on {
+    background: #f87171;
+    color: #0c1830;
+    border-color: #f87171;
   }
 
   /* Refresh button moved onto the chart's top-right corner — see
@@ -1602,12 +1738,13 @@
       minmax(0, 0.55fr)   /* delta */
       minmax(0, 0.55fr)   /* theta */
       minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr);   /* source */
+      minmax(0, 0.6fr)    /* source */
+      auto;               /* trade (+/−) */
     row-gap: 0.2rem;
-    /* Min-width enforces a sensible row width — 12 columns. The
+    /* Min-width enforces a sensible row width — 13 columns. The
        wrapping `.cand-scroll` handles horizontal overflow when the
        viewport is narrower than this. */
-    min-width: 980px;
+    min-width: 1040px;
   }
   /* When the operator filters to a single account, the Account
      column is implicit (every row carries the same value) — drop
@@ -1625,8 +1762,9 @@
       minmax(0, 0.55fr)   /* delta */
       minmax(0, 0.55fr)   /* theta */
       minmax(0, 0.55fr)   /* vega */
-      minmax(0, 0.6fr);   /* source */
-    min-width: 880px;
+      minmax(0, 0.6fr)    /* source */
+      auto;               /* trade (+/−) */
+    min-width: 940px;
   }
   /* Single parent grid via subgrid. Each row inherits the parent's
      column tracks — so headers and data cells line up exactly,
@@ -1694,6 +1832,52 @@
   .cand-pnl-neg {
     color: #f87171;
     background-color: rgba(248,113,113,0.10);
+  }
+
+  /* Per-row trade pills — paired +/− that pre-fill the OrderTicket
+     for THIS row's symbol. Mirrors the picker bar's BUY/SELL pair
+     palette but at row-density (smaller, tighter) so the column
+     doesn't dominate. */
+  .cand-trade {
+    display: inline-flex;
+    gap: 1px;
+  }
+  .cand-trade-btn {
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border-radius: 2px;
+    font-family: monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .cand-trade-buy {
+    border: 1px solid rgba(74,222,128,0.55);
+    background: rgba(74,222,128,0.10);
+    color: #4ade80;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .cand-trade-buy:hover {
+    background: rgba(74,222,128,0.22);
+    border-color: rgba(74,222,128,0.85);
+  }
+  .cand-trade-sell {
+    border: 1px solid rgba(248,113,113,0.55);
+    background: rgba(248,113,113,0.10);
+    color: #f87171;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .cand-trade-sell:hover {
+    background: rgba(248,113,113,0.22);
+    border-color: rgba(248,113,113,0.85);
   }
   .cand-row input[type="checkbox"] {
     accent-color: #fbbf24;
