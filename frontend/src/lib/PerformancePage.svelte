@@ -4,9 +4,10 @@
   import { fetchHoldings, fetchPositions, fetchFunds } from '$lib/api';
   import { createPerformanceSocket } from '$lib/ws';
   import { dataCache, authStore } from '$lib/stores';
-  import OrderPopup from '$lib/OrderPopup.svelte';
+  import OrderTicket from '$lib/order/OrderTicket.svelte';
   import MultiSelect from '$lib/MultiSelect.svelte';
   import Select      from '$lib/Select.svelte';
+  import { getInstrument, loadInstruments } from '$lib/data/instruments';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
@@ -28,13 +29,49 @@
   const validTabs = ['positions', 'holdings'];
   let activeTab = $state(validTabs.includes(page.url.searchParams.get('tab')) ? page.url.searchParams.get('tab') : 'positions');
 
-  let orderRow = $state(/** @type {any|null} */(null));
-  let orderSource = $state('holdings');
+  // OrderTicket props built from the clicked row. IBKR convention:
+  // a row click defaults the ticket to CLOSE semantics (opposite
+  // side, full held qty). Operator can flip the side toggle inside
+  // the modal to instead add to the position. The DRAFT mode is
+  // hidden here — this surface has no drafts panel, so the only
+  // useful submit modes are PAPER and LIVE.
+  let orderTicketProps = $state(/** @type {any|null} */(null));
 
-  function openOrderPopup(row, source) {
+  // Load the instruments cache once so we can pull the authoritative
+  // exchange (`e`) and lot size (`ls`) per symbol when opening the
+  // ticket. Held in IndexedDB after the first /console autocomplete
+  // load — usually resolves from cache instantly.
+  onMount(() => { loadInstruments().catch(() => {}); });
+
+  function openOrderTicket(row, source) {
     if (!allowOrders || $authStore.user?.role !== 'admin') return;
-    orderRow = row;
-    orderSource = source;
+    if (!row?.tradingsymbol) return;
+    const sym = String(row.tradingsymbol).toUpperCase();
+    const inst = getInstrument(sym);
+    const lot  = Number(inst?.ls || 1);
+    // Exchange — instrument cache wins; otherwise default by source
+    // (holdings = NSE equities, positions = NFO F&O most of the time).
+    const exch = inst?.e || (source === 'holdings' ? 'NSE' : 'NFO');
+    const heldQty = Number(row.quantity) || 0;
+    const isLong  = heldQty > 0;
+    orderTicketProps = {
+      symbol:   sym,
+      exchange: exch,
+      // IBKR-style close: side opposite to the held direction.
+      side:     isLong ? 'SELL' : 'BUY',
+      action:   'close',
+      qty:      Math.abs(heldQty) || lot,
+      lotSize:  lot,
+      // Pre-fill account from the row (real value when admin sees
+      // unmasked data); ticket auto-fetches /api/accounts/ as a
+      // backstop when this is empty or masked.
+      account:  String(row.account || ''),
+      accounts: [],
+      // Hide DRAFT — no drafts surface here. PAPER is the safe
+      // default; operator opts into LIVE per execution flag.
+      defaultMode:    'paper',
+      availableModes: ['paper', 'live'],
+    };
   }
 
   function switchTab(/** @type {string} */ id) {
@@ -385,9 +422,9 @@
 
   onMount(async () => {
     holdingsSummaryGrid  = makeGrid(holdingsSummaryEl,  holdingsSummaryCols);
-    holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols, [], (r) => openOrderPopup(r, 'holdings'));
+    holdingsAllGrid      = makeGrid(holdingsAllEl,      holdingsCols, [], (r) => openOrderTicket(r, 'holdings'));
     positionsSummaryGrid = makeGrid(positionsSummaryEl, positionsSummaryCols);
-    positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderPopup(r, 'positions'));
+    positionsAllGrid     = makeGrid(positionsAllEl,     positionsCols, [], (r) => openOrderTicket(r, 'positions'));
     fundsGrid            = makeGrid(fundsEl,             fundsCols);
 
     if (dataCache.holdings && dataCache.positions && dataCache.funds) {
@@ -505,12 +542,26 @@
   <div bind:this={holdingsAllEl} class="ag-theme-quartz {theme} w-full"></div>
 </section>
 
-{#if orderRow}
-  <OrderPopup
-    row={orderRow}
-    source={orderSource}
-    onclose={() => orderRow = null}
-    onordered={loadAll}
+{#if orderTicketProps}
+  <OrderTicket
+    symbol={orderTicketProps.symbol}
+    exchange={orderTicketProps.exchange}
+    side={orderTicketProps.side}
+    action={orderTicketProps.action}
+    qty={orderTicketProps.qty}
+    lotSize={orderTicketProps.lotSize}
+    accounts={orderTicketProps.accounts}
+    account={orderTicketProps.account}
+    defaultMode={orderTicketProps.defaultMode}
+    availableModes={orderTicketProps.availableModes}
+    onSubmit={(payload) => {
+      // PAPER + LIVE submissions already hit the backend before
+      // onSubmit fires (the ticket awaits placeTicketOrder). Refresh
+      // the grids so the new fill / order shows up without waiting
+      // for the next 30 s poll.
+      if (payload?.mode !== 'draft') loadAll();
+    }}
+    onClose={() => orderTicketProps = null}
   />
 {/if}
 

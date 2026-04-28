@@ -42,6 +42,8 @@
    *   lotSize?:  number,
    *   accounts?: string[],
    *   account?:  string,
+   *   defaultMode?:    'draft' | 'paper' | 'live',
+   *   availableModes?: Array<'draft' | 'paper' | 'live'>,
    *   onSubmit:  (payload: any) => void | Promise<void>,
    *   onClose:   () => void,
    * }} */
@@ -59,6 +61,13 @@
     lotSize   = 0,
     accounts  = /** @type {string[]} */ ([]),
     account   = '',
+    // Initial mode pill the ticket opens on. Surfaces with no drafts
+    // concept (PerformancePage row click) typically pass 'paper';
+    // surfaces with a drafts panel (admin/options) keep 'draft'.
+    defaultMode    = /** @type {'draft' | 'paper' | 'live'} */ ('draft'),
+    // Which mode pills the operator can see. Pass ['paper','live']
+    // to suppress DRAFT on surfaces where it has no meaning.
+    availableModes = /** @type {Array<'draft'|'paper'|'live'>} */ (['draft', 'paper', 'live']),
     onSubmit,
     onClose,
   } = $props();
@@ -90,7 +99,15 @@
   let _price   = $state(price ?? '');
   let _trigger = $state(trigger ?? '');
   let _product = $state(productVal);
-  let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ ('draft'));
+  // Initial mode comes from `defaultMode` prop; if the caller's
+  // chosen default isn't in `availableModes`, fall back to the
+  // first allowed mode so a misconfigured caller doesn't open the
+  // ticket on a hidden pill.
+  let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ (
+    untrack(() => availableModes.includes(defaultMode)
+      ? defaultMode
+      : (availableModes[0] || 'draft'))
+  ));
   // Chase toggle — when on, the backend's paper engine re-quotes
   // the limit each tick until the order fills (or hits the chase-
   // attempt cap). Default ON: industry-standard "fire and forget"
@@ -460,18 +477,27 @@
          next to the field label. -->
     <OrderDepth {symbol} {exchange} onQuote={onDepthQuote} />
 
-    <!-- Mode selector — only DRAFT wired in phase 1 -->
+    <!-- Mode selector — pills filtered by `availableModes`. Surfaces
+         that don't have a drafts concept (e.g. row-clicks on the
+         dashboard / performance grids) drop DRAFT to keep the
+         operator's choices to "real" submit modes only. -->
     <div class="ot-mode-row">
       <span class="ot-label">Mode</span>
       <div class="ot-mode-pills">
-        <button type="button" class="ot-mode-pill ot-mode-draft" class:on={_mode === 'draft'}
-                onclick={() => _mode = 'draft'}>DRAFT</button>
-        <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
-                title="Routes through the prod paper engine — real bid/ask, no broker hit"
-                onclick={() => _mode = 'paper'}>PAPER</button>
-        <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
-                title="Real broker order — gated by branch (prod only) + execution.live.place_order setting"
-                onclick={() => _mode = 'live'}>LIVE</button>
+        {#if availableModes.includes('draft')}
+          <button type="button" class="ot-mode-pill ot-mode-draft" class:on={_mode === 'draft'}
+                  onclick={() => _mode = 'draft'}>DRAFT</button>
+        {/if}
+        {#if availableModes.includes('paper')}
+          <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
+                  title="Routes through the prod paper engine — real bid/ask, no broker hit"
+                  onclick={() => _mode = 'paper'}>PAPER</button>
+        {/if}
+        {#if availableModes.includes('live')}
+          <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
+                  title="Real broker order — gated by branch (prod only) + execution.live.place_order setting"
+                  onclick={() => _mode = 'live'}>LIVE</button>
+        {/if}
       </div>
 
       <!-- Chase toggle — only meaningful for limit-bearing orders.
@@ -529,7 +555,7 @@
               class:ot-submit-sell={_side === 'SELL'}
               disabled={!!validationErr || submitting}
               onclick={submit}>
-        {submitting ? '…' : (_mode === 'draft' ? 'Save draft' : `Place ${_side.toLowerCase()}`)}
+        {#if submitting}…{:else if _mode === 'draft'}Save draft{:else if action === 'close'}Close · {_side.toLowerCase()}{:else}Place {_side.toLowerCase()}{/if}
       </button>
     </div>
   </div>

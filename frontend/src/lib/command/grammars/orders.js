@@ -506,11 +506,11 @@ export function parseKiteSymbol(tradingsymbol) {
 /**
  * Shared enrichPairs function for order CommandBars.
  * Adds symbol:LTP and expanded qty format for F&O.
- * Use in both Orders page and OrderPopup.
+ * Used by the Orders page CommandBar.
  */
 /**
  * Execute a buy/sell order from parsed command. Returns result object.
- * Shared between Orders page and OrderPopup.
+ * Used by the Orders page (CommandBar grammar parser path).
  */
 export async function executeBuySell(parsed) {
   const { placeOrder } = await import('$lib/api');
