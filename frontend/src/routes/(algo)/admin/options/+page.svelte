@@ -21,6 +21,7 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
+    fetchAccounts,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import OrderTicket   from '$lib/order/OrderTicket.svelte';
@@ -479,9 +480,26 @@
   // account; otherwise leave blank and let the ticket force a pick.
   // The ticket itself owns the dropdown UI, so pages just pass the
   // candidate list + an optional default.
+  /** Account name "looks real" — i.e. it's not the masked `ZG####`
+   *  form that non-admin sessions see on positions/holdings. The
+   *  OrderTicket needs the real account_id to route correctly, so
+   *  we filter masked entries out of any default-pick logic. */
+  function _isRealAccount(/** @type {string|null|undefined} */ a) {
+    return !!(a && !String(a).includes('#'));
+  }
   function _ticketAccountDefault() {
-    if (selectedAccounts.length === 1) return selectedAccounts[0];
-    if (accountChoices.length === 1)   return String(accountChoices[0]);
+    // Prefer the operator's filter (single account picked in the
+    // multiselect) when it's a real value. Then a single available
+    // real account. Then the masked-but-only choice — falls back to
+    // empty so the picker forces an explicit pick. Never returns a
+    // masked value that the order endpoint can't route on.
+    if (selectedAccounts.length === 1 && _isRealAccount(selectedAccounts[0])) {
+      return selectedAccounts[0];
+    }
+    if (realAccounts.length === 1) return realAccounts[0];
+    if (accountChoices.length === 1 && _isRealAccount(accountChoices[0])) {
+      return String(accountChoices[0]);
+    }
     return '';
   }
   function addChainDraft(/** @type {number} */ strike,
@@ -501,7 +519,7 @@
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
-      accounts: accountChoices.map(String),
+      accounts: ticketAccounts,
       account:  _ticketAccountDefault(),
     });
   }
@@ -518,7 +536,7 @@
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
-      accounts: accountChoices.map(String),
+      accounts: ticketAccounts,
       account:  _ticketAccountDefault(),
     });
   }
@@ -541,8 +559,13 @@
    * order on the right Kite handle without manual picking).
    */
   function _rowTicketAccount(/** @type {{account?: string}} */ c) {
+    // Use the row's own account when it's a real (un-masked) value;
+    // otherwise fall through to the page default. A masked account
+    // (ZG####) on the row would otherwise pre-fill an unroutable
+    // value into the ticket.
     const fromRow = String(c.account || '').trim();
-    return fromRow || _ticketAccountDefault();
+    if (_isRealAccount(fromRow)) return fromRow;
+    return _ticketAccountDefault();
   }
   function addToPosition(/** @type {any} */ c) {
     if (!c?.symbol || c.source === 'draft') return;
@@ -601,6 +624,41 @@
   // because the backend can't fetch their ltp from the broker).
   /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
   let positions = $state([]);
+
+  /** Real (unmasked) broker account IDs from /api/accounts/. Loaded
+   *  separately from positions because /positions masks the account
+   *  field for non-admin signed-in users (server-side mask_column),
+   *  which would leave the OrderTicket with un-tradeable "ZG####"
+   *  options. The /accounts endpoint is jwt-guarded but doesn't
+   *  mask, so any signed-in user gets the real account_ids and the
+   *  ticket can route the order to the right Kite handle.
+   *
+   *  Stays empty for anonymous demo sessions — the OrderTicket
+   *  routes such orders through the demo paper-engine path which
+   *  doesn't need a real account anyway. */
+  /** @type {string[]} */
+  let realAccounts = $state([]);
+
+  async function loadRealAccounts() {
+    try {
+      const r = await fetchAccounts();
+      const list = (r?.accounts || [])
+        .map(/** @param {any} a */ (a) => String(a?.account_id || ''))
+        .filter(Boolean);
+      realAccounts = list;
+    } catch (_) {
+      // 401 / 403 (anonymous demo on prod) — keep realAccounts
+      // empty; the ticket falls back to the masked accountChoices.
+      realAccounts = [];
+    }
+  }
+
+  /** Account list to feed the OrderTicket — prefers the unmasked
+   *  /api/accounts/ result; falls back to whatever's on the loaded
+   *  positions (which may be masked for non-admin sessions). */
+  const ticketAccounts = $derived(
+    realAccounts.length ? realAccounts : accountChoices.map(String)
+  );
 
   async function loadPositions() {
     /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
@@ -770,6 +828,12 @@
     // fetches below replace the snapshot once the broker responds.
     _loadCache();
     loadPositions();
+    // Real broker accounts — needed by the OrderTicket so the
+    // operator can pick which Kite handle the order routes through.
+    // Fetched separately from positions because /positions masks
+    // the account field for non-admin signed-in users; /accounts
+    // returns unmasked account_ids to any authenticated user.
+    loadRealAccounts();
     // Load the instruments cache so the option-chain picker has data.
     // Already cached in IndexedDB after the first /console autocomplete
     // load — most operators will see this resolve from cache instantly.
