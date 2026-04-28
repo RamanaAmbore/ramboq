@@ -26,13 +26,13 @@
 
   import { onMount, untrack } from 'svelte';
   import OrderDepth from './OrderDepth.svelte';
-  import { placeTicketOrder, fetchAccounts } from '$lib/api';
+  import { placeTicketOrder, fetchAccounts, modifyOrder } from '$lib/api';
 
   /** @type {{
    *   symbol:    string,
    *   exchange?: string,
    *   side?:     'BUY' | 'SELL',
-   *   action?:   'open' | 'close' | 'modify' | 'repeat',
+   *   action?:   'open' | 'close' | 'modify' | 'repeat' | 'cancel',
    *   qty?:      number,
    *   product?:  'CNC' | 'MIS' | 'NRML',
    *   orderType?:'MARKET' | 'LIMIT' | 'SL' | 'SL-M',
@@ -42,6 +42,7 @@
    *   lotSize?:  number,
    *   accounts?: string[],
    *   account?:  string,
+   *   orderId?:  string,
    *   defaultMode?:    'draft' | 'paper' | 'live',
    *   availableModes?: Array<'draft' | 'paper' | 'live'>,
    *   onSubmit:  (payload: any) => void | Promise<void>,
@@ -51,7 +52,7 @@
     symbol,
     exchange  = '',
     side      = /** @type {'BUY' | 'SELL'} */ ('BUY'),
-    action    = /** @type {'open' | 'close' | 'modify' | 'repeat'} */ ('open'),
+    action    = /** @type {'open' | 'close' | 'modify' | 'repeat' | 'cancel'} */ ('open'),
     qty       = 0,
     product   = /** @type {'CNC' | 'MIS' | 'NRML' | undefined} */ (undefined),
     orderType = /** @type {'MARKET' | 'LIMIT' | 'SL' | 'SL-M'} */ ('LIMIT'),
@@ -61,6 +62,10 @@
     lotSize   = 0,
     accounts  = /** @type {string[]} */ ([]),
     account   = '',
+    // Existing-order id — required for action='modify'/'cancel' so
+    // the submit path knows which order to mutate. Ignored for
+    // action='open'.
+    orderId   = '',
     // Initial mode pill the ticket opens on. Surfaces with no drafts
     // concept (PerformancePage row click) typically pass 'paper';
     // surfaces with a drafts panel (admin/options) keep 'draft'.
@@ -246,6 +251,42 @@
 
   async function submit() {
     if (validationErr) return;
+    // ── action='modify' branch ─────────────────────────────────
+    // Modifying an existing working order — bypass the
+    // place/ticket pipeline entirely. Calls PUT /api/orders/{id}
+    // with whatever fields the operator changed (price, qty,
+    // order_type, trigger). Mode pills + chase + L/M/H don't
+    // apply (those are place-time concerns). Account, symbol,
+    // and side are locked in the UI.
+    if (action === 'modify') {
+      if (!orderId) {
+        submitErr = 'Modify path requires an order id.';
+        return;
+      }
+      submitting = true; submitErr = ''; submitOk = '';
+      try {
+        const payload = {
+          account:       _account,
+          quantity:      Number(_qty) || undefined,
+          price:         showLimit   ? Number(_price)   : null,
+          trigger_price: showTrigger ? Number(_trigger) : null,
+          order_type:    _type,
+          variety:       _variety,
+        };
+        await modifyOrder(orderId, payload);
+        submitOk = `Order #${orderId} modified`;
+        // Surface the diff to the caller so the page can refresh
+        // its order list / log the change.
+        await onSubmit({ action: 'modify', orderId, ...payload });
+        setTimeout(onClose, 1200);
+      } catch (e) {
+        submitErr = /** @type {any} */ (e)?.message || String(e);
+      } finally {
+        submitting = false;
+      }
+      return;
+    }
+
     // LIVE confirmation — surfaces a hard-stop browser confirm so an
     // accidental click doesn't put real money on the wire. The
     // backend separately gates by branch + the
@@ -369,13 +410,18 @@
       <button type="button" class="ot-close" title="Close" aria-label="Close" onclick={onClose}>×</button>
     </div>
 
-    <!-- Side toggle -->
+    <!-- Side toggle — locked when modifying an existing order
+         (Kite doesn't support flipping side on a working order;
+         the operator has to cancel + re-place). Click is a no-op
+         in that case + the button visibly reads as disabled. -->
     <div class="ot-row">
-      <div class="ot-side-toggle">
+      <div class="ot-side-toggle" class:ot-locked={action === 'modify'}>
         <button type="button" class="ot-side-btn ot-side-buy"  class:on={_side === 'BUY'}
-                onclick={() => _side = 'BUY'}>BUY</button>
+                disabled={action === 'modify'}
+                onclick={() => action !== 'modify' && (_side = 'BUY')}>BUY</button>
         <button type="button" class="ot-side-btn ot-side-sell" class:on={_side === 'SELL'}
-                onclick={() => _side = 'SELL'}>SELL</button>
+                disabled={action === 'modify'}
+                onclick={() => action !== 'modify' && (_side = 'SELL')}>SELL</button>
       </div>
       <div class="ot-qty-block">
         <label class="ot-label" for="ot-qty">Qty</label>
@@ -477,10 +523,11 @@
          next to the field label. -->
     <OrderDepth {symbol} {exchange} onQuote={onDepthQuote} />
 
-    <!-- Mode selector — pills filtered by `availableModes`. Surfaces
-         that don't have a drafts concept (e.g. row-clicks on the
-         dashboard / performance grids) drop DRAFT to keep the
-         operator's choices to "real" submit modes only. -->
+    <!-- Mode selector + chase — only relevant when *placing* a new
+         order. action='modify' bypasses the place-pipeline entirely
+         (PUT /api/orders/{id} hits the broker directly), so neither
+         mode nor chase apply there; the whole row is hidden. -->
+    {#if action !== 'modify'}
     <div class="ot-mode-row">
       <span class="ot-label">Mode</span>
       <div class="ot-mode-pills">
@@ -537,6 +584,7 @@
         {/if}
       {/if}
     </div>
+    {/if}
 
     {#if validationErr}
       <div class="ot-err">{validationErr}</div>
@@ -555,7 +603,7 @@
               class:ot-submit-sell={_side === 'SELL'}
               disabled={!!validationErr || submitting}
               onclick={submit}>
-        {#if submitting}…{:else if _mode === 'draft'}Save draft{:else if action === 'close'}Close · {_side.toLowerCase()}{:else}Place {_side.toLowerCase()}{/if}
+        {#if submitting}…{:else if action === 'modify'}Modify{orderId ? ' · #' + orderId : ''}{:else if _mode === 'draft'}Save draft{:else if action === 'close'}Close · {_side.toLowerCase()}{:else}Place {_side.toLowerCase()}{/if}
       </button>
     </div>
   </div>
@@ -694,6 +742,13 @@
   }
   .ot-side-buy.on  { background: rgba(34,197,94,0.18);  color: #4ade80; }
   .ot-side-sell.on { background: rgba(248,113,113,0.18); color: #f87171; }
+  /* Locked side toggle (action='modify') — Kite doesn't support
+     flipping side on a working order; the button visibly reads as
+     disabled and the click is a no-op. */
+  .ot-side-toggle.ot-locked .ot-side-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
 
   .ot-qty-block { display: flex; align-items: flex-end; gap: 0.4rem; flex: 1 1 0; }
   .ot-qty-block .ot-label { margin: 0 0 0.18rem; }

@@ -315,6 +315,34 @@
 <OrderDetail order={selectedOrder}
   onclose={() => selectedOrder = null}
   onchanged={async () => { await loadOrders(); if (selectedOrder) selectedOrder = orders.find(o => o.order_id === selectedOrder.order_id) || null; }}
+  onmodify={(ord) => {
+    // Phase 3: Modify routes through the shared OrderTicket
+    // (action='modify'). Pre-fill from the existing order's
+    // fields. Symbol + side are locked inside the ticket; price /
+    // qty / type / trigger remain editable. Submit hits PUT
+    // /api/orders/{id} via modifyOrder().
+    if (!ord) return;
+    orderTicketProps = {
+      symbol:    String(ord.tradingsymbol || '').toUpperCase(),
+      exchange:  ord.exchange || 'NFO',
+      side:      ord.transaction_type,
+      action:    'modify',
+      orderId:   String(ord.order_id || ''),
+      qty:       Number(ord.quantity) || 0,
+      lotSize:   1,
+      orderType: ord.order_type || 'LIMIT',
+      price:     ord.price > 0 ? ord.price : undefined,
+      trigger:   ord.trigger_price > 0 ? ord.trigger_price : undefined,
+      product:   ord.product,
+      account:   String(ord.account || ''),
+      accounts:  [],
+      // Modify path doesn't touch /api/orders/ticket — mode pills
+      // are hidden by the ticket when action='modify' anyway, so
+      // the values here are inert. Pass paper-only to be tidy.
+      defaultMode:    'paper',
+      availableModes: ['paper'],
+    };
+  }}
 />
 
 <LogPanel
@@ -334,6 +362,7 @@
     exchange={orderTicketProps.exchange}
     side={orderTicketProps.side}
     action={orderTicketProps.action}
+    orderId={orderTicketProps.orderId}
     qty={orderTicketProps.qty}
     lotSize={orderTicketProps.lotSize}
     orderType={orderTicketProps.orderType}
@@ -345,6 +374,19 @@
     defaultMode={orderTicketProps.defaultMode}
     availableModes={orderTicketProps.availableModes}
     onSubmit={(payload) => {
+      // Modify path — payload carries `action: 'modify'` and the
+      // modified fields. Refresh the orders list so the operator
+      // sees the new price / qty in the row immediately.
+      if (payload?.action === 'modify') {
+        addResult('✓', `Order modified`, {
+          id:      String(payload.orderId || ''),
+          price:   String(payload.price ?? ''),
+          qty:     String(payload.quantity ?? ''),
+          account: payload.account,
+        });
+        loadOrders();
+        return;
+      }
       // PAPER + LIVE submissions already hit the backend before
       // onSubmit fires (the ticket awaits placeTicketOrder). Refresh
       // the orders list so the new row appears immediately, and log

@@ -1,34 +1,55 @@
 <script>
-  // Expandable order detail panel — appears inline between the order cards
-  // grid and the log panel when a card is clicked. Shows full details plus
-  // inline cancel / modify controls for open orders.
+  // Expandable order detail panel — appears inline between the order
+  // cards grid and the log panel when a card is clicked. Shows full
+  // details + Modify / Cancel buttons for open orders.
+  //
+  // Modify routes back to the parent via `onmodify(order)` which
+  // opens the shared OrderTicket pre-filled with action='modify'.
+  // Cancel uses a window.confirm dialog + direct API call (matches
+  // IBKR's "Cancel Order" affordance — single confirm, no full
+  // ticket needed for a one-target op).
 
-  import { modifyOrder, cancelOrder } from '$lib/api';
+  import { cancelOrder } from '$lib/api';
 
-  /** @type {{ order: any|null, onclose: () => void, onchanged: () => void }} */
-  let { order = null, onclose = () => {}, onchanged = () => {} } = $props();
+  /** @type {{
+   *   order:     any|null,
+   *   onclose:   () => void,
+   *   onchanged: () => void,
+   *   onmodify?: (order: any) => void,
+   * }} */
+  let {
+    order = null,
+    onclose = () => {},
+    onchanged = () => {},
+    onmodify  = /** @type {((order:any)=>void)|undefined} */ (undefined),
+  } = $props();
 
-  let busy  = $state(false);
-  let error = $state('');
+  let busy    = $state(false);
+  let error   = $state('');
   let success = $state('');
-  let modifyOpen = $state(false);
-  let modPrice = $state('');
-  let modQty   = $state('');
 
   $effect(() => {
-    if (order) {
-      modPrice = String(order.price ?? '');
-      modQty = String(order.quantity ?? '');
-      modifyOpen = false;
-      error = ''; success = '';
-    }
+    if (order) { error = ''; success = ''; }
   });
 
-  function fmt(v, dflt = '—') { return (v === null || v === undefined || v === '') ? dflt : v; }
-  const isOpen = $derived(order && (order.status === 'OPEN' || order.status === 'TRIGGER PENDING'));
+  function fmt(/** @type {any} */ v, /** @type {any} */ dflt = '—') {
+    return (v === null || v === undefined || v === '') ? dflt : v;
+  }
+  const isOpen = $derived(
+    order && (order.status === 'OPEN' || order.status === 'TRIGGER PENDING')
+  );
 
   async function doCancel() {
     if (!order) return;
+    // Hard-stop confirm — matches IBKR's Cancel Order pattern. No
+    // full ticket modal for a one-click op; the operator sees the
+    // order id + symbol + qty in the prompt and accepts / declines.
+    const ok = typeof window !== 'undefined' && window.confirm(
+      `Cancel order #${order.order_id}?\n\n` +
+      `  ${order.transaction_type} ${order.quantity} ${order.tradingsymbol}\n` +
+      `  Account: ${order.account}`
+    );
+    if (!ok) return;
     busy = true; error = ''; success = '';
     try {
       await cancelOrder(order.order_id, order.account);
@@ -38,21 +59,12 @@
     finally { busy = false; }
   }
 
-  async function doModify() {
+  function doModify() {
     if (!order) return;
-    const payload = {};
-    if (modPrice !== '' && Number(modPrice) !== order.price) payload.price = Number(modPrice);
-    if (modQty !== ''   && Number(modQty)   !== order.quantity) payload.quantity = Number(modQty);
-    if (Object.keys(payload).length === 0) { error = 'no changes'; return; }
-    payload.account = order.account;
-    busy = true; error = ''; success = '';
-    try {
-      await modifyOrder(order.order_id, payload);
-      success = 'Modified';
-      modifyOpen = false;
-      onchanged();
-    } catch (e) { error = e.message; }
-    finally { busy = false; }
+    if (typeof onmodify === 'function') onmodify(order);
+    // Parent owns the ticket — closing this panel is its call. We
+    // leave the panel open so the operator can see the source order
+    // alongside the modify modal.
   }
 </script>
 
@@ -86,27 +98,16 @@
     {#if success}<div class="text-[0.6rem] text-green-600 mb-1">{success}</div>{/if}
 
     {#if isOpen}
+      <!-- One-click ops — Modify opens the shared OrderTicket
+           (action='modify') in the parent; Cancel uses a hard-stop
+           confirm dialog + direct API. Same UX shape as the rest
+           of the platform's order surfaces post-Phase 3 unification. -->
       <div class="flex gap-2 items-center">
-        {#if !modifyOpen}
-          <button type="button" onclick={() => modifyOpen = true}
-            class="btn-secondary text-[0.6rem] py-0.5 px-2" disabled={busy}>Modify</button>
-          <button type="button" onclick={doCancel}
-            class="text-[0.6rem] text-red-600 border border-red-300 rounded py-0.5 px-2 hover:bg-red-50"
-            disabled={busy}>{busy ? '…' : 'Cancel'}</button>
-        {:else}
-          <label class="text-[0.6rem] text-muted">price
-            <input type="number" step="0.05" bind:value={modPrice}
-              class="field-input text-[0.65rem] py-0.5 px-1 w-20 ml-1" />
-          </label>
-          <label class="text-[0.6rem] text-muted">qty
-            <input type="number" bind:value={modQty}
-              class="field-input text-[0.65rem] py-0.5 px-1 w-16 ml-1" />
-          </label>
-          <button type="button" onclick={doModify} disabled={busy}
-            class="btn-primary text-[0.6rem] py-0.5 px-2">{busy ? '…' : 'Save'}</button>
-          <button type="button" onclick={() => modifyOpen = false} disabled={busy}
-            class="text-[0.6rem] text-muted hover:text-text">Cancel</button>
-        {/if}
+        <button type="button" onclick={doModify}
+          class="btn-secondary text-[0.6rem] py-0.5 px-2" disabled={busy}>Modify</button>
+        <button type="button" onclick={doCancel}
+          class="text-[0.6rem] text-red-600 border border-red-300 rounded py-0.5 px-2 hover:bg-red-50"
+          disabled={busy}>{busy ? '…' : 'Cancel'}</button>
       </div>
     {/if}
   </div>
