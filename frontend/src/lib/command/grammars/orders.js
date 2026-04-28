@@ -508,20 +508,12 @@ export function parseKiteSymbol(tradingsymbol) {
  * Adds symbol:LTP and expanded qty format for F&O.
  * Used by the Orders page CommandBar.
  */
-/**
- * Execute a buy/sell order from parsed command. Returns result object.
- * Used by the Orders page (CommandBar grammar parser path).
- */
-export async function executeBuySell(parsed) {
-  const { placeOrder } = await import('$lib/api');
-  const payload = buildOrderPayload(parsed);
-  const res = await placeOrder(payload);
-  return {
-    order_id: res.order_id,
-    payload,
-    verb: parsed.verb.toUpperCase(),
-  };
-}
+// `executeBuySell` was retired during the Phase 2/4 unification.
+// The Orders page now parses with `buildOrderPayload(parsed)` then
+// opens the shared <OrderTicket> pre-filled (with action='open').
+// Submit happens through the ticket → POST /api/orders/ticket. The
+// old direct-broker path (POST /api/orders/place) is no longer
+// reached from any frontend code path.
 
 export function enrichOrderPairs(pairs, ctx) {
   return pairs.map(p => {

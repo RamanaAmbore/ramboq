@@ -1,12 +1,18 @@
 """
-Orders endpoints — Phase 2.
+Orders endpoints.
 
-GET  /api/orders/           — list all orders across all accounts (cached 15s)
-POST /api/orders/place      — place a new order for a specific account
-PUT  /api/orders/{order_id} — modify an open order
+GET  /api/orders/             — list all orders across all accounts (cached 15s)
+POST /api/orders/ticket       — primary order-placement entry point. Routes by
+                                mode (paper / live), records an AlgoOrder row,
+                                supports chase + chase_aggressiveness. Every
+                                frontend surface flows through this endpoint.
+POST /api/orders/place        — DEPRECATED. Direct-broker placement, kept for
+                                external scripts only. New integrations must
+                                use /ticket. Hits log a deprecation warning.
+PUT  /api/orders/{order_id}   — modify an open order
 DELETE /api/orders/{order_id} — cancel an open order
-POST /api/orders/postback   — Kite postback: real-time order status updates
-GET  /api/accounts/         — list accounts (masked display + unmasked ID for order form)
+POST /api/orders/postback     — Kite postback: real-time order status updates
+GET  /api/accounts/           — list accounts (masked display + unmasked ID for order form)
 """
 
 import json
@@ -207,12 +213,29 @@ class OrdersController(Controller):
 
     @post("/place")
     async def place_order(self, data: PlaceOrderRequest, request: Request) -> PlaceOrderResponse:
+        """
+        DEPRECATED — kept only for any external scripts that may still
+        be hitting this endpoint. Every frontend surface now opens the
+        shared <OrderTicket> and submits via POST /api/orders/ticket
+        (TicketOrderRequest), which records an AlgoOrder row, supports
+        chase / chase_aggressiveness, and routes by mode (paper vs
+        live). Direct-broker placement here skips all that bookkeeping.
+        New integrations should use /ticket instead.
+        """
         if getattr(request.state, "is_demo", False):
             raise HTTPException(status_code=403,
                 detail="Demo: use OrderTicket → PAPER.")
         _validate_place(data)
         kite   = _kite_for(data.account)
         masked = mask_column(pd.Series([data.account]))[0]
+        # Surface a deprecation warning every time this path is used
+        # so we can spot any lingering callers in the logs and migrate
+        # them to /ticket.
+        logger.warning(
+            f"[deprecated] POST /api/orders/place hit by [{masked}] — "
+            f"use POST /api/orders/ticket instead. "
+            f"{data.transaction_type} {data.quantity} {data.tradingsymbol}"
+        )
         try:
             order_id = kite.place_order(
                 variety=data.variety,

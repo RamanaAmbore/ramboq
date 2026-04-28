@@ -284,7 +284,11 @@ export const deleteAgent     = (slug) => _del(`/agents/${slug}`, { auth: true })
 export const interpretAgent  = (command) => _post('/agents/interpret', { command }, { auth: true });
 
 // ── Order mutations (protected) ───────────────────────────────────────────────
-export const placeOrder  = (payload)         => _post('/orders/place', payload, { auth: true });
+// Note: `placeOrder` (POST /orders/place) was retired during the Phase 2/4
+// unification — every order surface now opens the shared OrderTicket and
+// submits via `placeTicketOrder` → /api/orders/ticket. The backend endpoint
+// still exists for any external scripts that may be hitting it directly,
+// but no frontend code path calls it.
 export const modifyOrder = (orderId, payload) => _put(`/orders/${orderId}`, payload, { auth: true });
 
 // ── Admin endpoints (require admin JWT) ──────────────────────────────────────
