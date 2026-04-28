@@ -27,6 +27,7 @@
    *   legCount?:    number|null,
    *   onRefresh?:   (() => void) | null,
    *   loading?:     boolean,
+   *   prevClose?:   number|null,
    * }} */
   let {
     payoff = [],
@@ -44,7 +45,18 @@
     legCount   = /** @type {number|null|undefined} */ (null),
     onRefresh  = /** @type {(() => void) | null} */ (null),
     loading    = false,
+    prevClose  = /** @type {number|null|undefined} */ (null),
   } = $props();
+
+  // Day's direction — flag the SPOT readout green when trading above
+  // yesterday's close, red below. Falls through to the neutral cyan
+  // when prev_close isn't available (override / sim / fallback).
+  const spotDir = $derived.by(() => {
+    if (prevClose == null || prevClose <= 0) return 'flat';
+    if (spot >  prevClose) return 'pos';
+    if (spot <  prevClose) return 'neg';
+    return 'flat';
+  });
 
   // Nearest curve point to current spot — drives the on-chart TDAY/EXP
   // readouts so the operator sees position P&L right beside the chart.
@@ -330,7 +342,14 @@
     <div class="payoff-stats" aria-hidden="true">
       <div class="ps-row">
         <span class="ps-k">SPOT</span>
-        <span class="ps-v ps-spot">₹{spot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+        <span class={'ps-v ps-spot ps-spot-' + spotDir}
+              title={prevClose != null && prevClose > 0
+                ? 'Prev close ₹' + prevClose.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+                  + ' · ' + (spot >= prevClose ? '+' : '−')
+                  + Math.abs((spot / prevClose - 1) * 100).toFixed(2) + '%'
+                : 'Spot — prev close unavailable'}>
+          ₹{spot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+        </span>
       </div>
       {#if curveAtSpot}
         <div class="ps-row">
@@ -684,6 +703,12 @@
     font-variant-numeric: tabular-nums;
   }
   .ps-v.ps-spot { color: #7dd3fc; }
+  /* Day-direction tint on the SPOT readout — green when above
+     yesterday's close, red below. Falls through to the neutral
+     cyan (`ps-spot-flat`) when prev_close is unavailable. */
+  .ps-v.ps-spot-pos  { color: #4ade80; }
+  .ps-v.ps-spot-neg  { color: #f87171; }
+  .ps-v.ps-spot-flat { color: #7dd3fc; }
   .ps-v.ps-pos  { color: #22c55e; }
   .ps-v.ps-neg  { color: #f87171; }
 </style>

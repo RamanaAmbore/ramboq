@@ -360,6 +360,66 @@
     return listStrikes(chainUnderlying.toUpperCase(), 'CE', chainExpiry);
   });
 
+  /** Spot for the chain underlying, when we already know it. The
+   *  strategy response carries an authoritative spot for the page's
+   *  underlying — when chainUnderlying matches that, reuse it for
+   *  free. Different underlyings would need a separate fetch; for
+   *  the common operator flow (open chain right after picking an
+   *  underlying) the match is guaranteed. */
+  const chainSpot = $derived.by(() => {
+    if (!chainUnderlying || !strategy) return null;
+    const sUnd = String(strategy.underlying || '').toUpperCase();
+    if (sUnd && sUnd === chainUnderlying.toUpperCase()) {
+      return Number(strategy.spot) || null;
+    }
+    return null;
+  });
+
+  /** Strike closest to the underlying spot — the ATM row. Used to
+   *  highlight the row in the chain table and auto-scroll it into
+   *  view when the chain opens. Null when chainSpot is unknown
+   *  (different underlying or no strategy yet). */
+  const chainAtmStrike = $derived.by(() => {
+    if (chainSpot == null || !chainStrikes.length) return null;
+    let best = chainStrikes[0];
+    let bestDiff = Math.abs(best - chainSpot);
+    for (const k of chainStrikes) {
+      const d = Math.abs(k - chainSpot);
+      if (d < bestDiff) { best = k; bestDiff = d; }
+    }
+    return best;
+  });
+
+  /** ATM-row DOM ref — captured via the `chainAtmRow` Svelte action
+   *  attached to the ATM <tr>. The action fires when the element
+   *  mounts (or remounts due to a key change), updates the ref, and
+   *  the effect below scrolls it into view. Using an action sidesteps
+   *  the `bind:this` constraint (which only accepts a plain
+   *  identifier, not a conditional expression). */
+  /** @type {HTMLTableRowElement | null} */
+  let chainAtmRowEl = $state(null);
+  /** Svelte action — captures the <tr> element on mount, releases it
+   *  on destroy. Used in place of `bind:this` since the ATM row's
+   *  identity flips between strike rows as the underlying spot moves. */
+  /** @type {(node: HTMLTableRowElement) => { destroy(): void }} */
+  const chainAtmRow = (node) => {
+    chainAtmRowEl = node;
+    return {
+      destroy() { if (chainAtmRowEl === node) chainAtmRowEl = null; },
+    };
+  };
+  $effect(() => {
+    void chainAtmRowEl;
+    void chainAtmStrike;
+    void showAddPanel;
+    if (chainAtmRowEl && showAddPanel) {
+      // Defer one tick so the row has been laid out before we scroll.
+      queueMicrotask(() => {
+        chainAtmRowEl?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      });
+    }
+  });
+
   // Futures contracts on the same underlying — surfaced as a quick-add
   // row above the strike grid. Filter to the selected expiry first; if
   // none match (futures and option expiries can drift by a day in
@@ -432,7 +492,12 @@
     const lot = Number(inst.ls || 1);
     openTicket({
       symbol:   inst.s,
-      exchange: 'NFO',
+      // Exchange comes from the instruments cache (Kite's authoritative
+      // `e` field per contract). CRUDEOIL options live on MCX, NIFTY
+      // options on NFO, BSE options on BFO — hardcoding NFO would route
+      // every depth lookup to the wrong exchange and the ladder would
+      // come back empty.
+      exchange: inst.e || 'NFO',
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
@@ -444,9 +509,12 @@
                           /** @type {number} */ lotSize) {
     if (!sym) return;
     const lot = Number(lotSize || 1);
+    // Look up the instrument so we route to the right exchange
+    // (commodity futures live on MCX, not NFO).
+    const inst = getInstrument(sym.toUpperCase());
     openTicket({
       symbol:   sym,
-      exchange: 'NFO',
+      exchange: inst?.e || 'NFO',
       side:     chainSide === 'long' ? 'BUY' : 'SELL',
       qty:      lot,
       lotSize:  lot,
@@ -805,6 +873,14 @@
     <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
       <div class="opt-section-h" style="padding-bottom: 0.5rem;">
         Option chain
+        {#if chainSpot != null}
+          <span class="chain-spot-pill" title="Underlying spot — ATM strike highlighted in the grid below">
+            SPOT ₹{chainSpot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            {#if chainAtmStrike != null}
+              · ATM {chainAtmStrike.toFixed(0)}
+            {/if}
+          </span>
+        {/if}
         <span class="opt-section-meta">
           click CE / PE next to a strike to add a leg ·
           quantity defaults to 1 lot
@@ -866,23 +942,50 @@
             </thead>
             <tbody>
               {#each chainStrikes as k (k)}
-                <tr>
-                  <td class="chain-td-ce">
-                    <button type="button" class="chain-btn chain-btn-ce"
-                            title="Add {k} CE as a {chainSide} leg"
-                            onclick={() => addChainDraft(k, 'CE')}>
-                      + CE
-                    </button>
-                  </td>
-                  <td class="chain-td-strike">{k.toFixed(0)}</td>
-                  <td class="chain-td-pe">
-                    <button type="button" class="chain-btn chain-btn-pe"
-                            title="Add {k} PE as a {chainSide} leg"
-                            onclick={() => addChainDraft(k, 'PE')}>
-                      + PE
-                    </button>
-                  </td>
-                </tr>
+                {@const isAtm = chainAtmStrike != null && k === chainAtmStrike}
+                {@const dir   = chainSpot != null
+                                ? (k < chainSpot ? 'itm-call'
+                                  : k > chainSpot ? 'itm-put' : 'atm')
+                                : ''}
+                {#if isAtm}
+                  <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
+                    <td class="chain-td-ce">
+                      <button type="button" class="chain-btn chain-btn-ce"
+                              title="Add {k} CE as a {chainSide} leg"
+                              onclick={() => addChainDraft(k, 'CE')}>
+                        + CE
+                      </button>
+                    </td>
+                    <td class="chain-td-strike">
+                      {k.toFixed(0)}<span class="chain-atm-tag">ATM</span>
+                    </td>
+                    <td class="chain-td-pe">
+                      <button type="button" class="chain-btn chain-btn-pe"
+                              title="Add {k} PE as a {chainSide} leg"
+                              onclick={() => addChainDraft(k, 'PE')}>
+                        + PE
+                      </button>
+                    </td>
+                  </tr>
+                {:else}
+                  <tr class="chain-row chain-row-{dir}">
+                    <td class="chain-td-ce">
+                      <button type="button" class="chain-btn chain-btn-ce"
+                              title="Add {k} CE as a {chainSide} leg"
+                              onclick={() => addChainDraft(k, 'CE')}>
+                        + CE
+                      </button>
+                    </td>
+                    <td class="chain-td-strike">{k.toFixed(0)}</td>
+                    <td class="chain-td-pe">
+                      <button type="button" class="chain-btn chain-btn-pe"
+                              title="Add {k} PE as a {chainSide} leg"
+                              onclick={() => addChainDraft(k, 'PE')}>
+                        + PE
+                      </button>
+                    </td>
+                  </tr>
+                {/if}
               {/each}
             </tbody>
           </table>
@@ -922,6 +1025,7 @@
     <OptionsPayoff
       payoff={strategy.payoff}
       spot={strategy.spot}
+      prevClose={strategy.spot_prev_close}
       strikes={strategy.legs.map(l => l.strike)}
       breakevens={strategy.risk.breakevens}
       spanSigmas={strategy.span_sigmas}
@@ -1822,6 +1926,51 @@
   .chain-td-ce      { text-align: left; }
   .chain-td-pe      { text-align: right; }
   .chain-td-strike  { text-align: center; color: #c8d8f0; font-weight: 700; }
+
+  /* Chain row tinting — strikes BELOW spot are ITM-call (the call is
+     in-the-money); strikes ABOVE spot are ITM-put. Subtle background
+     bands so the operator sees the moneyness boundary at a glance.
+     ATM row (closest to spot) gets a warm amber highlight + a "ATM"
+     tag next to the strike value, and is the scroll target when the
+     chain opens. */
+  .chain-row-itm-call > td { background: rgba(56,189,248,0.05); }
+  .chain-row-itm-put  > td { background: rgba(251,146,60,0.05); }
+  .chain-row-atm > td {
+    background: rgba(251,191,36,0.18);
+    border-top:    1px solid rgba(251,191,36,0.55);
+    border-bottom: 1px solid rgba(251,191,36,0.55);
+  }
+  .chain-atm-tag {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0 0.3rem;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #0c1830;
+    background: #fbbf24;
+    border-radius: 2px;
+    vertical-align: 1px;
+  }
+
+  /* Chain header SPOT pill — sits next to the "Option chain" title
+     when chainSpot resolves. Same amber palette as the ATM tag so
+     the visual link "this number drives that highlighted row" reads
+     instantly. */
+  .chain-spot-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 1px 6px;
+    border-radius: 2px;
+    border: 1px solid rgba(251,191,36,0.55);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+  }
   .chain-btn {
     font-family: monospace;
     font-size: 0.55rem;

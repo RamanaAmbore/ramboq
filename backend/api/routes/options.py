@@ -138,6 +138,12 @@ class OptionAnalyticsResponse(msgspec.Struct):
     span_pct:     float
     span_sigmas:  float
 
+    # Yesterday's close on the underlying — lets the UI color the SPOT
+    # value green/red depending on whether it's traded above or below
+    # the prior close. Null when the broker didn't supply ohlc.close
+    # (operator override, sim, fallback path).
+    spot_prev_close: float | None = None
+
 
 class HistoricalBar(msgspec.Struct):
     ts:     str
@@ -233,6 +239,10 @@ class StrategyResponse(msgspec.Struct):
     risk:              StrategyRisk
     payoff:            list[PayoffPoint]
     legs:              list[LegDetail]
+    # Yesterday's close on the underlying — used by the UI to color
+    # the SPOT value green/red depending on the day's direction. Null
+    # when the broker didn't supply ohlc.close on the resolving leg.
+    spot_prev_close:   float | None = None
     # Same provenance as single-leg /analytics — UI shows ±2.5σ in the
     # chart footnote when span_sigmas is non-zero.
     span_pct:          float = 0.10
@@ -343,13 +353,31 @@ def _ltp_from_quote(q: dict) -> tuple[Optional[float], str]:
     return (None, "none")
 
 
+def _prev_close_from_quote(q: dict) -> float | None:
+    """Yesterday's close from a Kite quote dict. Used by callers that
+    want a sign cue ("today's spot vs yesterday's close") for the
+    operator. Returns None when the broker didn't supply ohlc.close."""
+    if not q:
+        return None
+    close = (q.get("ohlc") or {}).get("close")
+    if close in (None, 0, 0.0):
+        return None
+    try:
+        return float(close)
+    except (TypeError, ValueError):
+        return None
+
+
 def _resolve_spot(underlying: str, override: Optional[float],
                   *, fallback: Optional[float] = None,
                   expiry_hint: Optional[date] = None
-                  ) -> tuple[float, str]:
-    """Spot for the underlying. Returns `(spot, source)` so the UI can
-    flag stale data. Sources: 'override' | 'sim' | 'live' | 'close' |
-    'depth' | 'futures' | 'fallback'.
+                  ) -> tuple[float, str, Optional[float]]:
+    """Spot for the underlying. Returns `(spot, source, prev_close)`
+    so the UI can flag stale data and color the spot value against
+    yesterday's close. Sources: 'override' | 'sim' | 'live' | 'close'
+    | 'depth' | 'futures' | 'fallback'. `prev_close` is None when
+    the broker didn't include ohlc.close on the resolving leg
+    (overrides, sim, fallback).
 
     Resolution order:
       1. Operator override
@@ -367,12 +395,14 @@ def _resolve_spot(underlying: str, override: Optional[float],
     futures contract for commodities.
     """
     if override is not None and override > 0:
-        return (float(override), "override")
+        # Operator overrides don't carry a prev_close; the UI just shows
+        # the value as-is without a sign cue.
+        return (float(override), "override", None)
     try:
         from backend.api.algo.sim.driver import get_driver
         drv = get_driver()
         if drv.active and underlying in drv._underlyings:
-            return (float(drv._underlyings[underlying]), "sim")
+            return (float(drv._underlyings[underlying]), "sim", None)
     except Exception:
         pass
 
@@ -387,9 +417,10 @@ def _resolve_spot(underlying: str, override: Optional[float],
         key = underlying_ltp_key(underlying)
         try:
             resp = broker.quote([key]) or {}
-            px, src = _ltp_from_quote(resp.get(key) or {})
+            quote_dict = resp.get(key) or {}
+            px, src = _ltp_from_quote(quote_dict)
             if px is not None:
-                return (px, src)
+                return (px, src, _prev_close_from_quote(quote_dict))
         except Exception as e:
             logger.warning(f"options spot quote for {underlying} failed: {e}")
 
@@ -413,13 +444,15 @@ def _resolve_spot(underlying: str, override: Optional[float],
                 full_key = f"{ex}:{fut_sym}"
                 try:
                     resp = broker.quote([full_key]) or {}
-                    px, _src = _ltp_from_quote(resp.get(full_key) or {})
+                    quote_dict = resp.get(full_key) or {}
+                    px, _src = _ltp_from_quote(quote_dict)
                     if px is not None:
                         # Tag uniformly as 'futures' regardless of which
                         # leg of the quote produced the value — the UI
                         # just needs to know the spot came from the
                         # futures proxy, not the index.
-                        return (px, "futures")
+                        return (px, "futures",
+                                _prev_close_from_quote(quote_dict))
                 except Exception as e:
                     logger.warning(
                         f"options futures-spot quote for {underlying} "
@@ -434,7 +467,7 @@ def _resolve_spot(underlying: str, override: Optional[float],
         # payoff diagram still draws sensibly (strike-centred); the
         # operator gets a 'fallback' chip so they know the spot is
         # synthetic and shouldn't be trusted for absolute P&L.
-        return (float(fallback), "fallback")
+        return (float(fallback), "fallback", None)
 
     raise HTTPException(status_code=502,
                         detail=f"spot for {underlying} unavailable from any source")
@@ -598,9 +631,10 @@ class OptionsController(Controller):
         # matching monthly futures contract for commodities (MCX
         # underlyings have no NSE spot ticker — index lookup misses
         # silently and we'd otherwise anchor on the strike).
-        S, spot_src = _resolve_spot(parsed["underlying"], spot,
-                                    fallback=parsed["strike"],
-                                    expiry_hint=parsed["expiry"])
+        S, spot_src, spot_prev_close = _resolve_spot(
+            parsed["underlying"], spot,
+            fallback=parsed["strike"],
+            expiry_hint=parsed["expiry"])
         T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
         # Pass avg_cost AND estimated-BS inputs as last-resort fallbacks
         # so a stale broker quote on an illiquid contract still produces
@@ -723,6 +757,7 @@ class OptionsController(Controller):
             iv_source=iv_src,
             span_pct=span_pct_resolved,
             span_sigmas=float(span_sigmas) if span_pct is None else 0.0,
+            spot_prev_close=spot_prev_close,
         )
 
     @get("/historical")
@@ -934,9 +969,10 @@ class OptionsController(Controller):
             expiry_hint = date.fromisoformat(
                 _leg_expiry_iso(data.legs[0], first_parsed)
             )
-        S, _spot_src = _resolve_spot(underlying, data.spot,
-                                     fallback=median_strike,
-                                     expiry_hint=expiry_hint)
+        S, _spot_src, spot_prev_close = _resolve_spot(
+            underlying, data.spot,
+            fallback=median_strike,
+            expiry_hint=expiry_hint)
 
         # ── 3. Build resolved-leg list with σ calibrated per leg ──────
         T_yrs_shared = 0.0
@@ -1153,6 +1189,7 @@ class OptionsController(Controller):
                 greeks=OptionGreeks(**l["greeks"]),
                 ltp_source=l["ltp_source"], iv_source=l["iv_source"],
             ) for l in leg_details],
+            spot_prev_close=spot_prev_close,
             span_pct=span_pct_resolved,
             span_sigmas=float(data.span_sigmas) if data.span_pct is None else 0.0,
         )
