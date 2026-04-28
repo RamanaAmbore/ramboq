@@ -4,6 +4,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { authStore, visibleInterval } from '$lib/stores';
   import { fetchSimStatus, fetchPaperStatus } from '$lib/api';
+  import PositionStrip from '$lib/PositionStrip.svelte';
 
   const { children } = $props();
 
@@ -269,6 +270,13 @@
         <span class="paper-banner-meta">fake fills against live quotes</span>
       </div>
     {/if}
+
+    <!-- Glanceable position / holdings strip — pinned just under
+         the navbar (and below SIM / PAPER banners when those are
+         active) so it reads as part of the chrome. Self-fetches
+         from /api/positions + /api/holdings on mount; auto-hides
+         when the operator has no positions. -->
+    <PositionStrip />
 
     <main class="algo-content">
       {@render children()}
