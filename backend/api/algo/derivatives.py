@@ -23,6 +23,15 @@ import math
 import re
 from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
+
+# F&O contracts are Indian instruments — Kite expiry dates are calendar
+# days in IST. Computing DTE against the server's local clock (which is
+# UTC on most VPS hosts) drops a day across the IST→UTC offset and gives
+# the operator a stale "DTE" the moment the IST day flips. Anchor every
+# DTE comparison to Asia/Kolkata so the rollover matches the operator's
+# trading day, not the server's.
+_IST = ZoneInfo("Asia/Kolkata")
 
 
 DEFAULT_RISK_FREE   = 0.07     # 7% annualized
@@ -130,13 +139,20 @@ def _last_thursday(year: int, month: int) -> date:
 
 def days_to_expiry(expiry: date, *, ref: Optional[datetime] = None,
                    default_days: int = DEFAULT_DTE_DAYS) -> float:
-    """Whole + fractional days from `ref` (default: now) to `expiry`. Floors at 0."""
+    """Whole + fractional days from `ref` (default: now in IST) to `expiry`.
+    Floors at 0. Both sides are normalised to Asia/Kolkata so the day
+    boundary lines up with the Indian trading calendar regardless of the
+    host server's clock timezone."""
     if not expiry:
         return float(default_days)
-    now = ref or datetime.now()
+    if ref is None:
+        ref = datetime.now(tz=_IST)
+    elif ref.tzinfo is None:
+        ref = ref.replace(tzinfo=_IST)
     if isinstance(expiry, datetime):
         expiry = expiry.date()
-    delta = (datetime(expiry.year, expiry.month, expiry.day) - now)
+    expiry_dt = datetime(expiry.year, expiry.month, expiry.day, tzinfo=_IST)
+    delta = expiry_dt - ref
     days  = delta.total_seconds() / 86400.0
     return max(0.0, days)
 

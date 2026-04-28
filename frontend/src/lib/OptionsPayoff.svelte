@@ -70,7 +70,10 @@
 
   // ── Geometry ──────────────────────────────────────────────────────
   const W = 720;
-  const PAD_L = 50, PAD_R = 12, PAD_T = 12, PAD_B = 28;
+  // PAD_B widened from 28 → 40 so rotated σ labels (-30°) and the
+  // breakeven labels stacked beneath them have the vertical room they
+  // need without colliding with the chart legend.
+  const PAD_L = 50, PAD_R = 12, PAD_T = 12, PAD_B = 40;
   const innerW = $derived(W - PAD_L - PAD_R);
   const innerH = $derived(height - PAD_T - PAD_B);
 
@@ -367,8 +370,9 @@
            evenly spaced spot values otherwise. Whole-sigma ticks
            (±1σ, ±2σ, …) get a stronger grid line + brighter label;
            half-sigma ticks (±0.5σ, ±1.5σ, …) are subdued. Labels
-           sit between the axis baseline (y = height-PAD_B) and the
-           spot/strike/BE marker labels (y = height-PAD_B+18). -->
+           are rotated -30° so neighbouring ticks (every 0.5σ) don't
+           collide on narrow charts — the slant also gives the axis
+           a proper tabular feel without forcing label hiding. -->
       {#each xTicks as xt}
         {@const wholeSigma = xt.sigma != null && xt.sigma % 1 === 0}
         {@const isCenter   = xt.sigma === 0}
@@ -378,8 +382,10 @@
                 stroke-width="1"/>
         {/if}
         {#if !isCenter}
-          <text x={xt.x} y={height - PAD_B + 12}
-                text-anchor="middle"
+          {@const ly = height - PAD_B + 10}
+          <text x={xt.x} y={ly}
+                text-anchor="end"
+                transform="rotate(-30 {xt.x} {ly})"
                 fill={wholeSigma ? '#fbbf24' : '#c8d8f0'}
                 font-size={wholeSigma ? 11 : 10}
                 font-weight={wholeSigma ? 700 : 500}
@@ -422,7 +428,7 @@
         {#if be > sMin && be < sMax}
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(251,191,36,0.55)" stroke-width="1" stroke-dasharray="3 3"/>
-          <text x={xOf(be)} y={height - PAD_B + 18}
+          <text x={xOf(be)} y={height - PAD_B + 32}
                 text-anchor="middle" fill="#fbbf24"
                 font-size="9" font-family="monospace">
             BE {be.toFixed(0)}

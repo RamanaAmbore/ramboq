@@ -483,7 +483,16 @@
         symbol:   String(l.symbol || '').trim().toUpperCase(),
         qty:      l.qty === '' || l.qty == null ? 0 : Number(l.qty),
         avg_cost: l.avg_cost === '' || l.avg_cost == null ? null : Number(l.avg_cost),
-        ltp:      l.ltp      === '' || l.ltp      == null ? null : Number(l.ltp),
+        // Only inline ltp for sources whose price isn't on the wire
+        // (sim driver state, operator drafts). For live broker
+        // positions, drop ltp so the backend re-fetches a fresh quote
+        // every poll — otherwise the stale `last_price` from the 30s
+        // position poll overrides every subsequent broker fetch and
+        // the chart's spot/Greeks/EV freeze even though analytics is
+        // polling at 5s.
+        ltp: (l.source === 'sim' || l.source === 'draft')
+          ? (l.ltp === '' || l.ltp == null ? null : Number(l.ltp))
+          : null,
       }))
       .filter(l => l.symbol && l.qty);
     if (!cleanLegs.length) {
@@ -668,6 +677,15 @@
       options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
       placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
   </div>
+  <button type="button"
+          class="opt-refresh-btn"
+          class:opt-refresh-btn-busy={loading}
+          disabled={loading}
+          title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
+          aria-label="Refresh prices"
+          onclick={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}>
+    {#if loading}Refreshing…{:else}↻ Refresh{/if}
+  </button>
   <button type="button"
           class="opt-add-btn"
           class:opt-add-btn-on={showAddPanel}
@@ -907,7 +925,7 @@
           </div>
           {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
             {@const lg = legAnalyticsBySymbol[c.symbol]}
-            {@const ltp = c.ltp != null ? c.ltp : (lg ? lg.ltp : null)}
+            {@const ltp = lg && lg.ltp != null ? lg.ltp : c.ltp}
             {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
             {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
             <label class="cand-row" class:cand-disabled={enabledSymbols[c.symbol] === false}>
@@ -1108,6 +1126,45 @@
     background: #fbbf24;
     color: #0c1830;
     border-color: #fbbf24;
+  }
+
+  /* Refresh button — sits between Expiry and the chain-picker toggle.
+     Same height (1.55rem) and 3px radius as the rest of the picker
+     so the row reads as one consistent control bar. Wider than the
+     +/− pill to fit the "↻ Refresh" / "Refreshing…" labels without
+     wrapping. Disabled state dims the button while a request is in
+     flight; the label flips to "Refreshing…" so the operator knows
+     the click registered. */
+  .opt-refresh-btn {
+    height: 1.55rem;
+    min-height: 1.55rem;
+    flex: 0 0 auto;
+    align-self: flex-end;
+    padding: 0 0.55rem;
+    border-radius: 3px;
+    border: 1px solid rgba(125,211,252,0.55);
+    background: rgba(125,211,252,0.10);
+    color: #7dd3fc;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .opt-refresh-btn:hover:not(:disabled) {
+    background: rgba(125,211,252,0.22);
+    border-color: rgba(125,211,252,0.85);
+  }
+  .opt-refresh-btn:disabled,
+  .opt-refresh-btn-busy {
+    cursor: progress;
+    opacity: 0.7;
   }
 
   .opt-grid {

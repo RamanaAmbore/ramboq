@@ -193,6 +193,16 @@
 .ag-theme-ramboq .ag-row.pos-short .ag-col-fill {
   background-color: rgba(196,122,61,0.14) !important;
 }
+/* Symbol-cell side borders — paint a neutral pair on every Symbol cell
+   so the column always reads as bordered, even on rows that don't carry
+   a long/short class (TOTAL aggregates, qty=0 holdings, in-flight rows
+   before getRowClass has tagged them). pos-long / pos-short rules below
+   override the colour with the warmer/cooler direction tint, but the
+   border is always present. */
+.ag-theme-ramboq .ag-col-sym {
+  box-shadow: inset 4px 0 0 rgba(120,135,160,0.55),
+              inset -4px 0 0 rgba(120,135,160,0.55) !important;
+}
 .ag-theme-ramboq .ag-row.pos-long .ag-col-sym {
   box-shadow: inset 4px 0 0 rgba(91,142,149,0.85),
               inset -4px 0 0 rgba(91,142,149,0.85) !important;
