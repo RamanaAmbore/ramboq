@@ -6,9 +6,10 @@
   import LogPanel from '$lib/LogPanel.svelte';
   import CommandBar from '$lib/CommandBar.svelte';
   import OrderDetail from '$lib/OrderDetail.svelte';
-  import { loadInstruments } from '$lib/data/instruments';
+  import OrderTicket from '$lib/order/OrderTicket.svelte';
+  import { loadInstruments, getInstrument } from '$lib/data/instruments';
   import { loadAccounts } from '$lib/data/accounts';
-  import { orderGrammar, setQuoteLoadedCallback, previewSymbol, enrichOrderPairs, executeBuySell } from '$lib/command/grammars/orders';
+  import { orderGrammar, setQuoteLoadedCallback, previewSymbol, enrichOrderPairs, buildOrderPayload } from '$lib/command/grammars/orders';
   import { createPerformanceSocket } from '$lib/ws';
 
   let orders        = $state([]);
@@ -24,6 +25,12 @@
   let systemLog     = $state([]);
   let cmdHistory    = $state([]);
   let selectedOrder = $state(/** @type {any|null} */(null));
+  // OrderTicket props built when the operator types `buy …` / `sell …`
+  // — Phase 2 of the order-entry unification: every order surface
+  // routes through the same modal so CHASE + L/M/H + depth auto-fill +
+  // per-account picker apply uniformly. Cancel / modify stay direct
+  // API calls (no modal needed for those — they're targeted ops).
+  let orderTicketProps = $state(/** @type {any|null} */(null));
   let cmdBar;
   let unsub;
   let logTeardown;
@@ -56,14 +63,49 @@
     running = true;
     try {
       if (parsed.verb === 'buy' || parsed.verb === 'sell') {
-        const { order_id, payload, verb } = await executeBuySell(parsed);
-        addResult('✓', `Order placed`, {
-          verb, account: parsed.args.account,
+        // Phase 2 unification — instead of POSTing the parsed
+        // payload directly, open OrderTicket pre-filled. The ticket
+        // owns submit (PAPER / LIVE), depth ladder, account picker,
+        // CHASE + L/M/H. Same surface as /admin/options + the
+        // dashboard row-click. Cancel / modify keep their direct
+        // path below — they're single-target ops, no modal needed.
+        const payload = buildOrderPayload(parsed);
+        if (!payload) throw new Error(`couldn't build order payload`);
+        const sym  = String(payload.tradingsymbol || '').toUpperCase();
+        const inst = getInstrument(sym);
+        const lot  = Number(inst?.ls || 1);
+        orderTicketProps = {
+          symbol:    sym,
+          exchange:  payload.exchange || inst?.e || 'NFO',
+          side:      payload.transaction_type,
+          action:    'open',
+          qty:       Number(payload.quantity) || 0,
+          lotSize:   lot,
+          orderType: payload.order_type || 'LIMIT',
+          price:     payload.price > 0 ? payload.price : undefined,
+          trigger:   payload.trigger_price > 0 ? payload.trigger_price : undefined,
+          product:   payload.product,
+          accounts:  [],
+          account:   String(payload.account || ''),
+          // Orders page has no drafts panel — start on PAPER, allow
+          // LIVE escalation.
+          defaultMode:    'paper',
+          availableModes: ['paper', 'live'],
+        };
+        addResult('…', `Opening ticket`, {
+          verb: parsed.verb.toUpperCase(),
+          account: parsed.args.account,
           symbol: payload.tradingsymbol, exchange: payload.exchange,
           qty: String(payload.quantity), type: payload.order_type,
           price: String(payload.price || ''), product: payload.product,
-          id: order_id,
         });
+        cmdBar?.clear();
+        // Short-circuit — the ticket's onSubmit handler will fire
+        // loadOrders() once the operator confirms. Skipping the
+        // loadOrders() at the bottom of this function avoids a
+        // wasted poll while the modal is still open.
+        running = false;
+        return;
       } else if (parsed.verb === 'cancel') {
         const id = parsed.args.order_id;
         const ord = orders.find(o => o.order_id === id);
@@ -285,3 +327,40 @@
   onTabChange={(id) => { logTab = id; loadCurrentLog(); }}
 />
 </div>
+
+{#if orderTicketProps}
+  <OrderTicket
+    symbol={orderTicketProps.symbol}
+    exchange={orderTicketProps.exchange}
+    side={orderTicketProps.side}
+    action={orderTicketProps.action}
+    qty={orderTicketProps.qty}
+    lotSize={orderTicketProps.lotSize}
+    orderType={orderTicketProps.orderType}
+    price={orderTicketProps.price}
+    trigger={orderTicketProps.trigger}
+    product={orderTicketProps.product}
+    accounts={orderTicketProps.accounts}
+    account={orderTicketProps.account}
+    defaultMode={orderTicketProps.defaultMode}
+    availableModes={orderTicketProps.availableModes}
+    onSubmit={(payload) => {
+      // PAPER + LIVE submissions already hit the backend before
+      // onSubmit fires (the ticket awaits placeTicketOrder). Refresh
+      // the orders list so the new row appears immediately, and log
+      // the result alongside the operator's command echo so the
+      // history reads as a single coherent flow.
+      if (payload?.mode === 'draft') return;
+      addResult('✓', `Order submitted (${(payload.mode || '').toUpperCase()})`, {
+        verb:    payload.side,
+        symbol:  payload.symbol,
+        qty:     String(payload.quantity),
+        type:    payload.order_type,
+        price:   String(payload.price || ''),
+        account: payload.account,
+      });
+      loadOrders();
+    }}
+    onClose={() => orderTicketProps = null}
+  />
+{/if}

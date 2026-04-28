@@ -3,6 +3,8 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import { goto } from '$app/navigation';
   import LogPanel from '$lib/LogPanel.svelte';
+  import OrderTicket from '$lib/order/OrderTicket.svelte';
+  import { loadInstruments, getInstrument } from '$lib/data/instruments';
 
   let command      = $state('');
   let cmdHistory   = $state([]);  // [{cmd, result, time}]
@@ -12,6 +14,17 @@
   let logTab       = $state('terminal');
   let running      = $state(false);
   let logTeardown;
+
+  // OrderTicket props built when the operator types a `BUY|SELL …`
+  // command — Phase 2 of the order-entry unification: every order
+  // surface routes through the same ticket modal so CHASE + L/M/H +
+  // depth auto-fill + per-account picker apply uniformly.
+  let orderTicketProps = $state(/** @type {any|null} */(null));
+
+  // Warm the instruments cache so the ticket can pull authoritative
+  // exchange (`e`) + lot size (`ls`) when an operator types a
+  // commodity / equity / F&O symbol.
+  onMount(() => { loadInstruments().catch(() => {}); });
 
   function authHeaders() {
     const token = $authStore.token;
@@ -55,19 +68,43 @@
       return;
     }
 
-    // Order command
+    // Order command — parse the line and open the OrderTicket
+    // pre-filled. The ticket then owns submit (PAPER / LIVE), the
+    // depth ladder, account picker, CHASE + L/M/H, etc. — same
+    // surface as the dashboard row click and the /admin/options
+    // chain picker.
     const order = parseOrder(cmd);
     if (order) {
-      try {
-        const res = await fetch('/api/orders/place', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify(order),
-        });
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) addResult(cmd, `ORDER FAILED: ${d.detail || res.statusText}`);
-        else addResult(cmd, `✓ Order placed: ${order.transaction_type} ${order.quantity} ${order.tradingsymbol} | ID: ${d.order_id}`);
-      } catch (e) { addResult(cmd, `ORDER ERROR: ${e.message}`); }
-      finally { running = false; command = ''; }
+      const sym  = String(order.tradingsymbol || '').toUpperCase();
+      const inst = getInstrument(sym);
+      // Exchange comes from the instruments cache when the symbol
+      // is recognised (NFO / NSE / MCX / BFO); otherwise fall back
+      // to the parsed default ('NFO' from parseOrder above).
+      const exch = inst?.e || order.exchange || 'NFO';
+      const lot  = Number(inst?.ls || 1);
+      orderTicketProps = {
+        symbol:   sym,
+        exchange: exch,
+        side:     order.transaction_type,
+        action:   'open',
+        qty:      Number(order.quantity) || 0,
+        lotSize:  lot,
+        orderType: order.order_type || 'LIMIT',
+        price:    order.price > 0 ? order.price : undefined,
+        product:  order.product,
+        accounts: [],
+        account:  String(order.account || ''),
+        // Terminal commands have no drafts surface — start on
+        // PAPER, allow LIVE if the operator escalates.
+        defaultMode:    'paper',
+        availableModes: ['paper', 'live'],
+        _origCommand:   cmd,
+      };
+      // Echo the parse into history so the operator sees the
+      // command was recognised even before they confirm in the
+      // ticket.
+      addResult(cmd, `Opening ticket: ${order.transaction_type} ${order.quantity} ${sym} on ${exch}`);
+      running = false; command = '';
       return;
     }
 
@@ -168,3 +205,33 @@
     />
   </div>
 </div>
+
+{#if orderTicketProps}
+  <OrderTicket
+    symbol={orderTicketProps.symbol}
+    exchange={orderTicketProps.exchange}
+    side={orderTicketProps.side}
+    action={orderTicketProps.action}
+    qty={orderTicketProps.qty}
+    lotSize={orderTicketProps.lotSize}
+    orderType={orderTicketProps.orderType}
+    price={orderTicketProps.price}
+    product={orderTicketProps.product}
+    accounts={orderTicketProps.accounts}
+    account={orderTicketProps.account}
+    defaultMode={orderTicketProps.defaultMode}
+    availableModes={orderTicketProps.availableModes}
+    onSubmit={(payload) => {
+      if (payload?.mode === 'draft') return;
+      // PAPER / LIVE: backend already responded — log a confirmation
+      // alongside the operator's command echo so the terminal
+      // history stays the system of record.
+      const verb = payload?.side || '?';
+      const sym  = payload?.symbol || orderTicketProps.symbol;
+      const qty  = payload?.quantity || orderTicketProps.qty;
+      addResult(orderTicketProps._origCommand,
+        `✓ Order submitted (${(payload.mode || '').toUpperCase()}): ${verb} ${qty} ${sym}`);
+    }}
+    onClose={() => orderTicketProps = null}
+  />
+{/if}
