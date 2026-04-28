@@ -11,8 +11,12 @@
   import { onMount, onDestroy } from 'svelte';
   import { fetchQuote } from '$lib/api';
 
-  /** @type {{ symbol: string, exchange?: string }} */
-  let { symbol, exchange = 'NFO' } = $props();
+  /** @type {{
+   *   symbol: string,
+   *   exchange?: string,
+   *   onQuote?: (q: any) => void,
+   * }} */
+  let { symbol, exchange = 'NFO', onQuote = null } = $props();
 
   /** @type {{ ltp: number, bid: number|null, ask: number|null, depth_buy: any[], depth_sell: any[] } | null} */
   let q = $state(null);
@@ -26,6 +30,11 @@
     try {
       q   = await fetchQuote(exchange || 'NFO', symbol);
       err = '';
+      // Bubble the fresh quote up so the OrderTicket can auto-fill
+      // the limit price (BUY → top ask, SELL → top bid). Defensive
+      // try/catch — a parent throwing must never break the depth
+      // poll.
+      try { onQuote?.(q); } catch (_) { /* ignore */ }
     } catch (e) {
       err = /** @type {any} */ (e)?.message || 'depth unavailable';
     }

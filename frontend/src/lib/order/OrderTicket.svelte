@@ -24,7 +24,7 @@
   // page's drafts array, the strategy state, the broker. Every
   // outcome routes through onSubmit(payload).
 
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import OrderDepth from './OrderDepth.svelte';
   import { placeTicketOrder, fetchAccounts } from '$lib/api';
 
@@ -91,6 +91,49 @@
   let _trigger = $state(trigger ?? '');
   let _product = $state(productVal);
   let _mode    = $state(/** @type {'draft' | 'paper' | 'live'} */ ('draft'));
+
+  // Auto-fill plumbing — the OrderDepth child polls the quote
+  // every 1.2 s and bubbles each fresh response here via
+  // onDepthQuote. We pre-fill the limit price with the marketable
+  // side (BUY → ask, SELL → bid) so the operator doesn't have to
+  // type a price every time. Once the operator types into the
+  // field, `_priceTouched` flips true and we stop overwriting
+  // their input. Flipping side resets to the new marketable side
+  // unless they've typed.
+  // Caller can pre-supply `price` to suppress auto-fill (e.g. a
+  // close-position flow that wants the operator's last limit).
+  // Untrack the read so we capture the initial value once — this
+  // is intentional, the operator's edits flip the flag from there.
+  let _priceTouched = $state(untrack(() => typeof price === 'number' && price > 0));
+  /** @type {{ bid: number|null, ask: number|null, ltp: number|null } | null} */
+  let _lastQuote = $state(null);
+
+  function _autoFillFromQuote() {
+    if (_priceTouched) return;
+    if (_type !== 'LIMIT' && _type !== 'SL') return;
+    if (!_lastQuote) return;
+    const px = _side === 'BUY' ? _lastQuote.ask : _lastQuote.bid;
+    // Fall back to LTP when the corresponding side has no depth
+    // (off-hours, illiquid contracts) so the operator isn't left
+    // with a blank field.
+    const fallback = (px && px > 0) ? px : _lastQuote.ltp;
+    if (fallback && fallback > 0) _price = fallback;
+  }
+  function onDepthQuote(/** @type {any} */ q) {
+    _lastQuote = q ? {
+      bid: q.bid ?? null,
+      ask: q.ask ?? null,
+      ltp: q.ltp ?? null,
+    } : null;
+    _autoFillFromQuote();
+  }
+  // Re-fill when the operator flips BUY ⇄ SELL or changes order
+  // type (LIMIT ⇄ MARKET ⇄ SL — only LIMIT/SL show the price
+  // field, but the helper guards that).
+  $effect(() => {
+    void _side; void _type;
+    _autoFillFromQuote();
+  });
 
   // Self-fetched real account list — backstop for when the caller
   // didn't (or couldn't) supply one. /api/accounts/ is jwt-guarded
@@ -362,10 +405,22 @@
       <div class="ot-row">
         {#if showLimit}
           <div class="ot-label-block">
-            <label class="ot-label" for="ot-price">Limit price</label>
+            <label class="ot-label" for="ot-price">
+              Limit price
+              {#if !_priceTouched && _price !== '' && _price != null}
+                <span class="ot-price-auto" title="Pre-filled from {_side === 'BUY' ? 'top ask' : 'top bid'} on the depth ladder. Edit to override; click ↺ to re-arm auto-fill.">auto</span>
+              {/if}
+              {#if _priceTouched && _lastQuote}
+                <button type="button" class="ot-price-reset"
+                        title="Re-arm auto-fill — restore {_side === 'BUY' ? 'top ask' : 'top bid'}"
+                        aria-label="Reset price to depth"
+                        onclick={() => { _priceTouched = false; _autoFillFromQuote(); }}>↺</button>
+              {/if}
+            </label>
             <input id="ot-price" type="number" class="ot-input ot-num"
                    step="0.05"
-                   bind:value={_price} />
+                   bind:value={_price}
+                   oninput={() => { _priceTouched = true; }} />
           </div>
         {/if}
         {#if showTrigger}
@@ -379,8 +434,12 @@
       </div>
     {/if}
 
-    <!-- Depth (read-only) -->
-    <OrderDepth {symbol} {exchange} />
+    <!-- Depth — also bubbles its quote tick up via `onQuote` so the
+         ticket can keep the limit price aligned with the marketable
+         side (BUY → top ask, SELL → top bid). Operator edits to the
+         price field freeze the auto-fill until they hit the ↺ button
+         next to the field label. -->
+    <OrderDepth {symbol} {exchange} onQuote={onDepthQuote} />
 
     <!-- Mode selector — only DRAFT wired in phase 1 -->
     <div class="ot-mode-row">
@@ -492,6 +551,46 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 0.18rem;
+  }
+
+  /* "auto" chip next to the Limit price label — flags that the
+     value is being fed from the depth ladder and the operator
+     hasn't typed anything yet. Tiny pill so it doesn't compete
+     with the input below. */
+  .ot-price-auto {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0 0.3rem;
+    border-radius: 2px;
+    background: rgba(74,222,128,0.15);
+    border: 1px solid rgba(74,222,128,0.45);
+    color: #4ade80;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    vertical-align: 1px;
+  }
+  /* Re-arm-auto button — visible only after the operator has
+     touched the price field. Click → reset _priceTouched and
+     re-fill from the latest quote. */
+  .ot-price-reset {
+    margin-left: 0.4rem;
+    padding: 0 0.35rem;
+    height: 0.95rem;
+    line-height: 1;
+    border-radius: 2px;
+    border: 1px solid rgba(125,211,252,0.55);
+    background: rgba(125,211,252,0.10);
+    color: #7dd3fc;
+    font-size: 0.6rem;
+    font-weight: 700;
+    cursor: pointer;
+    vertical-align: 1px;
+  }
+  .ot-price-reset:hover {
+    background: rgba(125,211,252,0.22);
+    border-color: rgba(125,211,252,0.85);
   }
 
   /* Side toggle (BUY / SELL) */
