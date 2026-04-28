@@ -25,6 +25,8 @@
    *   dte?:         number|null,
    *   ivProxy?:     number|null,
    *   legCount?:    number|null,
+   *   onRefresh?:   (() => void) | null,
+   *   loading?:     boolean,
    * }} */
   let {
     payoff = [],
@@ -40,6 +42,8 @@
     dte        = /** @type {number|null|undefined} */ (null),
     ivProxy    = /** @type {number|null|undefined} */ (null),
     legCount   = /** @type {number|null|undefined} */ (null),
+    onRefresh  = /** @type {(() => void) | null} */ (null),
+    loading    = false,
   } = $props();
 
   // Nearest curve point to current spot — drives the on-chart TDAY/EXP
@@ -298,8 +302,26 @@
   {:else}
     {#if isZoomed}
       <button type="button" class="payoff-reset"
-              title="Reset zoom — return to the auto ±2.5σ range"
+              title="Reset zoom — return to the auto ±3σ range"
               onclick={resetZoom}>reset zoom</button>
+    {/if}
+    {#if onRefresh}
+      <!-- Top-right refresh button. Absolutely positioned so the
+           "Refresh" → "Refreshing…" text swap can never push the
+           SVG / stat overlay / legend around. Width is locked to
+           the wider "Refreshing…" string so the button itself also
+           stays put across state changes. -->
+      <button type="button"
+              class="payoff-refresh"
+              class:payoff-refresh-busy={loading}
+              disabled={loading}
+              title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
+              aria-label="Refresh prices"
+              onclick={() => onRefresh && onRefresh()}>
+        <span class="payoff-refresh-label">
+          {#if loading}Refreshing…{:else}↻ Refresh{/if}
+        </span>
+      </button>
     {/if}
     <!-- Top-left stat overlay — the chart's at-a-glance numerics so the
          operator doesn't have to glance at the Greeks / Risk cards just
@@ -520,7 +542,10 @@
   .payoff-reset {
     position: absolute;
     top: 0.4rem;
-    right: 0.6rem;
+    /* Sit immediately to the LEFT of the Refresh button (Refresh
+       width 5.4rem + 0.6rem right offset + 0.3rem gap = 6.3rem) so
+       the two top-right buttons never overlap. */
+    right: 6.3rem;
     font-family: monospace;
     font-size: 0.5rem;
     text-transform: uppercase;
@@ -536,6 +561,52 @@
   .payoff-reset:hover {
     background: rgba(251,191,36,0.20);
     border-color: rgba(251,191,36,0.65);
+  }
+
+  /* Refresh button — top-right corner of the chart. Width is locked
+     so the "Refresh" / "Refreshing…" swap never reflows; the inner
+     <span> centers either label inside the same fixed box. Position
+     is absolute so the button + its state changes can never push the
+     SVG / stat overlay / legend around. */
+  .payoff-refresh {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.6rem;
+    width: 5.4rem;
+    height: 1.1rem;
+    padding: 0;
+    border-radius: 2px;
+    border: 1px solid rgba(125,211,252,0.55);
+    background: rgba(125,211,252,0.10);
+    color: #7dd3fc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .payoff-refresh-label {
+    /* Center the label inside the fixed-width button; tabular-nums
+       keeps any digits steady if a future variant interleaves them. */
+    display: inline-block;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .payoff-refresh:hover:not(:disabled) {
+    background: rgba(125,211,252,0.22);
+    border-color: rgba(125,211,252,0.85);
+  }
+  .payoff-refresh:disabled,
+  .payoff-refresh-busy {
+    cursor: progress;
+    opacity: 0.7;
   }
   .payoff-empty {
     height: var(--chart-h, 280px);
