@@ -24,12 +24,36 @@
     // 'dark'  — algo console (navy gradient + amber)
     // 'light' — public site (cream + champagne gold)
     theme = 'dark',
+    // When true, render a search input at the top of the dropdown
+    // panel. The list shows in full until the operator types at
+    // least `searchMinChars` characters; from that point onward
+    // options are filtered by case-insensitive substring match.
+    searchable = false,
+    searchMinChars = 3,
+    searchPlaceholder = 'Type to filter…',
   } = $props();
 
   let open = $state(false);
   let triggerEl;
   let panelEl;
-  let highlighted = $state(-1);
+  /** @type {HTMLInputElement | undefined} */
+  let searchInputEl = $state();
+  let highlighted   = $state(-1);
+  let searchTerm    = $state('');
+
+  // Filtered option list — when search is active and the term has
+  // ≥searchMinChars characters, filter by case-insensitive substring
+  // match against label OR value. Otherwise show every option.
+  const filteredOptions = $derived.by(() => {
+    if (!searchable) return options;
+    const q = searchTerm.trim().toUpperCase();
+    if (q.length < searchMinChars) return options;
+    return options.filter(o => {
+      const l = String(o.label ?? '').toUpperCase();
+      const v = String(o.value ?? '').toUpperCase();
+      return l.includes(q) || v.includes(q);
+    });
+  });
 
   const current = $derived(
     options.find(o => String(o.value) === String(value)) || null
@@ -40,7 +64,15 @@
     if (disabled) return;
     open = !open;
     if (open) {
-      highlighted = Math.max(0, options.findIndex(o => String(o.value) === String(value)));
+      // Reset search every open so reopen always shows the full list.
+      searchTerm  = '';
+      highlighted = Math.max(0, filteredOptions.findIndex(o => String(o.value) === String(value)));
+      // Focus the search input after the panel mounts so the operator
+      // can start typing immediately. Falls through silently when the
+      // panel isn't searchable.
+      if (searchable) {
+        queueMicrotask(() => { searchInputEl?.focus(); });
+      }
     }
   }
 
@@ -60,14 +92,21 @@
       return;
     }
     if (e.key === 'Escape') { open = false; e.preventDefault(); return; }
-    if (e.key === 'ArrowDown') { highlighted = Math.min(options.length - 1, highlighted + 1); e.preventDefault(); return; }
+    if (e.key === 'ArrowDown') { highlighted = Math.min(filteredOptions.length - 1, highlighted + 1); e.preventDefault(); return; }
     if (e.key === 'ArrowUp')   { highlighted = Math.max(0, highlighted - 1); e.preventDefault(); return; }
     if (e.key === 'Enter') {
-      if (highlighted >= 0) pick(options[highlighted]);
+      if (highlighted >= 0 && filteredOptions[highlighted]) pick(filteredOptions[highlighted]);
       e.preventDefault();
       return;
     }
   }
+
+  // Reset highlight to the top whenever the filter changes — otherwise
+  // a leftover index could point past the new array's end.
+  $effect(() => {
+    void searchTerm;
+    if (open) highlighted = filteredOptions.length ? 0 : -1;
+  });
 
   /** @type {(e: MouseEvent) => void} */
   function onDocClick(e) {
@@ -91,20 +130,41 @@
   </button>
 
   {#if open}
-    <ul class="rbq-select-panel" role="listbox" bind:this={panelEl}>
-      {#each options as opt, i}
-        {@const selected = String(opt.value) === String(value)}
-        <li role="option" aria-selected={selected}
-            class="rbq-select-option
-              {selected ? 'rbq-select-option-selected' : ''}
-              {highlighted === i ? 'rbq-select-option-hl' : ''}"
-            onmousedown={() => pick(opt)}
-            onmouseenter={() => { highlighted = i; }}>
-          <span class="rbq-select-option-label">{opt.label}</span>
-          {#if opt.hint}<span class="rbq-select-option-hint">{opt.hint}</span>{/if}
-        </li>
-      {/each}
-    </ul>
+    <div class="rbq-select-panel" role="listbox" bind:this={panelEl}>
+      {#if searchable}
+        <div class="rbq-select-search">
+          <input type="text"
+                 class="rbq-select-search-input"
+                 bind:this={searchInputEl}
+                 bind:value={searchTerm}
+                 placeholder={searchPlaceholder}
+                 aria-label="Filter options"
+                 onkeydown={onKey} />
+          {#if searchTerm.trim().length > 0 && searchTerm.trim().length < searchMinChars}
+            <span class="rbq-select-search-hint">
+              type {searchMinChars - searchTerm.trim().length} more
+            </span>
+          {/if}
+        </div>
+      {/if}
+      <ul class="rbq-select-options">
+        {#each filteredOptions as opt, i}
+          {@const selected = String(opt.value) === String(value)}
+          <li role="option" aria-selected={selected}
+              class="rbq-select-option
+                {selected ? 'rbq-select-option-selected' : ''}
+                {highlighted === i ? 'rbq-select-option-hl' : ''}"
+              onmousedown={() => pick(opt)}
+              onmouseenter={() => { highlighted = i; }}>
+            <span class="rbq-select-option-label">{opt.label}</span>
+            {#if opt.hint}<span class="rbq-select-option-hint">{opt.hint}</span>{/if}
+          </li>
+        {/each}
+        {#if !filteredOptions.length}
+          <li class="rbq-select-empty">No matches.</li>
+        {/if}
+      </ul>
+    </div>
   {/if}
 </div>
 
@@ -155,24 +215,77 @@
 
   /* Popup panel — mirrors .popup-modal from OrderPopup: same gradient,
      same amber-accent border, same box-shadow. Floats absolutely below
-     the trigger. max-height + scroll for long lists. */
+     the trigger. The inner .rbq-select-options scrolls; the optional
+     search bar stays pinned at the top. */
   .rbq-select-panel {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
     right: 0;
     z-index: 60;
-    margin: 0;
-    padding: 0.2rem 0;
-    list-style: none;
     background: linear-gradient(180deg, #273552 0%, #1d2a44 100%);
     border: 1.5px solid rgba(251,191,36,0.35);
     border-radius: 4px;
     box-shadow: 0 10px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
-    max-height: 14rem;
-    overflow-y: auto;
     font-size: 0.62rem;
     color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    max-height: 16rem;
+  }
+
+  /* Optional search input row — pinned to the top of the panel when
+     `searchable` is on. Hint pill calls out how many more characters
+     the operator needs to type before filtering activates. */
+  .rbq-select-search {
+    position: relative;
+    padding: 0.25rem 0.35rem;
+    border-bottom: 1px solid rgba(251,191,36,0.18);
+    flex: 0 0 auto;
+  }
+  .rbq-select-search-input {
+    width: 100%;
+    background: rgba(13,21,38,0.55);
+    border: 1px solid rgba(251,191,36,0.22);
+    border-radius: 3px;
+    padding: 0.25rem 0.45rem;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 0.62rem;
+    outline: none;
+  }
+  .rbq-select-search-input:focus {
+    border-color: #fbbf24;
+  }
+  .rbq-select-search-input::placeholder {
+    color: rgba(180,200,230,0.45);
+  }
+  .rbq-select-search-hint {
+    position: absolute;
+    right: 0.55rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.5rem;
+    color: rgba(251,191,36,0.7);
+    pointer-events: none;
+    letter-spacing: 0.04em;
+  }
+
+  /* Options list — flex: 1 1 auto + overflow-y so the list area
+     scrolls while the search bar stays pinned. */
+  .rbq-select-options {
+    list-style: none;
+    margin: 0;
+    padding: 0.2rem 0;
+    overflow-y: auto;
+    flex: 1 1 auto;
+  }
+  .rbq-select-empty {
+    padding: 0.6rem 0.55rem;
+    color: rgba(180,200,230,0.55);
+    font-style: italic;
+    font-size: 0.6rem;
+    text-align: center;
   }
 
   .rbq-select-option {
@@ -227,6 +340,18 @@
     box-shadow: 0 10px 24px rgba(12,24,48,0.18);
     color: #1a1e35;
   }
+  .rbq-select-light .rbq-select-search {
+    border-bottom: 1px solid #e7e0cf;
+  }
+  .rbq-select-light .rbq-select-search-input {
+    background: #faf7f0;
+    border-color: #c0ccdc;
+    color: #1e3050;
+  }
+  .rbq-select-light .rbq-select-search-input:focus { border-color: #c8a84b; }
+  .rbq-select-light .rbq-select-search-input::placeholder { color: #94a3b8; }
+  .rbq-select-light .rbq-select-search-hint { color: #c8a84b; }
+  .rbq-select-light .rbq-select-empty { color: #64748b; }
   .rbq-select-light .rbq-select-option {
     border-left-color: transparent;
   }

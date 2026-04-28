@@ -301,10 +301,51 @@
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
   let chainSide        = $state(/** @type {'long'|'short'} */ ('long'));
-  // Convenience presets — auto-populate underlying when there's an
-  // obvious choice from the operator's existing legs.
-  /** @type {string[]} */
-  let underlyingChoices = $state([]);
+
+  /** Underlyings the chain picker offers, in priority order:
+   *  1. The page's currently-selected underlying (the operator's
+   *     anchor — first thing they see).
+   *  2. Underlyings already on the operator's loaded book (positions
+   *     and holdings).
+   *  3. Common indices + MCX commodities — quick-access bucket so
+   *     the operator can pivot to a new instrument without typing.
+   *  4. Everything else from the instruments cache, alphabetical.
+   *  Re-derives whenever the page's selectedUnderlying, positions,
+   *  or instrumentsReady changes — the chain picker always reflects
+   *  the freshest book without a manual refresh. */
+  const _COMMON_INDICES_AND_COMMODITIES = [
+    'NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX',
+    'CRUDEOIL', 'CRUDEOILM', 'NATURALGAS', 'NATGASMINI',
+    'GOLD', 'GOLDM', 'GOLDMINI', 'GOLDPETAL',
+    'SILVER', 'SILVERM', 'SILVERMINI', 'SILVERMIC',
+    'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI',
+    'ALUMINIUM', 'ALUMINI', 'NICKEL',
+    'MENTHAOIL', 'COTTON',
+  ];
+  const underlyingChoices = $derived.by(() => {
+    if (!instrumentsReady) return [];
+    const seen = new Set();
+    /** @type {string[]} */
+    const out = [];
+    const push = (/** @type {string|null|undefined} */ u) => {
+      if (!u) return;
+      const k = String(u).toUpperCase();
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(k);
+    };
+    // 1. Currently-selected underlying — top of the list.
+    push(selectedUnderlying);
+    // 2. Underlyings the operator already holds.
+    for (const p of positions) {
+      push(String(p.symbol || '').replace(/\d.*$/, ''));
+    }
+    // 3. Common indices + MCX commodities.
+    for (const u of _COMMON_INDICES_AND_COMMODITIES) push(u);
+    // 4. Everything else from the instruments cache.
+    for (const u of suggestUnderlyings('', 1000)) push(u);
+    return out;
+  });
 
   // Expiry list rebuilds when the operator picks a different underlying.
   const chainExpiries = $derived.by(() => {
@@ -334,6 +375,23 @@
     // Return up to 3 nearest futures so the operator can see what's
     // available without a separate "show all expiries" toggle.
     return all.slice(0, 3);
+  });
+
+  // Default the chain underlying to the top of the priority list
+  // (selectedUnderlying when set, otherwise the operator's first
+  // book underlying) once the instruments cache has loaded. Empty
+  // out the picked value if it disappears from the list.
+  $effect(() => {
+    const list = underlyingChoices;
+    untrack(() => {
+      if (!list.length) {
+        if (chainUnderlying) chainUnderlying = '';
+        return;
+      }
+      if (!chainUnderlying || !list.includes(chainUnderlying)) {
+        chainUnderlying = list[0];
+      }
+    });
   });
 
   // Auto-pick first expiry when chain underlying changes.
@@ -594,28 +652,12 @@
     // Load the instruments cache so the option-chain picker has data.
     // Already cached in IndexedDB after the first /console autocomplete
     // load — most operators will see this resolve from cache instantly.
+    // `underlyingChoices` is a $derived that recomputes off
+    // instrumentsReady + selectedUnderlying + positions, so flipping
+    // the flag is enough to populate the chain picker's dropdown.
     try {
       await loadInstruments();
       instrumentsReady = true;
-      // Pre-populate underlying choices from common indices first, then
-      // anything else the operator has open positions on so the dropdown
-      // shows familiar names at the top.
-      const seen = new Set();
-      const out = [];
-      for (const u of ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX']) {
-        if (!seen.has(u)) { seen.add(u); out.push(u); }
-      }
-      for (const p of positions) {
-        const u = p.symbol.replace(/\d.*$/, '');
-        if (u && !seen.has(u)) { seen.add(u); out.push(u); }
-      }
-      // Fall back to a wider suggest scan so the dropdown isn't tiny on
-      // a fresh book — pull every underlying that has CE options.
-      for (const u of suggestUnderlyings('', 50)) {
-        if (!seen.has(u)) { seen.add(u); out.push(u); }
-      }
-      underlyingChoices = out;
-      if (!chainUnderlying && out.length) chainUnderlying = out[0];
     } catch (_) { /* instruments unreachable — chain picker hides */ }
     // Two separate cadences:
     //   - hot (5 s): analytics / strategy aggregate — Greeks + IV move
@@ -773,6 +815,8 @@
           <label class="field-label" for="chain-und">Underlying</label>
           <Select id="chain-und"
             bind:value={chainUnderlying}
+            searchable={true}
+            searchPlaceholder="Type 3+ chars to filter…"
             options={underlyingChoices.map(u => ({ value: u, label: u }))} />
         </div>
         <div class="chain-field">
