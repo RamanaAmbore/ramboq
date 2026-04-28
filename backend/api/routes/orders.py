@@ -64,6 +64,86 @@ def _kite_for(account: str):
     return conn[account].get_kite_conn()
 
 
+def _live_chase_config(aggressiveness: str):
+    """Map operator-facing L/M/H aggressiveness to ChaseConfig.
+
+    Industry analogue: IBKR Adaptive Algo Patient / Normal / Urgent.
+      low   — patient: long interval, small aggression step, more
+              attempts. Order rests near midpoint, eases into
+              taking liquidity only when the market doesn't come.
+      med   — balanced (chase.py defaults).
+      high  — urgent: short interval, big aggression step, fewer
+              attempts. Cross the spread fast.
+
+    Engine-side defaults still come from /admin/settings (algo.*)
+    when the request doesn't carry an aggressiveness override.
+    """
+    from backend.api.algo.chase import ChaseConfig
+    a = (aggressiveness or "high").lower()
+    if a == "low":
+        return ChaseConfig(interval_seconds=30, aggression_step=0.05,
+                           max_attempts=30)
+    if a == "med":
+        return ChaseConfig(interval_seconds=20, aggression_step=0.10,
+                           max_attempts=20)
+    # high (default — same as the existing /place-direct path that
+    # previously had no chase at all, so this is a strict upgrade
+    # in execution quality rather than a behaviour change).
+    return ChaseConfig(interval_seconds=10, aggression_step=0.25,
+                       max_attempts=10)
+
+
+async def _start_live_chase(account: str, symbol: str, exchange: str,
+                            transaction_type: str, quantity: int,
+                            aggressiveness: str) -> str:
+    """Place + chase a LIVE order in the background.
+
+    Spawns `chase_order()` as an asyncio task and synchronously
+    returns the first broker order_id (so the ticket can confirm
+    placement to the operator immediately). The chase task keeps
+    running after this returns — re-quoting the limit per the
+    aggressiveness config until the order fills or the attempt
+    cap is hit.
+
+    Note: the chase loop CANCELS the current order and PLACES a
+    NEW one each attempt, so the order_id mutates over the chase
+    lifetime. The id we return here is the FIRST one. Operators
+    can poll /api/orders/ to see the currently-live order_id.
+    Future work could surface chase progress via WebSocket.
+    """
+    import asyncio
+    from backend.api.algo.chase import chase_order
+    cfg = _live_chase_config(aggressiveness)
+    cfg.exchange = exchange or "NFO"
+
+    loop = asyncio.get_running_loop()
+    fut: asyncio.Future = loop.create_future()
+
+    def on_event(evt: str, detail: dict):
+        # First order_placed event resolves the future. Subsequent
+        # events (cancel + re-place per attempt) are no-ops here
+        # — the chase task keeps logging them via chase.py's own
+        # `logger.info` calls.
+        if not fut.done():
+            if evt == "order_placed":
+                fut.set_result(str(detail.get("order_id") or ""))
+            elif evt in ("error", "chase_failed"):
+                fut.set_exception(RuntimeError(
+                    detail.get("error") or "chase failed before initial placement"
+                ))
+
+    asyncio.create_task(chase_order(
+        account=account, symbol=symbol,
+        transaction_type=transaction_type, quantity=quantity,
+        cfg=cfg, on_event=on_event,
+    ))
+
+    # 15 s timeout — chase_order's first iteration fetches depth
+    # and fires place_order; even a cold market should land
+    # under 5 s. 15 s gives Kite room for a slow first call.
+    return await asyncio.wait_for(fut, timeout=15.0)
+
+
 def _validate_place(req: PlaceOrderRequest) -> None:
     errors = []
     if req.variety not in _VARIETIES:
@@ -335,9 +415,19 @@ class OrdersController(Controller):
 
         # ─── LIVE branch ─────────────────────────────────────────────
         # Two gates: branch + per-action setting flag. Both must be
-        # truthy. Order placement on the wire is a single-shot
-        # `kite.place_order` — no chase loop. Operators wanting chase
-        # semantics for a manual order should use the agent surface.
+        # truthy.
+        #
+        # Two paths within LIVE:
+        #   chase=True + LIMIT → background chase loop (chase.py).
+        #     The first place_order returns synchronously so the ticket
+        #     gets an order_id to display; the loop keeps cancel-and-
+        #     re-placing in the background per L/M/H aggressiveness
+        #     until the order fills or the attempt cap is hit. The
+        #     order_id mutates per attempt; the response carries the
+        #     FIRST one. Operators see the current order via /api/orders.
+        #   chase=False or non-LIMIT → single-shot kite.place_order
+        #     (the existing direct-broker path; preserved for MARKET/
+        #     SL-M and for operators who explicitly opted out).
         if data.mode == "live":
             from backend.shared.helpers.utils import is_prod_branch
             from backend.shared.helpers.settings import get_bool
@@ -347,29 +437,57 @@ class OrdersController(Controller):
             if not get_bool("execution.live.place_order", False):
                 raise HTTPException(status_code=403,
                     detail="LIVE order placement is disabled in /admin/settings → execution.live.place_order")
+
+            order_type = (data.order_type or "LIMIT")
+            chase_eligible = (data.chase
+                              and order_type == "LIMIT"
+                              and data.price is not None
+                              and data.price > 0)
+
             try:
-                kite = _kite_for(account)
-                order_id = kite.place_order(
-                    variety=(data.variety or "regular"),
-                    exchange=(data.exchange or "NFO"),
-                    tradingsymbol=sym,
-                    transaction_type=side,
-                    quantity=qty,
-                    product=(data.product or "NRML"),
-                    order_type=(data.order_type or "LIMIT"),
-                    price=data.price,
-                    trigger_price=data.trigger_price,
-                    validity="DAY",
-                    tag="ramboq-ticket",
-                )
+                if chase_eligible:
+                    # Background chase loop — first place_order
+                    # returns synchronously; loop keeps running.
+                    order_id = await _start_live_chase(
+                        account=account,
+                        symbol=sym,
+                        exchange=(data.exchange or "NFO"),
+                        transaction_type=side,
+                        quantity=qty,
+                        aggressiveness=(data.chase_aggressiveness or "high"),
+                    )
+                    chase_tag = f" CHASE[{(data.chase_aggressiveness or 'high').lower()}]"
+                else:
+                    # Single-shot — preserves the existing path for
+                    # MARKET / SL-M and explicit chase=False tickets.
+                    kite = _kite_for(account)
+                    order_id = kite.place_order(
+                        variety=(data.variety or "regular"),
+                        exchange=(data.exchange or "NFO"),
+                        tradingsymbol=sym,
+                        transaction_type=side,
+                        quantity=qty,
+                        product=(data.product or "NRML"),
+                        order_type=order_type,
+                        price=data.price,
+                        trigger_price=data.trigger_price,
+                        validity="DAY",
+                        tag="ramboq-ticket",
+                    )
+                    chase_tag = ""
+
                 invalidate("orders")    # refresh /api/orders cache
                 masked = mask_column(pd.Series([account]))[0]
-                logger.info(f"Ticket LIVE order: {order_id} [{masked}] {side} {qty} {sym}")
+                logger.info(f"Ticket LIVE order: {order_id} [{masked}] "
+                            f"{side} {qty} {sym}{chase_tag}")
                 return TicketOrderResponse(
                     order_id=str(order_id),
                     mode="live",
                     status="OPEN",
-                    detail=f"Live broker order #{order_id} placed at {account}.",
+                    detail=(f"Live broker order #{order_id} placed at {account}"
+                            + (f" — chasing [{(data.chase_aggressiveness or 'high').lower()}]"
+                               if chase_eligible else "")
+                            + "."),
                 )
             except HTTPException:
                 raise
