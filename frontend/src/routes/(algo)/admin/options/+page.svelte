@@ -479,21 +479,33 @@
   let _stratFails = 0;
   async function loadStrategy() {
     const cleanLegs = legs
-      .map(l => ({
-        symbol:   String(l.symbol || '').trim().toUpperCase(),
-        qty:      l.qty === '' || l.qty == null ? 0 : Number(l.qty),
-        avg_cost: l.avg_cost === '' || l.avg_cost == null ? null : Number(l.avg_cost),
-        // Only inline ltp for sources whose price isn't on the wire
-        // (sim driver state, operator drafts). For live broker
-        // positions, drop ltp so the backend re-fetches a fresh quote
-        // every poll — otherwise the stale `last_price` from the 30s
-        // position poll overrides every subsequent broker fetch and
-        // the chart's spot/Greeks/EV freeze even though analytics is
-        // polling at 5s.
-        ltp: (l.source === 'sim' || l.source === 'draft')
-          ? (l.ltp === '' || l.ltp == null ? null : Number(l.ltp))
-          : null,
-      }))
+      .map(l => {
+        const sym = String(l.symbol || '').trim().toUpperCase();
+        // Look up the contract's actual expiry from the instruments
+        // cache. Kite stores per-contract expiries on the `x` field —
+        // authoritative for every exchange. Critical for MCX
+        // commodities (GOLDM/CRUDEOIL/etc.) where the backend's
+        // symbol parser would otherwise infer the NSE-F&O last-
+        // Thursday rule and land 1-3 days off the real expiry.
+        const inst    = sym ? getInstrument(sym) : null;
+        const expiry  = inst?.x || null;
+        return {
+          symbol:   sym,
+          qty:      l.qty === '' || l.qty == null ? 0 : Number(l.qty),
+          avg_cost: l.avg_cost === '' || l.avg_cost == null ? null : Number(l.avg_cost),
+          // Only inline ltp for sources whose price isn't on the wire
+          // (sim driver state, operator drafts). For live broker
+          // positions, drop ltp so the backend re-fetches a fresh
+          // quote every poll — otherwise the stale `last_price` from
+          // the 30s position poll overrides every subsequent broker
+          // fetch and the chart's spot/Greeks/EV freeze even though
+          // analytics is polling at 5s.
+          ltp: (l.source === 'sim' || l.source === 'draft')
+            ? (l.ltp === '' || l.ltp == null ? null : Number(l.ltp))
+            : null,
+          expiry,
+        };
+      })
       .filter(l => l.symbol && l.qty);
     if (!cleanLegs.length) {
       strategy = null; strategyErr = ''; _stratFails = 0;

@@ -165,6 +165,15 @@ class StrategyLeg(msgspec.Struct):
     avg_cost:  float | None = None       # per-share entry premium; defaults to ltp
     ltp:       float | None = None       # current premium; fetched from broker if absent
     iv:        float | None = None       # IV override; calibrated from ltp otherwise
+    # ISO-date expiry override (YYYY-MM-DD). The backend symbol parser
+    # assumes NSE F&O's last-Thursday-of-month rule — fine for NIFTY,
+    # BANKNIFTY, RELIANCE, etc., but wrong for MCX commodities (GOLDM
+    # expires on the 5th day of the contract month, not the last
+    # Thursday). The frontend already has the authoritative expiry in
+    # its instruments cache (Kite's own `expiry` field per contract);
+    # passing it here lets the backend skip the symbol-parser inference
+    # for that leg.
+    expiry:    str | None   = None
 
 
 class StrategyRequest(msgspec.Struct):
@@ -441,6 +450,25 @@ def _option_quote_key(symbol: str) -> str:
     if parsed and is_mcx_underlying(parsed.get("underlying", "")):
         return f"MCX:{symbol}"
     return f"NFO:{symbol}"
+
+
+def _leg_expiry_iso(leg, parsed: dict) -> str:
+    """Pick the most authoritative expiry for a strategy leg. The
+    frontend ships Kite's actual `expiry` field from its instruments
+    cache (per-contract), which is correct for every exchange — most
+    importantly MCX commodities, where the symbol parser's "last
+    Thursday" inference is wrong (GOLDM expires on the 5th of the
+    contract month, CRUDEOIL on the 19th-20th, etc.). When the
+    frontend hasn't supplied an override, fall back to the parsed
+    symbol's expiry."""
+    if leg.expiry:
+        try:
+            # Validate ISO format; raises on garbage so the parser
+            # fallback kicks in.
+            return date.fromisoformat(leg.expiry).isoformat()
+        except (ValueError, TypeError):
+            pass
+    return parsed["expiry"].isoformat()
 
 
 def _resolve_ltp(symbol: str, mode: str, account: Optional[str],
@@ -841,7 +869,11 @@ class OptionsController(Controller):
                     detail=f"'{sym}' isn't a recognised option or futures contract."
                 )
             underlyings.add(parsed["underlying"])
-            expiries.add(parsed["expiry"].isoformat())
+            # Expiry — the operator (frontend instruments cache) wins over
+            # parsed-symbol inference. The parser uses NSE F&O's last-
+            # Thursday rule which is wrong for MCX commodities.
+            leg_expiry = _leg_expiry_iso(leg, parsed)
+            expiries.add(leg_expiry)
             # Trigger broker fetch when ltp is missing OR explicitly 0
             # (sim picker that copied a stale last_price=0 would otherwise
             # bypass the fetch and fall straight to avg_cost).
@@ -894,10 +926,14 @@ class OptionsController(Controller):
                          if sorted_strikes else None)
         # Pull the shared expiry off any leg for the futures-fallback
         # path. v1 already guards against mixed-expiry baskets so any
-        # leg works as a representative; option legs and futures legs
-        # both carry an `expiry` field on the parser dict.
+        # leg works as a representative. Prefer the operator-supplied
+        # expiry (Kite instruments cache) over the parsed-symbol guess.
         first_parsed = parse_tradingsymbol(data.legs[0].symbol)
-        expiry_hint  = first_parsed.get("expiry") if first_parsed else None
+        expiry_hint: Optional[date] = None
+        if first_parsed:
+            expiry_hint = date.fromisoformat(
+                _leg_expiry_iso(data.legs[0], first_parsed)
+            )
         S, _spot_src = _resolve_spot(underlying, data.spot,
                                      fallback=median_strike,
                                      expiry_hint=expiry_hint)
@@ -910,7 +946,10 @@ class OptionsController(Controller):
         for leg in data.legs:
             sym = leg.symbol.upper().strip()
             parsed = parse_tradingsymbol(sym)
-            T_yrs = days_to_expiry(parsed["expiry"]) / 365.0
+            # Operator-supplied expiry (instruments cache) wins over
+            # the parser's last-Thursday inference.
+            leg_expiry = date.fromisoformat(_leg_expiry_iso(leg, parsed))
+            T_yrs = days_to_expiry(leg_expiry) / 365.0
             T_yrs_shared = T_yrs
             qty   = int(leg.qty or 0)
             if qty == 0:
@@ -1086,10 +1125,16 @@ class OptionsController(Controller):
                       if abs(net_cost) > 0 else None)
         agg_rr = risk_reward_ratio(max_p, max_l)
 
+        # Shared expiry — the v1 mixed-expiry guard above ensures every
+        # leg matches, so the first one is representative. Use the
+        # operator-supplied expiry (instruments cache) over the
+        # parser's last-Thursday inference.
+        shared_expiry_iso = next(iter(expiries))
+        shared_expiry     = date.fromisoformat(shared_expiry_iso)
         return StrategyResponse(
             underlying=underlying,
-            expiry=next(iter(expiries)),
-            days_to_expiry=days_to_expiry(parsed["expiry"]),
+            expiry=shared_expiry_iso,
+            days_to_expiry=days_to_expiry(shared_expiry),
             spot=S,
             net_cost=net_cost,
             net_qty=sum(int(l["qty"]) for l in resolved_legs),
