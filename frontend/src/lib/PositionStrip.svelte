@@ -165,19 +165,19 @@
   <a class="ps-strip" href="/dashboard"
      aria-label="Open the dashboard — full positions, holdings, and funds grids">
     <span class="ps-agg" title="Positions P/L — open + closed intraday">
-      <span class="ps-agg-k">P</span>
+      <span class="ps-agg-k">Pos</span>
       <span class={'ps-agg-v ' + (positionsPnl > 0 ? 'ps-pos' : positionsPnl < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(positionsPnl)}
       </span>
     </span>
     <span class="ps-agg" title="Holdings — today's move (day_change_val)">
-      <span class="ps-agg-k">T</span>
+      <span class="ps-agg-k">Tday</span>
       <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsToday)}
       </span>
     </span>
     <span class="ps-agg" title="Holdings — total unrealised P/L from entry">
-      <span class="ps-agg-k">H</span>
+      <span class="ps-agg-k">Hold</span>
       <span class={'ps-agg-v ' + (holdingsTotal > 0 ? 'ps-pos' : holdingsTotal < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsTotal)}
       </span>
@@ -212,9 +212,14 @@
   .ps-strip {
     display: flex;
     align-items: center;
-    gap: 0.7rem;
+    /* Center the metrics cluster horizontally — preview + meta sit
+       to the right of centre but the row reads as a centered group
+       at typical viewport widths (Pos / Tday / Hold are visually
+       balanced about the middle). */
+    justify-content: center;
+    gap: 0.9rem;
     width: 100%;
-    padding: 0.25rem 0.85rem;
+    padding: 0.2rem 0.85rem;
     background: linear-gradient(180deg, #0a1020 0%, #131c33 100%);
     border-bottom: 1px solid rgba(251,191,36,0.18);
     color: #c8d8f0;
@@ -247,7 +252,10 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
-  .ps-agg-meta { margin-left: auto; }
+  /* Meta count flows naturally — no margin-left: auto. With the
+     row centered, pushing the count to the right would offset
+     the group's centre of mass. */
+  .ps-agg-meta { color: rgba(180,200,230,0.55); }
 
   .ps-pos  { color: #4ade80; }
   .ps-neg  { color: #f87171; }

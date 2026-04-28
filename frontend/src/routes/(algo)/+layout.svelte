@@ -680,10 +680,12 @@
   /* ── Content ─────────────────────────────────────────────────────────────── */
   .algo-content {
     flex: 1;
-    /* Tighter side padding (0.5rem instead of 1rem) so the grids + log
-       panel have more horizontal room on narrow widths. Top / bottom
-       keep their previous rhythm. */
-    padding: 1rem 0.5rem 1.5rem;
+    /* Tighter side padding (0.5rem instead of 1rem) so the grids +
+       log panel have more horizontal room on narrow widths.
+       Top padding tightened to 0.5rem so the page content sits
+       close to the PositionStrip immediately above (was 1rem,
+       which left visible empty space below the strip's underline). */
+    padding: 0.5rem 0.5rem 1.5rem;
     color: #c8d8f0;
   }
 
