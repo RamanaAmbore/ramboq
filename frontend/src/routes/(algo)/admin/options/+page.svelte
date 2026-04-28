@@ -677,21 +677,27 @@
       options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
       placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
   </div>
-  <button type="button"
-          class="opt-refresh-btn"
-          class:opt-refresh-btn-busy={loading}
-          disabled={loading}
-          title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
-          aria-label="Refresh prices"
-          onclick={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}>
-    {#if loading}Refreshing…{:else}↻ Refresh{/if}
-  </button>
-  <button type="button"
-          class="opt-add-btn"
-          class:opt-add-btn-on={showAddPanel}
-          title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
-          aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
-          onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
+  <!-- Trailing-controls column: Refresh sits at the top edge (level
+       with the field labels), + sits at the bottom edge (level with
+       the Select triggers). Both right-aligned so they share a
+       common right margin. -->
+  <div class="opt-trailing">
+    <button type="button"
+            class="opt-refresh-btn"
+            class:opt-refresh-btn-busy={loading}
+            disabled={loading}
+            title="Re-fetch spot, LTPs, Greeks, and the payoff curve now"
+            aria-label="Refresh prices"
+            onclick={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}>
+      {#if loading}Refreshing…{:else}↻ Refresh{/if}
+    </button>
+    <button type="button"
+            class="opt-add-btn"
+            class:opt-add-btn-on={showAddPanel}
+            title={showAddPanel ? 'Close the option chain picker' : 'Open the option chain to add draft positions'}
+            aria-label={showAddPanel ? 'Close picker' : 'Open picker'}
+            onclick={() => showAddPanel = !showAddPanel}>{showAddPanel ? '−' : '+'}</button>
+  </div>
 </div>
 
 {#if strategyErr}
@@ -1128,23 +1134,37 @@
     border-color: #fbbf24;
   }
 
-  /* Refresh button — sits at the right edge of the picker bar next
-     to the "+" toggle, both vertically aligned with the Select
-     triggers (flex-end). Same height + radius as "+" so the two
-     trailing controls read as a paired group. Wider than "+" to
-     fit the "↻ Refresh" / "Refreshing…" labels without wrapping. */
-  .opt-refresh-btn {
-    height: 1.55rem;
-    min-height: 1.55rem;
+  /* Trailing-controls column — wraps the Refresh button (top) and
+     the "+" toggle (bottom) into a single right-anchored column.
+     align-self: stretch fills the picker bar's full row height so
+     justify-content: space-between pins Refresh to the top edge
+     (level with the field labels) and "+" to the bottom edge
+     (level with the Select triggers). Both right-aligned via
+     align-items: flex-end. */
+  .opt-trailing {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    align-items: flex-end;
+    justify-content: space-between;
     flex: 0 0 auto;
-    align-self: flex-end;
-    padding: 0 0.55rem;
-    border-radius: 3px;
+  }
+
+  /* Refresh button — compact pill sized to match the field-label row
+     height so it sits cleanly at the same vertical level as the
+     "Expiry" label text. Wider than "+" to fit the "↻ Refresh" /
+     "Refreshing…" labels without wrapping. Disabled state dims the
+     button while a request is in flight. */
+  .opt-refresh-btn {
+    height: 0.95rem;
+    flex: 0 0 auto;
+    padding: 0 0.45rem;
+    border-radius: 2px;
     border: 1px solid rgba(125,211,252,0.55);
     background: rgba(125,211,252,0.10);
     color: #7dd3fc;
     font-family: monospace;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     line-height: 1;

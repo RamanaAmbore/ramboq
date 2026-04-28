@@ -389,7 +389,7 @@
                 fill={wholeSigma ? '#fbbf24' : '#c8d8f0'}
                 font-size={wholeSigma ? 11 : 10}
                 font-weight={wholeSigma ? 700 : 500}
-                font-family="monospace">
+                font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.label}
           </text>
         {/if}

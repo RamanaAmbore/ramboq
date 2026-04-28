@@ -174,9 +174,10 @@ class StrategyRequest(msgspec.Struct):
     # qty-weighted IV proxy across legs and the shared expiry). Pass an
     # explicit value to override. Clamped to [1%, 50%].
     span_pct:    float | None = None
-    # σ-multiple used when span_pct is None. Default 2.5 → covers ~98 %
-    # of the lognormal mass at expiry.
-    span_sigmas: float = 2.5
+    # σ-multiple used when span_pct is None. Default 3.0 → tick labels
+    # at ±0.5σ, ±1σ, ±1.5σ, ±2σ, ±2.5σ, ±3σ on each side; covers
+    # ~99.7 % of the lognormal mass at expiry.
+    span_sigmas: float = 3.0
     points:      int   = 51
 
 
@@ -280,7 +281,7 @@ def _resolve_position(mode: str, symbol: str, qty: Optional[int],
 
 def _resolve_span_pct(*, sigma: float, T_years: float,
                       span_pct: Optional[float],
-                      span_sigmas: float = 2.5) -> float:
+                      span_sigmas: float = 3.0) -> float:
     """
     Pick the payoff-curve x-axis span. When the operator passed an
     explicit `span_pct` override, use that. Otherwise derive from the
@@ -537,7 +538,7 @@ class OptionsController(Controller):
                         ltp: Optional[float] = None,
                         iv: Optional[float] = None,
                         span_pct: Optional[float] = None,
-                        span_sigmas: float = 2.5,
+                        span_sigmas: float = 3.0,
                         points: int = 51) -> OptionAnalyticsResponse:
         """
         Full analytics bundle for one option position. Single round-trip
