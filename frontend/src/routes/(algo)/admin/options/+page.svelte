@@ -1417,12 +1417,15 @@
      submit). Phase 2 / 3: PAPER + LIVE submit paths land in the
      ticket itself; this page won't need to change. -->
 {#if ticketProps}
+  <!-- Spread every prop the calling site set onto the ticket. The
+       earlier hand-listed pass-through dropped accounts / account /
+       action / defaultMode / availableModes / orderId on the floor —
+       so chain + futures clicks opened the ticket without an account
+       picker (PAPER / LIVE submit blocked) and closePosition's
+       action='close' never reached the modal. Spread keeps any
+       future ticketProps field flowing through automatically. -->
   <OrderTicket
-    symbol={ticketProps.symbol}
-    exchange={ticketProps.exchange}
-    side={ticketProps.side}
-    qty={ticketProps.qty}
-    lotSize={ticketProps.lotSize}
+    {...ticketProps}
     onSubmit={onTicketSubmit}
     onClose={closeTicket} />
 {/if}
