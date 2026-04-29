@@ -475,14 +475,11 @@
       </div>
       <div class="ot-qty-block">
         {#if lotSize > 0}
-          <!-- Lots-driven qty input: [−] [select ▼] [+] (× lot N) = N qty.
-               Operator picks lots; resolved qty = lots × lotSize is
-               shown beside the meta tag so they always see what they're
-               actually placing. Dropdown carries common multiples
-               (1/2/3/5/10/25/50/100) for quick jumps; +/− steppers do
-               fine 1-by-1 moves. The native <select> happily shows the
-               current _lots even when it's not in the option list, so
-               typing+stepping past 100 still renders correctly. -->
+          <!-- Lots-driven qty input. Single-line layout:
+                 Lots [−] [1 ▼] [+] (× 50 = 50)
+               so all of label / stepper / dropdown / meta sit on
+               one row — operator wanted the field compact enough
+               that nothing wraps to a second line. -->
           <label class="ot-label" for="ot-lots">Lots</label>
           <div class="ot-lots-row">
             <button type="button" class="ot-lots-step"
@@ -501,7 +498,7 @@
             <button type="button" class="ot-lots-step"
                     onclick={() => stepLots(1)}
                     aria-label="Increase lots">+</button>
-            <span class="ot-meta">(× lot {lotSize})  =  {_qty} qty</span>
+            <span class="ot-meta">(× {lotSize} = {_qty})</span>
           </div>
         {:else}
           <label class="ot-label" for="ot-qty">Qty</label>
@@ -857,31 +854,29 @@
   .ot-qty-block .ot-label { margin: 0 0 0.18rem; }
   .ot-qty-block .ot-meta { font-size: 0.65rem; color: #a3b9d0; padding-bottom: 0.5rem; }
 
-  /* [−] [select ▼] [+] (× lot 50) = 50 qty — lots-driven Qty UI.
-     Mirrors the chain picker stepper but with a dropdown in the
-     middle so the operator can also jump to common multiples
-     (1/2/3/5/10/25/…) without 25 +-clicks. The select happily
-     accepts off-list values via the synthesized <option> emitted
-     when _lots isn't a common multiple. */
+  /* [−] [1 ▼] [+] (× 50 = 50) — lots-driven Qty UI. Sits inline on
+     a single row; nowrap so the +/− and the dropdown can never
+     break onto two lines on narrow viewports. */
   .ot-lots-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    flex-wrap: wrap;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
   }
   .ot-lots-step {
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.4rem;
+    height: 1.4rem;
     padding: 0;
     border-radius: 3px;
     border: 1px solid rgba(251,191,36,0.45);
     background: rgba(251,191,36,0.10);
     color: #fbbf24;
     font-family: monospace;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -895,10 +890,17 @@
     cursor: not-allowed;
   }
   .ot-lots-select {
-    width: auto;
-    min-width: 3.4rem;
+    /* Tight: enough room for 3-digit lots + the chevron, nothing
+       extra. Width was 3.4rem before — too generous for a 1-100
+       value range. */
+    width: 2.8rem;
+    min-width: 0;
+    flex: 0 0 auto;
+    height: 1.4rem;
+    padding: 0 1rem 0 0.25rem;
     text-align: center;
     font-weight: 700;
+    font-size: 0.7rem;
     color: #fbbf24;
     appearance: none;
     -webkit-appearance: none;
@@ -907,10 +909,17 @@
        theme's "open angle" caret. */
     background-image:
       url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
-    background-position: calc(100% - 6px) 50%;
+    background-position: calc(100% - 4px) 50%;
     background-size: 10px 6px;
     background-repeat: no-repeat;
-    padding-right: 1.2rem;
+  }
+  .ot-qty-block .ot-lots-row .ot-meta {
+    /* Meta tag sits inline next to the [+] button without padding
+       below — was inheriting `.ot-meta { padding-bottom: 0.5rem }`
+       from the cash-equity Qty path which mis-aligned it on the
+       lots row. */
+    padding-bottom: 0;
+    white-space: nowrap;
   }
 
   .ot-input {
