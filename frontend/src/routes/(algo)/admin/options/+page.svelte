@@ -239,6 +239,14 @@
         draftId: d.id,
       });
     }
+    // Closed positions (qty=0 — Kite returns these so realised P/L
+    // stays visible) sort to the END of the legs list. Live exposure
+    // first, history last; stable order otherwise.
+    out.sort((a, b) => {
+      const ac = (Number(a?.qty || 0) === 0) ? 1 : 0;
+      const bc = (Number(b?.qty || 0) === 0) ? 1 : 0;
+      return ac - bc;
+    });
     return out;
   });
 
@@ -587,11 +595,39 @@
     });
   }
 
-  // Per-row +/− trade launchers (addToPosition / closePosition) and
-  // the _rowTicketAccount helper they used were dropped — the
-  // legs grid no longer carries a Trade column. Operators add /
-  // close from the chain picker (+CE / +PE / + futures buttons in
-  // the option chain panel) or use the picker bar's BUY/SELL pair.
+  /** Pre-fill account when the row already names one. Falls back
+   *  to the page-level default. Masked (`ZG####`) values get
+   *  filtered so the ticket never seeds with an unroutable
+   *  account. */
+  function _rowTicketAccount(/** @type {{account?: string}} */ c) {
+    const fromRow = String(c.account || '').trim();
+    if (_isRealAccount(fromRow)) return fromRow;
+    return _ticketAccountDefault();
+  }
+
+  /** Click-on-row handler — opens the OrderTicket pre-filled to
+   *  close the row's position. Skipped for drafts (no real
+   *  exposure to close) and zero-qty rows (already closed —
+   *  sorted to end of list, included for visibility). The
+   *  checkbox inside the row stops propagation so its toggle
+   *  doesn't double-fire as a close. */
+  function closePosition(/** @type {any} */ c) {
+    if (!c?.symbol || c.source === 'draft') return;
+    const qty = Math.abs(Number(c.qty || 0));
+    if (!qty) return;       // already closed
+    const inst = getInstrument(String(c.symbol).toUpperCase());
+    const lot  = Number(inst?.ls || 1);
+    openTicket({
+      symbol:   c.symbol,
+      exchange: inst?.e || 'NFO',
+      side:     c.qty < 0 ? 'BUY' : 'SELL',   // opposite of held
+      action:   'close',
+      qty,
+      lotSize:  lot,
+      accounts: ticketAccounts,
+      account:  _rowTicketAccount(c),
+    });
+  }
 
   // Ticket → drafts: signed qty (BUY = +qty, SELL = −qty) so the
   // existing payoff math keeps working. Auto-aligns the page
@@ -1203,7 +1239,6 @@
             <span class="num">Δ</span>
             <span class="num">Θ</span>
             <span class="num">𝒱</span>
-            <span>Src</span>
           </div>
           {#each candidatePositions as c (c.source + '|' + c.account + '|' + c.symbol)}
             {@const lg = legAnalyticsBySymbol[c.symbol]}
@@ -1211,10 +1246,34 @@
             {@const cost = c.avg_cost != null ? c.avg_cost : (lg ? lg.avg_cost : null)}
             {@const pnl = (ltp != null && cost != null) ? (ltp - cost) * c.qty : null}
             {@const dir = c.qty < 0 ? 'short' : c.qty > 0 ? 'long' : 'flat'}
-            <label class="cand-row cand-row-{dir}"
-                   class:cand-disabled={enabledSymbols[c.symbol] === false}>
+            {@const isClosed = Number(c.qty || 0) === 0}
+            {@const isClosable = !isClosed && c.source !== 'draft'}
+            <!-- Row click → close-position ticket. Skipped on
+                 drafts (no real exposure) and zero-qty rows
+                 (already closed — sorted to end of list, kept
+                 visible for context). The checkbox stops
+                 propagation so toggling a leg doesn't
+                 inadvertently fire the close handler. -->
+            <div class="cand-row cand-row-{dir}"
+                 class:cand-disabled={enabledSymbols[c.symbol] === false}
+                 class:cand-closed={isClosed}
+                 role="button"
+                 tabindex={isClosable ? 0 : -1}
+                 aria-disabled={!isClosable}
+                 title={isClosable
+                   ? `Close ${Math.abs(c.qty)} ${c.symbol}`
+                   : isClosed ? 'Closed position' : ''}
+                 onclick={() => { if (isClosable) closePosition(c); }}
+                 onkeydown={(e) => {
+                   if (!isClosable) return;
+                   if (e.key === 'Enter' || e.key === ' ') {
+                     e.preventDefault();
+                     closePosition(c);
+                   }
+                 }}>
               <input type="checkbox"
                      checked={enabledSymbols[c.symbol] !== false}
+                     onclick={(e) => e.stopPropagation()}
                      onchange={(e) => {
                        const next = { ...enabledSymbols };
                        next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
@@ -1232,8 +1291,7 @@
               <span class="num">{lg ? lg.greeks.delta.toFixed(2) : '—'}</span>
               <span class="num {lg && lg.greeks.theta < 0 ? 'kv-neg' : ''}">{lg ? lg.greeks.theta.toFixed(0) : '—'}</span>
               <span class="num">{lg ? lg.greeks.vega.toFixed(0) : '—'}</span>
-              <span class="leg-source leg-source-{c.source}">{c.source}</span>
-            </label>
+            </div>
           {/each}
         </div>
       </div>
@@ -1779,8 +1837,7 @@
       max-content  /* iv */
       max-content  /* delta */
       max-content  /* theta */
-      max-content  /* vega */
-      max-content; /* source */
+      max-content; /* vega */
     column-gap: 0.6rem;
     row-gap: 0.2rem;
     /* No min-width — the grid is naturally as wide as its content.
@@ -1802,8 +1859,7 @@
       max-content  /* iv */
       max-content  /* delta */
       max-content  /* theta */
-      max-content  /* vega */
-      max-content; /* source */
+      max-content; /* vega */
   }
   /* Single parent grid via subgrid. Each row inherits the parent's
      column tracks — so headers and data cells line up exactly,
@@ -1850,6 +1906,14 @@
     transition: background 0.1s;
   }
   .cand-row:hover { background: rgba(251,191,36,0.05); }
+  /* Closed positions (qty=0) — sorted to end of list, kept
+     visible for context. Dim them so live rows pop, and disable
+     the click-to-close affordance (no exposure to close). */
+  .cand-row.cand-closed {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .cand-row.cand-closed:hover { background: transparent; }
 
   /* Long / short row tint — mirrors the /dashboard ag-theme-algo
      palette: sky-cyan for long positions, warm-orange for short.

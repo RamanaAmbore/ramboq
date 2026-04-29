@@ -440,38 +440,43 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Strike markers — one dashed white vertical per strike,
-           labelled with the strike's distance from spot in σ-units
-           (e.g. "+1.5σ" / "−0.8σ"). Falls back to the raw strike
-           value when σ metadata isn't available (operator-overridden
-           span_pct on the API). The actual strike price is still
-           visible in the kv-pair tables below the chart. -->
+      <!-- Strike markers — one dashed white vertical per strike.
+           Label is the strike PRICE rendered vertically (rotated
+           90°) along the line itself, near the top of the chart.
+           The σ-distance label that used to sit above each line was
+           dropped — σ scale is already on the bottom x-axis ticks,
+           and an inline σ label inside the chart was redundant. -->
       {#each strikeList as k}
         {#if k >= sMin && k <= sMax}
           <line x1={xOf(k)} x2={xOf(k)} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(226,232,240,0.40)" stroke-width="1" stroke-dasharray="2 2"/>
-          <text x={xOf(k)} y={PAD_T + 10}
-                text-anchor="middle" fill="#e2e8f0"
-                font-size="9" font-family="monospace" opacity="0.85">
-            {#if spanSigmas > 0 && spanPct > 0 && spot > 0}
-              {@const kSig = ((k / spot) - 1) * spanSigmas / spanPct}
-              {kSig >= 0 ? '+' : '−'}{Math.abs(kSig).toFixed(1)}σ
-            {:else}
-              {k.toFixed(0)}
-            {/if}
+          {@const sx = xOf(k)}
+          {@const sy = PAD_T + 6}
+          <text x={sx} y={sy}
+                text-anchor="end"
+                transform="rotate(-90 {sx} {sy})"
+                fill="#e2e8f0" opacity="0.85"
+                font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+            {k.toFixed(0)}
           </text>
         {/if}
       {/each}
 
       <!-- Breakeven markers — amber dashed verticals; multi-leg
-           strategies (iron condor, butterfly) can produce two. -->
+           strategies (iron condor, butterfly) can produce two.
+           Same convention as strikes: BE PRICE rendered vertically
+           on the dashed line itself. -->
       {#each breakevenList as be}
         {#if be > sMin && be < sMax}
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(251,191,36,0.55)" stroke-width="1" stroke-dasharray="3 3"/>
-          <text x={xOf(be)} y={height - PAD_B + 32}
-                text-anchor="middle" fill="#fbbf24"
-                font-size="9" font-family="monospace">
+          {@const bx = xOf(be)}
+          {@const by = PAD_T + 6}
+          <text x={bx} y={by}
+                text-anchor="end"
+                transform="rotate(-90 {bx} {by})"
+                fill="#fbbf24"
+                font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
             BE {be.toFixed(0)}
           </text>
         {/if}

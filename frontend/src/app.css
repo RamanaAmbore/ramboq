@@ -225,15 +225,26 @@
 .ag-theme-algo .ag-row.totals-row .pnl-zero,
 .ag-theme-algo .ag-row.totals-row .ag-cell { color: #fbbf24 !important; background-color: transparent !important; }
 
-/* Right-align all numeric cells and their headers across every grid */
+/* Right-align all numeric cells and their headers across every grid.
+   The two header rules cover both naming conventions:
+     `.ag-right-aligned-header` — applied via our columnTypes
+                                   (custom cellClass / headerClass).
+     `.ag-numeric-header`        — auto-applied by AG Grid v33+ when
+                                   `type: 'numericColumn'` is set
+                                   (covers any column that uses
+                                   the type but has a per-column
+                                   cellClass that overrides ours). */
 .ag-theme-ramboq .ag-right-aligned-cell,
 .ag-theme-algo .ag-right-aligned-cell {
   text-align: right !important;
   justify-content: flex-end !important;
 }
 .ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-label,
-.ag-theme-algo .ag-right-aligned-header .ag-header-cell-label {
+.ag-theme-algo .ag-right-aligned-header .ag-header-cell-label,
+.ag-theme-ramboq .ag-numeric-header .ag-header-cell-label,
+.ag-theme-algo .ag-numeric-header .ag-header-cell-label {
   justify-content: flex-end !important;
+  text-align: right !important;
 }
 
 /* AG Grid: show blank row when no data */

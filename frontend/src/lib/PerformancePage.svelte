@@ -316,8 +316,19 @@
     const keepSym  = (r) => !selectedSymbols.length
       || selectedSymbols.includes(r.tradingsymbol)
       || selectedSymbols.includes(underlyingOf(r.tradingsymbol));
-    const hRows     = rawHoldings.filter(r => keepAcct(r) && keepSym(r));
-    const pRows     = rawPositions.filter(r => keepAcct(r) && keepSym(r));
+    // Stable sort with closed (qty=0) rows at the end. Kite returns
+    // closed intraday positions / sold-off holdings with quantity=0
+    // so realised P/L stays visible — operators want them grouped
+    // last, not interleaved with live exposure.
+    const closedLast = (a, b) => {
+      const ac = (Number(a?.quantity || 0) === 0) ? 1 : 0;
+      const bc = (Number(b?.quantity || 0) === 0) ? 1 : 0;
+      return ac - bc;
+    };
+    const hRows = rawHoldings.filter(r => keepAcct(r) && keepSym(r))
+      .slice().sort(closedLast);
+    const pRows = rawPositions.filter(r => keepAcct(r) && keepSym(r))
+      .slice().sort(closedLast);
     const hSummary  = rawHoldingsSummary.filter(keepAcct);
     const pSummary  = rawPositionsSummary.filter(keepAcct);
     const fRows     = rawFunds.filter(keepAcct);
