@@ -346,11 +346,35 @@ def _fmt_pct(n: float) -> str:
     return f"{n:.2f}%"
 
 
+def _fmt_rupees_compact(n: float) -> str:
+    """Compact ₹ string for inline breakdowns — switches to k/L/Cr above
+    1,000 so the per-underlying line stays under ~32 char on a phone.
+    Examples: -₹22k, +₹1.2L, -₹3.4Cr, -₹450."""
+    a = abs(n)
+    sign = '-' if n < 0 else ''
+    if a >= 10_000_000:
+        return f"{sign}₹{a / 10_000_000:.1f}Cr"
+    if a >= 100_000:
+        return f"{sign}₹{a / 100_000:.1f}L"
+    if a >= 1_000:
+        return f"{sign}₹{a / 1_000:.1f}k"
+    return f"{sign}₹{a:.0f}"
+
+
 def _tg_alert_body(alerts: list) -> str:
     """
     Build the narrow 2-line-per-row Telegram body. Each alert gets:
       line 1:  ▸ <short> <scope>  <current ₹> (<pct>)
       line 2:    <rule>  <extra / threshold>
+
+    Position alerts can carry two extra lines:
+      line 3:    by und: NIFTY -₹22k · BANKNIFTY -₹13k · …
+      line 4:    rate:   <rate ₹/min>            (when alert_state had
+                                                  enough history for a
+                                                  static-alert rate
+                                                  reading; rate alerts
+                                                  already carry it on
+                                                  line 2)
 
     Keeps rows under ~32 char so they don't wrap on a phone in portrait.
     """
@@ -377,6 +401,22 @@ def _tg_alert_body(alerts: list) -> str:
                          f"floor {a['threshold']}")
         else:
             lines.append(f"  {label}  {a['threshold']}")
+
+        # Optional enrichment for position alerts. Compact ₹ formatting
+        # keeps the line under the 32-char rule of thumb.
+        if a['section'] == 'Positions':
+            ub = a.get('underlyings_breakdown') or []
+            if ub:
+                pieces = [f"{u['underlying']} {_fmt_rupees_compact(u['pnl'])}"
+                          for u in ub]
+                lines.append("  by und: " + " · ".join(pieces))
+            # Static-alert rate enrichment — rate alerts already showed
+            # `now <rate>/min` on line 2 so we suppress to avoid the
+            # dupe.
+            rv = a.get('rate_val')
+            if rv is not None and k not in ('rate_abs', 'rate_pct'):
+                lines.append(f"  rate:   {_fmt_rupees(rv)}/min")
+
         lines.append("")  # blank line between alerts for easy scanning
     if lines and lines[-1] == "":
         lines.pop()
@@ -422,14 +462,17 @@ def _email_alert_body(alerts: list) -> str:
         current = _fmt_rupees(a['pnl'])
         if a.get('pct') is not None and a['pct'] != 0:
             current += f"<br><span style='color:#555;font-size:11px'>{_fmt_pct(a['pct'])}</span>"
+        # Rate column — always show when rate_val is set, regardless of
+        # whether the rule itself is rate-based. Static position alerts
+        # now carry rate_val too (computed by agent_engine from the same
+        # pnl_history rate metrics use). Format follows the metric
+        # family — % for percentage rates, ₹ otherwise.
         if a.get('rate_val') is None:
             rate = "—"
-        elif a['kind'] == 'rate_abs':
-            rate = f"{_fmt_rupees(a['rate_val'])}/min"
         elif a['kind'] == 'rate_pct':
             rate = f"{_fmt_pct(a['rate_val'])}/min"
         else:
-            rate = "—"
+            rate = f"{_fmt_rupees(a['rate_val'])}/min"
         row_html += (
             "<tr>"
             + cell(a['section'], bg)
@@ -440,6 +483,29 @@ def _email_alert_body(alerts: list) -> str:
             + cell(a['threshold'], bg)
             + "</tr>"
         )
+        # Per-underlying breakdown sub-row — only for Position alerts
+        # that carry the breakdown payload. Renders as a nested table
+        # spanning all 6 columns so the operator sees the contributing
+        # underlyings without leaving the alert.
+        ub = a.get('underlyings_breakdown') or []
+        if a['section'] == 'Positions' and ub:
+            sub_cells = ''.join(
+                f"<td style='padding:3px 8px;font-size:11px;color:#444;"
+                f"border-right:1px solid #e8eef5'>"
+                f"<b>{u['underlying']}</b> "
+                f"<span style='color:#555'>{_fmt_rupees(u['pnl'])}</span>"
+                f"</td>"
+                for u in ub
+            )
+            row_html += (
+                f"<tr><td colspan='6' style='padding:0 12px 8px;"
+                f"background-color:{bg or '#fafbfc'}'>"
+                f"<div style='font-size:11px;color:#666;padding:4px 0 2px'>"
+                f"By underlying:</div>"
+                f"<table style='border-collapse:collapse'>"
+                f"<tr>{sub_cells}</tr></table>"
+                f"</td></tr>"
+            )
     return (
         f"<table style='border-collapse:collapse;width:100%'>"
         f"<thead><tr>{header_cells}</tr></thead>"

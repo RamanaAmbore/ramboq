@@ -112,10 +112,23 @@ def _v2_build_evalresult(matches, agent_name: str) -> EvalResult:
 # consistent across both engines makes parity testing trivial — the
 # operator can spot-diff two messages and only care about the agent slug.
 
-def _v2_match_to_alertrow(match: dict) -> dict:
+def _v2_match_to_alertrow(match: dict, *,
+                          df_positions=None,
+                          alert_state: dict | None = None,
+                          rate_window_min: int = 10) -> dict:
     """
     Convert a v2 evaluator match into the alert-row dict shape consumed by
     alert_utils._tg_alert_body / _email_alert_body.
+
+    Optional enrichment when caller supplies the kwargs:
+      - df_positions: raw broker positions DataFrame. Drives the per-
+        underlying breakdown surfaced under each Position alert.
+      - alert_state: persistent state from background.py — carries
+        `pnl_history` keyed by (section, scope). Lets us surface a
+        rate-of-loss readout on STATIC position alerts (rate alerts
+        already carry it via `rate_val`).
+      - rate_window_min: how far back to walk pnl_history when computing
+        the rate. Defaults to the engine's rate window.
     """
     scope_tok = match.get('scope', '') or ''
     metric    = match.get('metric', '') or ''
@@ -172,18 +185,73 @@ def _v2_match_to_alertrow(match: dict) -> dict:
 
     scope_label = str(row.get('account', 'TOTAL'))
 
+    # ── Optional enrichment for position alerts ────────────────────────
+    # 1) Per-underlying breakdown — operator wants to see `NIFTY -₹22k ·
+    #    BANKNIFTY -₹13k` alongside the bare account total. Honours the
+    #    `alerts.show_underlying_breakdown` and `alerts.max_underlyings_per_alert`
+    #    settings, with fallbacks so a settings-cache miss doesn't block.
+    # 2) Rate-of-loss enrichment for STATIC alerts — rate-based metrics
+    #    already populate rate_val above. For static_pct / static_abs we
+    #    reach into alert_state's pnl_history (same source the rate
+    #    metrics use) and compute ΔP&L over the rate window.
+    underlyings_breakdown: list[dict] = []
+    if section == 'Positions' and df_positions is not None:
+        try:
+            from backend.shared.helpers.settings import get_bool, get_int
+            from backend.shared.helpers.summarise import (
+                breakdown_positions_by_underlying,
+            )
+            if get_bool('alerts.show_underlying_breakdown', True):
+                top_n = get_int('alerts.max_underlyings_per_alert', 5)
+                underlyings_breakdown = breakdown_positions_by_underlying(
+                    df_positions, account=scope_label, top_n=top_n,
+                )
+        except Exception as e:
+            logger.warning(f"underlying breakdown failed: {e}")
+
+    # Compute rate for static position alerts on the same (section, scope)
+    # bucket the rate metrics use. alert_state is keyed by ('positions',
+    # scope) tuple per agent_evaluator.Context._compute_rate.
+    if (section == 'Positions' and rate_val is None and alert_state
+            and kind in ('static_pct', 'static_abs')):
+        try:
+            from backend.shared.helpers.settings import get_bool
+            if get_bool('alerts.show_rate_in_static_alerts', True):
+                hist = (alert_state.get('pnl_history') or {}).get(
+                    ('positions', scope_label), []
+                ) or []
+                if len(hist) >= 2:
+                    cutoff_window = hist[-1][0] - timedelta(minutes=rate_window_min)
+                    window = [s for s in hist if s[0] >= cutoff_window]
+                    if len(window) >= 2:
+                        oldest, latest = window[0], window[-1]
+                        mins = (latest[0] - oldest[0]).total_seconds() / 60.0
+                        if mins > 0:
+                            # field_idx=1 → pnl ₹/min, matching rate_abs metric
+                            rate_val = (latest[1] - oldest[1]) / mins
+        except Exception as e:
+            logger.warning(f"static-alert rate enrichment failed: {e}")
+
     return dict(
         section=section, scope=scope_label, kind=kind,
         pnl=pnl, pct=pct, rate_val=rate_val, threshold=thr_str,
+        underlyings_breakdown=underlyings_breakdown,
     )
 
 
-async def _v2_send_rich_alert(agent, matches, now, sim_mode: bool = False):
+async def _v2_send_rich_alert(agent, matches, now, sim_mode: bool = False,
+                              context: dict | None = None):
     """
     Render the v2 alert as the same narrow-TG + HTML-table format the legacy
     engine uses, and send through Telegram + email via alert_utils's own
     dispatcher (which already branch-tags and honours is_enabled gates).
     Returns True when at least one channel was attempted.
+
+    `context` is the same dict run_cycle passed into the evaluator; we
+    surface df_positions + alert_state from it so per-underlying
+    breakdown and static-alert rate enrichment can light up. Backward-
+    compatible — when context is None each row builds with the bare
+    section/scope/kind/pnl/threshold fields and no enrichment.
     """
     # Late import avoids the agent_engine → alert_utils cycle at import time.
     from backend.shared.helpers.alert_utils import (
@@ -191,7 +259,18 @@ async def _v2_send_rich_alert(agent, matches, now, sim_mode: bool = False):
     )
     from backend.shared.helpers.date_time_utils import timestamp_display
 
-    rows = [_v2_match_to_alertrow(m) for m in matches]
+    df_positions = (context or {}).get("df_positions")
+    alert_state  = (context or {}).get("alert_state")
+    cfg          = _v2_cfg()
+    rows = [
+        _v2_match_to_alertrow(
+            m,
+            df_positions=df_positions,
+            alert_state=alert_state,
+            rate_window_min=cfg['rate_window_min'],
+        )
+        for m in matches
+    ]
     if not rows:
         return False
 
@@ -778,7 +857,9 @@ async def run_cycle(context: dict, broadcast_fn=None,
             # alert_utils._dispatch. Fall back to the generic dispatch()
             # path on any failure so the log / WebSocket channel still
             # carries a record of the fire.
-            rich_sent = await _v2_send_rich_alert(agent, matches, now, sim_mode=sim_mode)
+            rich_sent = await _v2_send_rich_alert(
+                agent, matches, now, sim_mode=sim_mode, context=context,
+            )
             if not rich_sent:
                 await dispatch(agent, result, broadcast_fn, sim_mode=sim_mode)
             else:

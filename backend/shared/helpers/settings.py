@@ -65,6 +65,24 @@ SEEDS: list[tuple] = [
     ("alerts", "alerts.suppress_delta_pct",      "float",  0.5,
      "Rate-agent re-fire requires |Δpct| of at least this much since last fire.",
      "%", {"min": 0, "max": 10, "step": 0.05}),
+    # Underlying-breakdown + rate enrichment for position alerts. Each
+    # position alert can carry a one-line "by underlying" summary
+    # (NIFTY -₹22k · BANKNIFTY -₹13k …) plus a rate-of-loss readout
+    # (₹/min over the rate window) to give the operator richer
+    # context than the bare account-total number.
+    ("alerts", "alerts.show_underlying_breakdown",       "bool",  True,
+     "Append per-underlying loss breakdown to position-alert messages "
+     "(both Telegram and email).", None, None),
+    ("alerts", "alerts.max_underlyings_per_alert",       "int",   5,
+     "Top-N underlyings shown in the per-alert breakdown, sorted by "
+     "|loss| descending.", None, {"min": 1, "max": 20, "step": 1}),
+    ("alerts", "alerts.show_rate_in_static_alerts",      "bool",  True,
+     "Show rate-of-loss (₹/min over the rate window) on static-threshold "
+     "position alerts too — by default only rate-based alerts surface it.",
+     None, None),
+    ("alerts", "alerts.summary_show_underlying_breakdown", "bool", True,
+     "Append a per-underlying breakdown to the open/close summary "
+     "Telegram + email message.", None, None),
 
     # ── Performance refresh ─────────────────────────────────────────────
     ("performance", "performance.refresh_interval",        "int", 5,
