@@ -1193,11 +1193,11 @@
           {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
           {fmtMoney(Math.abs(strategy.net_cost), false)}
         </span>
-        <span class="opt-section-tag tag-long">
-          MAX PROFIT {fmtMoney(strategy.risk.max_profit, false)}
+        <span class="opt-section-tag tag-long" title="Max profit">
+          MAX P {fmtMoney(strategy.risk.max_profit, false)}
         </span>
-        <span class="opt-section-tag tag-short">
-          MAX LOSS {fmtMoney(strategy.risk.max_loss, false)}
+        <span class="opt-section-tag tag-short" title="Max loss">
+          MAX L {fmtMoney(strategy.risk.max_loss, false)}
         </span>
       </div>
     </div>
@@ -1205,7 +1205,6 @@
       payoff={strategy.payoff}
       spot={strategy.spot}
       prevClose={strategy.spot_prev_close}
-      strikes={strategy.legs.map(l => l.strike)}
       breakevens={strategy.risk.breakevens}
       spanSigmas={strategy.span_sigmas}
       spanPct={strategy.span_pct}

@@ -14,9 +14,7 @@
   /** @type {{
    *   payoff: Array<{spot:number,today_value:number,expiry_value:number}>,
    *   spot:         number,
-   *   strike?:      number,
    *   breakeven?:   number,
-   *   strikes?:     number[],
    *   breakevens?:  number[],
    *   height?:      number,
    *   currentPnl?:  number|null,
@@ -32,9 +30,7 @@
   let {
     payoff = [],
     spot,
-    strike     = undefined,
     breakeven  = undefined,
-    strikes    = /** @type {number[]|undefined} */ (undefined),
     breakevens = /** @type {number[]|undefined} */ (undefined),
     height     = 280,
     currentPnl = null,
@@ -71,12 +67,12 @@
     return best;
   });
 
-  // Multi-leg charts pass `strikes` / `breakevens` arrays; single-leg
-  // charts pass scalars. Normalise to arrays so the render code is one
-  // path. Undefined / empty falls through to no markers.
-  const strikeList    = $derived(strikes
-    ? strikes.filter(s => s != null)
-    : (strike != null ? [strike] : []));
+  // Multi-leg charts pass `breakevens` array; single-leg charts pass
+  // a scalar. Normalise to an array so the render code is one path;
+  // undefined / empty falls through to no markers.
+  // strike / strikes props are kept on the API surface for back-
+  // compat but no longer rendered (operator removed strike verticals
+  // from the chart — see "spot/strike removal" below).
   const breakevenList = $derived(breakevens
     ? breakevens.filter(b => b != null)
     : (breakeven != null ? [breakeven] : []));
@@ -459,32 +455,17 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Strike markers — one dashed white vertical per strike.
-           Label is the strike PRICE rendered vertically (rotated
-           90°) along the line itself, near the top of the chart.
-           The σ-distance label that used to sit above each line was
-           dropped — σ scale is already on the bottom x-axis ticks,
-           and an inline σ label inside the chart was redundant. -->
-      {#each strikeList as k}
-        {#if k >= sMin && k <= sMax}
-          <line x1={xOf(k)} x2={xOf(k)} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(226,232,240,0.40)" stroke-width="1" stroke-dasharray="2 2"/>
-          {@const sx = xOf(k)}
-          {@const sy = PAD_T + 6}
-          <text x={sx} y={sy}
-                text-anchor="end"
-                transform="rotate(-90 {sx} {sy})"
-                fill="#e2e8f0" opacity="0.85"
-                font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
-            {k.toFixed(0)}
-          </text>
-        {/if}
-      {/each}
+      <!-- Strike + spot vertical-line markers were removed by
+           operator request — the only verticals left are σ ticks
+           (above) and breakevens (below). Strike values are still
+           visible as the dashed-line price labels at the σ ticks
+           closest to each strike, and spot lives in the top-left
+           stat overlay. Keeping the SVG less busy makes the today /
+           expiry curves the main visual signal. -->
 
-      <!-- Breakeven markers — amber dashed verticals; multi-leg
+      <!-- Breakeven markers — magenta dashed verticals; multi-leg
            strategies (iron condor, butterfly) can produce two.
-           Same convention as strikes: BE PRICE rendered vertically
-           on the dashed line itself. -->
+           BE PRICE rendered vertically on the line itself. -->
       {#each breakevenList as be}
         {#if be > sMin && be < sMax}
           <!-- Breakeven verticals use a distinct MAGENTA palette
@@ -509,10 +490,11 @@
         {/if}
       {/each}
 
-      <!-- Current spot marker — cyan vertical (numeric value lives in
-           the top-left stat overlay; the legend identifies the line). -->
-      <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
-            stroke="#7dd3fc" stroke-width="1.5"/>
+      <!-- Spot vertical line removed by operator request (only σ
+           ticks + breakevens remain as on-chart verticals). The
+           current-P&L dot below still anchors at spot, and the
+           SPOT readout in the top-left stat overlay carries the
+           numeric value. -->
 
       <!-- Expiry curve (dashed sky) -->
       <path d={pathExpiry} fill="none" stroke="#7dd3fc"
@@ -558,10 +540,6 @@
       <span class="legend-item">
         <span class="legend-line legend-expiry"></span>
         Expiry (intrinsic)
-      </span>
-      <span class="legend-item legend-spot">
-        <span class="legend-mark legend-spot-mark"></span>
-        Spot
       </span>
       <span class="legend-item legend-be">
         <span class="legend-mark legend-be-mark"></span>
