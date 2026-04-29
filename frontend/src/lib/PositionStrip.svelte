@@ -16,17 +16,21 @@
   // pinned to the footer where the eye tunes it out.
 
   import { onMount, onDestroy } from 'svelte';
-  import { dataCache, visibleInterval } from '$lib/stores';
-  import { fetchPositions, fetchHoldings } from '$lib/api';
+  import { dataCache, marketAwareInterval } from '$lib/stores';
+  import { fetchPositions, fetchHoldings, fetchFunds } from '$lib/api';
 
   // Local mirror of the cache so the strip re-renders when /dashboard
   // refreshes the snapshot. The cache itself isn't a Svelte store
   // — we self-fetch on mount + refresh on a slow timer.
   let positions = $state(/** @type {any[]} */ ([]));
   let holdings  = $state(/** @type {any[]} */ ([]));
+  // Funds rows — one per account. Used only to surface a single
+  // aggregated CASH pill on the strip; the dashboard owns the
+  // detailed funds grid.
+  let funds     = $state(/** @type {any[]} */ ([]));
   let lastRefresh = $state('');
 
-  /** @type {ReturnType<typeof visibleInterval> | null} */
+  /** @type {ReturnType<typeof marketAwareInterval> | null} */
   let teardown = null;
 
   // Demo / anonymous sessions still get real data (with masked
@@ -37,7 +41,10 @@
       // Cache hit — paint instantly, then refresh in the background.
       if (dataCache.positions?.rows) positions = dataCache.positions.rows;
       if (dataCache.holdings?.rows)  holdings  = dataCache.holdings.rows;
-      const [p, h] = await Promise.allSettled([fetchPositions(), fetchHoldings()]);
+      if (dataCache.funds?.rows)     funds     = dataCache.funds.rows;
+      const [p, h, f] = await Promise.allSettled([
+        fetchPositions(), fetchHoldings(), fetchFunds(),
+      ]);
       if (p.status === 'fulfilled') {
         positions = p.value?.rows || [];
         dataCache.positions = p.value;
@@ -45,6 +52,10 @@
       if (h.status === 'fulfilled') {
         holdings = h.value?.rows || [];
         dataCache.holdings = h.value;
+      }
+      if (f.status === 'fulfilled') {
+        funds = f.value?.rows || [];
+        dataCache.funds = f.value;
       }
       lastRefresh = new Date().toLocaleTimeString('en-IN', {
         hour12: false, hour: '2-digit', minute: '2-digit',
@@ -58,7 +69,9 @@
     // and /dashboard refresh every 30 s on their own; we mirror that
     // cadence so we don't hammer /api/positions when the operator
     // sits on a different algo page.
-    teardown = visibleInterval(loadOnce, 30000);
+    // marketAwareInterval — strip values are positions/holdings P&L,
+    // both static outside NSE/MCX hours. No need to poll overnight.
+    teardown = marketAwareInterval(loadOnce, 30000);
   });
   onDestroy(() => { teardown?.(); });
 
@@ -84,6 +97,15 @@
   const holdingsTotal = $derived.by(() => {
     let s = 0;
     for (const h of holdings)  s += Number(h?.pnl || 0);
+    return s;
+  });
+  // Aggregate cash across accounts. Funds rows expose `cash` as the
+  // free balance — the same column the Funds grid surfaces. Prefer
+  // numeric coercion + |0| fallback so a row missing the field
+  // doesn't break the sum.
+  const cashTotal = $derived.by(() => {
+    let s = 0;
+    for (const f of funds) s += Number(f?.cash || 0);
     return s;
   });
 
@@ -165,7 +187,7 @@
   <a class="ps-strip" href="/dashboard"
      aria-label="Open the dashboard — full positions, holdings, and funds grids">
     <span class="ps-agg" title="Positions P/L — open + closed intraday">
-      <span class="ps-agg-k">Positions</span>
+      <span class="ps-agg-k">Pos</span>
       <span class={'ps-agg-v ' + (positionsPnl > 0 ? 'ps-pos' : positionsPnl < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(positionsPnl)}
       </span>
@@ -177,9 +199,15 @@
       </span>
     </span>
     <span class="ps-agg" title="Holdings — total unrealised P/L from entry">
-      <span class="ps-agg-k">Holdings</span>
+      <span class="ps-agg-k">Hold</span>
       <span class={'ps-agg-v ' + (holdingsTotal > 0 ? 'ps-pos' : holdingsTotal < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsTotal)}
+      </span>
+    </span>
+    <span class="ps-agg" title="Cash — free balance summed across accounts">
+      <span class="ps-agg-k">Cash</span>
+      <span class={'ps-agg-v ' + (cashTotal > 0 ? 'ps-cash' : cashTotal < 0 ? 'ps-neg' : 'ps-flat')}>
+        {fmtMoney(cashTotal)}
       </span>
     </span>
     <span class="ps-agg ps-agg-meta">
@@ -259,6 +287,10 @@
   .ps-pos  { color: #4ade80; }
   .ps-neg  { color: #f87171; }
   .ps-flat { color: #c8d8f0; }
+  /* Cash pill — sky-cyan to read as a balance/inventory pill rather
+     than a P&L pill. Negative cash (margin debt) still flips to
+     red via .ps-neg so the operator catches it instantly. */
+  .ps-cash { color: #7dd3fc; }
 
   .ps-pos-bg { background: rgba(74,222,128,0.10); }
   .ps-neg-bg { background: rgba(248,113,113,0.10); }

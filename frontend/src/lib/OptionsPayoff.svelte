@@ -494,19 +494,16 @@
           </text>
           <!-- Spot price rendered vertically along the line. Anchored
                near the BOTTOM of the inner chart (just above the σ
-               axis labels) so it stays clear of:
-                 - top-left stat overlay (SPOT / TDAY / DTE / σ pills)
-                 - top-right Refresh button + reset-zoom button
-                 - the chart's busiest area (the curves) is the middle,
-                   which the labels avoid by reading bottom-up
-               The text-anchor="start" + rotate(-90) combo makes the
-               glyphs extend UPWARD from the anchor so the read flows
-               from bottom to top. A 3px stroke matched to the chart
-               background paints a halo around each glyph (paint-order
-               draws stroke before fill) — punches through the dashed
-               σ line behind the text without needing to offset the
-               label off the line. */ -->
-          {@const vx = xt.x}
+               axis labels). The text is OFFSET 5 px to the RIGHT of
+               the dashed line so there's a visible gap between line
+               and glyphs (operator request: text was sitting on the
+               line and reading muddy). The halo (3 px stroke matched
+               to the chart background) still paints under the text so
+               any incidental overlap on narrow viewports stays
+               legible. text-anchor="start" + rotate(-90) about the
+               offset point makes the glyphs extend UPWARD from the
+               anchor so the read flows bottom → top. -->
+          {@const vx = xt.x + 5}
           {@const vy = height - PAD_B - 4}
           <text x={vx} y={vy}
                 text-anchor="start"
@@ -536,7 +533,9 @@
       {#if spot > sMin && spot < sMax}
         <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
               stroke="rgba(125,211,252,0.85)" stroke-width="1.25"/>
-        {@const sx = xOf(spot)}
+        <!-- Anchor 5 px to the right of the spot line — visible gap
+             between the cyan vertical and the SPOT label glyphs. -->
+        {@const sx = xOf(spot) + 5}
         {@const sy = height - PAD_B - 4}
         <text x={sx} y={sy}
               text-anchor="start"
@@ -570,9 +569,9 @@
           <!-- BE label anchored near the BOTTOM of the chart, same
                convention as the σ-tick price labels: away from the
                top-left stat overlay + top-right Refresh button.
-               Stroke halo punches through the dashed BE line
-               behind the glyphs so the text reads cleanly. -->
-          {@const bx = xOf(be)}
+               5 px gap to the right of the dashed line so the BE
+               glyphs aren't sitting on the cream stroke. -->
+          {@const bx = xOf(be) + 5}
           {@const by = height - PAD_B - 4}
           <text x={bx} y={by}
                 text-anchor="start"

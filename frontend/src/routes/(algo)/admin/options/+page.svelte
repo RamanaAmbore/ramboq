@@ -21,7 +21,7 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
-    fetchAccounts, fetchOptionsSpot,
+    fetchAccounts, fetchOptionsSpot, placeTicketOrder,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import OrderTicket   from '$lib/order/OrderTicket.svelte';
@@ -324,16 +324,16 @@
   let instrumentsReady = $state(false);
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
-  // chainSide is the INITIAL preference set by the outer + / − toggle
-  // (so the operator can open the picker with their dominant side in
-  // mind). Per-row +/− buttons override it on a per-pick basis, so a
-  // single open-then-pick session can land mixed long/short legs.
+  // chainSide stays as the (i) launcher's default leg side (long).
+  // Per-row +/− buttons override on a per-pick basis (each button
+  // explicitly passes its own side to addChainDraft), so the outer
+  // toggle no longer carries operator-meaningful state.
   let chainSide        = $state(/** @type {'long'|'short'} */ ('long'));
-  // Lots multiplier — every leg added through the chain (or a futures
-  // pill) is sized as `lot_size × chainLots`. Default 1 keeps the
-  // existing single-lot behaviour. Operator can bump to 2/3/… for
-  // multi-lot strategies without rewriting the per-leg qty in the
-  // OrderTicket.
+  // Lots multiplier — a per-row inline quick-picker is the next-iteration
+  // ask (lots input on each + / − click). For now keep a simple default
+  // of 1 so addChainDraft / addFutureDraft can size qty as
+  // `lot_size × chainLots`. Operator can override the qty inside the
+  // OrderTicket modal that opens.
   let chainLots        = $state(1);
 
   /** Underlyings the chain picker offers, in priority order:
@@ -1019,7 +1019,7 @@
               : 'Pick exactly one account to enable the chain picker'}
             aria-label="Toggle chain picker"
             aria-pressed={showAddPanel}
-            onclick={() => { showAddPanel = !showAddPanel; }}>OChain</button>
+            onclick={() => { showAddPanel = !showAddPanel; }}>O Chain</button>
   </div>
 </div>
 
@@ -1118,21 +1118,6 @@
             options={chainExpiries.map(e => ({ value: e, label: e }))}
             placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
         </div>
-        <div class="chain-field">
-          <label class="field-label" for="chain-lots">Lots</label>
-          <!-- Lot multiplier — every leg is sized as
-               `contract_lot_size × chainLots`. Default 1 keeps the
-               existing single-lot behaviour. The Select-style border
-               + height match the neighbouring Select fields so the
-               control row reads as one consistent bar. -->
-          <input id="chain-lots"
-                 type="number"
-                 min="1"
-                 step="1"
-                 class="chain-lots-input"
-                 bind:value={chainLots}
-                 title="Number of lots per leg — qty becomes contract_lot_size × this value"/>
-        </div>
       </div>
       {#if chainFutures.length}
         <!-- Futures quick-add row — paired BUY / SELL pills per
@@ -1183,20 +1168,24 @@
                      operator can land mixed long/short legs across
                      strikes in one open-then-pick session without
                      toggling the outer +/− between picks. -->
+                <!-- Buttons drop the CE/PE suffix — the column header
+                     (CE | Strike | PE) already attributes side, so the
+                     glyph alone is enough. (i) opens the full
+                     OrderTicket pre-filled for that side+type as the
+                     advanced / "edit before placing" path. -->
                 {#if isAtm}
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
                       <span class="chain-btn-pair">
                         <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} CE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>
-                          + CE
-                        </button>
+                                title="BUY {k} CE × 1 lot"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>+</button>
                         <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} CE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'CE', 'short')}>
-                          − CE
-                        </button>
+                                title="SELL {k} CE × 1 lot"
+                                onclick={() => addChainDraft(k, 'CE', 'short')}>−</button>
+                        <button type="button" class="chain-btn chain-btn-info"
+                                title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
                       </span>
                     </td>
                     <td class="chain-td-strike">
@@ -1205,15 +1194,14 @@
                     <td class="chain-td-pe">
                       <span class="chain-btn-pair">
                         <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} PE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>
-                          + PE
-                        </button>
+                                title="BUY {k} PE × 1 lot"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>+</button>
                         <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} PE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'PE', 'short')}>
-                          − PE
-                        </button>
+                                title="SELL {k} PE × 1 lot"
+                                onclick={() => addChainDraft(k, 'PE', 'short')}>−</button>
+                        <button type="button" class="chain-btn chain-btn-info"
+                                title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
                       </span>
                     </td>
                   </tr>
@@ -1222,30 +1210,28 @@
                     <td class="chain-td-ce">
                       <span class="chain-btn-pair">
                         <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} CE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>
-                          + CE
-                        </button>
+                                title="BUY {k} CE × 1 lot"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>+</button>
                         <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} CE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'CE', 'short')}>
-                          − CE
-                        </button>
+                                title="SELL {k} CE × 1 lot"
+                                onclick={() => addChainDraft(k, 'CE', 'short')}>−</button>
+                        <button type="button" class="chain-btn chain-btn-info"
+                                title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
                       </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
                       <span class="chain-btn-pair">
                         <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} PE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>
-                          + PE
-                        </button>
+                                title="BUY {k} PE × 1 lot"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>+</button>
                         <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} PE × {chainLots} lot(s)"
-                                onclick={() => addChainDraft(k, 'PE', 'short')}>
-                          − PE
-                        </button>
+                                title="SELL {k} PE × 1 lot"
+                                onclick={() => addChainDraft(k, 'PE', 'short')}>−</button>
+                        <button type="button" class="chain-btn chain-btn-info"
+                                title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
                       </span>
                     </td>
                   </tr>
@@ -2340,6 +2326,15 @@
   .chain-btn-sell { color: #f87171; }
   .chain-btn-buy:hover  { background: rgba(74,222,128,0.10); }
   .chain-btn-sell:hover { background: rgba(248,113,113,0.10); }
+  /* Info button — sky-blue, neutral. Opens the full OrderTicket
+     pre-filled (advanced path, when the operator wants to edit
+     qty / limit price / chase / mode before placing). */
+  .chain-btn-info {
+    color: #7dd3fc;
+    font-style: italic;
+    padding: 1px 5px;
+  }
+  .chain-btn-info:hover { background: rgba(125,211,252,0.10); }
   /* Lots input — match Select trigger height + border so the
      control bar reads as one consistent row. */
   .chain-lots-input {
