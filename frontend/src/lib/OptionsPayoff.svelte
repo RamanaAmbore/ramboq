@@ -8,7 +8,7 @@
   //     would be worth if the underlying moves NOW.
   //   - Expiry value (intrinsic only) — sky-blue dashed, what it'd be
   //     worth at settlement.
-  // Markers: current spot (cyan), strike (white), breakeven (amber).
+  // Markers: current spot (cyan), strike (white), breakeven (magenta).
   // Profit zone shaded green, loss zone shaded red.
 
   /** @type {{
@@ -487,15 +487,23 @@
            on the dashed line itself. -->
       {#each breakevenList as be}
         {#if be > sMin && be < sMax}
+          <!-- Breakeven verticals use a distinct MAGENTA palette
+               (Tailwind pink-400) so they read as a different
+               concept from the amber strike markers + cyan spot
+               line. Slightly heavier dash + bolder stroke than
+               the strike line to telegraph that this is the
+               outcome-zero boundary, not a contract anchor. -->
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(251,191,36,0.55)" stroke-width="1" stroke-dasharray="3 3"/>
+                stroke="rgba(244,114,182,0.75)" stroke-width="1.25"
+                stroke-dasharray="5 3"/>
           {@const bx = xOf(be)}
           {@const by = PAD_T + 6}
           <text x={bx} y={by}
                 text-anchor="end"
                 transform="rotate(-90 {bx} {by})"
-                fill="#fbbf24"
-                font-size="9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+                fill="#f472b6"
+                font-size="9" font-weight="700"
+                font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
             BE {be.toFixed(0)}
           </text>
         {/if}
@@ -688,7 +696,7 @@
     height: 12px;
   }
   .legend-spot-mark { border-left: 2px solid #7dd3fc; }
-  .legend-be-mark   { border-left: 2px dashed #fbbf24; }
+  .legend-be-mark   { border-left: 2px dashed #f472b6; }
 
   /* On-chart stat overlay — reads the key numerics off the curve so
      the chart is self-contained. Sits top-left, semi-transparent,
