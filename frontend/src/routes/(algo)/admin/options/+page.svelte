@@ -705,6 +705,29 @@
     realAccounts.length ? realAccounts : accountChoices.map(String)
   );
 
+  /** Chain picker is gated on having exactly ONE real (un-masked)
+   *  account selected at the page level. Reasoning:
+   *   - Every leg added through the chain goes straight to OrderTicket
+   *     for placement, and an order needs exactly one routing account.
+   *   - With zero accounts picked, the picker would default to "all
+   *     accounts" which is meaningless for placement.
+   *   - With multiple accounts picked, the picker has no way to know
+   *     which account a basket leg should land on — operator could
+   *     pick the wrong one in the ticket and split a strategy across
+   *     accounts by accident.
+   *  Forcing a single-account filter makes the routing unambiguous;
+   *  the OrderTicket inherits that account via _ticketAccountDefault. */
+  const chainEnabled = $derived(
+    selectedAccounts.length === 1 && _isRealAccount(selectedAccounts[0])
+  );
+
+  // Auto-close the chain panel when the operator de-selects / multi-
+  // selects accounts after opening it — otherwise a stale picker
+  // would sit open with the buttons greyed.
+  $effect(() => {
+    if (!chainEnabled && showAddPanel) showAddPanel = false;
+  });
+
   async function loadPositions() {
     /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
     const merged = [];
@@ -963,12 +986,18 @@
   </div>
   <!-- Generic BUY / SELL launcher — paired pair of pills; click +
        to open the chain picker pre-set to LONG, click − for SHORT.
-       Re-clicking the active button collapses the panel. -->
+       Re-clicking the active button collapses the panel. Disabled
+       until the operator picks exactly one real account on the page
+       — every leg landed via the chain routes through OrderTicket
+       which needs an unambiguous routing account. -->
   <div class="opt-trade" role="group" aria-label="Open chain picker (buy or sell)">
     <button type="button"
             class="opt-add-btn opt-add-btn-buy"
             class:opt-add-btn-on={showAddPanel && chainSide === 'long'}
-            title="Open the chain picker to BUY (long)"
+            disabled={!chainEnabled}
+            title={chainEnabled
+              ? 'Open the chain picker to BUY (long)'
+              : 'Pick exactly one account to enable the chain picker'}
             aria-label="Open picker — buy"
             onclick={() => {
               if (showAddPanel && chainSide === 'long') { showAddPanel = false; return; }
@@ -977,7 +1006,10 @@
     <button type="button"
             class="opt-add-btn opt-add-btn-sell"
             class:opt-add-btn-on={showAddPanel && chainSide === 'short'}
-            title="Open the chain picker to SELL (short)"
+            disabled={!chainEnabled}
+            title={chainEnabled
+              ? 'Open the chain picker to SELL (short)'
+              : 'Pick exactly one account to enable the chain picker'}
             aria-label="Open picker — sell"
             onclick={() => {
               if (showAddPanel && chainSide === 'short') { showAddPanel = false; return; }
@@ -1489,6 +1521,23 @@
   .opt-add-btn:hover {
     background: rgba(251,191,36,0.22);
     border-color: rgba(251,191,36,0.75);
+  }
+  /* Disabled state — chain picker requires exactly one account
+     selected on the page. Greyed border + faded glyph + not-allowed
+     cursor; hover styling suppressed so it doesn't flash on
+     mouse-over. */
+  .opt-add-btn:disabled,
+  .opt-add-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: rgba(126,151,184,0.08);
+    border-color: rgba(126,151,184,0.30);
+    color: #7e97b8;
+  }
+  .opt-add-btn:disabled:hover,
+  .opt-add-btn[disabled]:hover {
+    background: rgba(126,151,184,0.08);
+    border-color: rgba(126,151,184,0.30);
   }
   .opt-add-btn-on {
     background: #fbbf24;
