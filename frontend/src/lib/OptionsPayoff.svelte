@@ -432,19 +432,31 @@
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.label}
           </text>
-          <!-- Spot price along the line itself, rendered vertically
-               (rotated -90° = reads bottom-up). Sits near the top
-               of the chart so it doesn't collide with the σ label
-               at the bottom or the strike / breakeven markers
-               (which sit at slightly different x positions). -->
+          <!-- Spot price rendered vertically along the line. Anchored
+               near the BOTTOM of the inner chart (just above the σ
+               axis labels) so it stays clear of:
+                 - top-left stat overlay (SPOT / TDAY / DTE / σ pills)
+                 - top-right Refresh button + reset-zoom button
+                 - the chart's busiest area (the curves) is the middle,
+                   which the labels avoid by reading bottom-up
+               The text-anchor="start" + rotate(-90) combo makes the
+               glyphs extend UPWARD from the anchor so the read flows
+               from bottom to top. A 3px stroke matched to the chart
+               background paints a halo around each glyph (paint-order
+               draws stroke before fill) — punches through the dashed
+               σ line behind the text without needing to offset the
+               label off the line. */ -->
           {@const vx = xt.x}
-          {@const vy = PAD_T + 6}
+          {@const vy = height - PAD_B - 4}
           <text x={vx} y={vy}
-                text-anchor="end"
+                text-anchor="start"
                 transform="rotate(-90 {vx} {vy})"
-                fill="rgba(200,216,240,{wholeSigma ? 0.7 : 0.45})"
-                font-size={wholeSigma ? 9 : 8}
-                font-weight={wholeSigma ? 600 : 400}
+                fill={wholeSigma ? '#e2e8f0' : '#c8d8f0'}
+                stroke="#152033"
+                stroke-width="3"
+                paint-order="stroke fill"
+                font-size={wholeSigma ? 11 : 10}
+                font-weight={wholeSigma ? 700 : 600}
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.s.toFixed(0)}
           </text>
@@ -477,13 +489,21 @@
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
                 stroke="rgba(244,114,182,0.75)" stroke-width="1.25"
                 stroke-dasharray="5 3"/>
+          <!-- BE label anchored near the BOTTOM of the chart, same
+               convention as the σ-tick price labels: away from the
+               top-left stat overlay + top-right Refresh button.
+               Stroke halo punches through the magenta dashed BE
+               line behind the glyphs so the text reads cleanly. -->
           {@const bx = xOf(be)}
-          {@const by = PAD_T + 6}
+          {@const by = height - PAD_B - 4}
           <text x={bx} y={by}
-                text-anchor="end"
+                text-anchor="start"
                 transform="rotate(-90 {bx} {by})"
                 fill="#f472b6"
-                font-size="9" font-weight="700"
+                stroke="#152033"
+                stroke-width="3"
+                paint-order="stroke fill"
+                font-size="11" font-weight="700"
                 font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
             BE {be.toFixed(0)}
           </text>
