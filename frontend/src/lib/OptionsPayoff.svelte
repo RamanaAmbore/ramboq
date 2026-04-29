@@ -392,12 +392,22 @@
       <path d={fillProfit} fill="rgba(74,222,128,0.10)" stroke="none"/>
       <path d={fillLoss}   fill="rgba(248,113,113,0.10)" stroke="none"/>
 
-      <!-- Y-axis grid + labels -->
+      <!-- Y-axis grid + labels. Halo (stroke + paint-order) lets the
+           label punch cleanly through the horizontal grid line behind
+           it without needing extra padding. Bumped from font-size 9
+           muted-slate to font-size 11 light-blue + weight 600 — the
+           earlier styling was too dim/small to read at a glance, and
+           on mobile it disappeared into the chart background. -->
       {#each yTicks as t}
         <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y}
               stroke="rgba(200,216,240,0.10)" stroke-width="1"/>
-        <text x={PAD_L - 6} y={t.y + 3} text-anchor="end"
-              fill="#7e97b8" font-size="9" font-family="monospace">
+        <text x={PAD_L - 6} y={t.y + 4} text-anchor="end"
+              fill="#c8d8f0"
+              stroke="#152033"
+              stroke-width="3"
+              paint-order="stroke fill"
+              font-size="11" font-weight="600"
+              font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
           {fmtMoney(t.v)}
         </text>
       {/each}
@@ -421,14 +431,19 @@
         {/if}
         {#if !isCenter}
           <!-- σ label at the bottom (rotated -30° to clear adjacent
-               half-σ ticks). -->
+               half-σ ticks). Bumped from 11/10 → 12/11 + halo so
+               the labels stay readable on mobile where the rotation
+               compresses the visible footprint. -->
           {@const ly = height - PAD_B + 10}
           <text x={xt.x} y={ly}
                 text-anchor="end"
                 transform="rotate(-30 {xt.x} {ly})"
-                fill={wholeSigma ? '#fbbf24' : '#c8d8f0'}
-                font-size={wholeSigma ? 11 : 10}
-                font-weight={wholeSigma ? 700 : 500}
+                fill={wholeSigma ? '#fbbf24' : '#e2e8f0'}
+                stroke="#152033"
+                stroke-width="3"
+                paint-order="stroke fill"
+                font-size={wholeSigma ? 12 : 11}
+                font-weight={wholeSigma ? 700 : 600}
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.label}
           </text>
