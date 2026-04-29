@@ -11,6 +11,7 @@
 
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { isMarketOpen } from '$lib/marketHours';
 
 // ---------------------------------------------------------------------------
 // Auth store
@@ -112,6 +113,32 @@ export function visibleInterval(fn, ms) {
       document.removeEventListener('visibilitychange', onVis);
     }
   };
+}
+
+/**
+ * visibleInterval + market-hours gate. Use for auto-refresh of any
+ * data that ONLY moves during NSE/MCX hours (LTPs, positions P&L,
+ * agent fires) — outside the combined 09:00-23:30 IST Mon-Fri window
+ * the callback is a no-op so we don't flood the API with refreshes
+ * that return identical cached values.
+ *
+ * The interval timer still runs (we just skip the callback) so the
+ * gate re-engages naturally at the next minute boundary as the market
+ * opens — no special cross-boundary scheduling needed.
+ *
+ * The visibility gate (pause when tab hidden) layers on top, same as
+ * `visibleInterval`. Manual refresh buttons keep working always —
+ * operators clicking a button are explicitly asking for a fetch.
+ *
+ * @param {() => void} fn   callback to run on each tick
+ * @param {number}      ms  interval in milliseconds
+ * @returns {() => void}    teardown
+ */
+export function marketAwareInterval(fn, ms) {
+  return visibleInterval(() => {
+    if (!isMarketOpen()) return;
+    fn();
+  }, ms);
 }
 
 /** Display label for a git branch name. The `main` branch is the
