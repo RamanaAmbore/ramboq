@@ -352,9 +352,11 @@ async def _task_performance(state: dict) -> None:
                 if ss['last_open'] != today and now >= open_trigger:
                     _label = seg['name'].capitalize()
                     _dm = df_margins
+                    _dp = df_positions
                     try:
                         await _run(lambda: send_summary(all_sum_h, all_sum_p, ist_display,
-                                                        'open', label=_label, df_margins=_dm))
+                                                        'open', label=_label,
+                                                        df_margins=_dm, df_positions=_dp))
                         logger.info(f"Background: open summary sent for {seg['name']}")
                     except Exception as e:
                         logger.error(f"Background: open summary failed for {seg['name']}: {e}")
@@ -477,8 +479,10 @@ async def _task_close(state: dict) -> None:
                     _sp = _summarise_positions(df_p)
                     _label = seg['name'].capitalize()
                     _dm = df_margins
+                    _dp = df_p
                     await _run(lambda: send_summary(_sh, _sp, ist_display, 'close',
-                                                    label=_label, df_margins=_dm))
+                                                    label=_label,
+                                                    df_margins=_dm, df_positions=_dp))
                     ss['last_close'] = today
                     logger.info(f"Background: close summary sent for {seg['name']}")
                 except Exception as e:

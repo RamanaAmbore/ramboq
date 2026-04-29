@@ -229,11 +229,16 @@ def _build_funds_rows(df_margins):
 # ---------------------------------------------------------------------------
 
 def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
-                 label: str = "", df_margins=None):
+                 label: str = "", df_margins=None, df_positions=None):
     """
     Send holdings + positions + funds summary at market open or close.
     msg_type: 'open' or 'close'
     df_margins: full margins dataframe (all accounts + TOTAL); included when provided.
+    df_positions: raw broker positions dataframe. When provided AND
+        `alerts.summary_show_underlying_breakdown` is true, an extra
+        per-underlying section is appended after the Positions table —
+        same format as the per-alert breakdown so the operator's eye
+        moves naturally between the two surfaces.
     """
     # Holdings table: Account | Cur Val | P&L | P&L% | Day Loss | Day Loss%
     h_headers = ("Account", "Cur Val", "P&L", "P&L%", "Day Loss", "Day Loss%")
@@ -269,6 +274,26 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
     segment_label = f" — {label}" if label else ""
     subject_detail = f"{label + ' — ' if label else ''}{ist_display}"
 
+    # ── Per-underlying breakdown (optional) ──────────────────────────
+    # Settings-gated; defaults to enabled. Reuses the same helper the
+    # per-alert formatter uses so the format stays consistent. Returns
+    # an empty list on any failure (settings cache miss, missing
+    # column, etc.) so the summary always sends.
+    und_rows: list[dict] = []
+    try:
+        from backend.shared.helpers.settings import get_bool, get_int
+        from backend.shared.helpers.summarise import (
+            breakdown_positions_by_underlying,
+        )
+        if df_positions is not None and get_bool(
+                'alerts.summary_show_underlying_breakdown', True):
+            top_n = get_int('alerts.max_underlyings_per_alert', 5)
+            und_rows = breakdown_positions_by_underlying(
+                df_positions, account=None, top_n=top_n,
+            )
+    except Exception as e:
+        logger.warning(f"summary underlying breakdown failed: {e}")
+
     # Telegram: fixed-width monospace
     h_tg = _fixed_table(h_headers, h_rows) if h_rows else "No holdings data"
     p_tg = _fixed_table(p_headers, p_rows) if p_rows else "No positions data"
@@ -276,6 +301,14 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
     if f_rows:
         f_tg = _fixed_table(f_headers, f_rows)
         tg_table += f"\n\nFunds\n{f_tg}"
+    if und_rows:
+        # Compact one-line-per-underlying so the section stays short
+        # on a phone. Sign + ₹ format reads at a glance.
+        und_lines = "\n".join(
+            f"  {u['underlying']:<10} {_fmt_rupees(u['pnl'])}"
+            for u in und_rows
+        )
+        tg_table += f"\n\nBy underlying\n{und_lines}"
 
     # Email: HTML tables with section headings
     h_email = _html_table(h_headers, h_rows) if h_rows else "<p>No holdings data</p>"
@@ -289,6 +322,16 @@ def send_summary(sum_holdings, sum_positions, ist_display: str, msg_type: str,
     if f_rows:
         f_email = _html_table(f_headers, f_rows)
         email_table_html += f"<p style='margin-top:16px;font-weight:bold'>Funds</p>{f_email}"
+    if und_rows:
+        und_html = _html_table(
+            ("Underlying", "P&L", "Positions"),
+            [(u['underlying'], _fmt_rupees(u['pnl']), str(u['count']))
+             for u in und_rows],
+        )
+        email_table_html += (
+            f"<p style='margin-top:16px;font-weight:bold'>By underlying</p>"
+            f"{und_html}"
+        )
 
     _dispatch(msg_type, ist_display, tg_table, email_table_html, subject_detail)
     logger.info(f"Background: {msg_type} summary sent")
