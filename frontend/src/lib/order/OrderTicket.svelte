@@ -964,15 +964,18 @@
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
+    /* Inline SVG chevron — `⌄` shape (open angle, like reverse `^`)
+       drawn as two strokes meeting at a point. Brighter `#c8d8f0`
+       and bigger (12 px) than the earlier 4 px filled triangles so
+       the dropdown affordance reads at a glance on a phone.
+       url() value uses Litestar-friendly escaping (no quotes inside
+       the data URI). */
     background-image:
-      linear-gradient(45deg, transparent 50%, #7e97b8 50%),
-      linear-gradient(135deg, #7e97b8 50%, transparent 50%);
-    background-position:
-      calc(100% - 12px) 50%,
-      calc(100% - 8px)  50%;
-    background-size: 4px 4px, 4px 4px;
+      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23c8d8f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
+    background-position: calc(100% - 8px) 50%;
+    background-size: 12px 8px;
     background-repeat: no-repeat;
-    padding-right: 1.4rem;
+    padding-right: 1.6rem;
   }
 
   /* Funds pill — appears under the Account input. Compact 12px-ish

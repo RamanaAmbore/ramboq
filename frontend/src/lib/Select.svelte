@@ -207,9 +207,16 @@
   .rbq-select-placeholder { color: rgba(180,200,230,0.55); }
   .rbq-select-caret {
     flex: 0 0 auto;
+    /* Bumped from 0.55rem amber `▾` to 0.95rem so the dropdown
+       affordance reads at a glance — earlier the glyph was so small
+       it looked like a stray period. Open state rotates 180° to
+       point up (`▴`-equivalent). */
     color: #fbbf24;
-    font-size: 0.55rem;
+    font-size: 0.95rem;
+    line-height: 1;
+    font-weight: 700;
     transform: translateY(-1px);
+    transition: transform 0.12s ease;
   }
   .rbq-select-open .rbq-select-caret { transform: translateY(-1px) rotate(180deg); }
 

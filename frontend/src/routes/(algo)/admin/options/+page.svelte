@@ -368,9 +368,21 @@
     return !!quickPicker && quickPicker.isFuture && quickPicker.sym === sym;
   }
   function openQuickPicker(strike, optType, side) {
+    // Look up the contract's lot size up-front so the picker can
+    // surface the `(× lot N)` meta tag alongside the stepper. Falls
+    // back to 0 on cache miss — the meta tag hides in that case.
+    let lot = 0;
+    try {
+      if (chainUnderlying && chainExpiry) {
+        const inst = findOption(
+          chainUnderlying.toUpperCase(), optType, strike, chainExpiry,
+        );
+        lot = Number(inst?.ls || 0) || 0;
+      }
+    } catch (_) { lot = 0; }
     quickPicker = {
       strike, optType, side,
-      lots: 1, isFuture: false, sym: null, lotSize: 0,
+      lots: 1, isFuture: false, sym: null, lotSize: lot,
     };
     quickError      = '';
     quickJustPlaced = null;
@@ -387,13 +399,28 @@
     quickPicker = null;
     quickError  = '';
   }
-  /** Keyboard convenience inside the lots input — Enter places, Esc
-   *  cancels. Stops the event so it doesn't bubble into the page's
-   *  default form-submit handling (there isn't a form, but defensive). */
-  function onQuickKey(/** @type {KeyboardEvent} */ e) {
-    if (e.key === 'Enter')  { e.preventDefault(); quickPlace(); }
-    if (e.key === 'Escape') { e.preventDefault(); cancelQuickPicker(); }
+  /** +/− stepper actions on the inline lots input. Floored at 1 lot
+   *  (zero / negative would post a no-op order). No upper cap —
+   *  operator can size as large as their margin allows; the
+   *  basket_margin pre-flight on the backend rejects anything that
+   *  blows the avail margin. */
+  function quickStepLots(delta) {
+    if (!quickPicker) return;
+    const cur = Math.max(1, Math.floor(Number(quickPicker.lots) || 1));
+    quickPicker.lots = Math.max(1, cur + delta);
   }
+  // Esc-to-cancel for the inline quick-picker. The +/− stepper
+  // buttons replaced the number input that previously hosted the
+  // keydown handler; this $effect is the global equivalent so Esc
+  // still bails out of an open picker even when no field has focus.
+  $effect(() => {
+    if (!quickPicker) return;
+    const onKey = (/** @type {KeyboardEvent} */ e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cancelQuickPicker(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
   /** Submit a paper MARKET order directly. No price field needed —
    *  the broker's market routing fills at the opposing top-of-book.
    *  Keeps the fast path truly one-click + lots; advanced limit /
@@ -1276,10 +1303,17 @@
               <span class="chain-quick chain-quick-{quickPicker.side}">
                 <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
                 <span class="chain-quick-sym">{f.s}</span>
-                <input type="number" min="1" step="1"
-                       bind:value={quickPicker.lots}
-                       onkeydown={onQuickKey}
-                       class="chain-quick-lots" aria-label="Lots"/>
+                <button type="button" class="chain-quick-step"
+                        onclick={() => quickStepLots(-1)}
+                        aria-label="Decrease lots"
+                        disabled={(quickPicker.lots || 1) <= 1}>−</button>
+                <span class="chain-quick-lots-val" aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                <button type="button" class="chain-quick-step"
+                        onclick={() => quickStepLots(1)}
+                        aria-label="Increase lots">+</button>
+                {#if quickPicker.lotSize > 0}
+                  <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                {/if}
                 <button type="button" class="chain-quick-ok"
                         disabled={quickPlacing}
                         title="Place paper MARKET order"
@@ -1353,10 +1387,18 @@
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <input type="number" min="1" step="1"
-                                 bind:value={quickPicker.lots}
-                                 onkeydown={onQuickKey}
-                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(-1)}
+                                  aria-label="Decrease lots"
+                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(1)}
+                                  aria-label="Increase lots">+</button>
+                          {#if quickPicker.lotSize > 0}
+                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                          {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
                                   title="Place paper MARKET order"
@@ -1388,10 +1430,18 @@
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <input type="number" min="1" step="1"
-                                 bind:value={quickPicker.lots}
-                                 onkeydown={onQuickKey}
-                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(-1)}
+                                  aria-label="Decrease lots"
+                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(1)}
+                                  aria-label="Increase lots">+</button>
+                          {#if quickPicker.lotSize > 0}
+                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                          {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
                                   title="Place paper MARKET order"
@@ -1423,10 +1473,18 @@
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <input type="number" min="1" step="1"
-                                 bind:value={quickPicker.lots}
-                                 onkeydown={onQuickKey}
-                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(-1)}
+                                  aria-label="Decrease lots"
+                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(1)}
+                                  aria-label="Increase lots">+</button>
+                          {#if quickPicker.lotSize > 0}
+                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                          {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
                                   title="Place paper MARKET order"
@@ -1456,10 +1514,18 @@
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <input type="number" min="1" step="1"
-                                 bind:value={quickPicker.lots}
-                                 onkeydown={onQuickKey}
-                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(-1)}
+                                  aria-label="Decrease lots"
+                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <button type="button" class="chain-quick-step"
+                                  onclick={() => quickStepLots(1)}
+                                  aria-label="Increase lots">+</button>
+                          {#if quickPicker.lotSize > 0}
+                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                          {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
                                   title="Place paper MARKET order"
@@ -2631,23 +2697,53 @@
     letter-spacing: 0.04em;
     white-space: nowrap;
   }
-  .chain-quick-lots {
-    width: 2.4rem;
+  /* +/− stepper around the lots count. Mirrors the OrderTicket's
+     "lot N" meta convention — operator sees `Lots: [- 1 +] (× lot 50)`
+     and reads "1 lot times 50 per lot = 50 qty" without thinking. */
+  .chain-quick-step {
+    width: 1.1rem;
     height: 1.25rem;
-    padding: 0 4px;
+    padding: 0;
     border-radius: 2px;
-    border: 1px solid rgba(126,151,184,0.35);
+    border: 1px solid rgba(126,151,184,0.45);
     background: rgba(13,21,38,0.6);
     color: #c8d8f0;
     font-family: monospace;
-    font-size: 0.6rem;
-    text-align: center;
-    box-sizing: border-box;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
-  .chain-quick-lots:focus {
-    outline: none;
+  .chain-quick-step:hover:not(:disabled) {
+    background: rgba(251,191,36,0.15);
     border-color: rgba(251,191,36,0.55);
-    background: rgba(13,21,38,0.85);
+    color: #fbbf24;
+  }
+  .chain-quick-step:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .chain-quick-lots-val {
+    min-width: 1.6rem;
+    padding: 0 2px;
+    text-align: center;
+    color: #fbbf24;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  /* `(× lot N)` tag — sky-blue muted, mirrors the OrderTicket header
+     chip's "lot 50" meta so the two surfaces read consistently. */
+  .chain-quick-meta {
+    color: #a3b9d0;
+    font-family: monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    padding: 0 3px;
   }
   .chain-quick-ok,
   .chain-quick-cancel {

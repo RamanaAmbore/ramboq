@@ -193,7 +193,7 @@
       </span>
     </span>
     <span class="ps-agg" title="Holdings — today's mark-to-market move (day_change_val)">
-      <span class="ps-agg-k">DayΔ</span>
+      <span class="ps-agg-k">Day</span>
       <span class={'ps-agg-v ' + (holdingsToday > 0 ? 'ps-pos' : holdingsToday < 0 ? 'ps-neg' : 'ps-flat')}>
         {fmtMoney(holdingsToday)}
       </span>
@@ -335,7 +335,14 @@
   }
 
   @media (max-width: 640px) {
-    .ps-strip   { gap: 0.45rem; padding: 0.25rem 0.55rem; }
+    /* Tightened so Pos / Day / Hold / Cash all fit on one line on a
+       phone in portrait. Earlier the gap was 0.45rem + each pill had
+       0.3rem internal label-value gap, which pushed Cash onto a
+       second row when any value crossed 6 digits. */
+    .ps-strip   { gap: 0.3rem; padding: 0.25rem 0.45rem; }
+    .ps-agg     { gap: 0.2rem; }
+    .ps-agg-k   { font-size: 0.55rem; }
+    .ps-agg-v   { font-variant-numeric: tabular-nums; }
     .ps-preview { display: none; }  /* mobile reads aggregates only */
     .ps-refresh { display: none; }
     .ps-agg-meta { display: none; }
