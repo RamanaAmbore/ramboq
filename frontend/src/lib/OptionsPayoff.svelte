@@ -490,31 +490,33 @@
            stat overlay. Keeping the SVG less busy makes the today /
            expiry curves the main visual signal. -->
 
-      <!-- Breakeven markers — magenta dashed verticals; multi-leg
+      <!-- Breakeven markers — soft cream dashed verticals; multi-leg
            strategies (iron condor, butterfly) can produce two.
            BE PRICE rendered vertically on the line itself. -->
       {#each breakevenList as be}
         {#if be > sMin && be < sMax}
-          <!-- Breakeven verticals use a distinct MAGENTA palette
-               (Tailwind pink-400) so they read as a different
-               concept from the amber strike markers + cyan spot
-               line. Slightly heavier dash + bolder stroke than
-               the strike line to telegraph that this is the
-               outcome-zero boundary, not a contract anchor. -->
+          <!-- Breakeven verticals use a soft cream / amber-200 palette
+               (`#fde68a` ~ Tailwind amber-200). The pink/magenta tone
+               we shipped first read as foreign next to the chart's
+               amber + sky-blue + cyan family. Cream stays visually
+               quiet but keeps the "important threshold" connotation;
+               the heavier dash + bolder stroke compared to the σ
+               grid still telegraphs this is the outcome-zero
+               boundary, not a routine grid line. -->
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(244,114,182,0.75)" stroke-width="1.25"
+                stroke="rgba(253,230,138,0.75)" stroke-width="1.25"
                 stroke-dasharray="5 3"/>
           <!-- BE label anchored near the BOTTOM of the chart, same
                convention as the σ-tick price labels: away from the
                top-left stat overlay + top-right Refresh button.
-               Stroke halo punches through the magenta dashed BE
-               line behind the glyphs so the text reads cleanly. -->
+               Stroke halo punches through the dashed BE line
+               behind the glyphs so the text reads cleanly. -->
           {@const bx = xOf(be)}
           {@const by = height - PAD_B - 4}
           <text x={bx} y={by}
                 text-anchor="start"
                 transform="rotate(-90 {bx} {by})"
-                fill="#f472b6"
+                fill="#fde68a"
                 stroke="#152033"
                 stroke-width="3"
                 paint-order="stroke fill"
@@ -709,7 +711,7 @@
     height: 12px;
   }
   .legend-spot-mark { border-left: 2px solid #7dd3fc; }
-  .legend-be-mark   { border-left: 2px dashed #f472b6; }
+  .legend-be-mark   { border-left: 2px dashed #fde68a; }
 
   /* On-chart stat overlay — reads the key numerics off the curve so
      the chart is self-contained. Sits top-left, semi-transparent,
