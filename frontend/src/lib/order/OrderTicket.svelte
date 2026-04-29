@@ -98,7 +98,29 @@
 
   // Local form state — start from prop defaults, then operator edits.
   let _side    = $state(side);
+  // Qty path:
+  //   - lotSize > 0  → operator edits in LOTS via [−] [N] [+], the
+  //     resolved qty `_lots * lotSize` flows into _qty. Mirrors the
+  //     chain picker so both surfaces read consistently.
+  //   - lotSize == 0 → cash equity / no lot concept; fall back to
+  //     raw number input bound directly to _qty.
+  // Initial _lots comes from the caller-supplied qty (rounded to the
+  // nearest whole lot, floored at 1).
+  let _lots = $state(
+    lotSize > 0
+      ? Math.max(1, Math.round((Number(qty) || lotSize) / lotSize))
+      : 1
+  );
   let _qty     = $state(qty || lotSize || 0);
+  // Keep _qty in sync with _lots × lotSize so submit + validation see
+  // the resolved raw quantity. Skipped when lotSize=0 (operator types
+  // qty directly).
+  $effect(() => {
+    if (lotSize > 0) _qty = _lots * lotSize;
+  });
+  function stepLots(/** @type {number} */ delta) {
+    _lots = Math.max(1, Math.floor((Number(_lots) || 1) + delta));
+  }
   let _type    = $state(orderType);
   let _variety = $state(variety);
   let _price   = $state(price ?? '');
@@ -452,13 +474,40 @@
                 onclick={() => action !== 'modify' && (_side = 'SELL')}>SELL</button>
       </div>
       <div class="ot-qty-block">
-        <label class="ot-label" for="ot-qty">Qty</label>
-        <input id="ot-qty" type="number" class="ot-input ot-num"
-               step={lotSize || 1}
-               min="1"
-               bind:value={_qty} />
-        {#if lotSize}
-          <span class="ot-meta">lot {lotSize}</span>
+        {#if lotSize > 0}
+          <!-- Lots-driven qty input: [−] [select ▼] [+] (× lot N) = N qty.
+               Operator picks lots; resolved qty = lots × lotSize is
+               shown beside the meta tag so they always see what they're
+               actually placing. Dropdown carries common multiples
+               (1/2/3/5/10/25/50/100) for quick jumps; +/− steppers do
+               fine 1-by-1 moves. The native <select> happily shows the
+               current _lots even when it's not in the option list, so
+               typing+stepping past 100 still renders correctly. -->
+          <label class="ot-label" for="ot-lots">Lots</label>
+          <div class="ot-lots-row">
+            <button type="button" class="ot-lots-step"
+                    onclick={() => stepLots(-1)}
+                    disabled={_lots <= 1}
+                    aria-label="Decrease lots">−</button>
+            <select id="ot-lots" class="ot-input ot-lots-select"
+                    bind:value={_lots} aria-label="Lots">
+              {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                <option value={n}>{n}</option>
+              {/each}
+              {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(_lots)}
+                <option value={_lots}>{_lots}</option>
+              {/if}
+            </select>
+            <button type="button" class="ot-lots-step"
+                    onclick={() => stepLots(1)}
+                    aria-label="Increase lots">+</button>
+            <span class="ot-meta">(× lot {lotSize})  =  {_qty} qty</span>
+          </div>
+        {:else}
+          <label class="ot-label" for="ot-qty">Qty</label>
+          <input id="ot-qty" type="number" class="ot-input ot-num"
+                 step="1" min="1"
+                 bind:value={_qty} />
         {/if}
       </div>
     </div>
@@ -804,9 +853,65 @@
     opacity: 0.55;
   }
 
-  .ot-qty-block { display: flex; align-items: flex-end; gap: 0.4rem; flex: 1 1 0; }
+  .ot-qty-block { display: flex; align-items: flex-end; gap: 0.4rem; flex: 1 1 0; flex-wrap: wrap; }
   .ot-qty-block .ot-label { margin: 0 0 0.18rem; }
   .ot-qty-block .ot-meta { font-size: 0.65rem; color: #a3b9d0; padding-bottom: 0.5rem; }
+
+  /* [−] [select ▼] [+] (× lot 50) = 50 qty — lots-driven Qty UI.
+     Mirrors the chain picker stepper but with a dropdown in the
+     middle so the operator can also jump to common multiples
+     (1/2/3/5/10/25/…) without 25 +-clicks. The select happily
+     accepts off-list values via the synthesized <option> emitted
+     when _lots isn't a common multiple. */
+  .ot-lots-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+  .ot-lots-step {
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border-radius: 3px;
+    border: 1px solid rgba(251,191,36,0.45);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+    font-family: monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ot-lots-step:hover:not(:disabled) {
+    background: rgba(251,191,36,0.22);
+    border-color: rgba(251,191,36,0.75);
+  }
+  .ot-lots-step:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .ot-lots-select {
+    width: auto;
+    min-width: 3.4rem;
+    text-align: center;
+    font-weight: 700;
+    color: #fbbf24;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    /* Same SVG chevron as the account select — matches the algo
+       theme's "open angle" caret. */
+    background-image:
+      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
+    background-position: calc(100% - 6px) 50%;
+    background-size: 10px 6px;
+    background-repeat: no-repeat;
+    padding-right: 1.2rem;
+  }
 
   .ot-input {
     width: 100%;

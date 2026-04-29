@@ -1307,7 +1307,16 @@
                         onclick={() => quickStepLots(-1)}
                         aria-label="Decrease lots"
                         disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                <span class="chain-quick-lots-val" aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                <select class="chain-quick-select"
+                        bind:value={quickPicker.lots}
+                        aria-label="Lots">
+                  {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                    <option value={n}>{n}</option>
+                  {/each}
+                  {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
+                    <option value={quickPicker.lots}>{quickPicker.lots}</option>
+                  {/if}
+                </select>
                 <button type="button" class="chain-quick-step"
                         onclick={() => quickStepLots(1)}
                         aria-label="Increase lots">+</button>
@@ -1391,8 +1400,16 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <select class="chain-quick-select"
+                                  bind:value={quickPicker.lots}
+                                  aria-label="Lots">
+                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                              <option value={n}>{n}</option>
+                            {/each}
+                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
+                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
+                            {/if}
+                          </select>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1434,8 +1451,16 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <select class="chain-quick-select"
+                                  bind:value={quickPicker.lots}
+                                  aria-label="Lots">
+                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                              <option value={n}>{n}</option>
+                            {/each}
+                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
+                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
+                            {/if}
+                          </select>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1477,8 +1502,16 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <select class="chain-quick-select"
+                                  bind:value={quickPicker.lots}
+                                  aria-label="Lots">
+                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                              <option value={n}>{n}</option>
+                            {/each}
+                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
+                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
+                            {/if}
+                          </select>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1518,8 +1551,16 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
+                          <select class="chain-quick-select"
+                                  bind:value={quickPicker.lots}
+                                  aria-label="Lots">
+                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
+                              <option value={n}>{n}</option>
+                            {/each}
+                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
+                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
+                            {/if}
+                          </select>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -2734,6 +2775,38 @@
     font-weight: 700;
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
+  }
+  /* Native <select> in the inline picker — sits between the +/-
+     steppers. Common multiples [1, 2, 3, 5, 10, 25, 50, 75, 100]
+     so operator can jump-pick; off-list values get a synthesized
+     option so stepping past 100 still renders. SVG chevron caret
+     matches the OrderTicket account picker. */
+  .chain-quick-select {
+    height: 1.25rem;
+    min-width: 2.6rem;
+    padding: 0 1.1rem 0 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(126,151,184,0.45);
+    background-color: rgba(13,21,38,0.6);
+    color: #fbbf24;
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    background-image:
+      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
+    background-position: calc(100% - 4px) 50%;
+    background-size: 10px 6px;
+    background-repeat: no-repeat;
+  }
+  .chain-quick-select:focus {
+    outline: none;
+    border-color: rgba(251,191,36,0.65);
+    background-color: rgba(13,21,38,0.85);
   }
   /* `(× lot N)` tag — sky-blue muted, mirrors the OrderTicket header
      chip's "lot 50" meta so the two surfaces read consistently. */
