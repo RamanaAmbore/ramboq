@@ -329,12 +329,130 @@
   // explicitly passes its own side to addChainDraft), so the outer
   // toggle no longer carries operator-meaningful state.
   let chainSide        = $state(/** @type {'long'|'short'} */ ('long'));
-  // Lots multiplier — a per-row inline quick-picker is the next-iteration
-  // ask (lots input on each + / − click). For now keep a simple default
-  // of 1 so addChainDraft / addFutureDraft can size qty as
-  // `lot_size × chainLots`. Operator can override the qty inside the
-  // OrderTicket modal that opens.
+  // chainLots is now only the FALLBACK qty multiplier the (i) modal
+  // path uses when opening OrderTicket directly. The fast +/− path
+  // owns its own per-click lots state via quickPicker below.
   let chainLots        = $state(1);
+
+  // ── Inline quick-place picker ─────────────────────────────────────
+  // Click +/− on a strike (or a futures pill) → cell collapses to an
+  // inline `[B/S] [Lots#] [✓] [✕]` mini-form. Press ✓ → submits a
+  // PAPER MARKET order via /api/orders/ticket directly, no modal.
+  // Press ✕ or Escape → cancel; Enter → place. The (i) button is
+  // the slow path (still opens the full OrderTicket).
+  /** @type {null | {
+   *   strike: number, optType: 'CE'|'PE'|'',
+   *   side: 'long'|'short',
+   *   lots: number,
+   *   isFuture: boolean,
+   *   sym: string|null,
+   *   lotSize: number,
+   * }} */
+  let quickPicker      = $state(null);
+  let quickPlacing     = $state(false);
+  let quickError       = $state('');
+  // Key of the cell that just placed successfully — drives the
+  // brief inline "✓ placed" toast. Auto-clears after ~1.5 s.
+  /** @type {string|null} */
+  let quickJustPlaced  = $state(null);
+
+  function _quickKeyOpt(strike, optType) { return `o:${strike}:${optType}`; }
+  function _quickKeyFut(sym)             { return `f:${sym}`; }
+  function isQuickActive(strike, optType) {
+    return !!quickPicker
+      && !quickPicker.isFuture
+      && quickPicker.strike === strike
+      && quickPicker.optType === optType;
+  }
+  function isQuickActiveFut(sym) {
+    return !!quickPicker && quickPicker.isFuture && quickPicker.sym === sym;
+  }
+  function openQuickPicker(strike, optType, side) {
+    quickPicker = {
+      strike, optType, side,
+      lots: 1, isFuture: false, sym: null, lotSize: 0,
+    };
+    quickError      = '';
+    quickJustPlaced = null;
+  }
+  function openQuickPickerFut(sym, lotSize, side) {
+    quickPicker = {
+      strike: 0, optType: '', side,
+      lots: 1, isFuture: true, sym, lotSize,
+    };
+    quickError      = '';
+    quickJustPlaced = null;
+  }
+  function cancelQuickPicker() {
+    quickPicker = null;
+    quickError  = '';
+  }
+  /** Keyboard convenience inside the lots input — Enter places, Esc
+   *  cancels. Stops the event so it doesn't bubble into the page's
+   *  default form-submit handling (there isn't a form, but defensive). */
+  function onQuickKey(/** @type {KeyboardEvent} */ e) {
+    if (e.key === 'Enter')  { e.preventDefault(); quickPlace(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelQuickPicker(); }
+  }
+  /** Submit a paper MARKET order directly. No price field needed —
+   *  the broker's market routing fills at the opposing top-of-book.
+   *  Keeps the fast path truly one-click + lots; advanced limit /
+   *  chase / mode / qty edits live on the (i) modal path. */
+  async function quickPlace() {
+    if (!quickPicker || quickPlacing) return;
+
+    let sym, exchange, lot;
+    if (quickPicker.isFuture) {
+      sym = String(quickPicker.sym || '');
+      const inst = getInstrument(sym.toUpperCase());
+      exchange = inst?.e || 'NFO';
+      lot      = Number(quickPicker.lotSize || inst?.ls || 1);
+    } else {
+      const inst = findOption(
+        chainUnderlying.toUpperCase(),
+        quickPicker.optType,
+        quickPicker.strike,
+        chainExpiry,
+      );
+      if (!inst) { quickError = 'Symbol not in instruments cache.'; return; }
+      sym       = inst.s;
+      exchange  = inst.e || 'NFO';
+      lot       = Number(inst.ls || 1);
+    }
+
+    const lots = Math.max(1, Math.floor(Number(quickPicker.lots) || 1));
+    const acct = _ticketAccountDefault();
+    if (!acct) { quickError = 'No routable account selected.'; return; }
+
+    const key = quickPicker.isFuture
+      ? _quickKeyFut(sym)
+      : _quickKeyOpt(quickPicker.strike, quickPicker.optType);
+
+    quickPlacing = true;
+    quickError   = '';
+    try {
+      await placeTicketOrder({
+        mode:          'paper',
+        side:          quickPicker.side === 'long' ? 'BUY' : 'SELL',
+        tradingsymbol: sym,
+        quantity:      lot * lots,
+        exchange,
+        product:       'NRML',
+        order_type:    'MARKET',
+        variety:       'regular',
+        account:       acct,
+      });
+      quickJustPlaced = key;
+      quickPicker     = null;
+      setTimeout(() => {
+        if (quickJustPlaced === key) quickJustPlaced = null;
+      }, 1500);
+    } catch (e) {
+      quickError = String(e?.message || e || 'Place failed');
+    } finally {
+      quickPlacing = false;
+    }
+  }
 
   /** Underlyings the chain picker offers, in priority order:
    *  1. The page's currently-selected underlying (the operator's
@@ -1120,29 +1238,53 @@
         </div>
       </div>
       {#if chainFutures.length}
-        <!-- Futures quick-add row — paired BUY / SELL pills per
-             contract. The +<sym> button buys, the −<sym> button
-             sells; qty in both cases is `contract_lot_size × Lots`
-             from the chain controls. Useful when building delta-
-             hedged option positions or pure futures strategies. -->
+        <!-- Futures quick-add row — paired BUY (+) / SELL (−) pills
+             open the inline lots-picker; (i) opens the full
+             OrderTicket modal pre-filled. Same fast/slow split as
+             the strike rows. -->
         <div class="chain-futures">
           <span class="chain-futures-label">Futures:</span>
           {#each chainFutures as f (f.s)}
-            <span class="chain-fut-pair">
-              <button type="button"
-                      class="chain-fut-pill chain-fut-pill-buy"
-                      title="BUY {f.s} ({f.ls} per lot × {chainLots} lots)"
-                      onclick={() => addFutureDraft(f.s, f.ls, 'long')}>
-                + {f.s}
-                <span class="chain-fut-meta">lot {f.ls}</span>
-              </button>
-              <button type="button"
-                      class="chain-fut-pill chain-fut-pill-sell"
-                      title="SELL {f.s} ({f.ls} per lot × {chainLots} lots)"
-                      onclick={() => addFutureDraft(f.s, f.ls, 'short')}>
-                − {f.s}
-              </button>
-            </span>
+            {@const futKey = _quickKeyFut(f.s)}
+            {#if isQuickActiveFut(f.s)}
+              <span class="chain-quick chain-quick-{quickPicker.side}">
+                <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
+                <span class="chain-quick-sym">{f.s}</span>
+                <input type="number" min="1" step="1"
+                       bind:value={quickPicker.lots}
+                       onkeydown={onQuickKey}
+                       class="chain-quick-lots" aria-label="Lots"/>
+                <button type="button" class="chain-quick-ok"
+                        disabled={quickPlacing}
+                        title="Place paper MARKET order"
+                        onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                <button type="button" class="chain-quick-cancel"
+                        title="Cancel" onclick={cancelQuickPicker}>✕</button>
+              </span>
+              {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
+            {:else if quickJustPlaced === futKey}
+              <span class="chain-quick-toast">✓ {f.s} placed</span>
+            {:else}
+              <span class="chain-fut-pair">
+                <button type="button"
+                        class="chain-fut-pill chain-fut-pill-buy"
+                        title="BUY {f.s} — pick lots inline ({f.ls} per lot)"
+                        onclick={() => openQuickPickerFut(f.s, f.ls, 'long')}>
+                  + {f.s}
+                  <span class="chain-fut-meta">lot {f.ls}</span>
+                </button>
+                <button type="button"
+                        class="chain-fut-pill chain-fut-pill-sell"
+                        title="SELL {f.s} — pick lots inline"
+                        onclick={() => openQuickPickerFut(f.s, f.ls, 'short')}>
+                  − {f.s}
+                </button>
+                <button type="button"
+                        class="chain-fut-pill chain-fut-pill-info"
+                        title="Open full ticket for {f.s} (edit qty / price / mode)"
+                        onclick={() => addFutureDraft(f.s, f.ls, 'long')}>i</button>
+              </span>
+            {/if}
           {/each}
         </div>
       {/if}
@@ -1173,66 +1315,148 @@
                      glyph alone is enough. (i) opens the full
                      OrderTicket pre-filled for that side+type as the
                      advanced / "edit before placing" path. -->
+                <!-- + / − fast path: opens the inline lots-picker
+                     in-cell. Press ✓ → submits a paper MARKET order
+                     directly. (i) is the slow path: opens the full
+                     OrderTicket modal pre-filled. -->
+                {@const ceKey = _quickKeyOpt(k, 'CE')}
+                {@const peKey = _quickKeyOpt(k, 'PE')}
                 {#if isAtm}
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
-                      <span class="chain-btn-pair">
-                        <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} CE × 1 lot"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>+</button>
-                        <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} CE × 1 lot"
-                                onclick={() => addChainDraft(k, 'CE', 'short')}>−</button>
-                        <button type="button" class="chain-btn chain-btn-info"
-                                title="Open full ticket for {k} CE (edit qty / price / mode)"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
-                      </span>
+                      {#if isQuickActive(k, 'CE')}
+                        <span class="chain-quick chain-quick-{quickPicker.side}">
+                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
+                          <input type="number" min="1" step="1"
+                                 bind:value={quickPicker.lots}
+                                 onkeydown={onQuickKey}
+                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-ok"
+                                  disabled={quickPlacing}
+                                  title="Place paper MARKET order"
+                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-cancel"
+                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
+                        </span>
+                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
+                      {:else if quickJustPlaced === ceKey}
+                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else}
+                        <span class="chain-btn-pair">
+                          <button type="button" class="chain-btn chain-btn-buy"
+                                  title="BUY {k} CE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'CE', 'long')}>+</button>
+                          <button type="button" class="chain-btn chain-btn-sell"
+                                  title="SELL {k} CE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'CE', 'short')}>−</button>
+                          <button type="button" class="chain-btn chain-btn-info"
+                                  title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                  onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                        </span>
+                      {/if}
                     </td>
                     <td class="chain-td-strike">
                       {k.toFixed(0)}<span class="chain-atm-tag">ATM</span>
                     </td>
                     <td class="chain-td-pe">
-                      <span class="chain-btn-pair">
-                        <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} PE × 1 lot"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>+</button>
-                        <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} PE × 1 lot"
-                                onclick={() => addChainDraft(k, 'PE', 'short')}>−</button>
-                        <button type="button" class="chain-btn chain-btn-info"
-                                title="Open full ticket for {k} PE (edit qty / price / mode)"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
-                      </span>
+                      {#if isQuickActive(k, 'PE')}
+                        <span class="chain-quick chain-quick-{quickPicker.side}">
+                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
+                          <input type="number" min="1" step="1"
+                                 bind:value={quickPicker.lots}
+                                 onkeydown={onQuickKey}
+                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-ok"
+                                  disabled={quickPlacing}
+                                  title="Place paper MARKET order"
+                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-cancel"
+                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
+                        </span>
+                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
+                      {:else if quickJustPlaced === peKey}
+                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else}
+                        <span class="chain-btn-pair">
+                          <button type="button" class="chain-btn chain-btn-buy"
+                                  title="BUY {k} PE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'PE', 'long')}>+</button>
+                          <button type="button" class="chain-btn chain-btn-sell"
+                                  title="SELL {k} PE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'PE', 'short')}>−</button>
+                          <button type="button" class="chain-btn chain-btn-info"
+                                  title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                  onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
+                        </span>
+                      {/if}
                     </td>
                   </tr>
                 {:else}
                   <tr class="chain-row chain-row-{dir}">
                     <td class="chain-td-ce">
-                      <span class="chain-btn-pair">
-                        <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} CE × 1 lot"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>+</button>
-                        <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} CE × 1 lot"
-                                onclick={() => addChainDraft(k, 'CE', 'short')}>−</button>
-                        <button type="button" class="chain-btn chain-btn-info"
-                                title="Open full ticket for {k} CE (edit qty / price / mode)"
-                                onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
-                      </span>
+                      {#if isQuickActive(k, 'CE')}
+                        <span class="chain-quick chain-quick-{quickPicker.side}">
+                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
+                          <input type="number" min="1" step="1"
+                                 bind:value={quickPicker.lots}
+                                 onkeydown={onQuickKey}
+                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-ok"
+                                  disabled={quickPlacing}
+                                  title="Place paper MARKET order"
+                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-cancel"
+                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
+                        </span>
+                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
+                      {:else if quickJustPlaced === ceKey}
+                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else}
+                        <span class="chain-btn-pair">
+                          <button type="button" class="chain-btn chain-btn-buy"
+                                  title="BUY {k} CE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'CE', 'long')}>+</button>
+                          <button type="button" class="chain-btn chain-btn-sell"
+                                  title="SELL {k} CE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'CE', 'short')}>−</button>
+                          <button type="button" class="chain-btn chain-btn-info"
+                                  title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                  onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                        </span>
+                      {/if}
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
-                      <span class="chain-btn-pair">
-                        <button type="button" class="chain-btn chain-btn-buy"
-                                title="BUY {k} PE × 1 lot"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>+</button>
-                        <button type="button" class="chain-btn chain-btn-sell"
-                                title="SELL {k} PE × 1 lot"
-                                onclick={() => addChainDraft(k, 'PE', 'short')}>−</button>
-                        <button type="button" class="chain-btn chain-btn-info"
-                                title="Open full ticket for {k} PE (edit qty / price / mode)"
-                                onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
-                      </span>
+                      {#if isQuickActive(k, 'PE')}
+                        <span class="chain-quick chain-quick-{quickPicker.side}">
+                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
+                          <input type="number" min="1" step="1"
+                                 bind:value={quickPicker.lots}
+                                 onkeydown={onQuickKey}
+                                 class="chain-quick-lots" aria-label="Lots"/>
+                          <button type="button" class="chain-quick-ok"
+                                  disabled={quickPlacing}
+                                  title="Place paper MARKET order"
+                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-cancel"
+                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
+                        </span>
+                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
+                      {:else if quickJustPlaced === peKey}
+                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else}
+                        <span class="chain-btn-pair">
+                          <button type="button" class="chain-btn chain-btn-buy"
+                                  title="BUY {k} PE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'PE', 'long')}>+</button>
+                          <button type="button" class="chain-btn chain-btn-sell"
+                                  title="SELL {k} PE — pick lots inline"
+                                  onclick={() => openQuickPicker(k, 'PE', 'short')}>−</button>
+                          <button type="button" class="chain-btn chain-btn-info"
+                                  title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                  onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
+                        </span>
+                      {/if}
                     </td>
                   </tr>
                 {/if}
@@ -2335,6 +2559,123 @@
     padding: 1px 5px;
   }
   .chain-btn-info:hover { background: rgba(125,211,252,0.10); }
+  /* Futures-row info pill — same role as .chain-btn-info but
+     scoped to the futures `.chain-fut-pair` so its borders /
+     background match the surrounding pills. */
+  .chain-fut-pill-info {
+    color: #7dd3fc;
+    border-color: rgba(125,211,252,0.45);
+    font-style: italic;
+  }
+  .chain-fut-pill-info:hover {
+    background: rgba(125,211,252,0.12);
+    border-color: rgba(125,211,252,0.75);
+  }
+
+  /* ── Inline lots quick-picker ────────────────────────────────────
+     Replaces the [+ − i] cell while a + or − is active. Layout:
+       [B/S]  [Lots]  [✓]  [✕]
+     Side tag colour-coded by long/short. Compact enough to fit in
+     the same column footprint as the 3-button row.            */
+  .chain-quick {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 2px;
+    border-radius: 3px;
+    border: 1px solid rgba(126,151,184,0.35);
+    background: rgba(13,21,38,0.75);
+  }
+  .chain-quick-long  { border-color: rgba(74,222,128,0.55); }
+  .chain-quick-short { border-color: rgba(248,113,113,0.55); }
+  .chain-quick-tag {
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 2px;
+  }
+  .chain-quick-long  .chain-quick-tag { color: #4ade80; background: rgba(74,222,128,0.15); }
+  .chain-quick-short .chain-quick-tag { color: #f87171; background: rgba(248,113,113,0.15); }
+  .chain-quick-sym {
+    font-family: monospace;
+    font-size: 0.55rem;
+    color: #c8d8f0;
+    padding: 0 3px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .chain-quick-lots {
+    width: 2.4rem;
+    height: 1.25rem;
+    padding: 0 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(126,151,184,0.35);
+    background: rgba(13,21,38,0.6);
+    color: #c8d8f0;
+    font-family: monospace;
+    font-size: 0.6rem;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .chain-quick-lots:focus {
+    outline: none;
+    border-color: rgba(251,191,36,0.55);
+    background: rgba(13,21,38,0.85);
+  }
+  .chain-quick-ok,
+  .chain-quick-cancel {
+    height: 1.25rem;
+    min-width: 1.25rem;
+    padding: 0 4px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    background: transparent;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.7rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chain-quick-ok      { color: #4ade80; }
+  .chain-quick-cancel  { color: #f87171; }
+  .chain-quick-ok:hover     { background: rgba(74,222,128,0.10); }
+  .chain-quick-cancel:hover { background: rgba(248,113,113,0.10); }
+  .chain-quick-ok:disabled  { opacity: 0.55; cursor: progress; }
+  /* Inline error / success messages — kept outside the picker so
+     the picker itself stays the same width while the ✓ toast or
+     ✕ message renders alongside (or replaces it, in the toast
+     case). */
+  .chain-quick-err {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: rgba(248,113,113,0.12);
+    color: #f87171;
+    font-family: monospace;
+    font-size: 0.5rem;
+    letter-spacing: 0.02em;
+  }
+  .chain-quick-toast {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: rgba(74,222,128,0.18);
+    color: #4ade80;
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    animation: chain-quick-fade 1.5s ease-out forwards;
+  }
+  @keyframes chain-quick-fade {
+    0%   { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
   /* Lots input — match Select trigger height + border so the
      control bar reads as one consistent row. */
   .chain-lots-input {
