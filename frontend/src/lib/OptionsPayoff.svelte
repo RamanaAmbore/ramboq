@@ -407,22 +407,25 @@
       {/each}
 
       <!-- X-axis grid + labels — sigma marks at every 0.5σ across
-           ±spanSigmas (when the API returned span metadata), or
-           evenly spaced spot values otherwise. Whole-sigma ticks
-           (±1σ, ±2σ, …) get a stronger grid line + brighter label;
-           half-sigma ticks (±0.5σ, ±1.5σ, …) are subdued. Labels
-           are rotated -30° so neighbouring ticks (every 0.5σ) don't
-           collide on narrow charts — the slant also gives the axis
-           a proper tabular feel without forcing label hiding. -->
+           ±spanSigmas. Whole-sigma ticks (±1σ, ±2σ, …) get a
+           stronger dashed line + brighter labels; half-sigma ticks
+           subdued. Each tick gets BOTH the σ label (rotated -30°
+           at the bottom axis) AND the actual spot price rendered
+           vertically (rotated -90°) along the dashed line itself
+           — so the operator can read either dimension at a glance
+           without leaving the chart. -->
       {#each xTicks as xt}
         {@const wholeSigma = xt.sigma != null && xt.sigma % 1 === 0}
         {@const isCenter   = xt.sigma === 0}
         {#if !isCenter}
           <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(200,216,240,{wholeSigma ? 0.16 : 0.07})"
-                stroke-width="1"/>
+                stroke="rgba(200,216,240,{wholeSigma ? 0.30 : 0.14})"
+                stroke-width="1"
+                stroke-dasharray={wholeSigma ? '4 3' : '2 3'}/>
         {/if}
         {#if !isCenter}
+          <!-- σ label at the bottom (rotated -30° to clear adjacent
+               half-σ ticks). -->
           {@const ly = height - PAD_B + 10}
           <text x={xt.x} y={ly}
                 text-anchor="end"
@@ -432,6 +435,22 @@
                 font-weight={wholeSigma ? 700 : 500}
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.label}
+          </text>
+          <!-- Spot price along the line itself, rendered vertically
+               (rotated -90° = reads bottom-up). Sits near the top
+               of the chart so it doesn't collide with the σ label
+               at the bottom or the strike / breakeven markers
+               (which sit at slightly different x positions). -->
+          {@const vx = xt.x}
+          {@const vy = PAD_T + 6}
+          <text x={vx} y={vy}
+                text-anchor="end"
+                transform="rotate(-90 {vx} {vy})"
+                fill="rgba(200,216,240,{wholeSigma ? 0.7 : 0.45})"
+                font-size={wholeSigma ? 9 : 8}
+                font-weight={wholeSigma ? 600 : 400}
+                font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+            {xt.s.toFixed(0)}
           </text>
         {/if}
       {/each}
