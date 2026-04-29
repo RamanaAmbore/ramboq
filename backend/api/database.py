@@ -82,6 +82,21 @@ async def init_db() -> None:
         await conn.execute(text(
             "UPDATE algo_orders SET mode = 'sim' WHERE mode = 'test'"
         ))
+        # Agent lifespan columns — added after the agents table existed in
+        # production. Default 'persistent' on existing rows preserves
+        # current behaviour; max_fires + expires_at remain NULL until the
+        # operator (or an algo spawning the agent) sets them.
+        await conn.execute(text(
+            "ALTER TABLE agents ADD COLUMN IF NOT EXISTS lifespan_type VARCHAR(16) "
+            "NOT NULL DEFAULT 'persistent'"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE agents ADD COLUMN IF NOT EXISTS lifespan_max_fires INTEGER"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE agents ADD COLUMN IF NOT EXISTS "
+            "lifespan_expires_at TIMESTAMP WITH TIME ZONE"
+        ))
     logger.info("Database: tables verified")
 
     # Seed grammar tokens (condition / notify / action catalog) BEFORE agents

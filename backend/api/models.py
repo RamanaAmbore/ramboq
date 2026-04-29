@@ -146,11 +146,37 @@ class Agent(Base):
     schedule: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default="market_hours")
     cooldown_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
 
-    # Runtime state
+    # Runtime state. `status` ∈ active / inactive / cooldown / completed.
+    # `completed` is the terminal state for lifespan-bounded agents
+    # (one_shot, n_fires, until_date). Engine skips `completed` rows
+    # entirely; operator can re-arm by editing back to active/inactive.
     status: Mapped[str]          = mapped_column(String(16), nullable=False, default="inactive")
     last_triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     trigger_count: Mapped[int]   = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Lifespan — controls whether the agent persists or auto-completes.
+    # Industry analogue: TradingView's "once" vs "every time" alerts;
+    # IBKR's Active vs Triggered. Lets algos spawn one-shot agents
+    # (e.g. an expiry-day auto-close that should only fire once) AND
+    # operators keep persistent agents (loss alerts, summaries).
+    #
+    #   "persistent" : default. Active ↔ Cooldown forever until
+    #                  operator deactivates.
+    #   "one_shot"   : fires ONCE then completes.
+    #   "n_fires"    : fires up to lifespan_max_fires times then
+    #                  completes (1 = same as one_shot but more
+    #                  explicit; >1 = bounded recurring agent).
+    #   "until_date" : completes when now >= lifespan_expires_at.
+    #                  Useful for "watch this until expiry" agents
+    #                  that algos spawn with a known end date.
+    lifespan_type: Mapped[str]   = mapped_column(
+        String(16), nullable=False, default="persistent"
+    )
+    lifespan_max_fires: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    lifespan_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Meta
     is_system: Mapped[bool]      = mapped_column(Boolean, nullable=False, default=False)

@@ -13,6 +13,7 @@ POST /api/agents/interpret      — terminal command parser
 """
 
 import json
+from datetime import datetime, timezone
 
 import msgspec
 from litestar import Controller, delete, get, post, put
@@ -25,6 +26,31 @@ from backend.api.models import Agent, AgentEvent
 from backend.shared.helpers.ramboq_logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# Valid lifespan_type values — see backend/api/models.py::Agent for
+# semantics. Engine treats any other value as 'persistent' but the
+# CRUD layer rejects unknowns up-front so config typos surface as
+# 400s rather than silently becoming persistent.
+_LIFESPAN_TYPES = {"persistent", "one_shot", "n_fires", "until_date"}
+
+
+def _parse_iso_dt(s):
+    """Parse an ISO 8601 datetime string into a tz-aware UTC datetime,
+    or return None for empty / null input. Operator-supplied strings
+    may omit the timezone (e.g. "2026-05-15T15:30:00") — assume UTC
+    in that case so the comparison against now-UTC in the engine
+    stays sane."""
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(s).replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400,
+            detail=f"lifespan_expires_at must be an ISO datetime; got {s!r}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +73,11 @@ class AgentInfo(msgspec.Struct):
     trigger_count: int
     last_error: str | None
     is_system: bool
+    # Lifespan — see backend/api/models.py::Agent for semantics.
+    # 'persistent' (default), 'one_shot', 'n_fires', 'until_date'.
+    lifespan_type:        str        = "persistent"
+    lifespan_max_fires:   int | None = None
+    lifespan_expires_at:  str | None = None
 
 
 class AgentCreateRequest(msgspec.Struct):
@@ -59,6 +90,12 @@ class AgentCreateRequest(msgspec.Struct):
     scope: str = "total"
     schedule: str = "market_hours"
     cooldown_minutes: int = 30
+    # Lifespan accepted on create so algos spawning agents can declare
+    # one-shot or bounded behaviour up front. Defaults preserve the
+    # existing persistent shape.
+    lifespan_type:        str        = "persistent"
+    lifespan_max_fires:   int | None = None
+    lifespan_expires_at:  str | None = None  # ISO datetime
 
 
 class AgentUpdateRequest(msgspec.Struct):
@@ -70,6 +107,9 @@ class AgentUpdateRequest(msgspec.Struct):
     scope: str | None = None
     schedule: str | None = None
     cooldown_minutes: int | None = None
+    lifespan_type:        str | None = None
+    lifespan_max_fires:   int | None = None
+    lifespan_expires_at:  str | None = None
 
 
 class AgentEventInfo(msgspec.Struct):
@@ -108,6 +148,12 @@ def _agent_to_info(a: Agent) -> AgentInfo:
         last_triggered_at=a.last_triggered_at.isoformat() if a.last_triggered_at else None,
         trigger_count=a.trigger_count, last_error=a.last_error,
         is_system=a.is_system,
+        lifespan_type=getattr(a, "lifespan_type", "persistent") or "persistent",
+        lifespan_max_fires=getattr(a, "lifespan_max_fires", None),
+        lifespan_expires_at=(
+            a.lifespan_expires_at.isoformat()
+            if getattr(a, "lifespan_expires_at", None) else None
+        ),
     )
 
 
@@ -170,15 +216,22 @@ class AgentController(Controller):
             existing = await session.execute(select(Agent).where(Agent.slug == data.slug))
             if existing.scalar_one_or_none():
                 raise HTTPException(status_code=409, detail=f"Agent '{data.slug}' already exists")
+            lifespan_type = (data.lifespan_type or "persistent").lower()
+            if lifespan_type not in _LIFESPAN_TYPES:
+                raise HTTPException(status_code=400,
+                    detail=f"lifespan_type must be one of {sorted(_LIFESPAN_TYPES)}")
             agent = Agent(
                 slug=data.slug, name=data.name, description=data.description,
                 conditions=data.conditions, events=data.events, actions=data.actions,
                 scope=data.scope, schedule=data.schedule,
                 cooldown_minutes=data.cooldown_minutes, status="inactive",
+                lifespan_type=lifespan_type,
+                lifespan_max_fires=data.lifespan_max_fires,
+                lifespan_expires_at=_parse_iso_dt(data.lifespan_expires_at),
             )
             session.add(agent)
             await session.commit()
-        logger.info(f"Agent created: {data.slug}")
+        logger.info(f"Agent created: {data.slug} [lifespan={lifespan_type}]")
         return {"detail": f"Agent '{data.slug}' created"}
 
     @put("/{slug:str}", guards=[admin_guard])
@@ -189,10 +242,21 @@ class AgentController(Controller):
             if not agent:
                 raise HTTPException(status_code=404, detail=f"Agent '{slug}' not found")
             for field in ('name', 'description', 'conditions', 'events', 'actions',
-                          'scope', 'schedule', 'cooldown_minutes'):
+                          'scope', 'schedule', 'cooldown_minutes',
+                          'lifespan_max_fires'):
                 val = getattr(data, field, None)
                 if val is not None:
                     setattr(agent, field, val)
+            # Validate + normalise lifespan_type when supplied.
+            if data.lifespan_type is not None:
+                lt = data.lifespan_type.lower()
+                if lt not in _LIFESPAN_TYPES:
+                    raise HTTPException(status_code=400,
+                        detail=f"lifespan_type must be one of {sorted(_LIFESPAN_TYPES)}")
+                agent.lifespan_type = lt
+            # ISO datetime parse for lifespan_expires_at.
+            if data.lifespan_expires_at is not None:
+                agent.lifespan_expires_at = _parse_iso_dt(data.lifespan_expires_at)
             await session.commit()
         logger.info(f"Agent updated: {slug}")
         return {"detail": f"Agent '{slug}' updated"}

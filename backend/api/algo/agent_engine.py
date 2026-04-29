@@ -688,6 +688,23 @@ async def run_cycle(context: dict, broadcast_fn=None,
     any_market_open = nse_open_flag or mcx_open_flag
 
     for agent in agents:
+        # Lifespan deadline — auto-complete `until_date` agents whose
+        # expiry has passed. Done before any other gates so a stale
+        # agent doesn't fire on its last tick. Sim runs (bypass_schedule)
+        # never mutate agent state, so the deadline check is gated.
+        if (not bypass_schedule
+                and getattr(agent, "lifespan_type", "persistent") == "until_date"
+                and agent.lifespan_expires_at
+                and now >= agent.lifespan_expires_at):
+            async with async_session() as session:
+                await session.execute(
+                    update(Agent).where(Agent.id == agent.id).values(status="completed")
+                )
+                await session.commit()
+            if broadcast_fn:
+                broadcast_fn("agent_state", {"slug": agent.slug, "status": "completed"})
+            continue
+
         # Enforce schedule: "market_hours" agents only run while some market
         # is open — unless the caller asked to bypass (isolated sim test).
         if (not bypass_schedule
@@ -788,9 +805,24 @@ async def run_cycle(context: dict, broadcast_fn=None,
         if not bypass_schedule:
             async with async_session() as session:
                 if triggered:
+                    # Lifespan check — one_shot or capped n_fires
+                    # transition straight to 'completed' instead of
+                    # 'cooldown'. Engine won't pick up `completed`
+                    # rows on subsequent cycles. Operator can re-arm
+                    # by editing status back to active/inactive.
+                    new_trigger_count = (agent.trigger_count or 0) + 1
+                    lifespan = getattr(agent, "lifespan_type", "persistent") or "persistent"
+                    if lifespan == "one_shot":
+                        end_status = "completed"
+                    elif (lifespan == "n_fires"
+                          and agent.lifespan_max_fires is not None
+                          and new_trigger_count >= agent.lifespan_max_fires):
+                        end_status = "completed"
+                    else:
+                        end_status = "cooldown"
                     await session.execute(
                         update(Agent).where(Agent.id == agent.id).values(
-                            status="cooldown",
+                            status=end_status,
                             last_triggered_at=datetime.now(timezone.utc),
                             trigger_count=Agent.trigger_count + 1,
                         )
@@ -802,5 +834,19 @@ async def run_cycle(context: dict, broadcast_fn=None,
                 await session.commit()
 
             if broadcast_fn:
-                new_status = "cooldown" if triggered else "active"
+                if triggered:
+                    # Compute the same end_status we just persisted so the
+                    # WS payload matches DB state.
+                    new_trigger_count = (agent.trigger_count or 0) + 1
+                    lifespan = getattr(agent, "lifespan_type", "persistent") or "persistent"
+                    if lifespan == "one_shot":
+                        new_status = "completed"
+                    elif (lifespan == "n_fires"
+                          and agent.lifespan_max_fires is not None
+                          and new_trigger_count >= agent.lifespan_max_fires):
+                        new_status = "completed"
+                    else:
+                        new_status = "cooldown"
+                else:
+                    new_status = "active"
                 broadcast_fn("agent_state", {"slug": agent.slug, "status": new_status})

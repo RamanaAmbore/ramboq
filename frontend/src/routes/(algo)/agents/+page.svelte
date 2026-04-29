@@ -29,7 +29,16 @@
   // Symbols with captured price-history ticks. Sourced from the active
   let editing     = $state(null);     // slug of agent being edited
   let expandedSlug = $state(/** @type {string|null} */(null));
-  let editForm    = $state(/** @type {{ name: string, description: string, conditions: string, events: string, actions: string, cooldown_minutes: number, scope: string, schedule: string }} */ ({ name: '', description: '', conditions: '{}', events: '[]', actions: '[]', cooldown_minutes: 30, scope: 'total', schedule: 'market_hours' }));
+  let editForm    = $state(/** @type {{
+    name: string, description: string, conditions: string, events: string, actions: string,
+    cooldown_minutes: number, scope: string, schedule: string,
+    lifespan_type: string, lifespan_max_fires: number|string,
+    lifespan_expires_at: string,
+  }} */ ({
+    name: '', description: '', conditions: '{}', events: '[]', actions: '[]',
+    cooldown_minutes: 30, scope: 'total', schedule: 'market_hours',
+    lifespan_type: 'persistent', lifespan_max_fires: '', lifespan_expires_at: '',
+  }));
   let ws;
   let refreshTeardown;
   let simStatusTeardown;
@@ -144,6 +153,13 @@
       cooldown_minutes: agent.cooldown_minutes,
       scope: agent.scope,
       schedule: agent.schedule || 'market_hours',
+      lifespan_type:        agent.lifespan_type || 'persistent',
+      lifespan_max_fires:   agent.lifespan_max_fires == null ? '' : agent.lifespan_max_fires,
+      // ISO datetime → "YYYY-MM-DDTHH:MM" (datetime-local input format).
+      // Trim seconds + tz so the native input accepts the value.
+      lifespan_expires_at:  agent.lifespan_expires_at
+        ? String(agent.lifespan_expires_at).slice(0, 16)
+        : '',
     };
   }
 
@@ -206,6 +222,13 @@
         cooldown_minutes: editForm.cooldown_minutes,
         scope: editForm.scope,
         schedule: editForm.schedule,
+        lifespan_type: editForm.lifespan_type || 'persistent',
+        lifespan_max_fires: (editForm.lifespan_type === 'n_fires'
+          && editForm.lifespan_max_fires !== '' && editForm.lifespan_max_fires != null)
+          ? Number(editForm.lifespan_max_fires) : null,
+        lifespan_expires_at: (editForm.lifespan_type === 'until_date'
+          && editForm.lifespan_expires_at)
+          ? String(editForm.lifespan_expires_at) : null,
       });
       editing = null;
       validationErrors = []; validationGrammar = '';
@@ -453,6 +476,38 @@
                   <label class="field-label">Cooldown (minutes)</label>
                   <input type="number" bind:value={editForm.cooldown_minutes} class="field-input" />
                 </div>
+                <!-- Lifespan — controls whether the agent persists or
+                     auto-completes after firing. one_shot / n_fires let
+                     algos spawn temporary agents (expiry-day auto-close,
+                     "watch this until X" rules) that drop out of the
+                     active set on completion instead of needing a manual
+                     deactivate. -->
+                <div>
+                  <label class="field-label">Lifespan</label>
+                  <select bind:value={editForm.lifespan_type} class="field-input">
+                    <option value="persistent">Persistent (default)</option>
+                    <option value="one_shot">One-shot (fires once)</option>
+                    <option value="n_fires">N fires</option>
+                    <option value="until_date">Until date</option>
+                  </select>
+                </div>
+                {#if editForm.lifespan_type === 'n_fires'}
+                  <div>
+                    <label class="field-label">Max fires</label>
+                    <input type="number" min="1"
+                           bind:value={editForm.lifespan_max_fires}
+                           class="field-input"
+                           placeholder="e.g. 3" />
+                  </div>
+                {/if}
+                {#if editForm.lifespan_type === 'until_date'}
+                  <div>
+                    <label class="field-label">Expires at (UTC)</label>
+                    <input type="datetime-local"
+                           bind:value={editForm.lifespan_expires_at}
+                           class="field-input" />
+                  </div>
+                {/if}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                 <div>
@@ -616,11 +671,25 @@
                 <span>
                   Last fire: {agent.last_triggered_at?.slice(0, 16) || '—'}
                   <span class="mx-1">|</span>
-                  Count: {agent.trigger_count}
+                  Count: {agent.trigger_count}{#if agent.lifespan_type === 'n_fires' && agent.lifespan_max_fires}/{agent.lifespan_max_fires}{/if}
                   <span class="mx-1">|</span>
                   Cooldown: {agent.cooldown_minutes}m
                   <span class="mx-1">|</span>
                   Scope: {agent.scope}
+                  {#if agent.lifespan_type && agent.lifespan_type !== 'persistent'}
+                    <span class="mx-1">|</span>
+                    <span class="agent-lifespan-tag" title={
+                      agent.lifespan_type === 'one_shot' ? 'Auto-completes after firing once' :
+                      agent.lifespan_type === 'n_fires' ? `Auto-completes after ${agent.lifespan_max_fires || '?'} fires` :
+                      agent.lifespan_type === 'until_date' ? `Auto-completes at ${(agent.lifespan_expires_at || '').slice(0,16)} UTC` :
+                      ''
+                    }>
+                      {#if agent.lifespan_type === 'one_shot'}1×
+                      {:else if agent.lifespan_type === 'n_fires'}≤{agent.lifespan_max_fires || '?'}×
+                      {:else if agent.lifespan_type === 'until_date'}until {(agent.lifespan_expires_at || '').slice(0,10)}
+                      {/if}
+                    </span>
+                  {/if}
                 </span>
                 <span class="flex items-center gap-3">
                   <button type="button"
@@ -727,6 +796,23 @@
     padding: 0.3rem 0.4rem;
   }
   .preview-action-type { color: #fbbf24; font-weight: 700; font-family: ui-monospace, monospace; font-size: 0.6rem; }
+
+  /* Lifespan chip — shows next to row meta when an agent is non-
+     persistent. Uses the sky-blue utility palette so it reads as an
+     "info tag" rather than a status (which is already colour-coded
+     by the dot pill). */
+  .agent-lifespan-tag {
+    display: inline-block;
+    padding: 0 0.3rem;
+    border-radius: 2px;
+    border: 1px solid var(--btn-sky-border);
+    background: var(--btn-sky-bg);
+    color: var(--btn-sky);
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 0.55rem;
+    letter-spacing: 0.04em;
+  }
   .preview-action-params {
     font-size: 0.55rem;
     background: rgba(0,0,0,0.25);
