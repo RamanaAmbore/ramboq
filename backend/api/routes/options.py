@@ -149,8 +149,10 @@ class OptionAnalyticsResponse(msgspec.Struct):
     payoff:              list[PayoffPoint]
     # Intermediate-DTE Black-Scholes curves between Today and Expiry
     # — empty when caller passes time_slices=0 (default). Each entry's
-    # `values` is parallel to `payoff` (same spot grid).
-    intermediate_curves: list[IntermediateCurve] = []
+    # `values` is parallel to `payoff` (same spot grid). NO default —
+    # msgspec.Struct rejects required fields after optional ones, and
+    # the route handler always supplies this list explicitly.
+    intermediate_curves: list[IntermediateCurve]
 
     # Provenance — lets the UI flag stale data with a yellow chip.
     # ltp_source ∈ {'override','sim','live','close','depth','avg_cost'}
