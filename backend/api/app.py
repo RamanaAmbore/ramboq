@@ -163,21 +163,69 @@ async def _rebuild_broker_connections() -> None:
 #                       IAD = Ashburn VA, …) — coarse geographic hint
 #                       about which CF edge served the request.
 #
-# Country + colo combination gives "approx location" without hitting an
-# external GeoIP service. De-duplicated per (IP, country, hour) so a
-# single visitor doesn't spam the log every poll cycle. In-memory dict
-# evicts entries older than 24 h on each read.
+# Country + colo gets us "approx location" without an external service.
+# For city-level resolution we additionally hit ip-api.com — free, no
+# auth, 45 req/min. With our 1-hour-per-IP dedup that's plenty of
+# headroom. The HTTP call is fire-and-forget (asyncio.create_task) so
+# it never blocks the actual request; the city info appears on a
+# follow-up `[visitor-loc]` log line once the lookup returns.
 from time import monotonic
+import asyncio
 _visitor_log_cache: dict[tuple[str, str], float] = {}
-_VISITOR_LOG_TTL_SEC   = 60 * 60       # re-log a known IP after 1 hour
-_VISITOR_LOG_EVICT_SEC = 60 * 60 * 24  # drop entries older than 24 h
+_visitor_loc_cache: dict[str, str] = {}        # ip → "City, Region, Country (ISP)"
+_visitor_loc_inflight: set[str] = set()        # IPs currently being looked up
+_VISITOR_LOG_TTL_SEC    = 60 * 60       # re-log a known IP after 1 hour
+_VISITOR_LOG_EVICT_SEC  = 60 * 60 * 24  # drop entries older than 24 h
+
+
+def _is_private_ip(ip: str) -> bool:
+    """Skip GeoIP lookup for RFC1918 / loopback / link-local IPs —
+    ip-api would just return a 'private range' error and we'd waste
+    a request."""
+    if not ip or ip == "?":
+        return True
+    if ip.startswith(("10.", "127.", "192.168.", "169.254.", "172.")):
+        return True
+    if ip in ("::1", "0.0.0.0") or ip.startswith("fc") or ip.startswith("fd"):
+        return True
+    return False
+
+
+async def _resolve_location(ip: str) -> None:
+    """Fire-and-forget GeoIP lookup against ip-api.com. Caches the
+    result so each IP is only queried once. Logs the resolved
+    location on a `[visitor-loc]` line so the operator sees the
+    enriched info alongside the original `[visitor]` line.
+    Network failures and odd responses are swallowed silently —
+    the visitor logger keeps working with country + colo only."""
+    if ip in _visitor_loc_cache or ip in _visitor_loc_inflight:
+        return
+    _visitor_loc_inflight.add(ip)
+    try:
+        import httpx
+        url = f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp"
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            r = await client.get(url)
+            data = r.json()
+        if data.get("status") != "success":
+            return
+        loc = ", ".join(filter(None, [
+            data.get("city"), data.get("regionName"), data.get("country"),
+        ])) or "?"
+        isp = data.get("isp") or ""
+        line = f"{loc}" + (f" ({isp})" if isp else "")
+        _visitor_loc_cache[ip] = line
+        logger.info(f"[visitor-loc] {ip} → {line}")
+    except Exception:
+        pass
+    finally:
+        _visitor_loc_inflight.discard(ip)
 
 
 async def _log_visitor(request) -> None:  # type: ignore[no-untyped-def]
     """Litestar before_request hook — logs the visitor's IP +
-    country + CF colo on first sight per hour. Fires on every
-    request but the log line only writes for new (IP, country)
-    pairs or those that haven't been seen in the last hour. Skips
+    country + CF colo on first sight per hour, kicks off a
+    background GeoIP lookup for city-level enrichment. Skips
     static asset paths so the log isn't drowned in
     /assets/*.js fetches."""
     try:
@@ -221,7 +269,17 @@ async def _log_visitor(request) -> None:  # type: ignore[no-untyped-def]
             return
         _visitor_log_cache[key] = now
         method = request.scope.get("method") or "GET"
-        logger.info(f"[visitor] {ip} ({country}, CF:{colo}) {method} {path} UA=\"{ua}\"")
+        # Inline the cached city/region if we already resolved this IP
+        # — saves the operator from cross-referencing the follow-up
+        # `[visitor-loc]` line.
+        loc_inline = _visitor_loc_cache.get(ip)
+        loc_part = f" — {loc_inline}" if loc_inline else ""
+        logger.info(f"[visitor] {ip} ({country}, CF:{colo}){loc_part} {method} {path} UA=\"{ua}\"")
+        # Fire off background lookup for city-level info on first
+        # sight. Real-IP only — RFC1918 / loopback / dev IPs are
+        # skipped (ip-api would error on them and we'd waste a hit).
+        if not _is_private_ip(ip):
+            asyncio.create_task(_resolve_location(ip))
     except Exception:
         # The hook must NEVER break a real request — geolog is
         # best-effort.

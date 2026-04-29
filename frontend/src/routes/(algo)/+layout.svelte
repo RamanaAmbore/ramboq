@@ -75,6 +75,23 @@
     _algoLinksAll.filter(l => !l.adminOnly || !isDemo)
   );
 
+  /** Footer label that tracks the current page. Earlier the footer
+   *  hard-coded "Admin Console" on every algo page; now it reflects
+   *  whichever nav entry the operator is on (longest-prefix match
+   *  against `_algoLinksAll`). Falls back to "Algo Console" for
+   *  unrecognised paths so the footer never reads as empty. */
+  const pageLabel = $derived.by(() => {
+    const path = page.url.pathname;
+    let best = { href: '', label: 'Algo Console' };
+    for (const link of _algoLinksAll) {
+      const h = link.href;
+      if ((path === h || path.startsWith(h + '/')) && h.length > best.href.length) {
+        best = { href: h, label: link.label };
+      }
+    }
+    return best.label;
+  });
+
   let menuOpen = $state(false);
   const closeMenu = () => { menuOpen = false; };
 
@@ -287,7 +304,7 @@
       <span class="algo-footer-sep">·</span>
       <span class="algo-footer-text">ACU-5195</span>
       <span class="algo-footer-sep">·</span>
-      <span class="algo-footer-text">Admin Console</span>
+      <span class="algo-footer-text">{pageLabel}</span>
     </footer>
   </div>
 </div>
