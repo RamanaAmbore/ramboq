@@ -482,13 +482,29 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Strike + spot vertical-line markers were removed by
-           operator request — the only verticals left are σ ticks
-           (above) and breakevens (below). Strike values are still
-           visible as the dashed-line price labels at the σ ticks
-           closest to each strike, and spot lives in the top-left
-           stat overlay. Keeping the SVG less busy makes the today /
-           expiry curves the main visual signal. -->
+      <!-- Spot vertical — distinct from σ ticks (dashed) and BE
+           (dashed cream) by being SOLID + cyan. Matches the SPOT
+           readout colour in the top-left stat overlay so the
+           operator's eye links the chart anchor with the numeric
+           pill above. The current-P&L dot below sits on this same
+           x-coordinate. -->
+      {#if spot > sMin && spot < sMax}
+        <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
+              stroke="rgba(125,211,252,0.85)" stroke-width="1.25"/>
+        {@const sx = xOf(spot)}
+        {@const sy = height - PAD_B - 4}
+        <text x={sx} y={sy}
+              text-anchor="start"
+              transform="rotate(-90 {sx} {sy})"
+              fill="#7dd3fc"
+              stroke="#152033"
+              stroke-width="3"
+              paint-order="stroke fill"
+              font-size="11" font-weight="700"
+              font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+          SPOT {spot.toFixed(0)}
+        </text>
+      {/if}
 
       <!-- Breakeven markers — soft cream dashed verticals; multi-leg
            strategies (iron condor, butterfly) can produce two.
@@ -581,6 +597,10 @@
       <span class="legend-item legend-be">
         <span class="legend-mark legend-be-mark"></span>
         Breakeven
+      </span>
+      <span class="legend-item">
+        <span class="legend-mark legend-spot-mark"></span>
+        Spot
       </span>
     </div>
   {/if}
@@ -712,6 +732,9 @@
   }
   .legend-spot-mark { border-left: 2px solid #7dd3fc; }
   .legend-be-mark   { border-left: 2px dashed #fde68a; }
+  /* Solid swatch for the spot legend — visually pairs with the
+     SOLID cyan vertical drawn at the spot price (BE is dashed
+     cream, σ ticks are dashed amber/light-blue). */
 
   /* On-chart stat overlay — reads the key numerics off the curve so
      the chart is self-contained. Sits top-left, semi-transparent,

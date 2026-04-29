@@ -1002,37 +1002,24 @@
       options={expiryChoicesForUnderlying.map(x => ({ value: x, label: x }))}
       placeholder={expiryChoicesForUnderlying.length ? 'Pick expiry' : '—'} />
   </div>
-  <!-- Generic BUY / SELL launcher — paired pair of pills; click +
-       to open the chain picker pre-set to LONG, click − for SHORT.
-       Re-clicking the active button collapses the panel. Disabled
-       until the operator picks exactly one real account on the page
-       — every leg landed via the chain routes through OrderTicket
-       which needs an unambiguous routing account. -->
-  <div class="opt-trade" role="group" aria-label="Open chain picker (buy or sell)">
+  <!-- OChain launcher — single toggle that opens / closes the chain
+       picker. Per-row +/− inside the picker decides each leg's side
+       (BUY / SELL); the outer button is now purely "show / hide
+       picker." Disabled until the operator picks exactly one real
+       account on the page — every leg landed via the chain routes
+       through OrderTicket which needs an unambiguous routing
+       account. -->
+  <div class="opt-trade" role="group" aria-label="Open chain picker">
     <button type="button"
-            class="opt-add-btn opt-add-btn-buy"
-            class:opt-add-btn-on={showAddPanel && chainSide === 'long'}
+            class="opt-add-btn opt-add-btn-ochain"
+            class:opt-add-btn-on={showAddPanel}
             disabled={!chainEnabled}
             title={chainEnabled
-              ? 'Open the chain picker to BUY (long)'
+              ? (showAddPanel ? 'Hide the chain picker' : 'Open the chain picker')
               : 'Pick exactly one account to enable the chain picker'}
-            aria-label="Open picker — buy"
-            onclick={() => {
-              if (showAddPanel && chainSide === 'long') { showAddPanel = false; return; }
-              chainSide = 'long'; showAddPanel = true;
-            }}>+</button>
-    <button type="button"
-            class="opt-add-btn opt-add-btn-sell"
-            class:opt-add-btn-on={showAddPanel && chainSide === 'short'}
-            disabled={!chainEnabled}
-            title={chainEnabled
-              ? 'Open the chain picker to SELL (short)'
-              : 'Pick exactly one account to enable the chain picker'}
-            aria-label="Open picker — sell"
-            onclick={() => {
-              if (showAddPanel && chainSide === 'short') { showAddPanel = false; return; }
-              chainSide = 'short'; showAddPanel = true;
-            }}>−</button>
+            aria-label="Toggle chain picker"
+            aria-pressed={showAddPanel}
+            onclick={() => { showAddPanel = !showAddPanel; }}>OChain</button>
   </div>
 </div>
 
@@ -1552,31 +1539,34 @@
      a third of the leftover space after the + button. */
   .opt-field-grow { flex: 1 1 0; min-width: 0; }
 
-  /* Trade-launcher group — pairs the BUY (+) and SELL (−) buttons
-     into a segmented pill aligned with the Select-trigger row. */
+  /* Chain-launcher slot — single OChain pill aligned with the
+     Select-trigger row. (Earlier this hosted a paired BUY (+) /
+     SELL (−) toggle; per-row +/− inside the picker now decides
+     side, so the outer is just an open / close affordance.) */
   .opt-trade {
     display: inline-flex;
     flex: 0 0 auto;
     align-self: flex-end;
-    gap: 1px;
   }
-  /* Square BUY/SELL pills matching the Select trigger height
-     (Select uses min-height: 1.55rem) so the row reads as one
-     consistent control bar. Color-coded — green for BUY, red for
-     SELL — so the operator's eye lands on the right one without
-     reading the glyph. */
+  /* OChain pill — height matches the Select trigger
+     (min-height: 1.55rem) so the row reads as one consistent
+     control bar. Amber palette to identify it as an action button
+     in the same family as the chart-corner Refresh. Wider than
+     the old square pills since "OChain" needs the room. */
   .opt-add-btn {
-    width: 1.55rem;
     height: 1.55rem;
     min-height: 1.55rem;
+    padding: 0 0.65rem;
     flex: 0 0 auto;
     align-self: flex-end;
     border-radius: 3px;          /* match Select's 3px radius */
     border: 1px solid rgba(251,191,36,0.5);
     background: rgba(251,191,36,0.10);
     color: #fbbf24;
-    font-size: 0.9rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.65rem;
     font-weight: 700;
+    letter-spacing: 0.06em;
     line-height: 1;
     cursor: pointer;
     display: inline-flex;
@@ -1605,45 +1595,12 @@
     background: rgba(126,151,184,0.08);
     border-color: rgba(126,151,184,0.30);
   }
+  /* Active (panel-open) — invert the palette so the OChain pill
+     visually links to the picker panel below it. */
   .opt-add-btn-on {
     background: #fbbf24;
     color: #0c1830;
     border-color: #fbbf24;
-  }
-  /* BUY (+) — green; SELL (−) — red. Active state inverts the
-     palette (filled bg + dark glyph) so the chosen side is
-     unmistakable while the chain panel is open. */
-  .opt-add-btn-buy {
-    border-color: rgba(74,222,128,0.55);
-    background: rgba(74,222,128,0.10);
-    color: #4ade80;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-  .opt-add-btn-buy:hover {
-    background: rgba(74,222,128,0.22);
-    border-color: rgba(74,222,128,0.85);
-  }
-  .opt-add-btn-buy.opt-add-btn-on {
-    background: #4ade80;
-    color: #0c1830;
-    border-color: #4ade80;
-  }
-  .opt-add-btn-sell {
-    border-color: rgba(248,113,113,0.55);
-    background: rgba(248,113,113,0.10);
-    color: #f87171;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-  }
-  .opt-add-btn-sell:hover {
-    background: rgba(248,113,113,0.22);
-    border-color: rgba(248,113,113,0.85);
-  }
-  .opt-add-btn-sell.opt-add-btn-on {
-    background: #f87171;
-    color: #0c1830;
-    border-color: #f87171;
   }
 
   /* Refresh button moved onto the chart's top-right corner — see
