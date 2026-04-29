@@ -41,7 +41,11 @@
       // Cache hit — paint instantly, then refresh in the background.
       if (dataCache.positions?.rows) positions = dataCache.positions.rows;
       if (dataCache.holdings?.rows)  holdings  = dataCache.holdings.rows;
-      if (dataCache.funds?.rows)     funds     = dataCache.funds.rows;
+      if (dataCache.funds?.rows) {
+        funds = dataCache.funds.rows.filter(
+          (/** @type {any} */ x) => x && x.account && x.account !== 'TOTAL'
+        );
+      }
       const [p, h, f] = await Promise.allSettled([
         fetchPositions(), fetchHoldings(), fetchFunds(),
       ]);
@@ -54,7 +58,14 @@
         dataCache.holdings = h.value;
       }
       if (f.status === 'fulfilled') {
-        funds = f.value?.rows || [];
+        // /api/funds returns per-account rows AND a synthesized TOTAL
+        // row (already pre-summed by the backend). Including the TOTAL
+        // row in the per-row sum below double-counts every value.
+        // Strip it on the way in so cashTotal / future aggregates read
+        // the per-account rows only.
+        funds = (f.value?.rows || []).filter(
+          (/** @type {any} */ x) => x && x.account && x.account !== 'TOTAL'
+        );
         dataCache.funds = f.value;
       }
       lastRefresh = new Date().toLocaleTimeString('en-IN', {
