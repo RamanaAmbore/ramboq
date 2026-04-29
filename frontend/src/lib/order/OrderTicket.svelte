@@ -704,7 +704,7 @@
   }
   .ot-symbol-meta {
     font-size: 0.6rem;
-    color: #7e97b8;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -730,8 +730,8 @@
   .ot-label-block { flex: 1 1 0; min-width: 0; }
   .ot-label {
     display: block;
-    font-size: 0.55rem;
-    color: #7e97b8;
+    font-size: 0.65rem;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 0.18rem;
@@ -749,7 +749,7 @@
     background: rgba(74,222,128,0.15);
     border: 1px solid rgba(74,222,128,0.45);
     color: #4ade80;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -788,7 +788,7 @@
     padding: 0.4rem 0.75rem;
     background: transparent;
     border: 0;
-    color: #7e97b8;
+    color: #a3b9d0;
     font-size: 0.72rem;
     font-weight: 700;
     cursor: pointer;
@@ -806,7 +806,7 @@
 
   .ot-qty-block { display: flex; align-items: flex-end; gap: 0.4rem; flex: 1 1 0; }
   .ot-qty-block .ot-label { margin: 0 0 0.18rem; }
-  .ot-qty-block .ot-meta { font-size: 0.55rem; color: #7e97b8; padding-bottom: 0.5rem; }
+  .ot-qty-block .ot-meta { font-size: 0.65rem; color: #a3b9d0; padding-bottom: 0.5rem; }
 
   .ot-input {
     width: 100%;
@@ -828,7 +828,7 @@
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 3px;
-    color: #7e97b8;
+    color: #a3b9d0;
     font-size: 0.6rem;
     font-weight: 600;
     cursor: pointer;
@@ -854,8 +854,8 @@
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 3px;
-    color: #7e97b8;
-    font-size: 0.55rem;
+    color: #a3b9d0;
+    font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     cursor: pointer;
@@ -885,13 +885,13 @@
   }
   .ot-chase-label {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     padding: 0.15rem 0.4rem;
     border-radius: 3px;
     border: 1px solid rgba(255,255,255,0.12);
-    color: #7e97b8;
+    color: #a3b9d0;
     background: rgba(255,255,255,0.04);
   }
   .ot-chase-label.on {
@@ -919,7 +919,7 @@
     border: 0;
     border-right: 1px solid rgba(255,255,255,0.12);
     background: rgba(255,255,255,0.04);
-    color: #7e97b8;
+    color: #a3b9d0;
     font-family: monospace;
     font-size: 0.6rem;
     font-weight: 700;
@@ -994,7 +994,7 @@
     line-height: 1.2;
   }
   .ot-funds-k {
-    color: #7e97b8;
+    color: #a3b9d0;
     font-size: 0.65rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -1005,7 +1005,7 @@
     font-variant-numeric: tabular-nums;
   }
   .ot-funds-sep {
-    color: #7e97b8;
+    color: #a3b9d0;
     opacity: 0.5;
   }
   .ot-funds-low {

@@ -1825,7 +1825,7 @@
     cursor: not-allowed;
     background: rgba(126,151,184,0.08);
     border-color: rgba(126,151,184,0.30);
-    color: #7e97b8;
+    color: #a3b9d0;
   }
   .opt-add-btn:disabled:hover,
   .opt-add-btn[disabled]:hover {
@@ -1889,7 +1889,7 @@
     letter-spacing: 0.06em;
   }
   .opt-section-tag {
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     padding: 1px 5px;
     border-radius: 2px;
     border: 1px solid currentColor;
@@ -1901,15 +1901,15 @@
      section gap so the row fits inside a ~360px viewport. */
   @media (max-width: 600px) {
     .opt-section-h { gap: 0.25rem; flex-wrap: nowrap; overflow-x: auto; }
-    .opt-section-tag { font-size: 0.5rem; padding: 1px 3px; letter-spacing: 0.02em; }
+    .opt-section-tag { font-size: 0.6rem; padding: 1px 3px; letter-spacing: 0.02em; }
   }
   .tag-deriv  { color: #7dd3fc; background: rgba(125,211,252,0.10); }
   .tag-long   { color: #4ade80; background: rgba(74,222,128,0.10); }
   .tag-short  { color: #f87171; background: rgba(248,113,113,0.10); }
   .opt-section-meta {
-    color: #7e97b8;
+    color: #a3b9d0;
     font-weight: 400;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     margin-left: auto;
   }
 
@@ -1966,7 +1966,7 @@
     min-width: 0;
   }
   .kv-k {
-    color: #7e97b8;
+    color: #a3b9d0;
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -2015,7 +2015,7 @@
   }
   .kv-pos { color: #4ade80; }
   .kv-neg { color: #f87171; }
-  .kv-sub { color: #7e97b8; font-size: 0.55rem; margin-left: 0.2rem; }
+  .kv-sub { color: #a3b9d0; font-size: 0.65rem; margin-left: 0.2rem; }
 
   .opt-payoff {
     display: flex;
@@ -2042,8 +2042,8 @@
   }
   .leg-headrow {
     font-family: monospace;
-    font-size: 0.55rem;
-    color: #7e97b8;
+    font-size: 0.65rem;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     padding-bottom: 0.15rem;
@@ -2056,10 +2056,10 @@
   }
   .leg-source {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #7e97b8;
+    color: #a3b9d0;
     text-align: center;
   }
   .leg-source-live   { color: #4ade80; }
@@ -2132,7 +2132,7 @@
   .legs-header:hover { color: #fde047; }
   .legs-chevron {
     font-size: 0.6rem;
-    color: #7e97b8;
+    color: #a3b9d0;
     width: 0.7rem;
     text-align: center;
   }
@@ -2208,8 +2208,8 @@
     font-variant-numeric: tabular-nums;
   }
   .cand-headrow {
-    font-size: 0.55rem;
-    color: #7e97b8;
+    font-size: 0.65rem;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     padding-bottom: 0.15rem;
@@ -2289,7 +2289,7 @@
   .cand-kind {
     text-align: center;
     font-weight: 700;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     letter-spacing: 0.05em;
   }
   .cand-kind-fut { color: #c084fc; }
@@ -2331,7 +2331,7 @@
     border-radius: 2px;
     padding: 0 4px;
     font-weight: 700;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
   }
   .leg-type-PE {
     color: #f87171;
@@ -2340,7 +2340,7 @@
     border-radius: 2px;
     padding: 0 4px;
     font-weight: 700;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
   }
 
   /* "Clear" button styled subtly red so the destructive action stands
@@ -2360,7 +2360,7 @@
   .src-chip {
     margin-left: 0.5rem;
     font-family: monospace;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -2375,8 +2375,8 @@
   .src-tag {
     margin-left: 0.3rem;
     font-family: monospace;
-    font-size: 0.5rem;
-    color: #7e97b8;
+    font-size: 0.6rem;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.03em;
   }
@@ -2391,7 +2391,7 @@
   .leg-src {
     display: inline-block;
     font-family: monospace;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     padding: 1px 5px;
@@ -2436,10 +2436,10 @@
   }
   .chain-futures-label {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #7e97b8;
+    color: #a3b9d0;
     margin-right: 0.25rem;
   }
   .chain-fut-pill {
@@ -2463,9 +2463,9 @@
     border-color: rgba(125,211,252,0.65);
   }
   .chain-fut-meta {
-    color: #7e97b8;
+    color: #a3b9d0;
     font-weight: 400;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -2488,10 +2488,10 @@
     top: 0;
     z-index: 1;
     background: rgba(251,191,36,0.10);
-    color: #7e97b8;
+    color: #a3b9d0;
     font-weight: 700;
     text-transform: uppercase;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     letter-spacing: 0.04em;
     padding: 0.25rem 0.4rem;
     border-bottom: 1px solid rgba(251,191,36,0.25);
@@ -2525,7 +2525,7 @@
     display: inline-block;
     margin-left: 0.35rem;
     padding: 0 0.3rem;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     color: #0c1830;
@@ -2543,7 +2543,7 @@
     align-items: center;
     gap: 0.3rem;
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     padding: 1px 6px;
@@ -2554,7 +2554,7 @@
   }
   .chain-btn {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     padding: 1px 6px;
     border-radius: 2px;
@@ -2616,7 +2616,7 @@
   .chain-quick-short { border-color: rgba(248,113,113,0.55); }
   .chain-quick-tag {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     padding: 0 4px;
     border-radius: 2px;
@@ -2625,7 +2625,7 @@
   .chain-quick-short .chain-quick-tag { color: #f87171; background: rgba(248,113,113,0.15); }
   .chain-quick-sym {
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     color: #c8d8f0;
     padding: 0 3px;
     letter-spacing: 0.04em;
@@ -2682,7 +2682,7 @@
     background: rgba(248,113,113,0.12);
     color: #f87171;
     font-family: monospace;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     letter-spacing: 0.02em;
   }
   .chain-quick-toast {
@@ -2692,7 +2692,7 @@
     background: rgba(74,222,128,0.18);
     color: #4ade80;
     font-family: monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     animation: chain-quick-fade 1.5s ease-out forwards;

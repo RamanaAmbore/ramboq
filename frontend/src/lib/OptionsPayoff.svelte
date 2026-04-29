@@ -731,7 +731,7 @@
     background: rgba(125,211,252,0.10);
     color: #7dd3fc;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -764,7 +764,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #7e97b8;
+    color: #a3b9d0;
     font-size: 0.65rem;
     font-family: monospace;
   }
@@ -773,7 +773,7 @@
     gap: 0.9rem;
     flex-wrap: wrap;
     padding-top: 0.4rem;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     font-family: monospace;
     color: #c8d8f0;
     border-top: 1px solid rgba(255,255,255,0.05);
@@ -830,9 +830,9 @@
     display: contents;
   }
   .ps-k {
-    color: #7e97b8;
+    color: #a3b9d0;
     letter-spacing: 0.04em;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     align-self: center;
   }
   .ps-v {
