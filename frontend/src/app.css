@@ -226,24 +226,48 @@
 .ag-theme-algo .ag-row.totals-row .ag-cell { color: #fbbf24 !important; background-color: transparent !important; }
 
 /* Right-align all numeric cells and their headers across every grid.
-   The two header rules cover both naming conventions:
-     `.ag-right-aligned-header` — applied via our columnTypes
-                                   (custom cellClass / headerClass).
-     `.ag-numeric-header`        — auto-applied by AG Grid v33+ when
-                                   `type: 'numericColumn'` is set
-                                   (covers any column that uses
-                                   the type but has a per-column
-                                   cellClass that overrides ours). */
+   AG Grid's internal header markup is:
+     .ag-header-cell.ag-numeric-header / .ag-right-aligned-header
+       .ag-header-cell-comp-wrapper
+         .ag-header-cell-label   (display: flex by default)
+           .ag-header-cell-text
+   To pin labels to the right we need flex-end on the LABEL container
+   AND text-align: right on the inner text node — AG Grid's own styles
+   sometimes override one or the other depending on which
+   sub-component is actually rendered. Belt + braces: target both. */
 .ag-theme-ramboq .ag-right-aligned-cell,
-.ag-theme-algo .ag-right-aligned-cell {
+.ag-theme-algo .ag-right-aligned-cell,
+.ag-theme-ramboq .ag-numeric-cell,
+.ag-theme-algo .ag-numeric-cell {
   text-align: right !important;
   justify-content: flex-end !important;
 }
+.ag-theme-ramboq .ag-right-aligned-header,
+.ag-theme-algo .ag-right-aligned-header,
+.ag-theme-ramboq .ag-numeric-header,
+.ag-theme-algo .ag-numeric-header {
+  /* The cell itself must allow its inner flex container to push
+     content to the right edge; AG Grid sometimes leaves this as
+     flex-start on the cell, then anchors the label-comp inside. */
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+.ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-comp-wrapper,
+.ag-theme-algo .ag-right-aligned-header .ag-header-cell-comp-wrapper,
+.ag-theme-ramboq .ag-numeric-header .ag-header-cell-comp-wrapper,
+.ag-theme-algo .ag-numeric-header .ag-header-cell-comp-wrapper,
 .ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-label,
 .ag-theme-algo .ag-right-aligned-header .ag-header-cell-label,
 .ag-theme-ramboq .ag-numeric-header .ag-header-cell-label,
 .ag-theme-algo .ag-numeric-header .ag-header-cell-label {
   justify-content: flex-end !important;
+  text-align: right !important;
+  display: flex !important;
+}
+.ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-text,
+.ag-theme-algo .ag-right-aligned-header .ag-header-cell-text,
+.ag-theme-ramboq .ag-numeric-header .ag-header-cell-text,
+.ag-theme-algo .ag-numeric-header .ag-header-cell-text {
   text-align: right !important;
 }
 
