@@ -324,7 +324,17 @@
   let instrumentsReady = $state(false);
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
+  // chainSide is the INITIAL preference set by the outer + / − toggle
+  // (so the operator can open the picker with their dominant side in
+  // mind). Per-row +/− buttons override it on a per-pick basis, so a
+  // single open-then-pick session can land mixed long/short legs.
   let chainSide        = $state(/** @type {'long'|'short'} */ ('long'));
+  // Lots multiplier — every leg added through the chain (or a futures
+  // pill) is sized as `lot_size × chainLots`. Default 1 keeps the
+  // existing single-lot behaviour. Operator can bump to 2/3/… for
+  // multi-lot strategies without rewriting the per-leg qty in the
+  // OrderTicket.
+  let chainLots        = $state(1);
 
   /** Underlyings the chain picker offers, in priority order:
    *  1. The page's currently-selected underlying (the operator's
@@ -571,12 +581,18 @@
     }
     return '';
   }
+  // Per-row buttons pass the side explicitly. Default to chainSide so
+  // any caller that hasn't been migrated yet still works. Qty sizing:
+  // contract lot size × chainLots, clamped so a 0/blank lots input
+  // doesn't post a zero-qty order.
   function addChainDraft(/** @type {number} */ strike,
-                         /** @type {'CE'|'PE'} */ optType) {
+                         /** @type {'CE'|'PE'} */ optType,
+                         /** @type {'long'|'short'} */ side = chainSide) {
     if (!chainUnderlying || !chainExpiry) return;
     const inst = findOption(chainUnderlying.toUpperCase(), optType, strike, chainExpiry);
     if (!inst) return;
-    const lot = Number(inst.ls || 1);
+    const lot  = Number(inst.ls || 1);
+    const lots = Math.max(1, Number(chainLots) || 1);
     openTicket({
       symbol:   inst.s,
       // Exchange comes from the instruments cache (Kite's authoritative
@@ -585,25 +601,27 @@
       // every depth lookup to the wrong exchange and the ladder would
       // come back empty.
       exchange: inst.e || 'NFO',
-      side:     chainSide === 'long' ? 'BUY' : 'SELL',
-      qty:      lot,
+      side:     side === 'long' ? 'BUY' : 'SELL',
+      qty:      lot * lots,
       lotSize:  lot,
       accounts: ticketAccounts,
       account:  _ticketAccountDefault(),
     });
   }
   function addFutureDraft(/** @type {string} */ sym,
-                          /** @type {number} */ lotSize) {
+                          /** @type {number} */ lotSize,
+                          /** @type {'long'|'short'} */ side = chainSide) {
     if (!sym) return;
-    const lot = Number(lotSize || 1);
+    const lot  = Number(lotSize || 1);
+    const lots = Math.max(1, Number(chainLots) || 1);
     // Look up the instrument so we route to the right exchange
     // (commodity futures live on MCX, not NFO).
     const inst = getInstrument(sym.toUpperCase());
     openTicket({
       symbol:   sym,
       exchange: inst?.e || 'NFO',
-      side:     chainSide === 'long' ? 'BUY' : 'SELL',
-      qty:      lot,
+      side:     side === 'long' ? 'BUY' : 'SELL',
+      qty:      lot * lots,
       lotSize:  lot,
       accounts: ticketAccounts,
       account:  _ticketAccountDefault(),
@@ -1114,30 +1132,45 @@
             placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
         </div>
         <div class="chain-field">
-          <label class="field-label" for="chain-side">Side</label>
-          <Select id="chain-side"
-            bind:value={chainSide}
-            options={[
-              { value: 'long',  label: 'Long (+)' },
-              { value: 'short', label: 'Short (−)' },
-            ]} />
+          <label class="field-label" for="chain-lots">Lots</label>
+          <!-- Lot multiplier — every leg is sized as
+               `contract_lot_size × chainLots`. Default 1 keeps the
+               existing single-lot behaviour. The Select-style border
+               + height match the neighbouring Select fields so the
+               control row reads as one consistent bar. -->
+          <input id="chain-lots"
+                 type="number"
+                 min="1"
+                 step="1"
+                 class="chain-lots-input"
+                 bind:value={chainLots}
+                 title="Number of lots per leg — qty becomes contract_lot_size × this value"/>
         </div>
       </div>
       {#if chainFutures.length}
-        <!-- Futures quick-add row — clicking the contract pill drops it
-             into the basket as a Long or Short leg per the Side toggle.
-             Useful when building delta-hedged option positions or pure
-             futures strategies. -->
+        <!-- Futures quick-add row — paired BUY / SELL pills per
+             contract. The +<sym> button buys, the −<sym> button
+             sells; qty in both cases is `contract_lot_size × Lots`
+             from the chain controls. Useful when building delta-
+             hedged option positions or pure futures strategies. -->
         <div class="chain-futures">
           <span class="chain-futures-label">Futures:</span>
           {#each chainFutures as f (f.s)}
-            <button type="button"
-                    class="chain-fut-pill"
-                    title="Add {f.s} as a {chainSide} leg ({f.ls} lot)"
-                    onclick={() => addFutureDraft(f.s, f.ls)}>
-              + {f.s}
-              <span class="chain-fut-meta">lot {f.ls}</span>
-            </button>
+            <span class="chain-fut-pair">
+              <button type="button"
+                      class="chain-fut-pill chain-fut-pill-buy"
+                      title="BUY {f.s} ({f.ls} per lot × {chainLots} lots)"
+                      onclick={() => addFutureDraft(f.s, f.ls, 'long')}>
+                + {f.s}
+                <span class="chain-fut-meta">lot {f.ls}</span>
+              </button>
+              <button type="button"
+                      class="chain-fut-pill chain-fut-pill-sell"
+                      title="SELL {f.s} ({f.ls} per lot × {chainLots} lots)"
+                      onclick={() => addFutureDraft(f.s, f.ls, 'short')}>
+                − {f.s}
+              </button>
+            </span>
           {/each}
         </div>
       {/if}
@@ -1158,42 +1191,75 @@
                                 ? (k < chainSpot ? 'itm-call'
                                   : k > chainSpot ? 'itm-put' : 'atm')
                                 : ''}
+                <!-- Each strike row exposes BOTH BUY (+) and SELL (−)
+                     for both CE and PE — 4 buttons total — so the
+                     operator can land mixed long/short legs across
+                     strikes in one open-then-pick session without
+                     toggling the outer +/− between picks. -->
                 {#if isAtm}
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
-                      <button type="button" class="chain-btn chain-btn-ce"
-                              title="Add {k} CE as a {chainSide} leg"
-                              onclick={() => addChainDraft(k, 'CE')}>
-                        + CE
-                      </button>
+                      <span class="chain-btn-pair">
+                        <button type="button" class="chain-btn chain-btn-buy"
+                                title="BUY {k} CE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>
+                          + CE
+                        </button>
+                        <button type="button" class="chain-btn chain-btn-sell"
+                                title="SELL {k} CE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'CE', 'short')}>
+                          − CE
+                        </button>
+                      </span>
                     </td>
                     <td class="chain-td-strike">
                       {k.toFixed(0)}<span class="chain-atm-tag">ATM</span>
                     </td>
                     <td class="chain-td-pe">
-                      <button type="button" class="chain-btn chain-btn-pe"
-                              title="Add {k} PE as a {chainSide} leg"
-                              onclick={() => addChainDraft(k, 'PE')}>
-                        + PE
-                      </button>
+                      <span class="chain-btn-pair">
+                        <button type="button" class="chain-btn chain-btn-buy"
+                                title="BUY {k} PE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>
+                          + PE
+                        </button>
+                        <button type="button" class="chain-btn chain-btn-sell"
+                                title="SELL {k} PE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'PE', 'short')}>
+                          − PE
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 {:else}
                   <tr class="chain-row chain-row-{dir}">
                     <td class="chain-td-ce">
-                      <button type="button" class="chain-btn chain-btn-ce"
-                              title="Add {k} CE as a {chainSide} leg"
-                              onclick={() => addChainDraft(k, 'CE')}>
-                        + CE
-                      </button>
+                      <span class="chain-btn-pair">
+                        <button type="button" class="chain-btn chain-btn-buy"
+                                title="BUY {k} CE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'CE', 'long')}>
+                          + CE
+                        </button>
+                        <button type="button" class="chain-btn chain-btn-sell"
+                                title="SELL {k} CE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'CE', 'short')}>
+                          − CE
+                        </button>
+                      </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
-                      <button type="button" class="chain-btn chain-btn-pe"
-                              title="Add {k} PE as a {chainSide} leg"
-                              onclick={() => addChainDraft(k, 'PE')}>
-                        + PE
-                      </button>
+                      <span class="chain-btn-pair">
+                        <button type="button" class="chain-btn chain-btn-buy"
+                                title="BUY {k} PE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'PE', 'long')}>
+                          + PE
+                        </button>
+                        <button type="button" class="chain-btn chain-btn-sell"
+                                title="SELL {k} PE × {chainLots} lot(s)"
+                                onclick={() => addChainDraft(k, 'PE', 'short')}>
+                          − PE
+                        </button>
+                      </span>
                     </td>
                   </tr>
                 {/if}
@@ -2296,7 +2362,7 @@
     font-family: monospace;
     font-size: 0.55rem;
     font-weight: 700;
-    padding: 1px 8px;
+    padding: 1px 6px;
     border-radius: 2px;
     border: 1px solid currentColor;
     background: transparent;
@@ -2304,10 +2370,47 @@
     letter-spacing: 0.04em;
     transition: background 0.12s;
   }
-  .chain-btn-ce { color: #4ade80; }
-  .chain-btn-pe { color: #f87171; }
-  .chain-btn-ce:hover { background: rgba(74,222,128,0.10); }
-  .chain-btn-pe:hover { background: rgba(248,113,113,0.10); }
+  /* Side-by-side BUY (+) / SELL (−) pair per CE/PE cell. */
+  .chain-btn-pair {
+    display: inline-flex;
+    gap: 3px;
+  }
+  /* BUY (+) — green, SELL (−) — red. Same palette as the outer
+     +/− toggle so the operator's eye reads the side without
+     parsing the glyph. */
+  .chain-btn-buy  { color: #4ade80; }
+  .chain-btn-sell { color: #f87171; }
+  .chain-btn-buy:hover  { background: rgba(74,222,128,0.10); }
+  .chain-btn-sell:hover { background: rgba(248,113,113,0.10); }
+  /* Lots input — match Select trigger height + border so the
+     control bar reads as one consistent row. */
+  .chain-lots-input {
+    width: 100%;
+    min-height: 1.55rem;
+    padding: 0 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(126,151,184,0.35);
+    background: rgba(13,21,38,0.6);
+    color: #c8d8f0;
+    font-family: monospace;
+    font-size: 0.65rem;
+    box-sizing: border-box;
+  }
+  .chain-lots-input:focus {
+    outline: none;
+    border-color: rgba(251,191,36,0.55);
+    background: rgba(13,21,38,0.8);
+  }
+  /* Paired BUY/SELL futures pills sit as one inline group with a
+     1px gap so they read as a single contract control. */
+  .chain-fut-pair {
+    display: inline-flex;
+    gap: 1px;
+  }
+  .chain-fut-pill-buy  { color: #4ade80; border-color: rgba(74,222,128,0.45); }
+  .chain-fut-pill-sell { color: #f87171; border-color: rgba(248,113,113,0.45); }
+  .chain-fut-pill-buy:hover  { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.75); }
+  .chain-fut-pill-sell:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.75); }
   /* "chain" source pill on legs added via the chain picker — sky-blue
      to distinguish from manual / live / sim. */
   .leg-source-chain { color: #c084fc; }
