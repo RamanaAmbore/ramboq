@@ -150,10 +150,89 @@ async def _rebuild_broker_connections() -> None:
         logger.warning(f"broker rebuild_from_db failed (sticking with YAML view): {e}")
 
 
+# ── Visitor IP / location logger ─────────────────────────────────────────
+#
+# Logs the approximate origin of every page open so the operator can see
+# in /api/admin/logs ("System log" tab) when a visitor lands. Site sits
+# behind Cloudflare, so the request headers carry:
+#
+#   CF-Connecting-IP  : real client IP (not the CF edge proxy)
+#   CF-IPCountry      : 2-letter ISO country code (per CF GeoIP)
+#   CF-Ray            : <id>-<colo> where colo is a 3-letter CF datacenter
+#                       code (BOM = Mumbai, SIN = Singapore, LHR = London,
+#                       IAD = Ashburn VA, …) — coarse geographic hint
+#                       about which CF edge served the request.
+#
+# Country + colo combination gives "approx location" without hitting an
+# external GeoIP service. De-duplicated per (IP, country, hour) so a
+# single visitor doesn't spam the log every poll cycle. In-memory dict
+# evicts entries older than 24 h on each read.
+from time import monotonic
+_visitor_log_cache: dict[tuple[str, str], float] = {}
+_VISITOR_LOG_TTL_SEC   = 60 * 60       # re-log a known IP after 1 hour
+_VISITOR_LOG_EVICT_SEC = 60 * 60 * 24  # drop entries older than 24 h
+
+
+async def _log_visitor(request) -> None:  # type: ignore[no-untyped-def]
+    """Litestar before_request hook — logs the visitor's IP +
+    country + CF colo on first sight per hour. Fires on every
+    request but the log line only writes for new (IP, country)
+    pairs or those that haven't been seen in the last hour. Skips
+    static asset paths so the log isn't drowned in
+    /assets/*.js fetches."""
+    try:
+        path = request.scope.get("path") or ""
+        # Skip static + asset traffic — the operator wants to see
+        # "someone opened the site," not every chunk fetch.
+        if (path.startswith("/assets/")
+                or path.startswith("/_app/")
+                or path == "/favicon.ico"
+                or path.endswith(".png") or path.endswith(".jpg")
+                or path.endswith(".svg") or path.endswith(".css")
+                or path.endswith(".js")  or path.endswith(".woff")
+                or path.endswith(".woff2") or path.endswith(".map")):
+            return
+        headers = request.headers
+        # Cloudflare-supplied real client IP. Fallback chain for
+        # local / dev (no Cloudflare) so the hook still produces
+        # something useful: X-Forwarded-For (first hop) → request
+        # client tuple → "?".
+        ip = (
+            headers.get("CF-Connecting-IP")
+            or (headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+            or (request.client.host if request.client else "")
+            or "?"
+        )
+        country = headers.get("CF-IPCountry") or "??"
+        # CF-Ray format: <id>-<colo>. Last hyphen-separated chunk is
+        # the 3-letter CF datacenter code that served the request.
+        cf_ray = headers.get("CF-Ray") or ""
+        colo = cf_ray.rsplit("-", 1)[-1] if "-" in cf_ray else "?"
+        ua = (headers.get("User-Agent") or "")[:80]
+
+        now = monotonic()
+        key = (ip, country)
+        # Evict stale entries lazily so the dict doesn't grow forever.
+        for k in [k for k, t in _visitor_log_cache.items()
+                  if (now - t) > _VISITOR_LOG_EVICT_SEC]:
+            _visitor_log_cache.pop(k, None)
+        last = _visitor_log_cache.get(key)
+        if last is not None and (now - last) < _VISITOR_LOG_TTL_SEC:
+            return
+        _visitor_log_cache[key] = now
+        method = request.scope.get("method") or "GET"
+        logger.info(f"[visitor] {ip} ({country}, CF:{colo}) {method} {path} UA=\"{ua}\"")
+    except Exception:
+        # The hook must NEVER break a real request — geolog is
+        # best-effort.
+        pass
+
+
 app = Litestar(
     route_handlers=_route_handlers,
     cors_config=cors_config,
     openapi_config=openapi_config,
     on_startup=[init_db, _rebuild_broker_connections, bg_startup],
     on_shutdown=[bg_shutdown],
+    before_request=_log_visitor,
 )
