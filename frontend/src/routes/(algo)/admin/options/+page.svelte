@@ -139,6 +139,21 @@
     return Array.from(set).sort();
   });
 
+  // Auto-select the first underlying from the loaded book when the
+  // page lands without a cached selection. Saves the operator a click;
+  // the page is essentially useless without an underlying picked, so
+  // defaulting feels right. Untrack the read of selectedUnderlying so
+  // operator-driven changes don't re-trigger this.
+  $effect(() => {
+    void underlyingChoicesFromBook;
+    untrack(() => {
+      const list = underlyingChoicesFromBook;
+      if (!selectedUnderlying && list.length) {
+        selectedUnderlying = list[0];
+      }
+    });
+  });
+
   /** Distinct expiries (YYYY-MM-DD) available on the chosen
    *  underlying — derived by looking up each loaded position's
    *  symbol in the instruments cache. Drafts contribute too. */

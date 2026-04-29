@@ -263,6 +263,12 @@
   justify-content: flex-end !important;
   text-align: right !important;
   display: flex !important;
+  /* AG Grid v33 default theme sets `flex-direction: row-reverse` on
+     `.ag-numeric-header .ag-header-cell-label` — combined with our
+     `justify-content: flex-end` that REVERSES the axis and pins
+     the label to the LEFT instead of the right. Force row direction
+     so flex-end behaves the way the operator expects. */
+  flex-direction: row !important;
 }
 .ag-theme-ramboq .ag-right-aligned-header .ag-header-cell-text,
 .ag-theme-algo .ag-right-aligned-header .ag-header-cell-text,
