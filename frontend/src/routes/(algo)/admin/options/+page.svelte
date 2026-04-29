@@ -1291,6 +1291,7 @@
       spot={strategy.spot}
       prevClose={strategy.spot_prev_close}
       breakevens={strategy.risk.breakevens}
+      intermediateCurves={strategy.intermediate_curves || []}
       spanSigmas={strategy.span_sigmas}
       spanPct={strategy.span_pct}
       dte={strategy.days_to_expiry}

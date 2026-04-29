@@ -16,6 +16,7 @@
    *   spot:         number,
    *   breakeven?:   number,
    *   breakevens?:  number[],
+   *   intermediateCurves?: Array<{label:string,elapsed_pct:number,days_left:number,values:number[]}>,
    *   height?:      number,
    *   currentPnl?:  number|null,
    *   spanSigmas?:  number,
@@ -32,6 +33,12 @@
     spot,
     breakeven  = undefined,
     breakevens = /** @type {number[]|undefined} */ (undefined),
+    // Time-slice curves between Today and Expiry. Each entry's
+    // `values` is parallel-indexed to `payoff` (same spot grid).
+    // Empty array → no slices (default; legacy single-leg mode
+    // and any caller that doesn't opt-in via `time_slices` keeps
+    // the original two-curve chart).
+    intermediateCurves = /** @type {Array<{label:string,elapsed_pct:number,days_left:number,values:number[]}>} */ ([]),
     height     = 280,
     currentPnl = null,
     spanSigmas = 0,
@@ -146,6 +153,44 @@
   const pathExpiry = $derived.by(() => {
     if (!payoff.length) return '';
     return payoff.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.spot).toFixed(1)},${yOf(p.expiry_value).toFixed(1)}`).join(' ');
+  });
+
+  // Time-slice curves — one path per intermediate slice, parallel-
+  // indexed against `payoff` (same spot grid). Stroke colour is
+  // interpolated from amber (today) to sky-cyan (expiry) via HSL,
+  // so the operator reads the family of curves as a smooth time
+  // gradient. Dashed at the same cadence as the expiry curve so
+  // they sit visually between today's solid and the dashed expiry
+  // line. Thinner than the two anchor curves so they don't crowd.
+  function _slerpAmberToSky(/** @type {number} */ t) {
+    // Amber: hsl(43, 96%, 56%) — Tailwind amber-400 / `#fbbf24`
+    // Sky:   hsl(199, 95%, 74%) — Tailwind sky-300 / `#7dd3fc`
+    const h = 43  + (199 - 43)  * t;
+    const s = 96  + (95  - 96)  * t;
+    const l = 56  + (74  - 56)  * t;
+    return `hsl(${h.toFixed(1)} ${s.toFixed(1)}% ${l.toFixed(1)}%)`;
+  }
+  const intermediatePaths = $derived.by(() => {
+    if (!payoff.length || !intermediateCurves.length) return [];
+    return intermediateCurves.map((c) => {
+      const vals = c.values || [];
+      // Defensive: only walk the part of the curve that has values
+      // for. Mismatched lengths shouldn't happen (the backend builds
+      // both arrays off the same spot grid) but it'd silently render
+      // a broken path otherwise.
+      const n = Math.min(vals.length, payoff.length);
+      let d = '';
+      for (let i = 0; i < n; i++) {
+        d += `${i === 0 ? 'M' : 'L'}${xOf(payoff[i].spot).toFixed(1)},${yOf(vals[i]).toFixed(1)} `;
+      }
+      return {
+        label:    c.label,
+        days:     c.days_left,
+        elapsed:  c.elapsed_pct,
+        d:        d.trim(),
+        color:    _slerpAmberToSky(c.elapsed_pct ?? 0.5),
+      };
+    });
   });
 
   // Profit + loss zones — shade above and below zero on the today curve
@@ -549,6 +594,16 @@
            SPOT readout in the top-left stat overlay carries the
            numeric value. -->
 
+      <!-- Time-slice curves (between Today and Expiry) — drawn FIRST
+           so the today + expiry anchor curves render on top. Dashed,
+           thinner than the anchors, with HSL-interpolated colour
+           from amber → sky so the operator reads them as a temporal
+           gradient. -->
+      {#each intermediatePaths as ip (ip.elapsed)}
+        <path d={ip.d} fill="none" stroke={ip.color}
+              stroke-width="1" stroke-dasharray="2 2"
+              stroke-opacity="0.65"/>
+      {/each}
       <!-- Expiry curve (dashed sky) -->
       <path d={pathExpiry} fill="none" stroke="#7dd3fc"
             stroke-width="1.25" stroke-dasharray="4 3" stroke-opacity="0.85"/>
@@ -590,6 +645,17 @@
         <span class="legend-line legend-today"></span>
         Today (BS)
       </span>
+      {#each intermediatePaths as ip (ip.elapsed)}
+        <!-- Intermediate-DTE legend chips render in temporal order
+             between Today and Expiry. Stroke colour matches the
+             chart line so the operator can pair label → curve at
+             a glance. -->
+        <span class="legend-item">
+          <span class="legend-line legend-mid"
+                style="border-top-color: {ip.color}"></span>
+          {ip.label}
+        </span>
+      {/each}
       <span class="legend-item">
         <span class="legend-line legend-expiry"></span>
         Expiry (intrinsic)
@@ -725,6 +791,10 @@
   }
   .legend-today  { border-top: 2px solid #fbbf24; }
   .legend-expiry { border-top: 1.5px dashed #7dd3fc; }
+  /* Intermediate-DTE swatch — the stroke colour comes inline via
+     `style="border-top-color: …"` because each slice gets its own
+     interpolated hsl(). Dashed, matching the chart curve. */
+  .legend-mid    { border-top: 1.5px dashed #fbbf24; }
   .legend-mark {
     display: inline-block;
     width: 0;

@@ -571,6 +571,132 @@ def multileg_payoff_curve(legs: list[dict], *, S: float,
     return out
 
 
+# ── Time-slice payoff curves ──────────────────────────────────────────
+#
+# Operators want to see how the position's value decays between Today
+# and Expiry. A single intermediate curve at T-halfway already telegraphs
+# theta acceleration; two slices (T-33%, T-67%) give a smoother visual
+# without crowding the chart.
+#
+# Slice fractions are evenly spaced between Today (elapsed=0) and Expiry
+# (elapsed=1):
+#   1 → [0.5];   2 → [1/3, 2/3];   3 → [0.25, 0.5, 0.75]; …
+# Each slice's curve uses the same Black-Scholes machinery the Today
+# curve uses — just with `T_years × (1 − elapsed)` instead of full
+# `T_years`. Output is parallel to the existing `payoff` array so the
+# frontend can map each slice's `values[i]` to `payoff[i].spot` without
+# a second spot grid.
+#
+# Each entry: {label: "T-Nd", elapsed_pct: float, days_left: float,
+#              values: list[float]}.  `label` is a compact display
+# string the chart legend can render.
+
+def _slice_fractions(time_slices: int) -> list[float]:
+    if time_slices <= 0:
+        return []
+    return [(i + 1) / (time_slices + 1) for i in range(time_slices)]
+
+
+def _slice_label(days_left: float) -> str:
+    """Compact label for a time-slice. Rounds to whole days when the
+    remaining DTE is ≥ 1 day, falls back to hours below that so a 3-h
+    slice on an expiry-day position doesn't display as `T-0d`."""
+    if days_left >= 1:
+        return f"T-{days_left:.0f}d"
+    return f"T-{max(0.0, days_left * 24):.0f}h"
+
+
+def intermediate_curves(*, S: float, K: float, T_years: float, r: float,
+                        sigma: float, opt_type: str, qty: int,
+                        entry_price: float, span_pct: float = 0.10,
+                        points: int = 51, time_slices: int = 0) -> list[dict]:
+    """
+    Single-leg companion to `payoff_curve`. Produces N intermediate-DTE
+    Black-Scholes curves between Today (full T_years) and Expiry (T=0).
+    Empty list when `time_slices <= 0` or `T_years <= 0` (no decay to
+    visualise on a same-day position).
+    """
+    fractions = _slice_fractions(time_slices)
+    if S <= 0 or qty == 0 or points < 2 or not fractions or T_years <= 0:
+        return []
+    lo  = S * (1.0 - span_pct)
+    hi  = S * (1.0 + span_pct)
+    step = (hi - lo) / (points - 1)
+    cost = entry_price * qty
+    out: list[dict] = []
+    for p in fractions:
+        T_p = T_years * (1.0 - p)
+        days_left = max(0.0, T_p * 365.0)
+        values: list[float] = []
+        for i in range(points):
+            s_i = lo + step * i
+            bs_value = black_scholes(s_i, K, T_p, r, sigma, opt_type)
+            values.append(round(bs_value * qty - cost, 2))
+        out.append({
+            "label":       _slice_label(days_left),
+            "elapsed_pct": round(p, 3),
+            "days_left":   round(days_left, 2),
+            "values":      values,
+        })
+    return out
+
+
+def multileg_intermediate_curves(legs: list[dict], *, S: float,
+                                 r: float = DEFAULT_RISK_FREE,
+                                 span_pct: float = 0.10,
+                                 points: int = 51,
+                                 time_slices: int = 0) -> list[dict]:
+    """
+    Multi-leg companion to `multileg_payoff_curve`. Each option leg's
+    own `T_years` is scaled by `(1 − elapsed)`; futures stay linear in
+    spot (theta-flat over the slice horizon). Label uses the longest-
+    DTE option leg as the reference clock so a calendar/diagonal would
+    label correctly — but v1 strategy enforces same-expiry across legs
+    so all option legs share T_years anyway.
+    """
+    fractions = _slice_fractions(time_slices)
+    if S <= 0 or not legs or points < 2 or not fractions:
+        return []
+    lo  = S * (1.0 - span_pct)
+    hi  = S * (1.0 + span_pct)
+    step = (hi - lo) / (points - 1)
+    total_cost = sum(float(l.get("entry_price") or 0) * int(l.get("qty") or 0) for l in legs)
+    base_T_years = max(
+        (float(l.get("T_years") or 0) for l in legs
+         if (l.get("kind") or "opt") == "opt"),
+        default=0.0,
+    )
+    if base_T_years <= 0:
+        return []
+    out: list[dict] = []
+    for p in fractions:
+        T_label   = base_T_years * (1.0 - p)
+        days_left = max(0.0, T_label * 365.0)
+        values: list[float] = []
+        for i in range(points):
+            s_i = lo + step * i
+            slice_sum = 0.0
+            for l in legs:
+                kind = l.get("kind") or "opt"
+                qty  = int(l["qty"])
+                if kind == "fut":
+                    slice_sum += s_i * qty
+                    continue
+                K     = float(l["strike"])
+                opt   = l["opt_type"]
+                T_yrs = float(l.get("T_years") or 0) * (1.0 - p)
+                sig   = float(l.get("sigma") or DEFAULT_IV)
+                slice_sum += black_scholes(s_i, K, T_yrs, r, sig, opt) * qty
+            values.append(round(slice_sum - total_cost, 2))
+        out.append({
+            "label":       _slice_label(days_left),
+            "elapsed_pct": round(p, 3),
+            "days_left":   round(days_left, 2),
+            "values":      values,
+        })
+    return out
+
+
 def multileg_greeks(legs: list[dict], *, S: float,
                     r: float = DEFAULT_RISK_FREE) -> dict:
     """

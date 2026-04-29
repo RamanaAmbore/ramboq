@@ -41,6 +41,8 @@ from backend.api.algo.derivatives import (
     multileg_extremes,
     multileg_greeks,
     multileg_payoff_curve,
+    multileg_intermediate_curves,
+    intermediate_curves,
     multileg_pop,
     parse_tradingsymbol,
     payoff_curve,
@@ -92,6 +94,18 @@ class PayoffPoint(msgspec.Struct):
     expiry_value: float
 
 
+class IntermediateCurve(msgspec.Struct):
+    """One time-slice curve between Today (full DTE) and Expiry (T=0).
+    `values` is parallel-indexed against the same spot grid as `payoff`,
+    so the frontend pairs `intermediate_curves[k].values[i]` with
+    `payoff[i].spot`. `label` is a compact display string ("T-3d", "T-12h")
+    suitable for the chart legend."""
+    label:       str
+    elapsed_pct: float       # 0..1 fraction of remaining time elapsed
+    days_left:   float       # decimal days remaining at this slice
+    values:      list[float]
+
+
 class SpotResponse(msgspec.Struct):
     """Lightweight spot lookup — used by the chain picker to anchor
     its ATM highlight + auto-scroll on whichever underlying the
@@ -131,8 +145,12 @@ class OptionAnalyticsResponse(msgspec.Struct):
     greeks_position:  OptionGreeks
 
     # Risk + payoff curve
-    risk:    OptionRisk
-    payoff:  list[PayoffPoint]
+    risk:                OptionRisk
+    payoff:              list[PayoffPoint]
+    # Intermediate-DTE Black-Scholes curves between Today and Expiry
+    # — empty when caller passes time_slices=0 (default). Each entry's
+    # `values` is parallel to `payoff` (same spot grid).
+    intermediate_curves: list[IntermediateCurve] = []
 
     # Provenance — lets the UI flag stale data with a yellow chip.
     # ltp_source ∈ {'override','sim','live','close','depth','avg_cost'}
@@ -205,6 +223,11 @@ class StrategyRequest(msgspec.Struct):
     # ~99.7 % of the lognormal mass at expiry.
     span_sigmas: float = 3.0
     points:      int   = 51
+    # Number of intermediate-DTE Black-Scholes curves to draw between
+    # the Today and Expiry lines. Default 0 keeps the response compact;
+    # the /admin/options page passes 2 for two-slice (T-33%, T-67%)
+    # rendering. Capped at 5.
+    time_slices: int   = 0
 
 
 class LegDetail(msgspec.Struct):
@@ -246,10 +269,11 @@ class StrategyResponse(msgspec.Struct):
     net_cost:          float             # signed: + paid, − collected
     net_qty:           int               # ∑ signed qty (just for the header)
     iv_proxy:          float             # qty-weighted IV used by POP
-    aggregate_greeks:  OptionGreeks
-    risk:              StrategyRisk
-    payoff:            list[PayoffPoint]
-    legs:              list[LegDetail]
+    aggregate_greeks:    OptionGreeks
+    risk:                StrategyRisk
+    payoff:              list[PayoffPoint]
+    intermediate_curves: list[IntermediateCurve]
+    legs:                list[LegDetail]
     # Yesterday's close on the underlying — used by the UI to color
     # the SPOT value green/red depending on the day's direction. Null
     # when the broker didn't supply ohlc.close on the resolving leg.
@@ -611,7 +635,8 @@ class OptionsController(Controller):
                         iv: Optional[float] = None,
                         span_pct: Optional[float] = None,
                         span_sigmas: float = 3.0,
-                        points: int = 51) -> OptionAnalyticsResponse:
+                        points: int = 51,
+                        time_slices: int = 0) -> OptionAnalyticsResponse:
         """
         Full analytics bundle for one option position. Single round-trip
         — Greeks, theoretical price, discrepancy, risk metrics, payoff
@@ -709,13 +734,26 @@ class OptionsController(Controller):
             sigma=sigma, T_years=T_yrs,
             span_pct=span_pct, span_sigmas=span_sigmas,
         )
+        pts = max(11, min(int(points), 101))
         curve = payoff_curve(
             S=S, K=parsed["strike"], T_years=T_yrs,
             r=DEFAULT_RISK_FREE, sigma=sigma,
             opt_type=parsed["opt_type"], qty=qty_resolved,
             entry_price=entry,
             span_pct=span_pct_resolved,
-            points=max(11, min(int(points), 101)),
+            points=pts,
+        )
+        # Time-slice intermediate curves — empty list when time_slices=0
+        # (default). Operator's frontend opts in via the query param.
+        # Cap at 5 slices so a typo doesn't request a 30-curve chart.
+        slices = intermediate_curves(
+            S=S, K=parsed["strike"], T_years=T_yrs,
+            r=DEFAULT_RISK_FREE, sigma=sigma,
+            opt_type=parsed["opt_type"], qty=qty_resolved,
+            entry_price=entry,
+            span_pct=span_pct_resolved,
+            points=pts,
+            time_slices=max(0, min(int(time_slices), 5)),
         )
 
         # Sanitize +inf in JSON — msgspec will choke; the API surface
@@ -763,6 +801,7 @@ class OptionsController(Controller):
                 rr_ratio=rr,
             ),
             payoff=[PayoffPoint(**p) for p in curve],
+            intermediate_curves=[IntermediateCurve(**s) for s in slices],
             ltp_source=ltp_src,
             spot_source=spot_src,
             iv_source=iv_src,
@@ -1188,10 +1227,19 @@ class OptionsController(Controller):
             span_pct=data.span_pct, span_sigmas=data.span_sigmas,
         )
 
+        pts = max(11, min(int(data.points or 51), 121))
         curve = multileg_payoff_curve(
             resolved_legs, S=S,
             span_pct=span_pct_resolved,
-            points=max(11, min(int(data.points or 51), 121)),
+            points=pts,
+        )
+        # Time-slice intermediates parallel to `curve` (same spot grid).
+        # Empty list when caller passes time_slices=0 (default).
+        slices = multileg_intermediate_curves(
+            resolved_legs, S=S,
+            span_pct=span_pct_resolved,
+            points=pts,
+            time_slices=max(0, min(int(data.time_slices or 0), 5)),
         )
         agg_greeks  = multileg_greeks(resolved_legs, S=S)
         bes         = find_breakevens(curve)
@@ -1229,6 +1277,7 @@ class OptionsController(Controller):
                 ev=agg_ev, ev_pct=agg_ev_pct, rr_ratio=agg_rr,
             ),
             payoff=[PayoffPoint(**p) for p in curve],
+            intermediate_curves=[IntermediateCurve(**s) for s in slices],
             legs=[LegDetail(
                 symbol=l["symbol"], opt_type=l["opt_type"], strike=l["strike"],
                 qty=l["qty"], avg_cost=l["avg_cost"], ltp=l["ltp"], iv=l["iv"],

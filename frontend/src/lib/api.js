@@ -417,9 +417,13 @@ export async function fetchStrategyAnalytics(legs, opts = {}) {
         // commodities (GOLDM expires on the 5th, CRUDEOIL on 19-20).
         expiry:   l.expiry   == null || l.expiry === '' ? null : String(l.expiry),
       })),
-      spot:     opts.spot     ?? null,
-      span_pct: opts.span_pct ?? null,
-      points:   opts.points   ?? 51,
+      spot:        opts.spot        ?? null,
+      span_pct:    opts.span_pct    ?? null,
+      points:      opts.points      ?? 51,
+      // Default 2 slices (T-33%, T-67%) so the operator gets the
+      // theta-decay overlay without opting in. Caller can pass 0
+      // to skip the slices, or up to 5 for a denser overlay.
+      time_slices: opts.time_slices ?? 2,
     },
     { auth: true });
 }
