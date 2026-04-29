@@ -26,7 +26,7 @@
 
   import { onMount, untrack } from 'svelte';
   import OrderDepth from './OrderDepth.svelte';
-  import { placeTicketOrder, fetchAccounts, modifyOrder } from '$lib/api';
+  import { placeTicketOrder, fetchAccounts, fetchFunds, modifyOrder } from '$lib/api';
 
   /** @type {{
    *   symbol:    string,
@@ -175,6 +175,23 @@
   // even if the page's positions came back masked.
   /** @type {string[]} */
   let _selfAccounts = $state([]);
+
+  // Per-account funds — used to render the "Avail margin" pill next to
+  // the account picker so the operator can see whether the chosen
+  // account has enough room to place this order. Populated lazily when
+  // the modal mounts (PAPER / LIVE submits need it; DRAFT doesn't but
+  // the cost is one cached fetch). Each row carries:
+  //   { account, cash, avail_margin, used_margin, collateral }
+  /** @type {Array<{account:string, cash:number, avail_margin:number,
+   *                used_margin:number, collateral:number}>} */
+  let _funds = $state([]);
+  // Match the row for the currently-picked account. Falls through to
+  // null when funds haven't loaded yet OR the account isn't in the
+  // funds payload (rare — usually a 401 / 403 / sim discrepancy).
+  const _accountFunds = $derived.by(() => {
+    if (!_account || !_funds.length) return null;
+    return _funds.find(r => r.account === _account) || null;
+  });
 
   // Account list shown by the picker — caller's `accounts` prop
   // wins when populated; otherwise we use whatever we self-fetched.
@@ -391,6 +408,17 @@
         })
         .catch(() => { /* silent — picker just stays empty */ });
     }
+    // Funds — drives the "Avail margin" pill next to the account
+    // picker. Cached for 30 s on the backend so re-opening the modal
+    // is instant. 401 / 403 (anonymous demo) leaves _funds empty and
+    // the pill collapses gracefully.
+    fetchFunds()
+      .then(/** @param {any} r */ (r) => {
+        _funds = (r?.rows || []).filter(/** @param {any} f */ (f) =>
+          f && f.account && f.account !== 'TOTAL'
+        );
+      })
+      .catch(() => { /* silent — pill stays hidden */ });
     return () => window.removeEventListener('keydown', onKey);
   });
 </script>
@@ -455,6 +483,32 @@
                 <option value={a}>{a}</option>
               {/each}
             </select>
+          {/if}
+          <!-- Per-account funds pill — sits beneath the Account input
+               so the operator can see Avail margin / Cash for the
+               account they just picked, without leaving the modal.
+               Available margin is the headline (it's the bound on
+               place-ability); Cash is the secondary readout. Negative
+               margin (margin debt) flips the pill red. -->
+          {#if _accountFunds}
+            <div class="ot-funds" class:ot-funds-low={_accountFunds.avail_margin < 0}>
+              <span class="ot-funds-k">Avail margin</span>
+              <span class="ot-funds-v">
+                {_accountFunds.avail_margin < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.avail_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              <span class="ot-funds-sep">·</span>
+              <span class="ot-funds-k">Cash</span>
+              <span class="ot-funds-v">
+                {_accountFunds.cash < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.cash || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </span>
+              {#if _accountFunds.used_margin > 0}
+                <span class="ot-funds-sep">·</span>
+                <span class="ot-funds-k">Used</span>
+                <span class="ot-funds-v">
+                  ₹{Math.abs(Number(_accountFunds.used_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </span>
+              {/if}
+            </div>
           {/if}
         </div>
       </div>
@@ -920,6 +974,45 @@
     background-repeat: no-repeat;
     padding-right: 1.4rem;
   }
+
+  /* Funds pill — appears under the Account input. Compact 12px-ish
+     row of `Avail margin ₹X · Cash ₹Y · Used ₹Z`. Sky-blue tint to
+     read as info, flips red when margin goes negative (margin debt
+     — the operator's about to get a Kite rejection). */
+  .ot-funds {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.4rem;
+    margin-top: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 3px;
+    background: rgba(125,211,252,0.08);
+    border: 1px solid rgba(125,211,252,0.25);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+  .ot-funds-k {
+    color: #7e97b8;
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .ot-funds-v {
+    color: #c8d8f0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .ot-funds-sep {
+    color: #7e97b8;
+    opacity: 0.5;
+  }
+  .ot-funds-low {
+    background: rgba(248,113,113,0.10);
+    border-color: rgba(248,113,113,0.35);
+  }
+  .ot-funds-low .ot-funds-v { color: #f87171; }
 
   .ot-footer {
     display: flex;

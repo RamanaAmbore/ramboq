@@ -613,7 +613,21 @@
     if (chainAtmRowEl && showAddPanel) {
       // Defer one tick so the row has been laid out before we scroll.
       queueMicrotask(() => {
-        chainAtmRowEl?.scrollIntoView({ block: 'center', behavior: 'auto' });
+        // Scroll INSIDE .chain-grid-wrap only — earlier we used
+        // rowEl.scrollIntoView({block:'center'}) which propagates up
+        // every scrollable ancestor and yanks the whole page up,
+        // hiding the Account / Underlying / Expiry picker bar at the
+        // top of the panel. Computing scrollTop on the wrapper keeps
+        // the page in place and only moves the chain grid.
+        const row  = chainAtmRowEl;
+        if (!row) return;
+        const wrap = row.closest('.chain-grid-wrap');
+        if (wrap) {
+          const target = row.offsetTop - (wrap.clientHeight - row.offsetHeight) / 2;
+          wrap.scrollTop = Math.max(0, target);
+        } else {
+          row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        }
       });
     }
   });
@@ -1137,7 +1151,19 @@
               : 'Pick exactly one account to enable the chain picker'}
             aria-label="Toggle chain picker"
             aria-pressed={showAddPanel}
-            onclick={() => { showAddPanel = !showAddPanel; }}>O Chain</button>
+            onclick={() => {
+              // Seed the chain picker from the operator's already-
+              // chosen underlying / expiry on the picker bar above.
+              // Earlier the chain picker kept its own independent
+              // chainUnderlying state, defaulting to NIFTY — an
+              // operator analysing BANKNIFTY / GOLDM had to pick the
+              // underlying again inside the panel.
+              if (!showAddPanel) {
+                if (selectedUnderlying) chainUnderlying = selectedUnderlying;
+                if (selectedExpiry)     chainExpiry     = selectedExpiry;
+              }
+              showAddPanel = !showAddPanel;
+            }}>O Chain</button>
   </div>
 </div>
 
