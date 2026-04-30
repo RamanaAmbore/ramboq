@@ -975,17 +975,19 @@
     left: 0.6rem;
     display: grid;
     grid-template-columns: max-content max-content;
-    column-gap: 0.6rem;
-    row-gap: 0.18rem;
-    padding: 0.45rem 0.65rem;
+    column-gap: 0.5rem;
+    row-gap: 0.12rem;
+    padding: 0.32rem 0.5rem;
     border-radius: 3px;
     background: rgba(13,21,38,0.85);
     border: 1px solid rgba(251,191,36,0.25);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    /* Bumped from 0.6rem → 0.75rem so labels + values read at a glance
-       (operator: "text not visible and clear"). pointer-events: auto
-       lets per-row title= tooltips surface on hover. */
-    font-size: 0.75rem;
+    /* Operator: "make the overlay look smaller, reduce the font size
+       slightly". Bumped down 0.75rem → 0.65rem on values and 0.78 →
+       0.7rem on keys; padding + gaps trimmed in proportion. Still
+       large enough to read at a glance but takes ~25 % less vertical
+       and horizontal space. */
+    font-size: 0.65rem;
     line-height: 1.2;
     z-index: 1;
   }
@@ -996,7 +998,7 @@
   .ps-k {
     color: #a3b9d0;
     letter-spacing: 0.05em;
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 700;
     align-self: center;
   }
