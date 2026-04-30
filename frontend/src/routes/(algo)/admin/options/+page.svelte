@@ -1592,6 +1592,11 @@
       {#if chainKind === 'opt' && chainStrikes.length}
         <div class="chain-grid-wrap">
           <table class="chain-grid">
+            <colgroup>
+              <col class="chain-col-ce" />
+              <col class="chain-col-strike" />
+              <col class="chain-col-pe" />
+            </colgroup>
             <thead>
               <tr>
                 <th class="chain-th-ce">CE</th>
@@ -1625,6 +1630,7 @@
                 {#if isAtm}
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
+                      <span class="chain-cell-row chain-cell-row-ce">
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
@@ -1669,12 +1675,14 @@
                         <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
                               class="chain-cell-sep">-</span><span
                               class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
+                      </span>
                       </span>
                     </td>
                     <td class="chain-td-strike chain-td-strike-atm">
                       {k.toFixed(0)}
                     </td>
                     <td class="chain-td-pe">
+                      <span class="chain-cell-row chain-cell-row-pe">
                       <span class="chain-cell-quote">
                         <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
                               class="chain-cell-sep">-</span><span
@@ -1720,11 +1728,13 @@
                         </span>
                       {/if}
                       </span>
+                      </span>
                     </td>
                   </tr>
                 {:else}
                   <tr class="chain-row chain-row-{dir}">
                     <td class="chain-td-ce">
+                      <span class="chain-cell-row chain-cell-row-ce">
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
@@ -1770,9 +1780,11 @@
                               class="chain-cell-sep">-</span><span
                               class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
                       </span>
+                      </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
+                      <span class="chain-cell-row chain-cell-row-pe">
                       <span class="chain-cell-quote">
                         <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
                               class="chain-cell-sep">-</span><span
@@ -1817,6 +1829,7 @@
                                   onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
                         </span>
                       {/if}
+                      </span>
                       </span>
                     </td>
                   </tr>
@@ -2995,7 +3008,15 @@
     border-collapse: collapse;
     font-family: monospace;
     font-size: 0.65rem;
+    /* Fixed layout + explicit colgroup widths so the CE and PE
+       columns are the SAME width on every row. Without this, the
+       inner edges (where bid-ask quotes sit) drift across rows
+       depending on per-row content width. */
+    table-layout: fixed;
   }
+  .chain-grid col.chain-col-strike { width: 4.4rem; }
+  .chain-grid col.chain-col-ce,
+  .chain-grid col.chain-col-pe { width: calc((100% - 4.4rem) / 2); }
   .chain-grid th {
     position: sticky;
     top: 0;
@@ -3024,17 +3045,20 @@
     border-bottom: 1px solid rgba(255,255,255,0.04);
   }
   .chain-grid tr:last-child td { border-bottom: 0; }
-  /* CE / PE cells flex the action group + LTP into a single row so
-     the LTP appears at the inner edge (next to the strike column)
-     while the buttons stay on the outer edge of the table. */
-  .chain-td-ce, .chain-td-pe {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    justify-content: space-between;
-  }
+  /* CE / PE cells host an inner flex wrapper (chain-cell-row) so
+     the cells themselves stay regular table-cells (which keeps the
+     colgroup widths reliable). The wrapper distributes action +
+     bid-ask quote across the cell width: action on the OUTER edge
+     of the table, bid-ask on the INNER edge next to the strike. */
   .chain-td-ce      { text-align: left; }
   .chain-td-pe      { text-align: right; }
+  .chain-cell-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    width: 100%;
+  }
   .chain-td-strike  { text-align: center; color: #c8d8f0; font-weight: 700; }
   /* ATM strike — bold amber numeral substitutes for the dropped
      "ATM" pill; the row's amber background + borders carry the rest
