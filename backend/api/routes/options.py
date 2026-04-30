@@ -117,6 +117,23 @@ class SpotResponse(msgspec.Struct):
     spot_prev_close:  float | None
 
 
+class ChainQuoteRow(msgspec.Struct):
+    """One strike's CE + PE last-traded price. Either side may be null
+    when the broker quote came back empty for that contract."""
+    k:        float
+    ce_ltp:   float | None
+    pe_ltp:   float | None
+
+
+class ChainQuotesResponse(msgspec.Struct):
+    """Per-strike CE / PE LTP map for the chain picker — one round-trip
+    populates LTP cells next to every Buy / Sell / (i) button on both
+    sides of the strike grid."""
+    underlying:  str
+    expiry:      str
+    rows:        list[ChainQuoteRow]
+
+
 class OptionAnalyticsResponse(msgspec.Struct):
     # Identification
     mode:          str
@@ -847,6 +864,91 @@ class OptionsController(Controller):
             spot_source=src,
             spot_prev_close=prev,
         )
+
+    @get("/chain-quotes")
+    async def chain_quotes(self, underlying: str = "",
+                           expiry: str = "") -> ChainQuotesResponse:
+        """Per-strike CE + PE LTP for a given (underlying, expiry).
+        Resolves all CE/PE contracts via the cached instruments dump
+        (already warmed by the daily refresh task), then makes ONE
+        broker `quote()` call covering both sides of every strike. The
+        chain picker on /admin/options renders the LTPs inline next to
+        each Buy / Sell / (i) button so the operator can size legs
+        without leaving the chain view."""
+        und = (underlying or "").upper().strip()
+        exp = (expiry or "").strip()
+        if not und:
+            raise HTTPException(status_code=400,
+                                detail="underlying is required")
+        if not exp:
+            raise HTTPException(status_code=400,
+                                detail="expiry is required")
+
+        from backend.api.cache import get_or_fetch
+        from backend.api.routes.instruments import _fetch_instruments
+        try:
+            inst_resp = await get_or_fetch(
+                "instruments", _fetch_instruments, ttl_seconds=86400)
+        except Exception as e:
+            logger.warning(f"chain-quotes instruments fetch failed: {e}")
+            return ChainQuotesResponse(underlying=und, expiry=exp, rows=[])
+
+        # Map (strike, side) → tradingsymbol for the matching contracts.
+        sym_by_strike: dict[float, dict[str, str]] = {}
+        for inst in inst_resp.items:
+            if (inst.u or "").upper() != und:
+                continue
+            if inst.x != exp:
+                continue
+            if inst.t not in ("CE", "PE"):
+                continue
+            if inst.k is None:
+                continue
+            sym_by_strike.setdefault(
+                float(inst.k), {"CE": "", "PE": ""}
+            )[inst.t] = inst.s
+
+        if not sym_by_strike:
+            return ChainQuotesResponse(underlying=und, expiry=exp, rows=[])
+
+        # Build the batch quote keys (MCX vs NFO routing handled by
+        # `_option_quote_key`). Track key → (strike, side) so the
+        # response can be redistributed back into the chain map.
+        keys: list[str] = []
+        key_meta: dict[str, tuple[float, str]] = {}
+        for strike, sides in sym_by_strike.items():
+            for side, sym in sides.items():
+                if not sym:
+                    continue
+                qk = _option_quote_key(sym)
+                keys.append(qk)
+                key_meta[qk] = (strike, side)
+
+        from backend.shared.brokers.registry import get_price_broker
+        quote_resp: dict = {}
+        if keys:
+            try:
+                quote_resp = get_price_broker().quote(keys) or {}
+            except Exception as e:
+                logger.warning(
+                    f"chain-quotes quote() failed for {und}/{exp}: {e}")
+
+        ltp_by_strike: dict[float, dict[str, float | None]] = {
+            k: {"CE": None, "PE": None} for k in sym_by_strike
+        }
+        for qk, (strike, side) in key_meta.items():
+            px, _src = _ltp_from_quote(quote_resp.get(qk) or {})
+            ltp_by_strike[strike][side] = px
+
+        rows = [
+            ChainQuoteRow(
+                k=strike,
+                ce_ltp=ltps["CE"],
+                pe_ltp=ltps["PE"],
+            )
+            for strike, ltps in sorted(ltp_by_strike.items())
+        ]
+        return ChainQuotesResponse(underlying=und, expiry=exp, rows=rows)
 
     @get("/historical")
     async def historical(self, symbol: str = "", days: int = 30,

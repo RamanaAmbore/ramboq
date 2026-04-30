@@ -442,3 +442,15 @@ export async function fetchOptionsSpot(underlying, expiry = null) {
   const e = expiry ? `&expiry=${encodeURIComponent(expiry)}` : '';
   return _get(`/options/spot?underlying=${u}${e}`, { auth: true });
 }
+
+/** GET /api/options/chain-quotes — per-strike CE + PE LTPs for the
+ *  chain picker's grid. One round-trip drives every LTP cell on the
+ *  page. Returns `{underlying, expiry, rows: [{k, ce_ltp, pe_ltp}]}`;
+ *  empty rows when the broker is unreachable so callers render the
+ *  grid without LTPs rather than failing. */
+export async function fetchChainQuotes(underlying, expiry) {
+  const u = encodeURIComponent(String(underlying || '').toUpperCase());
+  const e = encodeURIComponent(String(expiry || ''));
+  return _get(`/options/chain-quotes?underlying=${u}&expiry=${e}`,
+              { auth: true });
+}

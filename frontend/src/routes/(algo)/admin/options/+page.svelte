@@ -21,7 +21,8 @@
   import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
-    fetchAccounts, fetchOptionsSpot, placeTicketOrder,
+    fetchAccounts, fetchOptionsSpot, fetchChainQuotes,
+    placeTicketOrder,
   } from '$lib/api';
   import OptionsPayoff from '$lib/OptionsPayoff.svelte';
   import OrderTicket   from '$lib/order/OrderTicket.svelte';
@@ -679,6 +680,64 @@
       });
     });
   });
+
+  /** Per-strike CE + PE LTP map, populated by /api/options/chain-quotes
+   *  whenever (chainUnderlying, chainExpiry) changes while the panel is
+   *  open. Keyed by strike → {ce, pe}. Stays null until the first fetch
+   *  resolves; UI shows '—' for absent rows so layout doesn't jump as
+   *  data lands. */
+  /** @type {Record<string,{ce:number|null,pe:number|null}> | null} */
+  let chainQuotesMap = $state(null);
+  let chainQuotesKey = '';
+  let chainQuotesPoll = /** @type {any} */ (null);
+  function _refreshChainQuotes() {
+    if (!showAddPanel || !chainUnderlying || !chainExpiry) return;
+    const u = chainUnderlying.toUpperCase();
+    const e = chainExpiry;
+    fetchChainQuotes(u, e).then((r) => {
+      if (chainQuotesKey !== `${u}|${e}`) return;
+      const map = /** @type {Record<string,{ce:number|null,pe:number|null}>} */ ({});
+      for (const row of (r?.rows || [])) {
+        map[String(row.k)] = {
+          ce: row.ce_ltp == null ? null : Number(row.ce_ltp),
+          pe: row.pe_ltp == null ? null : Number(row.pe_ltp),
+        };
+      }
+      chainQuotesMap = map;
+    }).catch(() => { /* swallow — UI shows '—' */ });
+  }
+  $effect(() => {
+    void chainUnderlying; void chainExpiry; void showAddPanel;
+    untrack(() => {
+      if (chainQuotesPoll) {
+        clearInterval(chainQuotesPoll);
+        chainQuotesPoll = null;
+      }
+      if (!showAddPanel || !chainUnderlying || !chainExpiry) {
+        chainQuotesMap = null;
+        chainQuotesKey = '';
+        return;
+      }
+      const key = `${chainUnderlying.toUpperCase()}|${chainExpiry}`;
+      if (key !== chainQuotesKey) {
+        chainQuotesMap = null;       // clear stale rows on pivot
+        chainQuotesKey = key;
+      }
+      _refreshChainQuotes();
+      chainQuotesPoll = setInterval(_refreshChainQuotes, 5000);
+    });
+  });
+  onDestroy(() => {
+    if (chainQuotesPoll) clearInterval(chainQuotesPoll);
+  });
+  function _fmtLtp(/** @type {number|null|undefined} */ v) {
+    if (v == null || !Number.isFinite(v)) return '—';
+    return v >= 100
+      ? v.toFixed(0)
+      : v >= 10
+        ? v.toFixed(1)
+        : v.toFixed(2);
+  }
 
   /** Spot for the chain underlying. Prefers the strategy response's
    *  spot when chainUnderlying matches the page's primary underlying
@@ -1556,6 +1615,7 @@
                 {#if isAtm}
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
+                      <span class="chain-side-action">
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
@@ -1594,11 +1654,15 @@
                                   onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
                         </span>
                       {/if}
+                      </span>
+                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce)}</span>
                     </td>
-                    <td class="chain-td-strike">
-                      {k.toFixed(0)}<span class="chain-atm-tag">ATM</span>
+                    <td class="chain-td-strike chain-td-strike-atm">
+                      {k.toFixed(0)}
                     </td>
                     <td class="chain-td-pe">
+                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe)}</span>
+                      <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
@@ -1637,11 +1701,13 @@
                                   onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
                         </span>
                       {/if}
+                      </span>
                     </td>
                   </tr>
                 {:else}
                   <tr class="chain-row chain-row-{dir}">
                     <td class="chain-td-ce">
+                      <span class="chain-side-action">
                       {#if isQuickActive(k, 'CE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
@@ -1680,9 +1746,13 @@
                                   onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
                         </span>
                       {/if}
+                      </span>
+                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce)}</span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
+                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe)}</span>
+                      <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
                           <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
@@ -1721,6 +1791,7 @@
                                   onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
                         </span>
                       {/if}
+                      </span>
                     </td>
                   </tr>
                 {/if}
@@ -2902,15 +2973,22 @@
   .chain-grid th {
     position: sticky;
     top: 0;
-    z-index: 1;
-    background: rgba(251,191,36,0.10);
+    z-index: 2;
+    /* Stack a solid panel base under the amber tint so rows don't
+       bleed through when the body scrolls under the sticky header.
+       The panel gradient base is #1d2a44; matching it here keeps the
+       header visually contiguous with the surrounding card. */
+    background:
+      linear-gradient(rgba(251,191,36,0.10), rgba(251,191,36,0.10)),
+      #1d2a44;
     color: #a3b9d0;
     font-weight: 700;
     text-transform: uppercase;
     font-size: 0.65rem;
     letter-spacing: 0.04em;
     padding: 0.25rem 0.4rem;
-    border-bottom: 1px solid rgba(251,191,36,0.25);
+    border-bottom: 1px solid rgba(251,191,36,0.45);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.25);
   }
   .chain-th-ce     { text-align: left; color: #4ade80; }
   .chain-th-pe     { text-align: right; color: #f87171; }
@@ -2920,34 +2998,55 @@
     border-bottom: 1px solid rgba(255,255,255,0.04);
   }
   .chain-grid tr:last-child td { border-bottom: 0; }
+  /* CE / PE cells flex the action group + LTP into a single row so
+     the LTP appears at the inner edge (next to the strike column)
+     while the buttons stay on the outer edge of the table. */
+  .chain-td-ce, .chain-td-pe {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: space-between;
+  }
   .chain-td-ce      { text-align: left; }
   .chain-td-pe      { text-align: right; }
   .chain-td-strike  { text-align: center; color: #c8d8f0; font-weight: 700; }
+  /* ATM strike — bold amber numeral substitutes for the dropped
+     "ATM" pill; the row's amber background + borders carry the rest
+     of the highlight, so this stays compact (no extra width). */
+  .chain-td-strike-atm {
+    color: #fbbf24;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  /* Per-side LTP cell — small monospace numeral aligned next to the
+     strike. Column count is unchanged; the CE/PE cells flex to make
+     room. Muted slate so the action buttons stay the focal point. */
+  .chain-cell-ltp {
+    font-family: monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #c8d8f0;
+    min-width: 2.4rem;
+    text-align: center;
+    opacity: 0.85;
+  }
+  .chain-side-action {
+    display: inline-flex;
+    align-items: center;
+  }
 
   /* Chain row tinting — strikes BELOW spot are ITM-call (the call is
      in-the-money); strikes ABOVE spot are ITM-put. Subtle background
      bands so the operator sees the moneyness boundary at a glance.
-     ATM row (closest to spot) gets a warm amber highlight + a "ATM"
-     tag next to the strike value, and is the scroll target when the
-     chain opens. */
+     ATM row (closest to spot) gets a warm amber highlight + amber
+     borders top/bottom — paired with the bolder amber strike numeral
+     it identifies the row without taking extra horizontal space. */
   .chain-row-itm-call > td { background: rgba(56,189,248,0.05); }
   .chain-row-itm-put  > td { background: rgba(251,146,60,0.05); }
   .chain-row-atm > td {
     background: rgba(251,191,36,0.18);
     border-top:    1px solid rgba(251,191,36,0.55);
     border-bottom: 1px solid rgba(251,191,36,0.55);
-  }
-  .chain-atm-tag {
-    display: inline-block;
-    margin-left: 0.35rem;
-    padding: 0 0.3rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: #0c1830;
-    background: #fbbf24;
-    border-radius: 2px;
-    vertical-align: 1px;
   }
 
   /* Chain header SPOT pill — sits next to the "Option chain" title
