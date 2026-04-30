@@ -924,11 +924,53 @@
     });
   }
 
+  /** Click handler for draft rows — opens OrderTicket pre-filled in
+   *  PAPER mode (LIVE pill available too) so the operator can
+   *  convert a draft into a real order. The draft's id is stashed
+   *  on ticketProps; onTicketSubmit removes the draft from drafts[]
+   *  on a successful PAPER / LIVE submit, so the operator doesn't
+   *  end up with both a draft AND a real position for the same leg. */
+  function executeDraft(/** @type {any} */ c) {
+    if (c.source !== 'draft' || !c.symbol) return;
+    const sym  = String(c.symbol).toUpperCase();
+    const inst = getInstrument(sym);
+    const lot  = Number(inst?.ls || 1);
+    const qty  = Math.abs(Number(c.qty || 0)) || lot;
+    const side = Number(c.qty || 0) < 0 ? 'SELL' : 'BUY';
+    const acct = _ticketAccountDefault();
+    openTicket({
+      symbol:    sym,
+      exchange:  inst?.e || 'NFO',
+      side,
+      action:    'open',
+      qty,
+      lotSize:   lot,
+      price:     c.avg_cost != null && c.avg_cost !== ''
+                   ? Number(c.avg_cost) : undefined,
+      accounts:  ticketAccounts,
+      account:   acct,
+      defaultMode:    'paper',
+      availableModes: ['paper', 'live'],
+      // Stashed for onTicketSubmit; OrderTicket ignores extra
+      // fields, so this rides through unchanged.
+      _draftId:  c.draftId,
+    });
+  }
+
   // Ticket → drafts: signed qty (BUY = +qty, SELL = −qty) so the
   // existing payoff math keeps working. Auto-aligns the page
   // underlying so the new draft surfaces in candidates immediately.
+  // PAPER / LIVE submits when ticketProps carries _draftId clear the
+  // matching draft so the operator doesn't end up with both.
   function onTicketSubmit(/** @type {any} */ payload) {
-    if (payload.mode !== 'draft') return;   // PAPER / LIVE land in phase 2/3
+    if (payload.mode === 'paper' || payload.mode === 'live') {
+      const did = ticketProps?._draftId;
+      if (did != null) {
+        drafts = drafts.filter(d => d.id !== did);
+      }
+      return;
+    }
+    if (payload.mode !== 'draft') return;
     const signedQty = payload.side === 'BUY'
       ? Math.abs(Number(payload.quantity || 0))
       : -Math.abs(Number(payload.quantity || 0));
@@ -1846,21 +1888,30 @@
                  visible for context). The checkbox stops
                  propagation so toggling a leg doesn't
                  inadvertently fire the close handler. -->
+            {@const isDraft = c.source === 'draft'}
+            {@const isActionable = isDraft || isClosable}
             <div class="cand-row cand-row-{dir}"
                  class:cand-disabled={enabledSymbols[c.symbol] === false}
                  class:cand-closed={isClosed}
+                 class:cand-draft={isDraft}
                  role="button"
-                 tabindex={isClosable ? 0 : -1}
-                 aria-disabled={!isClosable}
-                 title={isClosable
-                   ? `Close ${Math.abs(c.qty)} ${c.symbol}`
-                   : isClosed ? 'Closed position' : ''}
-                 onclick={() => { if (isClosable) closePosition(c); }}
+                 tabindex={isActionable ? 0 : -1}
+                 aria-disabled={!isActionable}
+                 title={isDraft
+                   ? `Execute draft — open the order ticket pre-filled (PAPER / LIVE)`
+                   : isClosable
+                     ? `Close ${Math.abs(c.qty)} ${c.symbol}`
+                     : isClosed ? 'Closed position' : ''}
+                 onclick={() => {
+                   if (isDraft) executeDraft(c);
+                   else if (isClosable) closePosition(c);
+                 }}
                  onkeydown={(e) => {
-                   if (!isClosable) return;
+                   if (!isActionable) return;
                    if (e.key === 'Enter' || e.key === ' ') {
                      e.preventDefault();
-                     closePosition(c);
+                     if (isDraft) executeDraft(c);
+                     else closePosition(c);
                    }
                  }}>
               <input type="checkbox"
@@ -2520,6 +2571,27 @@
   }
   .cand-row-long:hover  { background-color: rgba(56,189,248,0.16); }
   .cand-row-short:hover { background-color: rgba(251,146,60,0.16); }
+
+  /* Draft rows — distinct from live / sim positions: dashed
+     magenta inset bar on the LEFT only (not both edges like
+     long/short), faint magenta-tinted background, and a slim
+     row-level dashed left border so even a flat-zero draft
+     reads as "this isn't a real position". Magenta matches the
+     `leg-source-draft` text colour `#f0abfc` used on the leg
+     panel + the draft input rows above. */
+  .cand-row.cand-draft {
+    background-color: rgba(240,171,252,0.06);
+    box-shadow: inset 4px 0 0 rgba(240,171,252,0.85);
+    /* Override the long/short tint so the draft cue wins. */
+  }
+  .cand-row.cand-draft.cand-row-long,
+  .cand-row.cand-draft.cand-row-short {
+    background-color: rgba(240,171,252,0.06);
+    box-shadow: inset 4px 0 0 rgba(240,171,252,0.85);
+  }
+  .cand-row.cand-draft:hover {
+    background-color: rgba(240,171,252,0.14);
+  }
 
   /* P&L cell — same green/red scheme as /dashboard's pnl-gain /
      pnl-loss classes. Subtle background tint for a glanceable
