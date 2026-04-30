@@ -118,17 +118,20 @@ class SpotResponse(msgspec.Struct):
 
 
 class ChainQuoteRow(msgspec.Struct):
-    """One strike's CE + PE last-traded price. Either side may be null
-    when the broker quote came back empty for that contract."""
+    """One strike's CE + PE top-of-book bid / ask. Any side may be null
+    when the broker quote came back empty for that contract or the
+    depth book was uncovered."""
     k:        float
-    ce_ltp:   float | None
-    pe_ltp:   float | None
+    ce_bid:   float | None
+    ce_ask:   float | None
+    pe_bid:   float | None
+    pe_ask:   float | None
 
 
 class ChainQuotesResponse(msgspec.Struct):
-    """Per-strike CE / PE LTP map for the chain picker — one round-trip
-    populates LTP cells next to every Buy / Sell / (i) button on both
-    sides of the strike grid."""
+    """Per-strike CE / PE bid / ask map for the chain picker — one
+    round-trip populates the inline quote cells next to every Buy /
+    Sell / (i) button on both sides of the strike grid."""
     underlying:  str
     expiry:      str
     rows:        list[ChainQuoteRow]
@@ -933,20 +936,38 @@ class OptionsController(Controller):
                 logger.warning(
                     f"chain-quotes quote() failed for {und}/{exp}: {e}")
 
-        ltp_by_strike: dict[float, dict[str, float | None]] = {
-            k: {"CE": None, "PE": None} for k in sym_by_strike
+        def _best(book: list, side: str) -> float | None:
+            """Top-of-book price from a depth.buy / depth.sell list.
+            Returns None when the depth array is empty (illiquid /
+            pre-market) so the UI can fall back to a placeholder."""
+            for level in (book or []):
+                p = level.get("price")
+                if p not in (None, 0, 0.0):
+                    return float(p)
+            return None
+
+        book_by_strike: dict[float, dict[str, dict[str, float | None]]] = {
+            k: {"CE": {"bid": None, "ask": None},
+                "PE": {"bid": None, "ask": None}}
+            for k in sym_by_strike
         }
         for qk, (strike, side) in key_meta.items():
-            px, _src = _ltp_from_quote(quote_resp.get(qk) or {})
-            ltp_by_strike[strike][side] = px
+            q = quote_resp.get(qk) or {}
+            depth = q.get("depth") or {}
+            book_by_strike[strike][side]["bid"] = _best(depth.get("buy"),
+                                                        "buy")
+            book_by_strike[strike][side]["ask"] = _best(depth.get("sell"),
+                                                        "sell")
 
         rows = [
             ChainQuoteRow(
                 k=strike,
-                ce_ltp=ltps["CE"],
-                pe_ltp=ltps["PE"],
+                ce_bid=sides["CE"]["bid"],
+                ce_ask=sides["CE"]["ask"],
+                pe_bid=sides["PE"]["bid"],
+                pe_ask=sides["PE"]["ask"],
             )
-            for strike, ltps in sorted(ltp_by_strike.items())
+            for strike, sides in sorted(book_by_strike.items())
         ]
         return ChainQuotesResponse(underlying=und, expiry=exp, rows=rows)
 

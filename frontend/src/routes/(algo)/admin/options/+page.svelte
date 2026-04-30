@@ -681,12 +681,15 @@
     });
   });
 
-  /** Per-strike CE + PE LTP map, populated by /api/options/chain-quotes
-   *  whenever (chainUnderlying, chainExpiry) changes while the panel is
-   *  open. Keyed by strike → {ce, pe}. Stays null until the first fetch
-   *  resolves; UI shows '—' for absent rows so layout doesn't jump as
-   *  data lands. */
-  /** @type {Record<string,{ce:number|null,pe:number|null}> | null} */
+  /** Per-strike CE + PE bid/ask map, populated by
+   *  /api/options/chain-quotes whenever (chainUnderlying, chainExpiry)
+   *  changes while the panel is open. Keyed by strike → {ce, pe} →
+   *  {bid, ask}. Stays null until the first fetch resolves; UI shows
+   *  '—' for absent sides so layout doesn't jump as data lands. */
+  /** @type {Record<string,{
+   *    ce:{bid:number|null,ask:number|null},
+   *    pe:{bid:number|null,ask:number|null}
+   *  }> | null} */
   let chainQuotesMap = $state(null);
   let chainQuotesKey = '';
   let chainQuotesPoll = /** @type {any} */ (null);
@@ -696,11 +699,18 @@
     const e = chainExpiry;
     fetchChainQuotes(u, e).then((r) => {
       if (chainQuotesKey !== `${u}|${e}`) return;
-      const map = /** @type {Record<string,{ce:number|null,pe:number|null}>} */ ({});
+      /** @type {Record<string,{ce:{bid:number|null,ask:number|null},pe:{bid:number|null,ask:number|null}}>} */
+      const map = {};
       for (const row of (r?.rows || [])) {
         map[String(row.k)] = {
-          ce: row.ce_ltp == null ? null : Number(row.ce_ltp),
-          pe: row.pe_ltp == null ? null : Number(row.pe_ltp),
+          ce: {
+            bid: row.ce_bid == null ? null : Number(row.ce_bid),
+            ask: row.ce_ask == null ? null : Number(row.ce_ask),
+          },
+          pe: {
+            bid: row.pe_bid == null ? null : Number(row.pe_bid),
+            ask: row.pe_ask == null ? null : Number(row.pe_ask),
+          },
         };
       }
       chainQuotesMap = map;
@@ -1655,13 +1665,19 @@
                         </span>
                       {/if}
                       </span>
-                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce)}</span>
+                      <span class="chain-cell-quote">
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span>
+                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
+                      </span>
                     </td>
                     <td class="chain-td-strike chain-td-strike-atm">
                       {k.toFixed(0)}
                     </td>
                     <td class="chain-td-pe">
-                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe)}</span>
+                      <span class="chain-cell-quote">
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span>
+                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                      </span>
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
@@ -1747,11 +1763,17 @@
                         </span>
                       {/if}
                       </span>
-                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce)}</span>
+                      <span class="chain-cell-quote">
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span>
+                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
+                      </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
-                      <span class="chain-cell-ltp">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe)}</span>
+                      <span class="chain-cell-quote">
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span>
+                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                      </span>
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
                         <span class="chain-quick chain-quick-{quickPicker.side}">
@@ -3018,18 +3040,25 @@
     font-weight: 800;
     letter-spacing: 0.04em;
   }
-  /* Per-side LTP cell — small monospace numeral aligned next to the
-     strike. Column count is unchanged; the CE/PE cells flex to make
-     room. Muted slate so the action buttons stay the focal point. */
-  .chain-cell-ltp {
+  /* Per-side bid / ask cell — top-of-book stacked vertically next to
+     the strike column. Bid in green, ask in red — matches the global
+     long/short palette so the operator reads "what I can hit if I'm
+     selling" (bid) and "what I'd pay to buy" (ask) at a glance.
+     Stacked layout keeps width tight (no extra column) while showing
+     both numbers on every row. */
+  .chain-cell-quote {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.05;
+    min-width: 2.6rem;
     font-family: monospace;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     font-weight: 600;
-    color: #c8d8f0;
-    min-width: 2.4rem;
     text-align: center;
-    opacity: 0.85;
   }
+  .chain-cell-bid { color: #4ade80; }   /* same green as CE header */
+  .chain-cell-ask { color: #f87171; }   /* same red as PE header */
   .chain-side-action {
     display: inline-flex;
     align-items: center;
