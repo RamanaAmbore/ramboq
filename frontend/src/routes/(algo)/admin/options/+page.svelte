@@ -1190,7 +1190,7 @@
                 if (selectedExpiry)     chainExpiry     = selectedExpiry;
               }
               showAddPanel = !showAddPanel;
-            }}>O Chain</button>
+            }}>OChain</button>
   </div>
 </div>
 
@@ -1618,7 +1618,7 @@
       <div class="opt-section-row">
         <span class="opt-section-title">Payoff</span>
         <span class="opt-section-tag tag-{strategy.net_cost > 0 ? 'long' : strategy.net_cost < 0 ? 'short' : 'long'}">
-          {strategy.net_cost > 0 ? 'NET DEBIT' : strategy.net_cost < 0 ? 'NET CREDIT' : 'FREE'}
+          {strategy.net_cost > 0 ? 'NET DR' : strategy.net_cost < 0 ? 'NET CR' : 'FREE'}
           {fmtMoney(Math.abs(strategy.net_cost), false)}
         </span>
         <span class="opt-section-tag tag-long" title="Max profit">
