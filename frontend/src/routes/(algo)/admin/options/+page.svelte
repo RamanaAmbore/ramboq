@@ -193,7 +193,7 @@
   // the chosen underlying held in one of the chosen accounts, plus all
   // drafts whose symbol matches the underlying prefix. Source is a
   // per-row property (badge in the panel), not a mode-level filter.
-  /** @type {{symbol:string,account:string,qty:number,avg_cost:number|null,ltp:number|null,source:string,kind:string,draftId?:number}[]} */
+  /** @type {{symbol:string,account:string,qty:number,avg_cost:number|null,ltp:number|null,pnl?:number,source:string,kind:string,draftId?:number}[]} */
   const candidatePositions = $derived.by(() => {
     if (!selectedUnderlying) return [];
     const target = selectedUnderlying.toUpperCase();
@@ -271,6 +271,20 @@
       return ac - bc;
     });
     return out;
+  });
+
+  // Realised P&L from positions that have been closed today (qty=0,
+  // pnl carries the realised number from the broker). Surfaced on the
+  // payoff chart header as a separate REAL chip so chart TDAY
+  // (open-leg theoretical) + REAL (closed-leg realised) ≈ the
+  // dashboard's per-underlying P&L. Without this, closed positions
+  // showed as a discrepancy between the legs panel and the dashboard.
+  const realizedPnl = $derived.by(() => {
+    let s = 0;
+    for (const c of candidatePositions) {
+      if (Number(c.qty || 0) === 0) s += Number(c.pnl || 0);
+    }
+    return s;
   });
 
   // Initialize the enable-flag map when candidates change. Default:
@@ -925,7 +939,7 @@
   });
 
   async function loadPositions() {
-    /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null}>} */
+    /** @type {Array<{symbol:string, account:string, qty:number, source:string, avg_cost:number|null, ltp:number|null, pnl:number}>} */
     const merged = [];
 
     // Live broker positions
@@ -944,6 +958,10 @@
           source:   'live',
           avg_cost: p?.average_price != null ? Number(p.average_price) : null,
           ltp:      p?.last_price    != null ? Number(p.last_price)    : null,
+          // Broker P&L (realised + unrealised). For qty=0 closed-out
+          // intraday rows this is the realized P&L; the chart adds it
+          // up separately so the legs panel + dashboard reconcile.
+          pnl:      p?.pnl != null ? Number(p.pnl) : 0,
         });
       }
     } catch (_) { /* ignore — show sim only */ }
@@ -964,6 +982,7 @@
           source:   'sim',
           avg_cost: p?.average_price != null ? Number(p.average_price) : null,
           ltp:      p?.last_price    != null ? Number(p.last_price)    : null,
+          pnl:      p?.pnl != null ? Number(p.pnl) : 0,
         });
       }
     } catch (_) { /* ignore */ }
@@ -1662,6 +1681,17 @@
         <span class="opt-section-tag tag-short" title="Max loss">
           MAX L {fmtMoney(strategy.risk.max_loss, false)}
         </span>
+        {#if realizedPnl !== 0}
+          <!-- Realised P&L from positions closed today (qty=0). The
+               chart's TDAY only sums OPEN-leg theoretical value; the
+               dashboard P&L includes realised. Surfacing this chip
+               lets the operator reconcile the two: TDAY + REAL ≈
+               dashboard ₹ for this underlying. -->
+          <span class={'opt-section-tag tag-' + (realizedPnl >= 0 ? 'long' : 'short')}
+                title="Realised P&L from positions closed today (qty=0). Adds to TDAY for total day P&L; doesn't affect the payoff curve.">
+            REAL {fmtMoney(realizedPnl, false)}
+          </span>
+        {/if}
       </div>
     </div>
     <OptionsPayoff
