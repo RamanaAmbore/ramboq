@@ -420,10 +420,11 @@ export async function fetchStrategyAnalytics(legs, opts = {}) {
       spot:        opts.spot        ?? null,
       span_pct:    opts.span_pct    ?? null,
       points:      opts.points      ?? 51,
-      // Default 2 slices (T-33%, T-67%) so the operator gets the
-      // theta-decay overlay without opting in. Caller can pass 0
-      // to skip the slices, or up to 5 for a denser overlay.
-      time_slices: opts.time_slices ?? 2,
+      // Default 0 slices — operator removed the T-33% / T-67%
+      // intermediate curves from the payoff chart. The backend
+      // helpers + IntermediateCurve schema stay in place; flip
+      // this to 1-5 to re-enable the overlay.
+      time_slices: opts.time_slices ?? 0,
     },
     { auth: true });
 }
