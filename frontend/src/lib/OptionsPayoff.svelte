@@ -547,8 +547,12 @@
            visually distinct as the only DOTTED vertical. round line-
            caps render the dasharray "1 4" as a clean dot-grid. -->
       {#if spot > sMin && spot < sMax}
+        <!-- Spot vertical kept dotted but very subtle (alpha 0.85
+             → 0.30) so the dotted pattern is just-visible against
+             the chart curves; the rotated SPOT-price label below
+             carries the readable identity via its halo. -->
         <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
-              stroke="rgba(125,211,252,0.85)" stroke-width="1.5"
+              stroke="rgba(125,211,252,0.30)" stroke-width="1.25"
               stroke-dasharray="1 4" stroke-linecap="round"/>
         <!-- Anchor 5 px to the right of the spot line — visible gap
              between the cyan vertical and the SPOT label glyphs. -->
@@ -580,8 +584,11 @@
                the heavier dash + bolder stroke compared to the σ
                grid still telegraphs this is the outcome-zero
                boundary, not a routine grid line. -->
+          <!-- BE vertical: alpha 0.75 → 0.30, stroke-width 1.25 → 1
+               so the line itself is very subtle; the rotated cream
+               BE-price label still pops via its halo. -->
           <line x1={xOf(be)} x2={xOf(be)} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(253,230,138,0.75)" stroke-width="1.25"
+                stroke="rgba(253,230,138,0.30)" stroke-width="1"
                 stroke-dasharray="5 3"/>
           <!-- BE label anchored near the BOTTOM of the chart, same
                convention as the σ-tick price labels: away from the
