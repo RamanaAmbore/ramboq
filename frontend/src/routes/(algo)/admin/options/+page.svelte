@@ -1562,16 +1562,8 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <select class="chain-quick-select"
-                                  bind:value={quickPicker.lots}
-                                  aria-label="Lots">
-                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                              <option value={n}>{n}</option>
-                            {/each}
-                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
-                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
-                            {/if}
-                          </select>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1613,16 +1605,8 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <select class="chain-quick-select"
-                                  bind:value={quickPicker.lots}
-                                  aria-label="Lots">
-                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                              <option value={n}>{n}</option>
-                            {/each}
-                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
-                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
-                            {/if}
-                          </select>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1664,16 +1648,8 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <select class="chain-quick-select"
-                                  bind:value={quickPicker.lots}
-                                  aria-label="Lots">
-                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                              <option value={n}>{n}</option>
-                            {/each}
-                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
-                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
-                            {/if}
-                          </select>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1713,16 +1689,8 @@
                                   onclick={() => quickStepLots(-1)}
                                   aria-label="Decrease lots"
                                   disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <select class="chain-quick-select"
-                                  bind:value={quickPicker.lots}
-                                  aria-label="Lots">
-                            {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                              <option value={n}>{n}</option>
-                            {/each}
-                            {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
-                              <option value={quickPicker.lots}>{quickPicker.lots}</option>
-                            {/if}
-                          </select>
+                          <span class="chain-quick-lots-val"
+                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
                           <button type="button" class="chain-quick-step"
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
@@ -1922,7 +1890,24 @@
                        next[c.symbol] = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
                        enabledSymbols = next;
                      }} />
-              <span class="font-mono">{c.symbol}</span>
+              <span class="font-mono cand-sym">
+                {c.symbol}
+                {#if isDraft}
+                  <!-- Draft remove button — page-local removal only,
+                       NO order placed. Clicking the row body still
+                       opens the OrderTicket pre-filled to PLACE the
+                       draft as a real order; this × is the
+                       "discard" affordance. Stops propagation so
+                       the row's executeDraft handler doesn't fire. -->
+                  <button type="button" class="cand-draft-x"
+                          title="Remove this draft (no order placed)"
+                          aria-label="Remove draft"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            if (c.draftId != null) removeDraft(c.draftId);
+                          }}>×</button>
+                {/if}
+              </span>
               {#if !hideAcct}<span class="font-mono">{c.account}</span>{/if}
               <span class="num {c.qty < 0 ? 'kv-neg' : 'kv-pos'}">{c.qty > 0 ? '+' : ''}{c.qty}</span>
               <span class="num cand-pnl {pnl == null ? '' : pnl >= 0 ? 'cand-pnl-pos' : 'cand-pnl-neg'}">
@@ -2591,6 +2576,38 @@
   }
   .cand-row.cand-draft:hover {
     background-color: rgba(240,171,252,0.14);
+  }
+
+  /* Draft × — sits inline with the symbol, lets operator discard
+     a draft without going through the OrderTicket modal. Magenta
+     to match the draft row identity. */
+  .cand-sym {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .cand-draft-x {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+    padding: 0;
+    border-radius: 2px;
+    border: 1px solid rgba(240,171,252,0.45);
+    background: rgba(240,171,252,0.10);
+    color: #f0abfc;
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cand-draft-x:hover {
+    background: rgba(240,171,252,0.22);
+    border-color: rgba(240,171,252,0.75);
+    color: #fff;
   }
 
   /* P&L cell — same green/red scheme as /dashboard's pnl-gain /
