@@ -405,6 +405,28 @@ class OrdersController(Controller):
         if data.order_type in ("SL", "SL-M") and not data.trigger_price:
             raise HTTPException(status_code=400, detail="trigger_price is required for SL/SL-M")
 
+        # Tick-size sanitisation. Kite rejects orders whose price isn't an
+        # exact tick multiple — most NSE F&O / equity ticks are ₹0.05 (some
+        # MCX commodities are coarser like ₹1.00, but those are still
+        # 0.05-tick-aligned multiples so a 0.05-snap is universally safe).
+        # We round here as a defence-in-depth: the OrderTicket frontend
+        # already rounds, but an external script POSTing /ticket directly
+        # could still leak a float-arithmetic value like 590.7999999. Snap
+        # everything that reaches the broker to the nearest paise tick.
+        def _snap_to_tick(px, tick: float = 0.05) -> float | None:
+            if px is None:
+                return None
+            try:
+                v = float(px)
+            except (TypeError, ValueError):
+                return None
+            if v <= 0:
+                return v
+            return round(round(v / tick) * tick, 2)
+
+        data.price         = _snap_to_tick(data.price)
+        data.trigger_price = _snap_to_tick(data.trigger_price)
+
         # Resolve account — caller may leave blank; pick the first
         # available connection (mirrors what the agent paper-trade
         # path does for total-scope actions).

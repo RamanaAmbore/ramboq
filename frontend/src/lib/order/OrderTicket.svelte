@@ -164,6 +164,24 @@
   /** @type {{ bid: number|null, ask: number|null, ltp: number|null } | null} */
   let _lastQuote = $state(null);
 
+  // Tick size for NSE F&O / equity is ₹0.05; commodities are
+  // typically ₹0.05 or coarser (CRUDEOIL ₹1.00, GOLDM ₹1.00). Kite
+  // rejects orders whose price isn't an exact tick multiple — the
+  // bid/ask from depth ARE tick-aligned, but JS floating-point can
+  // turn 590.80 into 590.7999999999999 which Kite then refuses.
+  // Snap to the nearest 0.05 + round to 2 decimals to scrub away
+  // both float artifacts and any operator-typed extra decimals.
+  function _roundToTick(/** @type {number|string} */ px,
+                        /** @type {number} */ tick = 0.05) {
+    const n = Number(px);
+    if (!Number.isFinite(n) || n <= 0) return n;
+    return Math.round((n / tick) + Number.EPSILON) * tick;
+  }
+  function _formatTick(/** @type {number} */ n) {
+    // Always render with 2 decimals for paise-aligned ticks. Doesn't
+    // round (caller did that already); just stringifies cleanly.
+    return Number.isFinite(n) ? Number(n.toFixed(2)) : n;
+  }
   function _autoFillFromQuote() {
     if (_priceTouched) return;
     if (_type !== 'LIMIT' && _type !== 'SL') return;
@@ -173,7 +191,7 @@
     // (off-hours, illiquid contracts) so the operator isn't left
     // with a blank field.
     const fallback = (px && px > 0) ? px : _lastQuote.ltp;
-    if (fallback && fallback > 0) _price = fallback;
+    if (fallback && fallback > 0) _price = _formatTick(_roundToTick(fallback));
   }
   function onDepthQuote(/** @type {any} */ q) {
     _lastQuote = q ? {
@@ -307,8 +325,8 @@
         const payload = {
           account:       _account,
           quantity:      Number(_qty) || undefined,
-          price:         showLimit   ? Number(_price)   : null,
-          trigger_price: showTrigger ? Number(_trigger) : null,
+          price:         showLimit   ? _roundToTick(_price)   : null,
+          trigger_price: showTrigger ? _roundToTick(_trigger) : null,
           order_type:    _type,
           variety:       _variety,
         };
@@ -354,8 +372,8 @@
       product:        _product,
       order_type:     _type,
       variety:        _variety,
-      price:          showLimit   ? Number(_price)   : null,
-      trigger_price:  showTrigger ? Number(_trigger) : null,
+      price:          showLimit   ? _roundToTick(_price)   : null,
+      trigger_price:  showTrigger ? _roundToTick(_trigger) : null,
       account:        _account,
       // Chase only carries on price-bearing order types; MARKET /
       // SL-M ignore it on the backend, but we still ship the flag
@@ -377,8 +395,8 @@
           product:          _product,
           order_type:       _type,
           variety:          _variety,
-          price:            showLimit   ? Number(_price)   : null,
-          trigger_price:    showTrigger ? Number(_trigger) : null,
+          price:            showLimit   ? _roundToTick(_price)   : null,
+          trigger_price:    showTrigger ? _roundToTick(_trigger) : null,
           account:          _account,
           chase:                showLimit ? _chase : false,
           chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'high',
