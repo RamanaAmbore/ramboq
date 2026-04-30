@@ -1279,10 +1279,10 @@
             {/if}
           </span>
         {/if}
-        <span class="opt-section-meta">
-          click CE / PE next to a strike to add a leg ·
-          quantity defaults to 1 lot
-        </span>
+        <!-- The trailing "click CE / PE next to a strike to add a leg
+             · quantity defaults to 1 lot" hint was dropped per
+             operator request: with it gone, Option chain + SPOT/ATM
+             pill fit on a single line at narrow widths. -->
       </div>
       <div class="chain-controls">
         <div class="chain-field">
@@ -2820,59 +2820,58 @@
     letter-spacing: 0.04em;
     white-space: nowrap;
   }
-  /* +/− stepper around the lots count. Mirrors the OrderTicket's
-     "lot N" meta convention — operator sees `Lots: [- 1 +] (× lot 50)`
-     and reads "1 lot times 50 per lot = 50 qty" without thinking. */
+  /* +/− stepper around the lots count — same shape + size + colours
+     as the OrderTicket Qty stepper (.ot-lots-step / .ot-lots-val /
+     .ot-meta) so the two surfaces read as one consistent control.
+     Operator request: "lot format in OChain and open/close should
+     look similar". */
   .chain-quick-step {
-    width: 1.1rem;
-    height: 1.25rem;
+    width: 1.4rem;
+    height: 1.4rem;
     padding: 0;
-    border-radius: 2px;
-    border: 1px solid rgba(126,151,184,0.45);
-    background: rgba(13,21,38,0.6);
-    color: #c8d8f0;
+    border-radius: 3px;
+    border: 1px solid rgba(251,191,36,0.45);
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
     font-family: monospace;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 700;
     line-height: 1;
     cursor: pointer;
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
   .chain-quick-step:hover:not(:disabled) {
-    background: rgba(251,191,36,0.15);
-    border-color: rgba(251,191,36,0.55);
-    color: #fbbf24;
+    background: rgba(251,191,36,0.22);
+    border-color: rgba(251,191,36,0.75);
   }
   .chain-quick-step:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
   .chain-quick-lots-val {
-    min-width: 1.6rem;
-    padding: 0 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.8rem;
+    padding: 0 0.35rem;
+    height: 1.4rem;
+    flex: 0 0 auto;
     text-align: center;
     color: #fbbf24;
     font-family: monospace;
     font-weight: 700;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-variant-numeric: tabular-nums;
   }
-  /* Native <select> in the inline picker — sits between the +/-
-     steppers. Common multiples [1, 2, 3, 5, 10, 25, 50, 75, 100]
-     so operator can jump-pick; off-list values get a synthesized
-     option so stepping past 100 still renders. SVG chevron caret
-     matches the OrderTicket account picker. */
-  /* The earlier <select> dropdown for picking from common lots
-     [1, 2, 3, 5, …] was retired — operator preference + the dropdown
-     spilled out of the row on narrow viewports. The +/− steppers
-     alone now drive the lots count. */
-  /* `(× lot N)` tag — sky-blue muted, mirrors the OrderTicket header
-     chip's "lot 50" meta so the two surfaces read consistently. */
+  /* `(× lot = qty)` tag — sky-blue muted at 0.65rem to match
+     the OrderTicket .ot-meta size + colour. */
   .chain-quick-meta {
     color: #a3b9d0;
     font-family: monospace;
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     letter-spacing: 0.02em;
     white-space: nowrap;
     padding: 0 3px;
