@@ -225,7 +225,15 @@
       const isFut = /FUT$/i.test(sym);
       const isOpt = /(CE|PE)$/i.test(sym);
       if (!isFut && !isOpt) continue;
-      if (!matchExpiry(sym)) continue;
+      // Closed positions (qty=0) bypass the expiry filter. Their
+      // contract often expired in the past, OR the instruments cache
+      // has already evicted them — so matchExpiry would always reject
+      // them and the row would silently disappear from the legs panel
+      // even though it still shows in the dashboard positions grid.
+      // Operator wanted parity with the grid: show every closed
+      // position regardless of selected expiry.
+      const isClosed = Number(p.qty || 0) === 0;
+      if (!isClosed && !matchExpiry(sym)) continue;
       out.push({
         ...p,
         kind: isFut ? 'fut' : 'opt',
