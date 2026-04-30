@@ -779,7 +779,7 @@
                 role="button" tabindex="0"
                 aria-label="Close tooltip — press anywhere"/>
           <!-- SPOT row — key in muted-slate, value in sky-cyan. -->
-          <text x={tx + 10} y={ty + 16} fill="#a3b9d0"
+          <text x={tx + 10} y={ty + 16} fill="#fbbf24" fill-opacity="0.85"
                 font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">SPOT</text>
@@ -788,7 +788,7 @@
                 font-family="monospace"
                 pointer-events="none">{fmtSpot(hover.spot)}</text>
           <!-- TDAY / EXP rows — value coloured by sign (green/red). -->
-          <text x={tx + 10} y={ty + 33} fill="#a3b9d0"
+          <text x={tx + 10} y={ty + 33} fill="#fbbf24" fill-opacity="0.85"
                 font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">TDAY</text>
@@ -796,7 +796,7 @@
                 font-size="14" font-weight="700" text-anchor="end"
                 font-family="monospace"
                 pointer-events="none">{fmtMoney(hover.today)}</text>
-          <text x={tx + 10} y={ty + 50} fill="#a3b9d0"
+          <text x={tx + 10} y={ty + 50} fill="#fbbf24" fill-opacity="0.85"
                 font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">EXP</text>
@@ -1008,10 +1008,15 @@
     cursor: help;
   }
   .ps-k {
-    color: #a3b9d0;
-    letter-spacing: 0.05em;
+    /* Amber label tier — same treatment as the OrderTicket modal's
+       .ot-label so popups across the algo theme share a label
+       colour scheme. Letter-spacing + opacity 0.85 mirror the
+       OrderTicket variant. */
+    color: #fbbf24;
+    letter-spacing: 0.08em;
     font-size: 0.7rem;
     font-weight: 700;
+    opacity: 0.85;
     align-self: center;
   }
   /* Inline hint after the σ glyph — small "IV" tag clarifies what
