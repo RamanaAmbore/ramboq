@@ -84,8 +84,8 @@
       accounts: [],
       // Hide DRAFT — no drafts surface here. PAPER is the safe
       // default; operator opts into LIVE per execution flag.
-      defaultMode:    'paper',
-      availableModes: ['paper', 'live'],
+      defaultMode:    'live',
+      availableModes: ['live'],
     };
   }
 

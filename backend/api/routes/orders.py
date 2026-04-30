@@ -450,9 +450,23 @@ class OrdersController(Controller):
         #   chase=False or non-LIMIT → single-shot kite.place_order
         #     (the existing direct-broker path; preserved for MARKET/
         #     SL-M and for operators who explicitly opted out).
+        # Master paper-trading toggle — when ON, force every incoming
+        # mode='live' to paper regardless of the per-action
+        # `execution.live.*` flags. Operator flips this OFF only when
+        # explicitly promoting actions to real broker calls (then the
+        # per-action flag matrix decides).
+        from backend.shared.helpers.utils import is_prod_branch
+        from backend.shared.helpers.settings import get_bool
+        if data.mode == "live" and is_prod_branch() and get_bool(
+                "execution.paper_trading_mode", True):
+            logger.info(
+                f"[paper-mode] coerced LIVE → paper for "
+                f"{data.side} {data.quantity} {data.tradingsymbol} "
+                f"(execution.paper_trading_mode is ON)"
+            )
+            data.mode = "paper"
+
         if data.mode == "live":
-            from backend.shared.helpers.utils import is_prod_branch
-            from backend.shared.helpers.settings import get_bool
             if not is_prod_branch():
                 raise HTTPException(status_code=403,
                     detail="LIVE mode is disabled on non-prod branches; use PAPER on dev.")

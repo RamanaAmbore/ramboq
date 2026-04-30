@@ -70,10 +70,14 @@
     // Initial mode pill the ticket opens on. Surfaces with no drafts
     // concept (PerformancePage row click) typically pass 'paper';
     // surfaces with a drafts panel (admin/options) keep 'draft'.
-    defaultMode    = /** @type {'draft' | 'paper' | 'live'} */ ('draft'),
-    // Which mode pills the operator can see. Pass ['paper','live']
-    // to suppress DRAFT on surfaces where it has no meaning.
-    availableModes = /** @type {Array<'draft'|'paper'|'live'>} */ (['draft', 'paper', 'live']),
+    defaultMode    = /** @type {'draft' | 'paper' | 'live'} */ ('live'),
+    // Which mode pills the operator can see. PAPER is no longer a
+    // user-facing choice — the backend's `execution.paper_trading_mode`
+    // setting routes every 'live' mode to paper on prod when ON
+    // (default true), and dev branch is paper-only via the branch
+    // gate. Operators pick between DRAFT (page-local what-if) and
+    // LIVE (submit to backend, server decides paper-vs-live).
+    availableModes = /** @type {Array<'draft'|'paper'|'live'>} */ (['draft', 'live']),
     // Signed qty of the operator's existing position when the ticket
     // is opened from a position-row click. Drives the side toggle's
     // ADD/CLOSE labels — operator thinks in "I want to add to this
@@ -685,23 +689,36 @@
          mode nor chase apply there; the whole row is hidden. -->
     {#if action !== 'modify'}
     <div class="ot-mode-row">
-      <span class="ot-label">Mode</span>
-      <div class="ot-mode-pills">
-        {#if availableModes.includes('draft')}
-          <button type="button" class="ot-mode-pill ot-mode-draft" class:on={_mode === 'draft'}
-                  onclick={() => _mode = 'draft'}>DRAFT</button>
-        {/if}
-        {#if availableModes.includes('paper')}
-          <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
-                  title="Routes through the prod paper engine — real bid/ask, no broker hit"
-                  onclick={() => _mode = 'paper'}>PAPER</button>
-        {/if}
-        {#if availableModes.includes('live')}
-          <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
-                  title="Real broker order — gated by branch (prod only) + execution.live.place_order setting"
-                  onclick={() => _mode = 'live'}>LIVE</button>
-        {/if}
-      </div>
+      <!-- Mode pills only render when there's an actual choice. With
+           only one mode available (e.g. ['live']) there's nothing to
+           pick — the operator just clicks Submit. The row stays
+           rendered for the chase / aggressiveness controls below. -->
+      {#if availableModes.length > 1}
+        <span class="ot-label">Mode</span>
+        <div class="ot-mode-pills">
+          {#if availableModes.includes('draft')}
+            <button type="button" class="ot-mode-pill ot-mode-draft" class:on={_mode === 'draft'}
+                    onclick={() => _mode = 'draft'}>DRAFT</button>
+          {/if}
+          <!-- PAPER pill retired from default availableModes — the
+               backend's `execution.paper_trading_mode` setting
+               routes every 'live' mode to paper on prod when it's
+               ON (default true), and dev is paper-only via the
+               branch gate. Calling sites that need PAPER as an
+               explicit choice can still pass it via
+               availableModes. -->
+          {#if availableModes.includes('paper')}
+            <button type="button" class="ot-mode-pill ot-mode-paper" class:on={_mode === 'paper'}
+                    title="Routes through the prod paper engine — real bid/ask, no broker hit"
+                    onclick={() => _mode = 'paper'}>PAPER</button>
+          {/if}
+          {#if availableModes.includes('live')}
+            <button type="button" class="ot-mode-pill ot-mode-live" class:on={_mode === 'live'}
+                    title="Submit to backend. Routed to paper when execution.paper_trading_mode is ON (default on prod) or always on dev; routed to LIVE only when the setting is OFF + the per-action execution.live.* flag is on."
+                    onclick={() => _mode = 'live'}>LIVE</button>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Chase toggle — only meaningful for limit-bearing orders.
            When ON, the engine re-quotes the limit each tick until

@@ -195,6 +195,25 @@ SEEDS: list[tuple] = [
     # that specific action starts calling the broker for real
     # (AlgoOrder.mode='live'). The branch is the hard outer gate — on
     # non-main (dev) these flags are ignored and every action is paper.
+    # ── Master paper-trading toggle ─────────────────────────────────
+    # When True, EVERY operator-initiated order on prod is forced to
+    # paper regardless of the per-action `execution.live.*` flags below
+    # — the OrderTicket / chain-quick-place / row-click flows all
+    # short-circuit to the prod paper engine.
+    #
+    # Branch interaction:
+    #   - dev branch  → always paper (branch gate, this setting is N/A)
+    #   - main + True → paper (this is the default; safe by design)
+    #   - main + False → per-action `execution.live.*` flags decide
+    #
+    # Operator flips this OFF only when intentionally promoting actions
+    # to live broker calls. Default True so a fresh prod deploy lands
+    # safe.
+    ("execution",   "execution.paper_trading_mode", "bool", True,
+     "PROD ONLY. When ON, every order is forced to paper regardless "
+     "of the per-action `execution.live.*` flags. Flip OFF to enable "
+     "real broker orders. Dev branch is always paper.", None, None),
+
     ("execution",   "execution.live.cancel_order",  "bool", False,
      "Allow `cancel_order` to hit the broker. Most reversible — typically "
      "flipped to True first.", None, None),

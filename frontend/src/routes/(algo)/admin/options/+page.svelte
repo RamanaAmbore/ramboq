@@ -949,8 +949,8 @@
                    ? Number(c.avg_cost) : undefined,
       accounts:  ticketAccounts,
       account:   acct,
-      defaultMode:    'paper',
-      availableModes: ['paper', 'live'],
+      defaultMode:    'live',
+      availableModes: ['live'],
       // Stashed for onTicketSubmit; OrderTicket ignores extra
       // fields, so this rides through unchanged.
       _draftId:  c.draftId,

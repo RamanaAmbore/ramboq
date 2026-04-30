@@ -94,10 +94,11 @@
         product:  order.product,
         accounts: [],
         account:  String(order.account || ''),
-        // Terminal commands have no drafts surface — start on
-        // PAPER, allow LIVE if the operator escalates.
-        defaultMode:    'paper',
-        availableModes: ['paper', 'live'],
+        // Terminal commands have no drafts surface — submit goes
+        // to backend; the execution.paper_trading_mode setting
+        // routes paper-vs-live on prod.
+        defaultMode:    'live',
+        availableModes: ['live'],
         _origCommand:   cmd,
       };
       // Echo the parse into history so the operator sees the

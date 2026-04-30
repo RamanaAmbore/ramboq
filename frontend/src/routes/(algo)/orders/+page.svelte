@@ -89,8 +89,8 @@
           account:   String(payload.account || ''),
           // Orders page has no drafts panel — start on PAPER, allow
           // LIVE escalation.
-          defaultMode:    'paper',
-          availableModes: ['paper', 'live'],
+          defaultMode:    'live',
+          availableModes: ['live'],
         };
         addResult('…', `Opening ticket`, {
           verb: parsed.verb.toUpperCase(),
