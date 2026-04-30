@@ -2752,7 +2752,18 @@
     align-items: end;
   }
   @media (max-width: 600px) {
-    .chain-controls { grid-template-columns: 1fr; }
+    /* Mobile: keep Underlying + Expiry on the SAME line (operator
+       request: "squeeze them on mobile"). Kind toggle spans the
+       full second row so the two Selects don't lose width to it.
+       Tighter gap + a shrunken Select min-width let both fit
+       comfortably on a phone in portrait. */
+    .chain-controls {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0.35rem 0.4rem;
+    }
+    .chain-controls .chain-kind-field {
+      grid-column: 1 / -1;     /* span both columns on row 2 */
+    }
   }
   .chain-field {
     display: flex;
