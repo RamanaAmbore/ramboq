@@ -741,17 +741,14 @@
            consistent family — the stat overlay shows numerics at
            the live spot, the tooltip shows them at hover-spot. -->
       {#if hover}
-        <!-- Hover tooltip — operator wanted bigger fonts AND a smaller
-             gap between labels and values. Earlier the box was 190 px
-             wide with values right-anchored at x=180 → big visible
-             gap between e.g. "SPOT" and "₹22,500". Now: 150 px wide,
-             values right-anchored at x=140, fonts bumped to 13/16.
-             Tight, glanceable, monospace tabular-nums for clean
-             column alignment. All `{@const}`s declared up-front:
-             Svelte requires them to be immediate children of the
-             {#if} block, not nested inside a <g>. -->
-        {@const tx = Math.min(W - 150 - PAD_R, Math.max(PAD_L, hover.x + 10))}
-        {@const ty = Math.max(PAD_T, hover.y - 64)}
+        <!-- Hover tooltip — operator: "popup numbers should be
+             reduced slightly". Knocked keys 13 → 11 and values
+             16 → 14, plus tightened the box to 130 × 54 (was
+             150 × 60). All `{@const}`s declared up-front: Svelte
+             requires them to be immediate children of the {#if}
+             block, not nested inside a <g>. -->
+        {@const tx = Math.min(W - 130 - PAD_R, Math.max(PAD_L, hover.x + 10))}
+        {@const ty = Math.max(PAD_T, hover.y - 58)}
         {@const tdCol = hover.today  >= 0 ? '#4ade80' : '#f87171'}
         {@const expCol = hover.expiry >= 0 ? '#4ade80' : '#f87171'}
         <line x1={hover.x} x2={hover.x} y1={PAD_T} y2={height - PAD_B}
@@ -766,7 +763,7 @@
                affordance visible on hover.
                Row baselines back to 18 / 36 / 54 (no header strip
                needed without the ×); box height back to 60. -->
-          <rect x={tx} y={ty} width="150" height="60" rx="6"
+          <rect x={tx} y={ty} width="130" height="54" rx="6"
                 fill="url(#payoff-tip-gradient)"
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"
                 style="cursor: pointer;"
@@ -781,32 +778,30 @@
                 }}
                 role="button" tabindex="0"
                 aria-label="Close tooltip — press anywhere"/>
-          <!-- SPOT row — key in muted-slate, value in sky-cyan to
-               match the .ps-v.ps-spot tint on the overlay. -->
-          <text x={tx + 8} y={ty + 18} fill="#a3b9d0"
-                font-size="13" font-weight="700" font-family="monospace"
+          <!-- SPOT row — key in muted-slate, value in sky-cyan. -->
+          <text x={tx + 8} y={ty + 16} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">SPOT</text>
-          <text x={tx + 142} y={ty + 18} fill="#7dd3fc"
-                font-size="16" font-weight="700" text-anchor="end"
+          <text x={tx + 122} y={ty + 16} fill="#7dd3fc"
+                font-size="14" font-weight="700" text-anchor="end"
                 font-family="monospace"
                 pointer-events="none">{fmtSpot(hover.spot)}</text>
-          <!-- TDAY / EXP rows — value coloured by sign (green/red),
-               matching .ps-v.ps-pos / .ps-v.ps-neg tints. -->
-          <text x={tx + 8} y={ty + 36} fill="#a3b9d0"
-                font-size="13" font-weight="700" font-family="monospace"
+          <!-- TDAY / EXP rows — value coloured by sign (green/red). -->
+          <text x={tx + 8} y={ty + 33} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">TDAY</text>
-          <text x={tx + 142} y={ty + 36} fill={tdCol}
-                font-size="16" font-weight="700" text-anchor="end"
+          <text x={tx + 122} y={ty + 33} fill={tdCol}
+                font-size="14" font-weight="700" text-anchor="end"
                 font-family="monospace"
                 pointer-events="none">{fmtMoney(hover.today)}</text>
-          <text x={tx + 8} y={ty + 54} fill="#a3b9d0"
-                font-size="13" font-weight="700" font-family="monospace"
+          <text x={tx + 8} y={ty + 50} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
                 letter-spacing="0.5"
                 pointer-events="none">EXP</text>
-          <text x={tx + 142} y={ty + 54} fill={expCol}
-                font-size="16" font-weight="700" text-anchor="end"
+          <text x={tx + 122} y={ty + 50} fill={expCol}
+                font-size="14" font-weight="700" text-anchor="end"
                 font-family="monospace"
                 pointer-events="none">{fmtMoney(hover.expiry)}</text>
         </g>
