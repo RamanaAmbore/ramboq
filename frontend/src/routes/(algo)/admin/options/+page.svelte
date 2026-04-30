@@ -285,6 +285,37 @@
     return s;
   });
 
+  // Master "select all" plumbing for the Legs panel header checkbox.
+  // allCandidatesOn = true when every candidate is enabled in the
+  // map; false when some are off. The DOM element ref drives the
+  // tri-state visual: checked / unchecked / indeterminate (some on,
+  // some off) — set via $effect so the indeterminate flag reflects
+  // the live state without us having to manually clear it on toggle.
+  let allCandidatesEl = $state(/** @type {HTMLInputElement|null} */ (null));
+  const allCandidatesOn = $derived.by(() => {
+    if (!candidatePositions.length) return false;
+    return candidatePositions.every(c => enabledSymbols[c.symbol] !== false);
+  });
+  const someCandidatesOn = $derived.by(() => {
+    if (!candidatePositions.length) return false;
+    return candidatePositions.some(c => enabledSymbols[c.symbol] !== false);
+  });
+  $effect(() => {
+    if (!allCandidatesEl) return;
+    // Indeterminate iff some-but-not-all are on. Browser doesn't
+    // accept this as an attribute; only JS property writes work.
+    allCandidatesEl.indeterminate = someCandidatesOn && !allCandidatesOn;
+  });
+  function toggleAllCandidates() {
+    // Flip toward the opposite of the current "all-on" state. Builds
+    // a fresh map so Svelte 5 picks up the change reactively.
+    /** @type {Record<string, boolean>} */
+    const next = {};
+    const target = !allCandidatesOn;
+    for (const c of candidatePositions) next[c.symbol] = target;
+    enabledSymbols = next;
+  }
+
   // Backend's BS-theoretical TDAY at the current spot — the value
   // the chart would render WITHOUT any offset. We pick the payoff
   // point nearest strategy.spot from the unshifted curve.
@@ -1768,8 +1799,25 @@
       {@const hideAcct = selectedAccounts.length === 1}
       <div class="cand-scroll">
         <div class="cand-grid" class:cand-grid-noacct={hideAcct}>
+          <!-- Header row checkbox = master toggle. Checked when
+               EVERY candidate is on; unchecked when none; the
+               middle "indeterminate" state is rendered via the JS
+               input.indeterminate property when some-but-not-all
+               are on. Click flips every row to the opposite of the
+               current "all-on" state (operator: easier than
+               clicking 12 checkboxes when starting from a fresh
+               page). Stops click propagation so the surrounding
+               grid-row toggle handlers don't double-fire. -->
           <div class="cand-headrow">
-            <span></span>
+            <input type="checkbox"
+                   class="cand-check cand-check-master"
+                   aria-label="Toggle all positions"
+                   title={allCandidatesOn
+                     ? 'Uncheck all positions'
+                     : 'Check all positions'}
+                   checked={allCandidatesOn}
+                   bind:this={allCandidatesEl}
+                   onclick={(e) => { e.stopPropagation(); toggleAllCandidates(); }} />
             <span>Symbol</span>
             {#if !hideAcct}<span>Acct</span>{/if}
             <span class="num">Qty</span>

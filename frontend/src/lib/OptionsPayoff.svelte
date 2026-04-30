@@ -540,6 +540,17 @@
          onpointerup={onPointerUp}
          onpointermove={onPointerMove}
          onpointerleave={onPointerLeave}>
+      <defs>
+        <!-- Tooltip gradient — same #273552 → #1d2a44 vertical
+             gradient as the .payoff-stats overlay (CSS) and the
+             algo-status-card / OrderTicket surfaces. Lets the SVG
+             hover-tooltip read as part of the same surface family
+             without a separate flat-fill rect. -->
+        <linearGradient id="payoff-tip-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#273552" stop-opacity="0.95"/>
+          <stop offset="100%" stop-color="#1d2a44" stop-opacity="0.95"/>
+        </linearGradient>
+      </defs>
       <!-- Profit / loss shading (under the curves so the lines pop) -->
       <path d={fillProfit} fill="rgba(74,222,128,0.10)" stroke="none"/>
       <path d={fillLoss}   fill="rgba(248,113,113,0.10)" stroke="none"/>
@@ -755,8 +766,8 @@
                affordance visible on hover.
                Row baselines back to 18 / 36 / 54 (no header strip
                needed without the ×); box height back to 60. -->
-          <rect x={tx} y={ty} width="150" height="60" rx="3"
-                fill="rgba(13,21,38,0.92)"
+          <rect x={tx} y={ty} width="150" height="60" rx="6"
+                fill="url(#payoff-tip-gradient)"
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"
                 style="cursor: pointer;"
                 onclick={(e) => { e.stopPropagation(); hover = null; }}
@@ -977,10 +988,15 @@
     grid-template-columns: max-content max-content;
     column-gap: 0.5rem;
     row-gap: 0.12rem;
-    padding: 0.32rem 0.5rem;
-    border-radius: 3px;
-    background: rgba(13,21,38,0.85);
-    border: 1px solid rgba(251,191,36,0.25);
+    padding: 0.32rem 0.55rem;
+    /* Match the algo theme's card palette — same gradient, amber
+       border, soft shadow as `.algo-status-card` and the OrderTicket
+       modal. Operator wanted the overlay and popup to read as part
+       of the algo surface family, not a foreign element. */
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(39,53,82,0.92) 0%, rgba(29,42,68,0.92) 100%);
+    border: 1px solid rgba(251,191,36,0.30);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     /* Operator: "make the overlay look smaller, reduce the font size
        slightly". Bumped down 0.75rem → 0.65rem on values and 0.78 →
