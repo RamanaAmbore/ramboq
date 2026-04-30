@@ -1666,8 +1666,9 @@
                       {/if}
                       </span>
                       <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span>
-                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
+                              class="chain-cell-sep">-</span><span
+                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
                       </span>
                     </td>
                     <td class="chain-td-strike chain-td-strike-atm">
@@ -1675,8 +1676,9 @@
                     </td>
                     <td class="chain-td-pe">
                       <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span>
-                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
+                              class="chain-cell-sep">-</span><span
+                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
                       </span>
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
@@ -1764,15 +1766,17 @@
                       {/if}
                       </span>
                       <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span>
-                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
+                              class="chain-cell-sep">-</span><span
+                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
                       </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
                       <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span>
-                        <span class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
+                              class="chain-cell-sep">-</span><span
+                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
                       </span>
                       <span class="chain-side-action">
                       {#if isQuickActive(k, 'PE')}
@@ -3040,25 +3044,29 @@
     font-weight: 800;
     letter-spacing: 0.04em;
   }
-  /* Per-side bid / ask cell — top-of-book stacked vertically next to
-     the strike column. Bid in green, ask in red — matches the global
-     long/short palette so the operator reads "what I can hit if I'm
-     selling" (bid) and "what I'd pay to buy" (ask) at a glance.
-     Stacked layout keeps width tight (no extra column) while showing
-     both numbers on every row. */
+  /* Per-side bid / ask cell — top-of-book inline next to the strike
+     column. Bid (green) - ask (red) reads "what I can hit if I'm
+     selling - what I'd pay to buy" at a glance. Single-line layout
+     keeps the row height tight; a muted hyphen separates the two
+     numbers without crowding them. */
   .chain-cell-quote {
     display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 1.05;
-    min-width: 2.6rem;
+    flex-direction: row;
+    align-items: baseline;
+    min-width: 3.4rem;
     font-family: monospace;
-    font-size: 0.58rem;
+    font-size: 0.6rem;
     font-weight: 600;
+    white-space: nowrap;
     text-align: center;
   }
   .chain-cell-bid { color: #4ade80; }   /* same green as CE header */
   .chain-cell-ask { color: #f87171; }   /* same red as PE header */
+  .chain-cell-sep {
+    color: #7e97b8;
+    opacity: 0.7;
+    margin: 0 0.18rem;
+  }
   .chain-side-action {
     display: inline-flex;
     align-items: center;
