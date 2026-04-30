@@ -280,11 +280,25 @@
     return `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   }
 
+  // After dismiss, suppress hover for a short window so the cursor's
+  // pointermove (still on the chart since the operator just clicked
+  // there) doesn't immediately re-create the tooltip — the visible
+  // glitch was "click sometimes works, sometimes not", actually a
+  // dismiss-then-instant-rehover. 350 ms gives the operator time to
+  // move the cursor away if they don't want the tooltip back; if
+  // they DO want it back, any movement after the window re-arms.
+  let _hoverSuppressUntil = 0;
+  function _dismissHover() {
+    hover = null;
+    _hoverSuppressUntil = Date.now() + 350;
+  }
+
   // Snap the tooltip to the payoff point nearest to the given client X.
   // Shared between hover (mouse pointermove) and tap (touch pointerdown)
   // so the touch path produces the same tooltip as desktop hover.
   function _setHoverFromClientX(/** @type {SVGSVGElement} */ svg,
                                 /** @type {number} */ clientX) {
+    if (Date.now() < _hoverSuppressUntil) return;
     // Hover tooltip reads values from adjustedPayoff so the
     // displayed TDAY / EXP at the hover spot already include the
     // realised offset — same as the on-chart curves they're
@@ -320,7 +334,9 @@
     _setHoverFromClientX(svg, e.clientX);
   }
   // Mouse leave clears hover. Touch keeps it pinned until the operator
-  // taps again (toggle behaviour, see onPointerDown).
+  // taps again (toggle behaviour, see onPointerDown). Plain
+  // `hover = null` here (no _dismissHover) — leaving the chart isn't
+  // an explicit "dismiss" gesture; re-entering should hover normally.
   function onPointerLeave(/** @type {PointerEvent} */ e) {
     if (e.pointerType !== 'touch') hover = null;
   }
@@ -330,7 +346,7 @@
   $effect(() => {
     if (!hover) return;
     const onKey = (/** @type {KeyboardEvent} */ e) => {
-      if (e.key === 'Escape') hover = null;
+      if (e.key === 'Escape') _dismissHover();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -359,7 +375,7 @@
     // pan: native scroll on a chart-cell on mobile is rarely what
     // the operator wants when reading a value at a strike.
     if (e.pointerType === 'touch') {
-      if (hover) { hover = null; return; }
+      if (hover) { _dismissHover(); return; }
       _setHoverFromClientX(/** @type {SVGSVGElement} */ (tgt), e.clientX);
       return;
     }
@@ -768,12 +784,12 @@
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"
                 style="cursor: pointer;"
                 pointer-events="all"
-                onclick={(e) => { e.stopPropagation(); hover = null; }}
-                onpointerdown={(e) => { e.stopPropagation(); hover = null; }}
+                onclick={(e) => { e.stopPropagation(); _dismissHover(); }}
+                onpointerdown={(e) => { e.stopPropagation(); _dismissHover(); }}
                 onkeydown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                     e.preventDefault();
-                    hover = null;
+                    _dismissHover();
                   }
                 }}
                 role="button" tabindex="0"
