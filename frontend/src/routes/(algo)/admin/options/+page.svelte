@@ -2549,9 +2549,13 @@
      scroll into oblivion when an underlying has 100+ strikes. */
   .chain-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+    /* Underlying + Expiry occupy equal space on the same line; Kind
+       toggle takes only the room it needs (compact 2-pill segmented
+       control). Operator request: equal-width Underlying / Expiry. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 0.4rem 0.5rem;
     margin-bottom: 0.5rem;
+    align-items: end;
   }
   @media (max-width: 600px) {
     .chain-controls { grid-template-columns: 1fr; }
