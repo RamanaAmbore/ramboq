@@ -541,15 +541,15 @@
       <line x1={PAD_L} x2={W - PAD_R} y1={zeroY} y2={zeroY}
             stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
 
-      <!-- Spot vertical — distinct from σ ticks (dashed) and BE
-           (dashed cream) by being SOLID + cyan. Matches the SPOT
-           readout colour in the top-left stat overlay so the
-           operator's eye links the chart anchor with the numeric
-           pill above. The current-P&L dot below sits on this same
-           x-coordinate. -->
+      <!-- Spot vertical — DOTTED cyan (operator request). σ ticks are
+           dashed at varying opacities, BE is dashed cream, today is
+           solid amber, expiry is dashed sky-blue → spot stays
+           visually distinct as the only DOTTED vertical. round line-
+           caps render the dasharray "1 4" as a clean dot-grid. -->
       {#if spot > sMin && spot < sMax}
         <line x1={xOf(spot)} x2={xOf(spot)} y1={PAD_T} y2={height - PAD_B}
-              stroke="rgba(125,211,252,0.85)" stroke-width="1.25"/>
+              stroke="rgba(125,211,252,0.85)" stroke-width="1.5"
+              stroke-dasharray="1 4" stroke-linecap="round"/>
         <!-- Anchor 5 px to the right of the spot line — visible gap
              between the cyan vertical and the SPOT label glyphs. -->
         {@const sx = xOf(spot) + 5}
@@ -654,14 +654,40 @@
         {@const expCol = hover.expiry >= 0 ? '#4ade80' : '#f87171'}
         <line x1={hover.x} x2={hover.x} y1={PAD_T} y2={height - PAD_B}
               stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
-        <g pointer-events="none">
+        <g>
           <!-- Row baselines tightened to 18 / 36 / 54 (was 20/44/66).
                18 px between baselines on a 16 px font leaves a
                ~2-3 px visible gap between rows — tight but readable.
-               Box height shrinks from 74 → 60 to follow the rows. -->
+               Box height shrinks from 74 → 60 to follow the rows.
+               <g> drops the pointer-events: none so the × close
+               button below can receive clicks; the rest of the
+               tooltip text doesn't need pointer events but having
+               them on doesn't hurt. -->
           <rect x={tx} y={ty} width="150" height="60" rx="3"
                 fill="rgba(13,21,38,0.92)"
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"/>
+          <!-- Close button — explicit affordance to dismiss the
+               tooltip, complements the existing tap-to-toggle and
+               Esc-to-dismiss paths. Positioned top-right so it
+               doesn't crowd the labels. Larger touch target via
+               the invisible <rect>; the visible × glyph sits
+               inside it. -->
+          <rect x={tx + 132} y={ty + 2} width="16" height="14"
+                fill="transparent"
+                style="cursor: pointer;"
+                onclick={() => { hover = null; }}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    hover = null;
+                  }
+                }}
+                role="button" tabindex="0"
+                aria-label="Close tooltip" />
+          <text x={tx + 140} y={ty + 13} fill="#a3b9d0"
+                font-size="13" font-weight="700" text-anchor="middle"
+                font-family="monospace"
+                pointer-events="none">×</text>
           <!-- SPOT row — key in muted-slate, value in sky-cyan to
                match the .ps-v.ps-spot tint on the overlay. -->
           <text x={tx + 8} y={ty + 18} fill="#a3b9d0"
@@ -847,7 +873,7 @@
     width: 0;
     height: 12px;
   }
-  .legend-spot-mark { border-left: 2px solid #7dd3fc; }
+  .legend-spot-mark { border-left: 2px dotted #7dd3fc; }
   .legend-be-mark   { border-left: 2px dashed #fde68a; }
   /* Solid swatch for the spot legend — visually pairs with the
      SOLID cyan vertical drawn at the spot price (BE is dashed
