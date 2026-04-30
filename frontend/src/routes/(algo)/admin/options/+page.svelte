@@ -422,6 +422,55 @@
   // by default, surface them via an explicit checkbox so they don't
   // crowd the strike grid.
   let chainKind        = $state(/** @type {'opt'|'fut'} */ ('opt'));
+
+  // Strategy template picker — operator picks "Bull Call Spread",
+  // legs auto-populate as drafts. Empty string = no template
+  // selected. Reset to '' immediately after applying so the same
+  // template can be re-applied.
+  let selectedStrategy = $state('');
+  // 12 named strategies. Each leg specifies a strike OFFSET in
+  // strike-step units (0 = ATM, +1 = next OTM call / next ITM put,
+  // −1 = next ITM call / next OTM put), the option type (CE / PE),
+  // and a qty multiplier (signed: + long, − short, ±2 for the
+  // butterfly's middle leg). Strike-step is derived from the
+  // chain's available strikes at apply time.
+  const _STRATEGY_TEMPLATES = [
+    { slug: 'long-call',       label: 'Long Call',
+      legs: [{ off:  0, t: 'CE', q:  1 }] },
+    { slug: 'long-put',        label: 'Long Put',
+      legs: [{ off:  0, t: 'PE', q:  1 }] },
+    { slug: 'short-call',      label: 'Short Call',
+      legs: [{ off:  0, t: 'CE', q: -1 }] },
+    { slug: 'short-put',       label: 'Short Put',
+      legs: [{ off:  0, t: 'PE', q: -1 }] },
+    { slug: 'bull-call-spread', label: 'Bull Call Spread',
+      legs: [{ off:  0, t: 'CE', q:  1 },
+             { off: +1, t: 'CE', q: -1 }] },
+    { slug: 'bear-put-spread',  label: 'Bear Put Spread',
+      legs: [{ off:  0, t: 'PE', q:  1 },
+             { off: -1, t: 'PE', q: -1 }] },
+    { slug: 'long-straddle',   label: 'Long Straddle',
+      legs: [{ off:  0, t: 'CE', q:  1 },
+             { off:  0, t: 'PE', q:  1 }] },
+    { slug: 'short-straddle',  label: 'Short Straddle',
+      legs: [{ off:  0, t: 'CE', q: -1 },
+             { off:  0, t: 'PE', q: -1 }] },
+    { slug: 'long-strangle',   label: 'Long Strangle',
+      legs: [{ off: +1, t: 'CE', q:  1 },
+             { off: -1, t: 'PE', q:  1 }] },
+    { slug: 'short-strangle',  label: 'Short Strangle',
+      legs: [{ off: +1, t: 'CE', q: -1 },
+             { off: -1, t: 'PE', q: -1 }] },
+    { slug: 'iron-condor',     label: 'Iron Condor',
+      legs: [{ off: -2, t: 'PE', q:  1 },
+             { off: -1, t: 'PE', q: -1 },
+             { off: +1, t: 'CE', q: -1 },
+             { off: +2, t: 'CE', q:  1 }] },
+    { slug: 'butterfly-call',  label: 'Butterfly (Call)',
+      legs: [{ off: -1, t: 'CE', q:  1 },
+             { off:  0, t: 'CE', q: -2 },
+             { off: +1, t: 'CE', q:  1 }] },
+  ];
   // chainSide stays as the (i) launcher's default leg side (long).
   // Per-row +/− buttons override on a per-pick basis (each button
   // explicitly passes its own side to addChainDraft), so the outer
@@ -711,6 +760,72 @@
       if (d < bestDiff) { best = k; bestDiff = d; }
     }
     return best;
+  });
+
+  // Strike step — minimum gap between consecutive available strikes.
+  // Defends against irregular spacing (e.g. CRUDEOIL has 50-rupee
+  // gaps in some strikes and 100 in others) by picking the smallest
+  // observed gap. Drives strategy-template offset calculations
+  // (offset of +1 = ATM + step, +2 = ATM + 2*step).
+  const chainStrikeStep = $derived.by(() => {
+    if (chainStrikes.length < 2) return 0;
+    let minGap = Infinity;
+    for (let i = 1; i < chainStrikes.length; i++) {
+      const gap = chainStrikes[i] - chainStrikes[i - 1];
+      if (gap > 0 && gap < minGap) minGap = gap;
+    }
+    return Number.isFinite(minGap) ? minGap : 0;
+  });
+
+  // Apply a strategy template — resolves the template's relative
+  // strikes into actual contracts (via findOption), creates one
+  // draft per leg, and appends to drafts[]. No-op if the chain
+  // isn't ready (no underlying / expiry / ATM / strike step).
+  // Existing drafts stay; the operator can × them away if they
+  // want a clean basket.
+  function applyStrategyTemplate(/** @type {string} */ slug) {
+    if (!slug) return;
+    const tpl = _STRATEGY_TEMPLATES.find(t => t.slug === slug);
+    if (!tpl || !chainUnderlying || !chainExpiry) return;
+    const atm  = chainAtmStrike;
+    const step = chainStrikeStep;
+    if (!atm || !step) return;
+    const u = chainUnderlying.toUpperCase();
+    const newDrafts = [];
+    for (const leg of tpl.legs) {
+      const strike = atm + leg.off * step;
+      const inst = findOption(u, leg.t, strike, chainExpiry);
+      if (!inst) continue;
+      const lot = Number(inst.ls || 1);
+      newDrafts.push({
+        id:       ++_draftSeq,
+        symbol:   String(inst.s),
+        qty:      leg.q * lot,        // signed: + long, − short
+        // Empty literal — drafts[] expects `number | ""` for these
+        // two fields; widening to `string` would break the array
+        // type. JSDoc cast forces the literal.
+        avg_cost: /** @type {''} */ (''),
+        ltp:      /** @type {''} */ (''),
+      });
+    }
+    if (!newDrafts.length) return;    // template found nothing —
+                                      // probably ATM ± k off-grid
+    drafts = [...drafts, ...newDrafts];
+    if (!selectedUnderlying) selectedUnderlying = u;
+    if (!selectedExpiry)     selectedExpiry     = chainExpiry;
+  }
+
+  // Auto-apply when the operator picks a template, then reset the
+  // picker so re-applying the same template works. untrack on the
+  // mutating call so the effect doesn't oscillate via its own
+  // `selectedStrategy = ''` reassignment.
+  $effect(() => {
+    const slug = selectedStrategy;
+    if (!slug) return;
+    untrack(() => {
+      applyStrategyTemplate(slug);
+      selectedStrategy = '';
+    });
   });
 
   /** ATM-row DOM ref — captured via the `chainAtmRow` Svelte action
@@ -1422,6 +1537,23 @@
              · quantity defaults to 1 lot" hint was dropped per
              operator request: with it gone, Option chain + SPOT/ATM
              pill fit on a single line at narrow widths. -->
+      </div>
+      <!-- Strategy template picker — pick "Bull Call Spread" /
+           "Iron Condor" / etc. and the legs auto-populate as drafts.
+           Sits above the standard Underlying / Expiry / Kind row so
+           it reads as a separate one-shot action. Empty value resets
+           after each apply (handled by an $effect in the script). -->
+      <div class="chain-strategy-row">
+        <span class="field-label chain-strategy-label">Strategy</span>
+        <Select id="chain-strategy"
+          bind:value={selectedStrategy}
+          placeholder={chainAtmStrike != null
+            ? 'Pick a template — populates drafts at ATM ± step…'
+            : 'Pick underlying + expiry first, then a template…'}
+          options={_STRATEGY_TEMPLATES.map(
+            (/** @type {{slug:string,label:string}} */ t) =>
+              ({ value: t.slug, label: t.label })
+          )} />
       </div>
       <div class="chain-controls">
         <div class="chain-field">
@@ -2753,6 +2885,31 @@
   }
   .leg-src-fresh { color: #7dd3fc; background: rgba(125,211,252,0.10); }
   .leg-src-stale { color: #fbbf24; background: rgba(251,191,36,0.10); }
+
+  /* Strategy-template picker row — sits above the standard chain
+     controls. Inline label + Select trigger; the Select takes the
+     remaining width so even long template names ("Short Strangle")
+     fit without truncation. Margin-bottom matches .chain-controls
+     gap so the two rows feel like one cohesive controls block. */
+  .chain-strategy-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .chain-strategy-row :global(.rbq-select-trigger) {
+    /* Force the Select to grow into the row (default min-width
+       sometimes leaves a gap between the label and the trigger). */
+    flex: 1 1 auto;
+  }
+  .chain-strategy-label {
+    flex: 0 0 auto;
+    /* Slight weight bump so the label reads as a section cue,
+       parallel to the inline labels in OrderTicket. */
+    font-weight: 700;
+    color: #fbbf24;
+    letter-spacing: 0.06em;
+  }
 
   /* Option-chain picker — three-column controls (Underlying / Expiry /
      Side) above a CE-strike-PE table. Each row shows one strike with
