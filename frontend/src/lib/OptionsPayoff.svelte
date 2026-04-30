@@ -478,7 +478,7 @@
       {#if curveAtSpot}
         <div class="ps-row"
              title={realizedPnl !== 0
-               ? `Today's TOTAL strategy P&L at the current spot — open-leg Black-Scholes minus entry cost, PLUS realised P&L from positions closed today. Matches the dashboard's per-underlying P&L. (Realised: ${fmtMoney(realizedPnl)} — see RLZ row.)`
+               ? `Today's strategy P&L at the current spot — adjusted to match the dashboard's per-underlying ₹ exactly. ADJ row shows the offset folded in (closed-position realised + open-leg theoretical-vs-LTP gap).`
                : "Today's strategy P&L at the current spot — Black-Scholes value of all open legs minus entry cost"}>
           <span class="ps-k">TDAY</span>
           <span class={'ps-v ' + (curveAtSpot.today_value >= 0 ? 'ps-pos' : 'ps-neg')}>
@@ -486,22 +486,23 @@
           </span>
         </div>
         {#if realizedPnl !== 0}
-          <!-- Realised P&L breakdown — informational. The TDAY row
-               above already INCLUDES this number (the entire payoff
-               curve is shifted by realizedPnl so the chart reads in
-               sync with the dashboard at every spot). RLZ surfaces
-               the constant offset so the operator sees "of TDAY's
-               -₹3.3 lakh, ₹X is realised closed positions". -->
+          <!-- ADJ = vertical offset folded into TDAY so the chart's
+               value at the current spot equals the dashboard ₹ for
+               this underlying. Two contributions:
+                 - realised P&L from closed positions (qty=0)
+                 - theoretical-vs-LTP gap on open legs (BS chart
+                   pricing drifts from market LTP for illiquid
+                   contracts) -->
           <div class="ps-row"
-               title="Realised P&L from positions closed today (qty=0). Already included in TDAY — listed separately so the open-vs-closed contribution is visible.">
-            <span class="ps-k">RLZ</span>
+               title="Adjustment folded into TDAY so chart matches dashboard exactly. Includes realised P&L from today's closed positions + theoretical-vs-LTP gap on open legs.">
+            <span class="ps-k">ADJ</span>
             <span class={'ps-v ' + (realizedPnl >= 0 ? 'ps-pos' : 'ps-neg')}>
               {fmtMoney(realizedPnl)}
             </span>
           </div>
         {/if}
         <div class="ps-row"
-             title="Strategy P&L at expiry (intrinsic only) for the current spot — also includes the realised offset when present.">
+             title="Strategy P&L at expiry (intrinsic only) for the current spot — same vertical offset as TDAY.">
           <span class="ps-k">EXP</span>
           <span class={'ps-v ' + (curveAtSpot.expiry_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.expiry_value)}

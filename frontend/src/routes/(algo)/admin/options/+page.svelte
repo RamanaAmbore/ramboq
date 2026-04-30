@@ -273,54 +273,55 @@
     return out;
   });
 
-  // Realised P&L from positions that have been closed today (qty=0,
-  // pnl carries the realised number from the broker). Folded into
-  // chartPnlOffset below so the payoff curve renders in sync with
-  // the dashboard's per-underlying P&L.
-  const realizedPnl = $derived.by(() => {
+  // Sum of broker P&L across every candidate for the selected
+  // underlying — open + closed. This is the SAME number the
+  // dashboard's per-underlying ₹ P&L shows; we use it as the target
+  // the chart's TDAY-at-current-spot must equal.
+  const candidatesActualPnl = $derived.by(() => {
     let s = 0;
     for (const c of candidatePositions) {
-      if (Number(c.qty || 0) === 0) s += Number(c.pnl || 0);
+      s += Number(c.pnl || 0);
     }
     return s;
   });
 
-  // Total chart-vs-dashboard P&L gap, applied as a vertical offset
-  // to the payoff curve so the chart's TDAY at the current spot
-  // matches the dashboard's per-underlying P&L exactly. Two
-  // contributions:
-  //
-  //   1. Realised P&L from CLOSED positions (qty=0). These sit in
-  //      candidatePositions but never reach the strategy endpoint
-  //      (filter `l.qty` drops them) — so the BS curve from the
-  //      backend doesn't account for them at all. Constant offset.
-  //
-  //   2. Theoretical-vs-LTP gap on OPEN legs. The backend prices
-  //      each leg at Black-Scholes theoretical against a calibrated
-  //      σ; the dashboard's broker pnl uses the actual market LTP.
-  //      For illiquid contracts (especially MCX commodity options)
-  //      these can drift several %. Per-leg gap is
-  //          (ltp - theoretical) * qty
-  //      and the strategy endpoint already returns ltp + theoretical
-  //      per leg, so we sum locally without a second backend call.
-  //
-  // The combined offset shifts the entire today + expiry curves up
-  // (or down) by `chartPnlOffset` rupees. At any spot, the chart
-  // value ≈ what the dashboard would show if the underlying moved
-  // there. At the current spot specifically, chart = dashboard ₹
-  // exactly (within float-rounding).
-  const chartPnlOffset = $derived.by(() => {
-    let off = realizedPnl;
-    for (const lg of (strategy?.legs || [])) {
-      const ltp  = Number(lg?.ltp || 0);
-      const theo = Number(lg?.theoretical || 0);
-      const qty  = Number(lg?.qty || 0);
-      if (ltp > 0 && theo > 0 && qty !== 0) {
-        off += (ltp - theo) * qty;
-      }
+  // Backend's BS-theoretical TDAY at the current spot — the value
+  // the chart would render WITHOUT any offset. We pick the payoff
+  // point nearest strategy.spot from the unshifted curve.
+  const chartTheoreticalAtSpot = $derived.by(() => {
+    const arr = strategy?.payoff;
+    if (!arr || arr.length === 0) return 0;
+    const targetSpot = Number(strategy?.spot || 0);
+    let best = arr[0];
+    let bestDiff = Math.abs(best.spot - targetSpot);
+    for (const p of arr) {
+      const d = Math.abs(p.spot - targetSpot);
+      if (d < bestDiff) { best = p; bestDiff = d; }
     }
-    return off;
+    return Number(best?.today_value || 0);
   });
+
+  // Vertical offset applied to the chart curves so that TDAY at the
+  // current spot exactly equals the dashboard's per-underlying ₹.
+  // Direct alignment — no per-leg theoretical / LTP accounting; the
+  // formula is the simplest expression of "make chart-at-current
+  // match the candidates' broker pnl":
+  //
+  //     offset = candidatesActualPnl − chartTheoreticalAtSpot
+  //
+  // After the shift, chart_today_value(current_spot)
+  //   = chart_theoretical_at_spot + offset
+  //   = chart_theoretical_at_spot
+  //     + (candidatesActualPnl − chart_theoretical_at_spot)
+  //   = candidatesActualPnl  ← matches dashboard exactly
+  //
+  // Off-current spots get the same offset, so the curve SHAPE (BS
+  // sensitivity to spot) is preserved. At realizedPnl=0 AND no
+  // theoretical-vs-LTP drift, candidatesActualPnl ≈ chart_theoretical,
+  // offset ≈ 0, no visible shift.
+  const chartPnlOffset = $derived(
+    candidatesActualPnl - chartTheoreticalAtSpot
+  );
 
   // Initialize the enable-flag map when candidates change. Default:
   // every candidate enabled (operator sees their book in the payoff
