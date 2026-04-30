@@ -273,13 +273,16 @@
     return out;
   });
 
-  // Sum of broker P&L across every candidate for the selected
-  // underlying — open + closed. This is the SAME number the
-  // dashboard's per-underlying ₹ P&L shows; we use it as the target
-  // the chart's TDAY-at-current-spot must equal.
+  // Sum of broker P&L across CHECKED candidates only. The chart's
+  // payoff curve is built from `legs` (also filtered by enabled
+  // checkboxes), so the alignment target must use the same subset.
+  // Earlier this summed every candidate — unchecking a leg dropped
+  // it from the curve but kept it in the offset, so the chart's
+  // TDAY didn't change visually. Now they stay in lock-step.
   const candidatesActualPnl = $derived.by(() => {
     let s = 0;
     for (const c of candidatePositions) {
+      if (enabledSymbols[c.symbol] === false) continue;
       s += Number(c.pnl || 0);
     }
     return s;

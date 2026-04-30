@@ -770,8 +770,9 @@
                 fill="url(#payoff-tip-gradient)"
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"
                 style="cursor: pointer;"
+                pointer-events="all"
                 onclick={(e) => { e.stopPropagation(); hover = null; }}
-                onpointerdown={(e) => e.stopPropagation()}
+                onpointerdown={(e) => { e.stopPropagation(); hover = null; }}
                 onkeydown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                     e.preventDefault();
