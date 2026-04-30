@@ -380,8 +380,12 @@
          operator doesn't have to glance at the Greeks / Risk cards just
          to read TDAY P&L or max profit. Pointer-events: none so the
          SVG hover / zoom / pan stay click-through. -->
-    <div class="payoff-stats" aria-hidden="true">
-      <div class="ps-row">
+    <!-- Stat overlay. aria-hidden was set so screen readers don't see
+         the abbreviated keys; we override per-row with a `title=` so a
+         hover/long-press surfaces the meaning of each label
+         (operator: "what is meaning of σ"). -->
+    <div class="payoff-stats">
+      <div class="ps-row" title="Underlying spot price (current LTP)">
         <span class="ps-k">SPOT</span>
         <span class={'ps-v ps-spot ps-spot-' + spotDir}
               title={prevClose != null && prevClose > 0
@@ -393,13 +397,15 @@
         </span>
       </div>
       {#if curveAtSpot}
-        <div class="ps-row">
+        <div class="ps-row"
+             title="Today's strategy P&L at the current spot — Black-Scholes value of all legs minus entry cost">
           <span class="ps-k">TDAY</span>
           <span class={'ps-v ' + (curveAtSpot.today_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.today_value)}
           </span>
         </div>
-        <div class="ps-row">
+        <div class="ps-row"
+             title="Strategy P&L at expiry (intrinsic only) for the current spot">
           <span class="ps-k">EXP</span>
           <span class={'ps-v ' + (curveAtSpot.expiry_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.expiry_value)}
@@ -407,19 +413,23 @@
         </div>
       {/if}
       {#if dte != null}
-        <div class="ps-row">
+        <div class="ps-row" title="Days to expiry (calendar days remaining)">
           <span class="ps-k">DTE</span>
           <span class="ps-v">{Math.round(dte)}</span>
         </div>
       {/if}
       {#if ivProxy != null}
-        <div class="ps-row">
-          <span class="ps-k">σ</span>
+        <!-- σ = strategy's implied volatility (annualised, qty-weighted
+             across the option legs). Drives Black-Scholes pricing for
+             the today curve and the σ-tick spacing on the x-axis. -->
+        <div class="ps-row"
+             title="Implied volatility (annualised %) — qty-weighted IV across the option legs">
+          <span class="ps-k">σ <span class="ps-k-hint">IV</span></span>
           <span class="ps-v">{(ivProxy * 100).toFixed(1)}%</span>
         </div>
       {/if}
       {#if legCount != null}
-        <div class="ps-row">
+        <div class="ps-row" title="Number of legs in the strategy basket">
           <span class="ps-k">LEGS</span>
           <span class="ps-v">{legCount}</span>
         </div>
@@ -622,40 +632,43 @@
            consistent family — the stat overlay shows numerics at
            the live spot, the tooltip shows them at hover-spot. -->
       {#if hover}
-        <!-- All `{@const}`s declared up-front: Svelte requires them
-             to be immediate children of the {#if} block, not nested
-             inside a <g>. -->
-        {@const tx = Math.min(W - 160 - PAD_R, Math.max(PAD_L, hover.x + 10))}
-        {@const ty = Math.max(PAD_T, hover.y - 56)}
+        <!-- Hover tooltip — bumped to 11/13 px (was 9/10) and width
+             190 (was 160) so the SPOT / TDAY / EXP labels + values
+             read clearly without squinting (operator: "text not
+             visible and clear"). All `{@const}`s declared up-front:
+             Svelte requires them to be immediate children of the
+             {#if} block, not nested inside a <g>. -->
+        {@const tx = Math.min(W - 190 - PAD_R, Math.max(PAD_L, hover.x + 10))}
+        {@const ty = Math.max(PAD_T, hover.y - 70)}
         {@const tdCol = hover.today  >= 0 ? '#4ade80' : '#f87171'}
         {@const expCol = hover.expiry >= 0 ? '#4ade80' : '#f87171'}
         <line x1={hover.x} x2={hover.x} y1={PAD_T} y2={height - PAD_B}
               stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
         <g pointer-events="none">
-          <rect x={tx} y={ty} width="160" height="52" rx="3"
-                fill="rgba(13,21,38,0.85)"
-                stroke="rgba(251,191,36,0.22)" stroke-width="1"/>
+          <rect x={tx} y={ty} width="190" height="68" rx="3"
+                fill="rgba(13,21,38,0.92)"
+                stroke="rgba(251,191,36,0.30)" stroke-width="1"/>
           <!-- SPOT row — key in muted-slate, value in sky-cyan to
                match the .ps-v.ps-spot tint on the overlay. -->
-          <text x={tx + 8} y={ty + 14} fill="#a3b9d0"
-                font-size="9" font-family="monospace"
-                letter-spacing="0.5">SPOT</text>
-          <text x={tx + 152} y={ty + 14} fill="#7dd3fc"
-                font-size="10" font-weight="700" text-anchor="end"
+          <text x={tx + 10} y={ty + 18} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
+                letter-spacing="0.6">SPOT</text>
+          <text x={tx + 180} y={ty + 18} fill="#7dd3fc"
+                font-size="13" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtSpot(hover.spot)}</text>
           <!-- TDAY / EXP rows — value coloured by sign (green/red),
                matching .ps-v.ps-pos / .ps-v.ps-neg tints. -->
-          <text x={tx + 8} y={ty + 30} fill="#a3b9d0"
-                font-size="9" font-family="monospace"
-                letter-spacing="0.5">TDAY</text>
-          <text x={tx + 152} y={ty + 30} fill={tdCol}
-                font-size="10" font-weight="600" text-anchor="end"
+          <text x={tx + 10} y={ty + 40} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
+                letter-spacing="0.6">TDAY</text>
+          <text x={tx + 180} y={ty + 40} fill={tdCol}
+                font-size="13" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtMoney(hover.today)}</text>
-          <text x={tx + 8} y={ty + 46} fill="#a3b9d0"
-                font-size="9" font-family="monospace"
-                letter-spacing="0.5">EXP</text>
-          <text x={tx + 152} y={ty + 46} fill={expCol}
-                font-size="10" font-weight="600" text-anchor="end"
+          <text x={tx + 10} y={ty + 60} fill="#a3b9d0"
+                font-size="11" font-weight="700" font-family="monospace"
+                letter-spacing="0.6">EXP</text>
+          <text x={tx + 180} y={ty + 60} fill={expCol}
+                font-size="13" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtMoney(hover.expiry)}</text>
         </g>
       {/if}
@@ -835,31 +848,45 @@
     left: 0.6rem;
     display: grid;
     grid-template-columns: max-content max-content;
-    column-gap: 0.55rem;
-    row-gap: 0.12rem;
-    padding: 0.35rem 0.55rem;
+    column-gap: 0.6rem;
+    row-gap: 0.18rem;
+    padding: 0.45rem 0.65rem;
     border-radius: 3px;
-    background: rgba(13,21,38,0.72);
-    border: 1px solid rgba(251,191,36,0.22);
-    font-family: monospace;
-    font-size: 0.6rem;
-    line-height: 1.15;
-    pointer-events: none;
+    background: rgba(13,21,38,0.85);
+    border: 1px solid rgba(251,191,36,0.25);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* Bumped from 0.6rem → 0.75rem so labels + values read at a glance
+       (operator: "text not visible and clear"). pointer-events: auto
+       lets per-row title= tooltips surface on hover. */
+    font-size: 0.75rem;
+    line-height: 1.2;
     z-index: 1;
   }
   .ps-row {
     display: contents;
+    cursor: help;
   }
   .ps-k {
     color: #a3b9d0;
-    letter-spacing: 0.04em;
-    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    font-size: 0.78rem;
+    font-weight: 700;
     align-self: center;
+  }
+  /* Inline hint after the σ glyph — small "IV" tag clarifies what
+     the symbol means without giving up the canonical σ shorthand. */
+  .ps-k-hint {
+    margin-left: 0.25rem;
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: #fde68a;
+    opacity: 0.75;
+    letter-spacing: 0.06em;
   }
   .ps-v {
     text-align: right;
-    font-weight: 600;
-    color: #c8d8f0;
+    font-weight: 700;
+    color: #e2e8f0;
     font-variant-numeric: tabular-nums;
   }
   .ps-v.ps-spot { color: #7dd3fc; }
