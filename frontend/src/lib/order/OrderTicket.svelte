@@ -532,26 +532,20 @@
       </div>
       <div class="ot-qty-block">
         {#if lotSize > 0}
-          <!-- Lots-driven qty input. Single-line layout:
-                 Lots [−] [1 ▼] [+] (× 50 = 50)
-               so all of label / stepper / dropdown / meta sit on
-               one row — operator wanted the field compact enough
-               that nothing wraps to a second line. -->
+          <!-- Lots-driven qty input — only +/− steppers, no dropdown.
+               Operator preference + the dropdown was spilling out of
+               the row on narrow viewports. Format mirrors the chain
+               picker exactly: [−] N [+] (× 50 = 50). The N is a tiny
+               read-only display; for big jumps, the operator can
+               click + repeatedly or open the underlying contract via
+               another path. -->
           <label class="ot-label" for="ot-lots">Lots</label>
           <div class="ot-lots-row">
             <button type="button" class="ot-lots-step"
                     onclick={() => stepLots(-1)}
                     disabled={_lots <= 1}
                     aria-label="Decrease lots">−</button>
-            <select id="ot-lots" class="ot-input ot-lots-select"
-                    bind:value={_lots} aria-label="Lots">
-              {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                <option value={n}>{n}</option>
-              {/each}
-              {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(_lots)}
-                <option value={_lots}>{_lots}</option>
-              {/if}
-            </select>
+            <span class="ot-lots-val" id="ot-lots" aria-label="Lots">{_lots}</span>
             <button type="button" class="ot-lots-step"
                     onclick={() => stepLots(1)}
                     aria-label="Increase lots">+</button>
@@ -946,29 +940,23 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
-  .ot-lots-select {
-    /* Tight: enough room for 3-digit lots + the chevron, nothing
-       extra. Width was 3.4rem before — too generous for a 1-100
-       value range. */
-    width: 2.8rem;
-    min-width: 0;
-    flex: 0 0 auto;
+  /* Lots count display — replaces the dropdown that spilled out of
+     the row on narrow viewports. Compact pill, amber + bold,
+     matching the chain picker's `.chain-quick-lots-val` style. */
+  .ot-lots-val {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.8rem;
+    padding: 0 0.35rem;
     height: 1.4rem;
-    padding: 0 1rem 0 0.25rem;
-    text-align: center;
-    font-weight: 700;
-    font-size: 0.7rem;
+    flex: 0 0 auto;
     color: #fbbf24;
-    appearance: none;
-    -webkit-appearance: none;
-    cursor: pointer;
-    /* Same SVG chevron as the account select — matches the algo
-       theme's "open angle" caret. */
-    background-image:
-      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
-    background-position: calc(100% - 4px) 50%;
-    background-size: 10px 6px;
-    background-repeat: no-repeat;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
   }
   .ot-qty-block .ot-lots-row .ot-meta {
     /* Meta tag sits inline next to the [+] button without padding

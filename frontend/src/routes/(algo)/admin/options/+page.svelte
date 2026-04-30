@@ -324,6 +324,12 @@
   let instrumentsReady = $state(false);
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
+  // OChain kind toggle — 'opt' shows the CE/PE strike grid (default,
+  // matches the existing options-trader workflow); 'fut' shows the
+  // futures contracts only. Operator request: hide the futures pills
+  // by default, surface them via an explicit checkbox so they don't
+  // crowd the strike grid.
+  let chainKind        = $state(/** @type {'opt'|'fut'} */ ('opt'));
   // chainSide stays as the (i) launcher's default leg side (long).
   // Per-row +/− buttons override on a per-pick basis (each button
   // explicitly passes its own side to addChainDraft), so the outer
@@ -1294,12 +1300,32 @@
             options={chainExpiries.map(e => ({ value: e, label: e }))}
             placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
         </div>
+        <!-- Options / Futures toggle — radio-style. Default lands on
+             Options (the strike grid); flip to Futures to hide the
+             grid and expose the futures pills. Operator preference:
+             futures shouldn't crowd the strike grid by default. -->
+        <div class="chain-field chain-kind-field">
+          <span class="field-label">Kind</span>
+          <div class="chain-kind-toggle" role="radiogroup" aria-label="Chain kind">
+            <label class="chain-kind-pill" class:on={chainKind === 'opt'}>
+              <input type="radio" name="chain-kind" value="opt"
+                     bind:group={chainKind} class="chain-kind-radio"/>
+              Options
+            </label>
+            <label class="chain-kind-pill" class:on={chainKind === 'fut'}>
+              <input type="radio" name="chain-kind" value="fut"
+                     bind:group={chainKind} class="chain-kind-radio"/>
+              Futures
+            </label>
+          </div>
+        </div>
       </div>
-      {#if chainFutures.length}
+      {#if chainKind === 'fut' && chainFutures.length}
         <!-- Futures quick-add row — paired BUY (+) / SELL (−) pills
              open the inline lots-picker; (i) opens the full
              OrderTicket modal pre-filled. Same fast/slow split as
-             the strike rows. -->
+             the strike rows. Gated on chainKind='fut' so the
+             futures pills don't crowd the default options view. -->
         <div class="chain-futures">
           <span class="chain-futures-label">Futures:</span>
           {#each chainFutures as f (f.s)}
@@ -1312,16 +1338,8 @@
                         onclick={() => quickStepLots(-1)}
                         aria-label="Decrease lots"
                         disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                <select class="chain-quick-select"
-                        bind:value={quickPicker.lots}
-                        aria-label="Lots">
-                  {#each [1, 2, 3, 5, 10, 25, 50, 75, 100] as n}
-                    <option value={n}>{n}</option>
-                  {/each}
-                  {#if ![1, 2, 3, 5, 10, 25, 50, 75, 100].includes(quickPicker.lots)}
-                    <option value={quickPicker.lots}>{quickPicker.lots}</option>
-                  {/if}
-                </select>
+                <span class="chain-quick-lots-val"
+                      aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
                 <button type="button" class="chain-quick-step"
                         onclick={() => quickStepLots(1)}
                         aria-label="Increase lots">+</button>
@@ -1362,7 +1380,7 @@
           {/each}
         </div>
       {/if}
-      {#if chainStrikes.length}
+      {#if chainKind === 'opt' && chainStrikes.length}
         <div class="chain-grid-wrap">
           <table class="chain-grid">
             <thead>
@@ -1602,10 +1620,14 @@
             </tbody>
           </table>
         </div>
-      {:else}
-        <div class="text-[0.6rem] text-[#7e97b8] italic mt-2">
+      {:else if chainKind === 'opt'}
+        <div class="text-[0.6rem] text-[#a3b9d0] italic mt-2">
           No strikes for {chainUnderlying} expiring {chainExpiry || '(pick expiry)'}.
           Try a different underlying or expiry.
+        </div>
+      {:else if chainKind === 'fut' && !chainFutures.length}
+        <div class="text-[0.6rem] text-[#a3b9d0] italic mt-2">
+          No futures contracts for {chainUnderlying}.
         </div>
       {/if}
     </div>
@@ -2539,6 +2561,54 @@
     flex-direction: column;
     gap: 0.15rem;
   }
+
+  /* Options / Futures toggle — radio-style pill pair. The native
+     <input type="radio"> is visually hidden; the wrapping <label>
+     carries the rendered pill. Active state inverts to filled
+     amber to match the OChain button + other selected affordances
+     across the algo theme. */
+  .chain-kind-toggle {
+    display: inline-flex;
+    border-radius: 3px;
+    border: 1px solid rgba(126,151,184,0.35);
+    overflow: hidden;
+    align-self: flex-start;
+  }
+  .chain-kind-pill {
+    flex: 0 0 auto;
+    padding: 0 0.55rem;
+    height: 1.55rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #a3b9d0;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .chain-kind-pill:hover {
+    background: rgba(251,191,36,0.10);
+    color: #fbbf24;
+  }
+  .chain-kind-pill.on {
+    background: rgba(251,191,36,0.18);
+    color: #fbbf24;
+  }
+  .chain-kind-pill + .chain-kind-pill {
+    border-left: 1px solid rgba(126,151,184,0.30);
+  }
+  .chain-kind-radio {
+    /* Native radio hidden; the surrounding pill is the visual. */
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+  }
   /* Futures quick-add row above the strike grid. Same general look as
      the chain CE/PE buttons but tagged sky-blue so it's visually
      distinct from the green/red option buttons below. */
@@ -2793,33 +2863,10 @@
      so operator can jump-pick; off-list values get a synthesized
      option so stepping past 100 still renders. SVG chevron caret
      matches the OrderTicket account picker. */
-  .chain-quick-select {
-    height: 1.25rem;
-    min-width: 2.6rem;
-    padding: 0 1.1rem 0 4px;
-    border-radius: 2px;
-    border: 1px solid rgba(126,151,184,0.45);
-    background-color: rgba(13,21,38,0.6);
-    color: #fbbf24;
-    font-family: monospace;
-    font-size: 0.7rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-    appearance: none;
-    -webkit-appearance: none;
-    cursor: pointer;
-    background-image:
-      url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1,1 6,7 11,1' /%3E%3C/svg%3E");
-    background-position: calc(100% - 4px) 50%;
-    background-size: 10px 6px;
-    background-repeat: no-repeat;
-  }
-  .chain-quick-select:focus {
-    outline: none;
-    border-color: rgba(251,191,36,0.65);
-    background-color: rgba(13,21,38,0.85);
-  }
+  /* The earlier <select> dropdown for picking from common lots
+     [1, 2, 3, 5, …] was retired — operator preference + the dropdown
+     spilled out of the row on narrow viewports. The +/− steppers
+     alone now drive the lots count. */
   /* `(× lot N)` tag — sky-blue muted, mirrors the OrderTicket header
      chip's "lot 50" meta so the two surfaces read consistently. */
   .chain-quick-meta {
