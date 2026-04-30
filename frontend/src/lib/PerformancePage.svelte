@@ -40,12 +40,22 @@
   // Load the instruments cache once so we can pull the authoritative
   // exchange (`e`) and lot size (`ls`) per symbol when opening the
   // ticket. Held in IndexedDB after the first /console autocomplete
-  // load — usually resolves from cache instantly.
-  onMount(() => { loadInstruments().catch(() => {}); });
+  // load — usually resolves from cache instantly. Stored as a promise
+  // so the click handler can `await` it on the operator's first
+  // interaction (avoids a "lot=200 instead of 2" bug where the cache
+  // hadn't loaded yet → getInstrument returned null → lot defaulted
+  // to 1 → OrderTicket displayed qty as the lot count).
+  let _instrumentsReady = /** @type {Promise<unknown>} */ (Promise.resolve());
+  onMount(() => { _instrumentsReady = loadInstruments().catch(() => {}); });
 
-  function openOrderTicket(row, source) {
+  async function openOrderTicket(row, source) {
     if (!allowOrders || $authStore.user?.role !== 'admin') return;
     if (!row?.tradingsymbol) return;
+    // Wait for the instruments cache to settle before reading lot
+    // size. The cache is normally instant from IndexedDB; this await
+    // is a no-op the second time around but rescues the first click
+    // after a fresh load.
+    await _instrumentsReady;
     const sym = String(row.tradingsymbol).toUpperCase();
     const inst = getInstrument(sym);
     const lot  = Number(inst?.ls || 1);
