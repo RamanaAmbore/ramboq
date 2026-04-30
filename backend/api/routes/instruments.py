@@ -39,6 +39,42 @@ logger = get_logger(__name__)
 _TTL_SECONDS = 86400  # 24 h — background task re-warms daily at 08:00 IST
 _EXCHANGES   = ("NSE", "NFO", "BSE", "MCX", "CDS")
 
+# MCX commodity lot-size overrides. Kite Connect's `kite.instruments("MCX")`
+# response returns `lot_size=1` for every commodity contract — the actual
+# contract size (e.g. CRUDEOIL = 100 barrels, NATURALGAS = 1250 mmBtu)
+# isn't exposed via the API. Without this override, the OrderTicket on a
+# 2-lot CRUDEOIL position (200 qty) renders as "Lots: 200" instead of
+# "Lots: 2 (× 100 = 200)" because lotSize defaults to 1.
+#
+# Keyed by Kite's `name` field (the underlying ticker). Add commodities
+# here as the trader desk verifies their contract size. The override
+# applies to FUT and CE/PE rows alike (options on commodity contracts use
+# the same multiplier as the underlying future).
+#
+# References: MCX contract specs at
+#   https://www.mcxindia.com/products/bullion/mcx-products
+_MCX_LOT_OVERRIDES = {
+    'CRUDEOIL':   100,     # 100 barrels per lot
+    'CRUDEOILM':  10,      # mini: 10 barrels
+    'NATURALGAS': 1250,    # 1250 mmBtu per lot
+    'NATGASMINI': 250,     # mini: 250 mmBtu
+    'GOLD':       100,     # 100 grams per lot
+    'GOLDM':      10,      # mini: 10 grams
+    'GOLDGUINEA': 8,       # 8 grams
+    'GOLDPETAL':  1,       # 1 gram
+    'SILVER':     30,      # 30 kg per lot
+    'SILVERM':    5,       # 5 kg
+    'SILVERMIC':  1,       # 1 kg
+    'COPPER':     2500,    # 2500 kg
+    'ZINC':       5000,    # 5000 kg
+    'LEAD':       5000,    # 5000 kg
+    'ALUMINIUM':  5000,    # 5000 kg
+    'NICKEL':     1500,    # 1500 kg
+    'MENTHAOIL':  360,     # 360 kg
+    'COTTON':     185,     # 185 bales (verify per contract)
+    'CPO':        10,      # 10 mt
+}
+
 
 class Instrument(msgspec.Struct, omit_defaults=True):
     s: str                        # tradingsymbol
@@ -75,11 +111,19 @@ def _fetch_instruments() -> InstrumentsResponse:
             itype = inst.get("instrument_type", "")
             expiry = inst.get("expiry")
             strike = inst.get("strike")
+            # MCX commodities → real lot sizes from the override map
+            # (Kite reports them all as 1). Other exchanges keep the
+            # vendor-supplied lot_size verbatim.
+            ls_raw = int(inst.get("lot_size") or 1)
+            if exch == "MCX":
+                ls_raw = _MCX_LOT_OVERRIDES.get(
+                    (inst.get("name") or "").upper(), ls_raw
+                )
             items.append(Instrument(
                 s=inst["tradingsymbol"],
                 e=inst["exchange"],
                 t=itype,
-                ls=int(inst.get("lot_size") or 1),
+                ls=ls_raw,
                 ts=float(inst.get("tick_size") or 0.05),
                 u=inst.get("name") or None,
                 x=expiry.isoformat() if isinstance(expiry, date) else (expiry or None),

@@ -18,7 +18,10 @@ const STORE    = 'instruments';
 const META_KEY = 'meta';
 const ITEMS_KEY = 'items';
 // Bump this when the index-building logic changes (e.g. _derivedUnderlying)
-const INDEX_SCHEMA_VERSION = 3;
+// OR when the backend instruments payload semantics change (e.g. MCX lot
+// size overrides at v4 — Kite's instruments dump reports lot_size=1 for
+// every MCX commodity, so the backend now applies hardcoded multipliers).
+const INDEX_SCHEMA_VERSION = 4;
 
 // Module-level runtime caches (rebuilt on each page load)
 let _items            = null;  // full list
