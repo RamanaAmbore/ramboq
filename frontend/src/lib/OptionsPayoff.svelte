@@ -655,61 +655,57 @@
         <line x1={hover.x} x2={hover.x} y1={PAD_T} y2={height - PAD_B}
               stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
         <g>
-          <!-- Row baselines tightened to 18 / 36 / 54 (was 20/44/66).
-               18 px between baselines on a 16 px font leaves a
-               ~2-3 px visible gap between rows — tight but readable.
-               Box height shrinks from 74 → 60 to follow the rows.
-               <g> drops the pointer-events: none so the × close
-               button below can receive clicks; the rest of the
-               tooltip text doesn't need pointer events but having
-               them on doesn't hurt. -->
+          <!-- Click-anywhere-on-tooltip-to-close (operator: "instead
+               of using X, pressing on the tooltip should close it").
+               The visible × button is gone; the rect itself is the
+               dismiss target. stopPropagation on pointerdown blocks
+               the SVG-level pan setup so the click reliably reaches
+               this rect's onclick handler. Cursor: pointer makes the
+               affordance visible on hover.
+               Row baselines back to 18 / 36 / 54 (no header strip
+               needed without the ×); box height back to 60. -->
           <rect x={tx} y={ty} width="150" height="60" rx="3"
                 fill="rgba(13,21,38,0.92)"
-                stroke="rgba(251,191,36,0.30)" stroke-width="1"/>
-          <!-- Close button — explicit affordance to dismiss the
-               tooltip, complements the existing tap-to-toggle and
-               Esc-to-dismiss paths. Positioned top-right so it
-               doesn't crowd the labels. Larger touch target via
-               the invisible <rect>; the visible × glyph sits
-               inside it. -->
-          <rect x={tx + 132} y={ty + 2} width="16" height="14"
-                fill="transparent"
+                stroke="rgba(251,191,36,0.30)" stroke-width="1"
                 style="cursor: pointer;"
-                onclick={() => { hover = null; }}
+                onclick={(e) => { e.stopPropagation(); hover = null; }}
+                onpointerdown={(e) => e.stopPropagation()}
                 onkeydown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
                     e.preventDefault();
                     hover = null;
                   }
                 }}
                 role="button" tabindex="0"
-                aria-label="Close tooltip" />
-          <text x={tx + 140} y={ty + 13} fill="#a3b9d0"
-                font-size="13" font-weight="700" text-anchor="middle"
-                font-family="monospace"
-                pointer-events="none">×</text>
+                aria-label="Close tooltip — press anywhere"/>
           <!-- SPOT row — key in muted-slate, value in sky-cyan to
                match the .ps-v.ps-spot tint on the overlay. -->
           <text x={tx + 8} y={ty + 18} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
-                letter-spacing="0.5">SPOT</text>
+                letter-spacing="0.5"
+                pointer-events="none">SPOT</text>
           <text x={tx + 142} y={ty + 18} fill="#7dd3fc"
                 font-size="16" font-weight="700" text-anchor="end"
-                font-family="monospace">{fmtSpot(hover.spot)}</text>
+                font-family="monospace"
+                pointer-events="none">{fmtSpot(hover.spot)}</text>
           <!-- TDAY / EXP rows — value coloured by sign (green/red),
                matching .ps-v.ps-pos / .ps-v.ps-neg tints. -->
           <text x={tx + 8} y={ty + 36} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
-                letter-spacing="0.5">TDAY</text>
+                letter-spacing="0.5"
+                pointer-events="none">TDAY</text>
           <text x={tx + 142} y={ty + 36} fill={tdCol}
                 font-size="16" font-weight="700" text-anchor="end"
-                font-family="monospace">{fmtMoney(hover.today)}</text>
+                font-family="monospace"
+                pointer-events="none">{fmtMoney(hover.today)}</text>
           <text x={tx + 8} y={ty + 54} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
-                letter-spacing="0.5">EXP</text>
+                letter-spacing="0.5"
+                pointer-events="none">EXP</text>
           <text x={tx + 142} y={ty + 54} fill={expCol}
                 font-size="16" font-weight="700" text-anchor="end"
-                font-family="monospace">{fmtMoney(hover.expiry)}</text>
+                font-family="monospace"
+                pointer-events="none">{fmtMoney(hover.expiry)}</text>
         </g>
       {/if}
     </svg>
