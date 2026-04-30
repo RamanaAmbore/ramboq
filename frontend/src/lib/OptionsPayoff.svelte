@@ -253,12 +253,22 @@
     }
     _setHoverFromClientX(svg, e.clientX);
   }
-  // Mouse leave clears hover. Touch leaves the tooltip pinned (the
-  // operator tapped to read; they expect it to stay until they tap
-  // somewhere else).
+  // Mouse leave clears hover. Touch keeps it pinned until the operator
+  // taps again (toggle behaviour, see onPointerDown).
   function onPointerLeave(/** @type {PointerEvent} */ e) {
     if (e.pointerType !== 'touch') hover = null;
   }
+  // Esc dismisses a pinned tooltip on desktop too — keyboard equivalent
+  // of the touch-tap-to-toggle path. Listener mounts only while hover
+  // is non-null so we don't sit on a global keydown for nothing.
+  $effect(() => {
+    if (!hover) return;
+    const onKey = (/** @type {KeyboardEvent} */ e) => {
+      if (e.key === 'Escape') hover = null;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   function onWheel(/** @type {WheelEvent} */ e) {
     if (!payoff.length) return;
@@ -277,10 +287,13 @@
   function onPointerDown(/** @type {PointerEvent} */ e) {
     if (!payoff.length || e.button !== 0) return;
     /** @type {any} */ const tgt = e.currentTarget;
-    // Touch tap → show the tooltip at the tap location. Don't start
-    // a pan: native scroll + page panning is rarely what the operator
-    // wants when they're trying to read a value at a strike.
+    // Touch tap → toggle. If a tooltip is already pinned, the next
+    // tap dismisses it (operator: "is there any way to hide it once
+    // displayed"). Tap on a different spot pins to that spot. No
+    // pan: native scroll on a chart-cell on mobile is rarely what
+    // the operator wants when reading a value at a strike.
     if (e.pointerType === 'touch') {
+      if (hover) { hover = null; return; }
       _setHoverFromClientX(/** @type {SVGSVGElement} */ (tgt), e.clientX);
       return;
     }
@@ -479,16 +492,16 @@
         {@const wholeSigma = xt.sigma != null && xt.sigma % 1 === 0}
         {@const isCenter   = xt.sigma === 0}
         {#if !isCenter}
+          <!-- σ-tick verticals: more subtle than before so the price
+               labels rendered ON them stay the dominant visual.
+               whole-σ: 0.30 → 0.18, half-σ: 0.14 → 0.07. -->
           <line x1={xt.x} x2={xt.x} y1={PAD_T} y2={height - PAD_B}
-                stroke="rgba(200,216,240,{wholeSigma ? 0.30 : 0.14})"
+                stroke="rgba(200,216,240,{wholeSigma ? 0.18 : 0.07})"
                 stroke-width="1"
                 stroke-dasharray={wholeSigma ? '4 3' : '2 3'}/>
         {/if}
         {#if !isCenter}
-          <!-- σ label at the bottom (rotated -30° to clear adjacent
-               half-σ ticks). Bumped from 11/10 → 12/11 + halo so
-               the labels stay readable on mobile where the rotation
-               compresses the visible footprint. -->
+          <!-- σ tick label at the bottom (rotated -30°). -->
           {@const ly = height - PAD_B + 10}
           <text x={xt.x} y={ly}
                 text-anchor="end"
@@ -502,27 +515,21 @@
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.label}
           </text>
-          <!-- Spot price rendered vertically along the line. Anchored
-               near the BOTTOM of the inner chart (just above the σ
-               axis labels). The text is OFFSET 5 px to the RIGHT of
-               the dashed line so there's a visible gap between line
-               and glyphs (operator request: text was sitting on the
-               line and reading muddy). The halo (3 px stroke matched
-               to the chart background) still paints under the text so
-               any incidental overlap on narrow viewports stays
-               legible. text-anchor="start" + rotate(-90) about the
-               offset point makes the glyphs extend UPWARD from the
-               anchor so the read flows bottom → top. -->
+          <!-- Vertical price label on the σ tick. Bumped from 11/10
+               → 13/12 with a stronger halo (4 px stroke) and brighter
+               whole-σ fill (#f9fafb white-ish, was #e2e8f0). The
+               σ-line beneath was just made more subtle so these
+               labels become the dominant read. -->
           {@const vx = xt.x + 5}
           {@const vy = height - PAD_B - 4}
           <text x={vx} y={vy}
                 text-anchor="start"
                 transform="rotate(-90 {vx} {vy})"
-                fill={wholeSigma ? '#e2e8f0' : '#c8d8f0'}
+                fill={wholeSigma ? '#f9fafb' : '#e2e8f0'}
                 stroke="#152033"
-                stroke-width="3"
+                stroke-width="4"
                 paint-order="stroke fill"
-                font-size={wholeSigma ? 11 : 10}
+                font-size={wholeSigma ? 13 : 12}
                 font-weight={wholeSigma ? 700 : 600}
                 font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
             {xt.s.toFixed(0)}
