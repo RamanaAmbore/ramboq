@@ -2238,10 +2238,17 @@
   }
   .legs-header:hover { color: #fde047; }
   .legs-chevron {
-    font-size: 0.6rem;
-    color: #a3b9d0;
-    width: 0.7rem;
+    /* Bumped to match the Select / MultiSelect dropdown carets
+       (0.95rem amber + weight 700). Earlier 0.6rem read as a stray
+       glyph; now consistent with the other open/close affordances
+       across the algo theme. */
+    font-size: 0.95rem;
+    line-height: 1;
+    font-weight: 700;
+    color: #fbbf24;
+    width: 1rem;
     text-align: center;
+    transition: transform 0.12s ease;
   }
 
   /* Parent grid — defines column tracks once. Children (`.cand-headrow`
