@@ -156,9 +156,15 @@
   .rbq-multi-clear:hover { color: #fbbf24; }
   .rbq-multi-caret {
     flex: 0 0 auto;
+    /* Match Select.svelte's caret treatment: 0.95rem amber `▾` with
+       weight 700 + smooth rotate transition. Earlier this was 0.55rem
+       which made the dropdown affordance read as a stray period. */
     color: #fbbf24;
-    font-size: 0.55rem;
+    font-size: 0.95rem;
+    line-height: 1;
+    font-weight: 700;
     transform: translateY(-1px);
+    transition: transform 0.12s ease;
   }
   .rbq-multi-open .rbq-multi-caret { transform: translateY(-1px) rotate(180deg); }
 

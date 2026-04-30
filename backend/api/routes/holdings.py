@@ -17,6 +17,16 @@ from backend.shared.helpers.utils import mask_column
 
 logger = get_logger(__name__)
 
+
+def _is_broker_outage(err: Exception) -> bool:
+    """Detect Kite (Zerodha) upstream HTTP gateway errors. See
+    funds.py for the rationale — same helper, same patterns."""
+    s = str(err).lower()
+    return any(needle in s for needle in (
+        'bad gateway', '502', '503', '504',
+        'service unavailable', 'gateway timeout',
+    ))
+
 _ROW_COLS = [
     'account', 'tradingsymbol', 'exchange', 'quantity',
     'average_price', 'close_price', 'inv_val', 'cur_val',
@@ -28,6 +38,8 @@ _TTL = 30  # seconds — background task invalidates on each refresh
 
 def _fetch() -> HoldingsResponse:
     raw = pd.concat(broker_apis.fetch_holdings(), ignore_index=True)
+    if raw.empty:
+        raise Exception("Broker (Kite) returned no holdings data — upstream Bad Gateway / outage")
     # Account masking removed — admin-only pages show real account IDs
 
     numeric = raw.select_dtypes(include='number').columns
@@ -87,4 +99,9 @@ class HoldingsController(Controller):
             return resp
         except Exception as e:
             logger.error(f"Holdings API error: {e}")
+            if _is_broker_outage(e):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Broker (Kite) is temporarily unavailable. Try again shortly.",
+                )
             raise HTTPException(status_code=500, detail=str(e))

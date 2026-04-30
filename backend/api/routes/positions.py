@@ -24,8 +24,20 @@ _ROW_COLS = [
 _TTL = 30
 
 
+def _is_broker_outage(err: Exception) -> bool:
+    """Detect Kite (Zerodha) upstream HTTP gateway errors. See
+    funds.py for the rationale — same helper, same patterns."""
+    s = str(err).lower()
+    return any(needle in s for needle in (
+        'bad gateway', '502', '503', '504',
+        'service unavailable', 'gateway timeout',
+    ))
+
+
 def _fetch() -> PositionsResponse:
     raw = pd.concat(broker_apis.fetch_positions(), ignore_index=True)
+    if raw.empty:
+        raise Exception("Broker (Kite) returned no positions data — upstream Bad Gateway / outage")
     # Account masking removed — admin-only pages show real account IDs
 
     numeric = raw.select_dtypes(include='number').columns
@@ -73,4 +85,9 @@ class PositionsController(Controller):
             return resp
         except Exception as e:
             logger.error(f"Positions API error: {e}")
+            if _is_broker_outage(e):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Broker (Kite) is temporarily unavailable. Try again shortly.",
+                )
             raise HTTPException(status_code=500, detail=str(e))

@@ -17,6 +17,19 @@ logger = get_logger(__name__)
 
 _TTL = 30
 
+
+def _is_broker_outage(err: Exception) -> bool:
+    """Detect Kite (Zerodha) upstream HTTP gateway errors so we can
+    surface a more specific message than the generic "Server busy".
+    Kite returns plain 502/503/504 HTML pages during their periodic
+    backend wobbles; the broker_apis helper logs them verbatim, so
+    the resulting Exception string carries the marker text."""
+    s = str(err).lower()
+    return any(needle in s for needle in (
+        'bad gateway', '502', '503', '504',
+        'service unavailable', 'gateway timeout',
+    ))
+
 _COL_MAP = {
     'avail opening_balance': 'cash',
     'net':                   'avail_margin',
@@ -27,6 +40,13 @@ _COL_MAP = {
 
 def _fetch() -> FundsResponse:
     raw = pd.concat(broker_apis.fetch_margins(), ignore_index=True)
+    # broker_apis.fetch_margins swallows Kite HTTP errors internally and
+    # returns empty per-account frames on outage. An empty concat result
+    # means EVERY account's call failed — signal of an upstream outage,
+    # not a real "no data" state. Raise with the marker text so the
+    # route's _is_broker_outage detector flips us to a 503 + clear msg.
+    if raw.empty:
+        raise Exception("Broker (Kite) returned no margin data — upstream Bad Gateway / outage")
     # Account masking removed — admin-only pages show real account IDs
 
     numeric = raw.select_dtypes(include='number').columns
@@ -64,4 +84,9 @@ class FundsController(Controller):
             return resp
         except Exception as e:
             logger.error(f"Funds API error: {e}")
+            if _is_broker_outage(e):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Broker (Kite) is temporarily unavailable. Try again shortly.",
+                )
             raise HTTPException(status_code=500, detail=str(e))

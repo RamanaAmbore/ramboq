@@ -104,7 +104,11 @@ function _friendlyError(/** @type {number|null} */ status,
   }
   if (status === 404)              return 'Not available.';
   if (status === 429)              return 'Too many requests.';
-  if (status && status >= 500)     return 'Server busy — retry.';
+  // 5xx — backend detail wins when present so specific upstream
+  // problems (e.g. "Broker (Kite) is temporarily unavailable") read
+  // accurately instead of the generic "Server busy" line. Falls back
+  // to the generic when the server didn't supply a detail.
+  if (status && status >= 500)     return detail ? _trimDetail(detail) : 'Server busy — retry.';
   if (status == null || status === 0) return 'No connection.';
   if (detail) return _trimDetail(detail);
   return 'Request rejected.';
