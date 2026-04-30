@@ -62,6 +62,11 @@
       action:   'close',
       qty:      Math.abs(heldQty) || lot,
       lotSize:  lot,
+      // Signed qty so the OrderTicket can render ADD / CLOSE labels
+      // on the side toggle. Operator clicked on an existing
+      // position; the bottom submit button still shows the resolved
+      // BUY / SELL.
+      currentQty: heldQty,
       // Pre-fill account from the row (real value when admin sees
       // unmasked data); ticket auto-fetches /api/accounts/ as a
       // backstop when this is empty or masked.
@@ -591,6 +596,7 @@
     account={orderTicketProps.account}
     defaultMode={orderTicketProps.defaultMode}
     availableModes={orderTicketProps.availableModes}
+    currentQty={orderTicketProps.currentQty ?? 0}
     onSubmit={(payload) => {
       // PAPER + LIVE submissions already hit the backend before
       // onSubmit fires (the ticket awaits placeTicketOrder). Refresh

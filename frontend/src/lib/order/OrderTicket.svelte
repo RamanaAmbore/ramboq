@@ -45,6 +45,7 @@
    *   orderId?:  string,
    *   defaultMode?:    'draft' | 'paper' | 'live',
    *   availableModes?: Array<'draft' | 'paper' | 'live'>,
+   *   currentQty?: number,
    *   onSubmit:  (payload: any) => void | Promise<void>,
    *   onClose:   () => void,
    * }} */
@@ -73,9 +74,34 @@
     // Which mode pills the operator can see. Pass ['paper','live']
     // to suppress DRAFT on surfaces where it has no meaning.
     availableModes = /** @type {Array<'draft'|'paper'|'live'>} */ (['draft', 'paper', 'live']),
+    // Signed qty of the operator's existing position when the ticket
+    // is opened from a position-row click. Drives the side toggle's
+    // ADD/CLOSE labels — operator thinks in "I want to add to this
+    // position" or "I want to close this position", not "I want to
+    // BUY or SELL". The bottom submit button still shows the resolved
+    // BUY/SELL so the actual broker action is unambiguous.
+    //   currentQty > 0  → existing LONG  ⇒ BUY pill = ADD,  SELL = CLOSE
+    //   currentQty < 0  → existing SHORT ⇒ SELL pill = ADD, BUY  = CLOSE
+    //   currentQty == 0 → no existing position ⇒ plain BUY / SELL labels
+    currentQty = 0,
     onSubmit,
     onClose,
   } = $props();
+
+  // Derived label map for the side toggle. Keeps the actual _side
+  // state as 'BUY' / 'SELL' (the broker payload never changes); only
+  // the display label flips between BUY/SELL and ADD/CLOSE.
+  const sideLabels = $derived.by(() => {
+    if (!currentQty || currentQty === 0) {
+      return { BUY: 'BUY', SELL: 'SELL' };
+    }
+    if (currentQty > 0) {
+      // Long position: buying more = ADD, selling = CLOSE.
+      return { BUY: 'ADD', SELL: 'CLOSE' };
+    }
+    // Short position: selling more = ADD, buying back = CLOSE.
+    return { BUY: 'CLOSE', SELL: 'ADD' };
+  });
 
   // Derived instrument kind from the tradingsymbol — simple suffix
   // match. Drives which fields show.
@@ -483,13 +509,26 @@
          the operator has to cancel + re-place). Click is a no-op
          in that case + the button visibly reads as disabled. -->
     <div class="ot-row">
+      <!-- When the operator opens this ticket from a current
+           position (currentQty != 0), the pills swap labels to ADD /
+           CLOSE — what they're actually thinking. The underlying
+           _side state stays as 'BUY' / 'SELL' so the broker payload
+           never changes; only the visible glyph flips. The bottom
+           submit button continues to show the resolved BUY/SELL so
+           the actual broker action is unambiguous. -->
       <div class="ot-side-toggle" class:ot-locked={action === 'modify'}>
         <button type="button" class="ot-side-btn ot-side-buy"  class:on={_side === 'BUY'}
                 disabled={action === 'modify'}
-                onclick={() => action !== 'modify' && (_side = 'BUY')}>BUY</button>
+                title={currentQty
+                  ? (sideLabels.BUY + ' (places a BUY order)')
+                  : 'BUY this contract'}
+                onclick={() => action !== 'modify' && (_side = 'BUY')}>{sideLabels.BUY}</button>
         <button type="button" class="ot-side-btn ot-side-sell" class:on={_side === 'SELL'}
                 disabled={action === 'modify'}
-                onclick={() => action !== 'modify' && (_side = 'SELL')}>SELL</button>
+                title={currentQty
+                  ? (sideLabels.SELL + ' (places a SELL order)')
+                  : 'SELL this contract'}
+                onclick={() => action !== 'modify' && (_side = 'SELL')}>{sideLabels.SELL}</button>
       </div>
       <div class="ot-qty-block">
         {#if lotSize > 0}

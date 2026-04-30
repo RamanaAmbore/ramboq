@@ -816,6 +816,11 @@
       action:   'close',
       qty,
       lotSize:  lot,
+      // Pass signed qty so the OrderTicket can label the side toggle
+      // as ADD / CLOSE (instead of BUY / SELL) — operator thinks in
+      // "I want to close this position" terms when clicking on a
+      // current position row.
+      currentQty: Number(c.qty || 0),
       accounts: ticketAccounts,
       account:  _rowTicketAccount(c),
     });
@@ -1321,7 +1326,7 @@
                         onclick={() => quickStepLots(1)}
                         aria-label="Increase lots">+</button>
                 {#if quickPicker.lotSize > 0}
-                  <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                  <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                 {/if}
                 <button type="button" class="chain-quick-ok"
                         disabled={quickPlacing}
@@ -1414,7 +1419,7 @@
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
                           {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
@@ -1465,7 +1470,7 @@
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
                           {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
@@ -1516,7 +1521,7 @@
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
                           {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}
@@ -1565,7 +1570,7 @@
                                   onclick={() => quickStepLots(1)}
                                   aria-label="Increase lots">+</button>
                           {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× lot {quickPicker.lotSize})</span>
+                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
                                   disabled={quickPlacing}

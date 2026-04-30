@@ -373,6 +373,7 @@
     account={orderTicketProps.account}
     defaultMode={orderTicketProps.defaultMode}
     availableModes={orderTicketProps.availableModes}
+    currentQty={orderTicketProps.currentQty ?? 0}
     onSubmit={(payload) => {
       // Modify path — payload carries `action: 'modify'` and the
       // modified fields. Refresh the orders list so the operator
