@@ -831,12 +831,20 @@
   }
   .ot-label-block { flex: 1 1 0; min-width: 0; }
   .ot-label {
+    /* Section-header treatment so labels read as form structure
+       cues, distinct from values / pills / numeric inputs. Amber
+       weight 700 (was muted-slate 400-ish) + slightly larger
+       letter-spacing — matches the way headings on the algo theme
+       cards lead with amber. Operator: "make labels look different
+       from others in the order window with depth". */
     display: block;
-    font-size: 0.65rem;
-    color: #a3b9d0;
+    font-size: 0.62rem;
+    color: #fbbf24;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    font-weight: 700;
     margin-bottom: 0.18rem;
+    opacity: 0.85;
   }
 
   /* "auto" chip next to the Limit price label — flags that the
