@@ -642,35 +642,39 @@
              Svelte requires them to be immediate children of the
              {#if} block, not nested inside a <g>. -->
         {@const tx = Math.min(W - 150 - PAD_R, Math.max(PAD_L, hover.x + 10))}
-        {@const ty = Math.max(PAD_T, hover.y - 76)}
+        {@const ty = Math.max(PAD_T, hover.y - 64)}
         {@const tdCol = hover.today  >= 0 ? '#4ade80' : '#f87171'}
         {@const expCol = hover.expiry >= 0 ? '#4ade80' : '#f87171'}
         <line x1={hover.x} x2={hover.x} y1={PAD_T} y2={height - PAD_B}
               stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
         <g pointer-events="none">
-          <rect x={tx} y={ty} width="150" height="74" rx="3"
+          <!-- Row baselines tightened to 18 / 36 / 54 (was 20/44/66).
+               18 px between baselines on a 16 px font leaves a
+               ~2-3 px visible gap between rows — tight but readable.
+               Box height shrinks from 74 → 60 to follow the rows. -->
+          <rect x={tx} y={ty} width="150" height="60" rx="3"
                 fill="rgba(13,21,38,0.92)"
                 stroke="rgba(251,191,36,0.30)" stroke-width="1"/>
           <!-- SPOT row — key in muted-slate, value in sky-cyan to
                match the .ps-v.ps-spot tint on the overlay. -->
-          <text x={tx + 8} y={ty + 20} fill="#a3b9d0"
+          <text x={tx + 8} y={ty + 18} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
                 letter-spacing="0.5">SPOT</text>
-          <text x={tx + 142} y={ty + 20} fill="#7dd3fc"
+          <text x={tx + 142} y={ty + 18} fill="#7dd3fc"
                 font-size="16" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtSpot(hover.spot)}</text>
           <!-- TDAY / EXP rows — value coloured by sign (green/red),
                matching .ps-v.ps-pos / .ps-v.ps-neg tints. -->
-          <text x={tx + 8} y={ty + 44} fill="#a3b9d0"
+          <text x={tx + 8} y={ty + 36} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
                 letter-spacing="0.5">TDAY</text>
-          <text x={tx + 142} y={ty + 44} fill={tdCol}
+          <text x={tx + 142} y={ty + 36} fill={tdCol}
                 font-size="16" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtMoney(hover.today)}</text>
-          <text x={tx + 8} y={ty + 66} fill="#a3b9d0"
+          <text x={tx + 8} y={ty + 54} fill="#a3b9d0"
                 font-size="13" font-weight="700" font-family="monospace"
                 letter-spacing="0.5">EXP</text>
-          <text x={tx + 142} y={ty + 66} fill={expCol}
+          <text x={tx + 142} y={ty + 54} fill={expCol}
                 font-size="16" font-weight="700" text-anchor="end"
                 font-family="monospace">{fmtMoney(hover.expiry)}</text>
         </g>
