@@ -475,7 +475,19 @@
 <div class:perf-dark={isDark}>
 
 {#if error}
-  <div class="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>
+  <!-- Graceful banner. Errors fall into two buckets:
+         (a) upstream broker outage (Kite is down) — informational tone,
+             amber palette + ⚠ icon. The data isn't gone, just stale.
+         (b) genuine error (auth, schema, real bug) — restrained red
+             palette, still readable on the algo theme's dark navy.
+       Both shapes pick up the page's color scheme (light or dark)
+       via the perf-dark wrapper. -->
+  {@const isOutage = /broker|kite|temporarily unavailable|outage/i.test(error)}
+  <div class={'perf-banner ' + (isOutage ? 'perf-banner-outage' : 'perf-banner-error')}
+       role="status">
+    <span class="perf-banner-icon" aria-hidden="true">{isOutage ? '⏳' : '⚠'}</span>
+    <span class="perf-banner-text">{error}</span>
+  </div>
 {/if}
 
 {#if !compactHeader}
@@ -594,6 +606,72 @@
 
 <style>
   .hidden { display: none; }
+
+  /* ── Page banners ────────────────────────────────────────────────
+     Two flavours, both palette-aware:
+
+       .perf-banner-outage  — Kite (or any upstream) is temporarily
+         unavailable. Informational, amber, calm copy. The data isn't
+         gone, the broker just isn't responding right now. ⏳ icon.
+
+       .perf-banner-error   — genuine error (auth / schema / bug). ⚠
+         icon, red palette but toned down so it doesn't shout against
+         the algo theme's dark navy.
+
+     Both render with the same shell (gap, radius, padding, monospace
+     font) so the layout doesn't shift between flavours. */
+  .perf-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    margin-bottom: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .perf-banner-icon {
+    font-size: 0.95rem;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+  .perf-banner-text {
+    flex: 1 1 auto;
+  }
+
+  /* Light (public) theme. */
+  .perf-banner-outage {
+    background: #fff8e8;
+    border-color: #e8c97a;
+    color: #6b4500;
+  }
+  .perf-banner-error {
+    background: #fdf0f0;
+    border-color: #e8a3a3;
+    color: #7a2929;
+  }
+
+  /* Dark (algo) theme — both inherit the navy/amber/red token set
+     used across the algo pages so the banner reads as part of the
+     page, not a foreign element. */
+  .perf-dark .perf-banner-outage {
+    background: rgba(251,191,36,0.10);
+    border-color: rgba(251,191,36,0.35);
+    color: #fde68a;
+  }
+  .perf-dark .perf-banner-outage .perf-banner-icon {
+    color: #fbbf24;
+  }
+  .perf-dark .perf-banner-error {
+    background: rgba(248,113,113,0.10);
+    border-color: rgba(248,113,113,0.35);
+    color: #fda4a4;
+  }
+  .perf-dark .perf-banner-error .perf-banner-icon {
+    color: #f87171;
+  }
 
   /* Tabs + Account + Symbol on one row — keep them all visible on
      narrow widths by setting `flex-wrap: nowrap` and tightening font
