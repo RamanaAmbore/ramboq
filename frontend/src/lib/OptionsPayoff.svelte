@@ -24,6 +24,7 @@
    *   dte?:         number|null,
    *   ivProxy?:     number|null,
    *   legCount?:    number|null,
+   *   realizedPnl?: number,
    *   onRefresh?:   (() => void) | null,
    *   loading?:     boolean,
    *   prevClose?:   number|null,
@@ -46,6 +47,13 @@
     dte        = /** @type {number|null|undefined} */ (null),
     ivProxy    = /** @type {number|null|undefined} */ (null),
     legCount   = /** @type {number|null|undefined} */ (null),
+    // Realised P&L from positions closed today (qty=0). Surfaced as
+    // REAL + TOTAL rows in the stat overlay so the chart's day-P&L
+    // reconciles with the dashboard's per-underlying P&L:
+    //   TDAY (open-leg theoretical) + REAL (closed-leg realised)
+    //   ≈ dashboard ₹ for this underlying
+    // 0 (default) → REAL + TOTAL rows hide; chart reads as before.
+    realizedPnl = 0,
     onRefresh  = /** @type {(() => void) | null} */ (null),
     loading    = false,
     prevClose  = /** @type {number|null|undefined} */ (null),
@@ -61,13 +69,57 @@
     return 'flat';
   });
 
+  // Apply the realised-P&L offset to the entire payoff curve. Closed
+  // positions (qty=0) contribute realised P&L that doesn't move with
+  // spot — a constant vertical shift on both today and expiry curves.
+  // The shift makes the chart's TDAY at current spot match the
+  // dashboard's per-underlying P&L (which is broker pnl total).
+  // Without this, closed-out CRUDEOIL trades caused a permanent gap.
+  // When realizedPnl=0, this is a no-op (returns the original array
+  // by reference is not safe under Svelte 5; we rebuild defensively).
+  const adjustedPayoff = $derived.by(() => {
+    if (!payoff.length) return payoff;
+    if (!realizedPnl || realizedPnl === 0) return payoff;
+    return payoff.map(p => ({
+      spot:         p.spot,
+      today_value:  p.today_value  + realizedPnl,
+      expiry_value: p.expiry_value + realizedPnl,
+    }));
+  });
+
+  // Recompute breakevens from the SHIFTED expiry curve when there's
+  // an offset — caller's `breakevens` prop came from the unshifted
+  // backend curve, so its zero-crossings are off by `realizedPnl`
+  // worth of vertical space when we plot the shifted curve.
+  const adjustedBreakevens = $derived.by(() => {
+    if (!realizedPnl || realizedPnl === 0) return null;
+    if (!adjustedPayoff || adjustedPayoff.length < 2) return null;
+    /** @type {number[]} */
+    const bes = [];
+    for (let i = 1; i < adjustedPayoff.length; i++) {
+      const a = adjustedPayoff[i - 1];
+      const b = adjustedPayoff[i];
+      if ((a.expiry_value <= 0 && b.expiry_value >= 0)
+       || (a.expiry_value >= 0 && b.expiry_value <= 0)) {
+        const dy = b.expiry_value - a.expiry_value;
+        if (dy === 0) continue;
+        const t = -a.expiry_value / dy;
+        bes.push(a.spot + t * (b.spot - a.spot));
+      }
+    }
+    return bes;
+  });
+
   // Nearest curve point to current spot — drives the on-chart TDAY/EXP
   // readouts so the operator sees position P&L right beside the chart.
+  // Reads from the offset-adjusted curve so the overlay value equals
+  // the dashboard's per-underlying P&L.
   const curveAtSpot = $derived.by(() => {
-    if (!payoff.length) return null;
-    let best = payoff[0];
+    const src = adjustedPayoff;
+    if (!src.length) return null;
+    let best = src[0];
     let bestDiff = Math.abs(best.spot - spot);
-    for (const p of payoff) {
+    for (const p of src) {
       const d = Math.abs(p.spot - spot);
       if (d < bestDiff) { bestDiff = d; best = p; }
     }
@@ -80,9 +132,14 @@
   // strike / strikes props are kept on the API surface for back-
   // compat but no longer rendered (operator removed strike verticals
   // from the chart — see "spot/strike removal" below).
-  const breakevenList = $derived(breakevens
-    ? breakevens.filter(b => b != null)
-    : (breakeven != null ? [breakeven] : []));
+  // When the curve is shifted by realizedPnl, the backend-supplied
+  // breakevens are stale (their zero-crossings were on the unshifted
+  // curve). Use the locally-recomputed list instead.
+  const breakevenList = $derived(adjustedBreakevens
+    ? adjustedBreakevens.filter(b => b != null)
+    : (breakevens
+       ? breakevens.filter(b => b != null)
+       : (breakeven != null ? [breakeven] : [])));
 
   /** @type {{x:number,y:number,spot:number,today:number,expiry:number}|null} */
   let hover = $state(null);
@@ -120,10 +177,10 @@
   // after zooming away from it. Force zero into the domain so the
   // loss/profit shading lands on the actual breakeven line.
   const visiblePayoff = $derived(
-    payoff.filter(p => p.spot >= sMin && p.spot <= sMax)
+    adjustedPayoff.filter(p => p.spot >= sMin && p.spot <= sMax)
   );
   const yDomain = $derived.by(() => {
-    const src = visiblePayoff.length ? visiblePayoff : payoff;
+    const src = visiblePayoff.length ? visiblePayoff : adjustedPayoff;
     let lo = 0, hi = 0;
     for (const p of src) {
       if (p.today_value < lo)  lo = p.today_value;
@@ -145,14 +202,16 @@
   // Y position of zero P&L line — the breakeven horizontal.
   const zeroY = $derived(yOf(0));
 
-  // SVG paths
+  // SVG paths — read from adjustedPayoff so the curve renders WITH
+  // the realised-P&L offset applied. At realizedPnl=0 this equals
+  // payoff (no-op pass-through).
   const pathToday = $derived.by(() => {
-    if (!payoff.length) return '';
-    return payoff.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.spot).toFixed(1)},${yOf(p.today_value).toFixed(1)}`).join(' ');
+    if (!adjustedPayoff.length) return '';
+    return adjustedPayoff.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.spot).toFixed(1)},${yOf(p.today_value).toFixed(1)}`).join(' ');
   });
   const pathExpiry = $derived.by(() => {
-    if (!payoff.length) return '';
-    return payoff.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.spot).toFixed(1)},${yOf(p.expiry_value).toFixed(1)}`).join(' ');
+    if (!adjustedPayoff.length) return '';
+    return adjustedPayoff.map((p, i) => `${i === 0 ? 'M' : 'L'}${xOf(p.spot).toFixed(1)},${yOf(p.expiry_value).toFixed(1)}`).join(' ');
   });
 
   // Time-slice curves — one path per intermediate slice, parallel-
@@ -177,11 +236,13 @@
       // Defensive: only walk the part of the curve that has values
       // for. Mismatched lengths shouldn't happen (the backend builds
       // both arrays off the same spot grid) but it'd silently render
-      // a broken path otherwise.
+      // a broken path otherwise. Each `vals[i]` gets the same
+      // realised offset as today + expiry curves so the slice
+      // family stays vertically aligned with them.
       const n = Math.min(vals.length, payoff.length);
       let d = '';
       for (let i = 0; i < n; i++) {
-        d += `${i === 0 ? 'M' : 'L'}${xOf(payoff[i].spot).toFixed(1)},${yOf(vals[i]).toFixed(1)} `;
+        d += `${i === 0 ? 'M' : 'L'}${xOf(payoff[i].spot).toFixed(1)},${yOf(vals[i] + (realizedPnl || 0)).toFixed(1)} `;
       }
       return {
         label:    c.label,
@@ -197,17 +258,17 @@
   // up to the chart bounds. Two filled paths whose top/bottom rides the
   // today curve and whose other edge is the chart's boundary.
   const fillProfit = $derived.by(() => {
-    if (!payoff.length) return '';
-    const top = payoff.map(p => `${xOf(p.spot).toFixed(1)},${yOf(Math.max(0, p.today_value)).toFixed(1)}`);
-    const lastX  = xOf(payoff[payoff.length - 1].spot).toFixed(1);
-    const firstX = xOf(payoff[0].spot).toFixed(1);
+    if (!adjustedPayoff.length) return '';
+    const top = adjustedPayoff.map(p => `${xOf(p.spot).toFixed(1)},${yOf(Math.max(0, p.today_value)).toFixed(1)}`);
+    const lastX  = xOf(adjustedPayoff[adjustedPayoff.length - 1].spot).toFixed(1);
+    const firstX = xOf(adjustedPayoff[0].spot).toFixed(1);
     return `M${firstX},${zeroY.toFixed(1)} L${top.join(' L')} L${lastX},${zeroY.toFixed(1)} Z`;
   });
   const fillLoss = $derived.by(() => {
-    if (!payoff.length) return '';
-    const bot = payoff.map(p => `${xOf(p.spot).toFixed(1)},${yOf(Math.min(0, p.today_value)).toFixed(1)}`);
-    const lastX  = xOf(payoff[payoff.length - 1].spot).toFixed(1);
-    const firstX = xOf(payoff[0].spot).toFixed(1);
+    if (!adjustedPayoff.length) return '';
+    const bot = adjustedPayoff.map(p => `${xOf(p.spot).toFixed(1)},${yOf(Math.min(0, p.today_value)).toFixed(1)}`);
+    const lastX  = xOf(adjustedPayoff[adjustedPayoff.length - 1].spot).toFixed(1);
+    const firstX = xOf(adjustedPayoff[0].spot).toFixed(1);
     return `M${firstX},${zeroY.toFixed(1)} L${bot.join(' L')} L${lastX},${zeroY.toFixed(1)} Z`;
   });
 
@@ -224,13 +285,18 @@
   // so the touch path produces the same tooltip as desktop hover.
   function _setHoverFromClientX(/** @type {SVGSVGElement} */ svg,
                                 /** @type {number} */ clientX) {
-    if (!payoff.length) return;
+    // Hover tooltip reads values from adjustedPayoff so the
+    // displayed TDAY / EXP at the hover spot already include the
+    // realised offset — same as the on-chart curves they're
+    // probing.
+    const src = adjustedPayoff;
+    if (!src.length) return;
     const rect = svg.getBoundingClientRect();
     const xPx  = (clientX - rect.left) * (W / rect.width);
     const xVal = sMin + ((xPx - PAD_L) / innerW) * sSpan;
-    let best = payoff[0];
+    let best = src[0];
     let bestDiff = Math.abs(best.spot - xVal);
-    for (const p of payoff) {
+    for (const p of src) {
       const d = Math.abs(p.spot - xVal);
       if (d < bestDiff) { best = p; bestDiff = d; }
     }
@@ -411,14 +477,31 @@
       </div>
       {#if curveAtSpot}
         <div class="ps-row"
-             title="Today's strategy P&L at the current spot — Black-Scholes value of all legs minus entry cost">
+             title={realizedPnl !== 0
+               ? `Today's TOTAL strategy P&L at the current spot — open-leg Black-Scholes minus entry cost, PLUS realised P&L from positions closed today. Matches the dashboard's per-underlying P&L. (Realised: ${fmtMoney(realizedPnl)} — see RLZ row.)`
+               : "Today's strategy P&L at the current spot — Black-Scholes value of all open legs minus entry cost"}>
           <span class="ps-k">TDAY</span>
           <span class={'ps-v ' + (curveAtSpot.today_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.today_value)}
           </span>
         </div>
+        {#if realizedPnl !== 0}
+          <!-- Realised P&L breakdown — informational. The TDAY row
+               above already INCLUDES this number (the entire payoff
+               curve is shifted by realizedPnl so the chart reads in
+               sync with the dashboard at every spot). RLZ surfaces
+               the constant offset so the operator sees "of TDAY's
+               -₹3.3 lakh, ₹X is realised closed positions". -->
+          <div class="ps-row"
+               title="Realised P&L from positions closed today (qty=0). Already included in TDAY — listed separately so the open-vs-closed contribution is visible.">
+            <span class="ps-k">RLZ</span>
+            <span class={'ps-v ' + (realizedPnl >= 0 ? 'ps-pos' : 'ps-neg')}>
+              {fmtMoney(realizedPnl)}
+            </span>
+          </div>
+        {/if}
         <div class="ps-row"
-             title="Strategy P&L at expiry (intrinsic only) for the current spot">
+             title="Strategy P&L at expiry (intrinsic only) for the current spot — also includes the realised offset when present.">
           <span class="ps-k">EXP</span>
           <span class={'ps-v ' + (curveAtSpot.expiry_value >= 0 ? 'ps-pos' : 'ps-neg')}>
             {fmtMoney(curveAtSpot.expiry_value)}

@@ -274,17 +274,52 @@
   });
 
   // Realised P&L from positions that have been closed today (qty=0,
-  // pnl carries the realised number from the broker). Surfaced on the
-  // payoff chart header as a separate REAL chip so chart TDAY
-  // (open-leg theoretical) + REAL (closed-leg realised) ≈ the
-  // dashboard's per-underlying P&L. Without this, closed positions
-  // showed as a discrepancy between the legs panel and the dashboard.
+  // pnl carries the realised number from the broker). Folded into
+  // chartPnlOffset below so the payoff curve renders in sync with
+  // the dashboard's per-underlying P&L.
   const realizedPnl = $derived.by(() => {
     let s = 0;
     for (const c of candidatePositions) {
       if (Number(c.qty || 0) === 0) s += Number(c.pnl || 0);
     }
     return s;
+  });
+
+  // Total chart-vs-dashboard P&L gap, applied as a vertical offset
+  // to the payoff curve so the chart's TDAY at the current spot
+  // matches the dashboard's per-underlying P&L exactly. Two
+  // contributions:
+  //
+  //   1. Realised P&L from CLOSED positions (qty=0). These sit in
+  //      candidatePositions but never reach the strategy endpoint
+  //      (filter `l.qty` drops them) — so the BS curve from the
+  //      backend doesn't account for them at all. Constant offset.
+  //
+  //   2. Theoretical-vs-LTP gap on OPEN legs. The backend prices
+  //      each leg at Black-Scholes theoretical against a calibrated
+  //      σ; the dashboard's broker pnl uses the actual market LTP.
+  //      For illiquid contracts (especially MCX commodity options)
+  //      these can drift several %. Per-leg gap is
+  //          (ltp - theoretical) * qty
+  //      and the strategy endpoint already returns ltp + theoretical
+  //      per leg, so we sum locally without a second backend call.
+  //
+  // The combined offset shifts the entire today + expiry curves up
+  // (or down) by `chartPnlOffset` rupees. At any spot, the chart
+  // value ≈ what the dashboard would show if the underlying moved
+  // there. At the current spot specifically, chart = dashboard ₹
+  // exactly (within float-rounding).
+  const chartPnlOffset = $derived.by(() => {
+    let off = realizedPnl;
+    for (const lg of (strategy?.legs || [])) {
+      const ltp  = Number(lg?.ltp || 0);
+      const theo = Number(lg?.theoretical || 0);
+      const qty  = Number(lg?.qty || 0);
+      if (ltp > 0 && theo > 0 && qty !== 0) {
+        off += (ltp - theo) * qty;
+      }
+    }
+    return off;
   });
 
   // Initialize the enable-flag map when candidates change. Default:
@@ -1681,17 +1716,13 @@
         <span class="opt-section-tag tag-short" title="Max loss">
           MAX L {fmtMoney(strategy.risk.max_loss, false)}
         </span>
-        {#if realizedPnl !== 0}
-          <!-- Realised P&L from positions closed today (qty=0). The
-               chart's TDAY only sums OPEN-leg theoretical value; the
-               dashboard P&L includes realised. Surfacing this chip
-               lets the operator reconcile the two: TDAY + REAL ≈
-               dashboard ₹ for this underlying. -->
-          <span class={'opt-section-tag tag-' + (realizedPnl >= 0 ? 'long' : 'short')}
-                title="Realised P&L from positions closed today (qty=0). Adds to TDAY for total day P&L; doesn't affect the payoff curve.">
-            REAL {fmtMoney(realizedPnl, false)}
-          </span>
-        {/if}
+        <!-- The dedicated REAL chip in the header was retired —
+             realised P&L is now folded into chartPnlOffset and
+             applied as a vertical curve shift inside OptionsPayoff,
+             so the chart's TDAY at any spot already matches the
+             dashboard total. The breakdown (open theoretical-vs-LTP
+             gap + closed realised) is surfaced inline as the RLZ
+             row in the chart's stat overlay. -->
       </div>
     </div>
     <OptionsPayoff
@@ -1705,6 +1736,7 @@
       dte={strategy.days_to_expiry}
       ivProxy={strategy.iv_proxy}
       legCount={strategy.legs.length}
+      realizedPnl={chartPnlOffset}
       loading={loading}
       onRefresh={() => { loadPositions(); loadSimStatus(); loadStrategy(); }}
       height={320} />
