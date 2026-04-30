@@ -611,20 +611,25 @@
       </div>
     {/if}
 
-    <!-- Order type pills -->
-    <div class="ot-row">
-      <div class="ot-label-block">
+    <!-- Type + Product pills — kept on a single row even on narrow
+         viewports. Earlier each label sat ABOVE its pill row, and
+         the row + the pills both wrapped — the modal felt cluttered.
+         Now: inline `Type:` / `Product:` labels next to compact
+         pills, ot-pills nowrap, ot-row nowrap. Pills shrink slightly
+         (font 0.6 → 0.55rem, padding tightened) to leave headroom. -->
+    <div class="ot-row ot-row-tight">
+      <div class="ot-label-inline">
         <label class="ot-label">Type</label>
-        <div class="ot-pills">
+        <div class="ot-pills ot-pills-nowrap">
           {#each ['MARKET', 'LIMIT', 'SL', 'SL-M'] as t}
             <button type="button" class="ot-pill" class:on={_type === t}
                     onclick={() => _type = /** @type {any} */ (t)}>{t}</button>
           {/each}
         </div>
       </div>
-      <div class="ot-label-block">
+      <div class="ot-label-inline">
         <label class="ot-label">Product</label>
-        <div class="ot-pills">
+        <div class="ot-pills ot-pills-nowrap">
           {#each productOptions as p}
             <button type="button" class="ot-pill" class:on={_product === p}
                     onclick={() => _product = /** @type {any} */ (p)}>{p}</button>
@@ -981,21 +986,44 @@
   .ot-num { text-align: right; }
 
   /* Pill toggles (Type, Product, Variety) */
-  .ot-pills { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+  .ot-pills { display: flex; gap: 0.15rem; flex-wrap: wrap; }
+  .ot-pills-nowrap { flex-wrap: nowrap; }
   .ot-pill {
-    padding: 0.25rem 0.55rem;
+    padding: 0.2rem 0.4rem;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 3px;
     color: #a3b9d0;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 600;
     cursor: pointer;
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   .ot-pill.on {
     background: rgba(251,191,36,0.18);
     border-color: rgba(251,191,36,0.55);
     color: #fbbf24;
+  }
+  /* Inline label + pill row: labels sit next to pills (instead of
+     stacking above), so Type and Product fit on the same line
+     within the modal's 28 rem width. nowrap on the ot-row level
+     keeps the two blocks side by side; the modal scrolls
+     horizontally only as a last-resort safety net. */
+  .ot-label-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .ot-label-inline .ot-label {
+    margin: 0;
+  }
+  .ot-row-tight {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    overflow-x: auto;
   }
 
   /* Mode row */
