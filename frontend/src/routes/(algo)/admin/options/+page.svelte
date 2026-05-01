@@ -419,12 +419,10 @@
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
   // Kind multi-select — operator picks any combination of Options
-  // and Futures. Both selected by default so the panel surfaces both
-  // contract types out of the box; deselecting one collapses that
-  // section. Empty → both auto-restored on next mount (kind picker
-  // is a filter, not a kill switch).
+  // and Futures. Defaults to Options only; the Futures section is
+  // opt-in so the strike grid stays the focal point on mount.
   /** @type {Array<'opt'|'fut'>} */
-  let chainKinds       = $state(/** @type {Array<'opt'|'fut'>} */ (['opt', 'fut']));
+  let chainKinds       = $state(/** @type {Array<'opt'|'fut'>} */ (['opt']));
 
   // chainSide stays as the (i) launcher's default leg side (long).
   // Per-row +/− buttons override on a per-pick basis (each button
@@ -460,9 +458,10 @@
   }
 
   /** Add an option leg to the basket. Resolves symbol + lot size from
-   *  the instruments cache for the (underlying, expiry, strike, type)
-   *  tuple. No-op when the cache miss (chain shouldn't render the row
-   *  in that case anyway). */
+   *  the instruments cache and seeds the limit price from chain
+   *  quotes (BUY → ask, SELL → bid) so the basket goes out as a
+   *  LIMIT order with a real price. Operator can edit the limit
+   *  inline on the pill. */
   function addOptionToBasket(/** @type {number} */ strike,
                               /** @type {'CE'|'PE'} */ optType,
                               /** @type {'long'|'short'} */ side) {
@@ -472,6 +471,10 @@
     );
     if (!inst) { basketError = 'Symbol not in instruments cache.'; return; }
     const sideTag = /** @type {'BUY'|'SELL'} */ (side === 'long' ? 'BUY' : 'SELL');
+    const q = chainQuotesMap?.[String(strike)]?.[optType.toLowerCase()];
+    const limit = sideTag === 'BUY'
+      ? (q?.ask ?? q?.bid ?? 0)
+      : (q?.bid ?? q?.ask ?? 0);
     chainBasket = [...chainBasket, {
       key:      `${sideTag}|${_quickKeyOpt(strike, optType)}|${Date.now()}`,
       side:     sideTag,
@@ -480,12 +483,15 @@
       lots:     1,
       lotSize:  Number(inst.ls || 1),
       product:  'NRML',
+      limit:    Number(limit) || 0,
     }];
     basketError = '';
     _flashToast(_quickKeyOpt(strike, optType), '✓ added');
   }
 
-  /** Add a futures leg to the basket. */
+  /** Add a futures leg to the basket. Limit is left at 0 (the
+   *  Place handler routes 0-priced legs as MARKET); operator can
+   *  set a limit inline on the pill if they want. */
   function addFuturesToBasket(/** @type {string} */ sym,
                                /** @type {number} */ lotSize,
                                /** @type {'long'|'short'} */ side) {
@@ -499,6 +505,7 @@
       lots:     1,
       lotSize:  Number(lotSize || inst?.ls || 1),
       product:  'NRML',
+      limit:    0,
     }];
     basketError = '';
     _flashToast(_quickKeyFut(sym), '✓ added');
@@ -523,11 +530,20 @@
    *   lots: number,
    *   lotSize: number,
    *   product: string,
+   *   limit: number,
    * }>} */
   let chainBasket    = $state([]);
   let basketPlacing  = $state(false);
   let basketError    = $state('');
   let basketProgress = $state(0);
+  // Chase + aggressiveness applied to every leg in placeBasket.
+  // CHASE on → submit as LIMIT with chase=true so the backend
+  // re-quotes until filled; OFF → static LIMIT (or MARKET when the
+  // leg's limit is 0). L / M / H mirror OrderTicket's adaptive-algo
+  // pills (Patient / Balanced / Urgent) — same vocabulary across
+  // every order surface so the operator's mental model is one.
+  let basketChase    = $state(true);
+  let basketChaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('high'));
   let basketJustDone = $state(false);
   function removeFromBasket(/** @type {string} */ key) {
     chainBasket = chainBasket.filter(b => b.key !== key);
@@ -549,6 +565,7 @@
     /** @type {string[]} */ const failures = [];
     for (const leg of chainBasket) {
       try {
+        const hasLimit = Number(leg.limit) > 0;
         await placeTicketOrder({
           mode:          'paper',
           side:          leg.side,
@@ -556,9 +573,14 @@
           quantity:      leg.lots * leg.lotSize,
           exchange:      leg.exchange,
           product:       leg.product || 'NRML',
-          order_type:    'MARKET',
+          order_type:    hasLimit ? 'LIMIT' : 'MARKET',
+          price:         hasLimit ? Number(leg.limit) : 0,
           variety:       'regular',
           account:       acct,
+          // Chase params apply only to limit-bearing legs; MARKET
+          // legs ignore them on the backend.
+          chase:                hasLimit ? basketChase : false,
+          chase_aggressiveness: hasLimit && basketChase ? basketChaseAgg : 'high',
         });
       } catch (e) {
         const msg = String(/** @type {any} */ (e)?.message || e || 'failed');
@@ -1564,37 +1586,33 @@
         </div>
       </div>
       {#if chainKinds.includes('fut') && chainFutures.length}
-        <!-- Futures quick-add row — paired BUY (+) / SELL (−) pills
-             open the inline lots-picker; (i) opens the full
-             OrderTicket modal pre-filled. Same fast/slow split as
-             the strike rows. Gated on chainKind='fut' so the
-             futures pills don't crowd the default options view. -->
+        <!-- Futures rows — same `+ − i` button cluster as the strike
+             rows, just no strike / CE / PE columns. Symbol + lot
+             size sit on the left; buttons on the right. -->
         <div class="chain-futures">
-          <span class="chain-futures-label">Futures:</span>
           {#each chainFutures as f (f.s)}
             {@const futKey = _quickKeyFut(f.s)}
-            <span class="chain-fut-pair">
-              <button type="button"
-                      class="chain-fut-pill chain-fut-pill-buy"
-                      title="BUY {f.s} — adds 1 lot ({f.ls}) to basket"
-                      onclick={() => addFuturesToBasket(f.s, f.ls, 'long')}>
-                + {f.s}
-                <span class="chain-fut-meta">lot {f.ls}</span>
-              </button>
-              <button type="button"
-                      class="chain-fut-pill chain-fut-pill-sell"
-                      title="SELL {f.s} — adds 1 lot to basket"
-                      onclick={() => addFuturesToBasket(f.s, f.ls, 'short')}>
-                − {f.s}
-              </button>
-              <button type="button"
-                      class="chain-fut-pill chain-fut-pill-info"
-                      title="Open full ticket for {f.s} (edit qty / price / mode)"
-                      onclick={() => addFutureDraft(f.s, f.ls, 'long')}>i</button>
-              {#if quickToast?.key === futKey}
-                <span class="chain-quick-toast">{quickToast?.msg}</span>
-              {/if}
-            </span>
+            <div class="chain-fut-row">
+              <span class="chain-fut-sym">
+                {f.s}<span class="chain-fut-meta">lot {f.ls}</span>
+              </span>
+              <span class="chain-side-action">
+                <span class="chain-btn-pair">
+                  <button type="button" class="chain-btn chain-btn-buy"
+                          title="BUY {f.s} — adds 1 lot ({f.ls}) to basket"
+                          onclick={() => addFuturesToBasket(f.s, f.ls, 'long')}>+</button>
+                  <button type="button" class="chain-btn chain-btn-sell"
+                          title="SELL {f.s} — adds 1 lot to basket"
+                          onclick={() => addFuturesToBasket(f.s, f.ls, 'short')}>−</button>
+                  <button type="button" class="chain-btn chain-btn-info"
+                          title="Open full ticket for {f.s} (edit qty / price / mode)"
+                          onclick={() => addFutureDraft(f.s, f.ls, 'long')}>i</button>
+                </span>
+                {#if quickToast?.key === futKey}
+                  <span class="chain-quick-toast">{quickToast?.msg}</span>
+                {/if}
+              </span>
+            </div>
           {/each}
         </div>
       {/if}
@@ -1791,10 +1809,56 @@
                         disabled={basketPlacing}
                         onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
                 <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
+                <label class="chain-basket-limit-wrap">
+                  <span class="chain-basket-at">@</span>
+                  <input type="number" class="chain-basket-limit" min="0" step="0.05"
+                         disabled={basketPlacing}
+                         placeholder="MKT"
+                         value={leg.limit || ''}
+                         onclick={(e) => e.stopPropagation()}
+                         onkeydown={(e) => e.stopPropagation()}
+                         oninput={(e) => {
+                           const v = Number(/** @type {HTMLInputElement} */ (e.currentTarget).value);
+                           chainBasket = chainBasket.map(b =>
+                             b.key === leg.key ? { ...b, limit: Number.isFinite(v) ? v : 0 } : b
+                           );
+                         }} />
+                </label>
               </span>
             {/each}
           </div>
           <div class="chain-basket-actions">
+            <!-- Chase + L/M/H — same vocabulary as OrderTicket's
+                 adaptive-algo pills (Patient / Balanced / Urgent).
+                 Applied to every limit-bearing leg in the basket
+                 on Place; market-priced legs ignore it. -->
+            <label class="chain-chase-toggle"
+                   title={basketChase
+                     ? 'CHASE on — re-quote each leg until filled'
+                     : 'CHASE off — leg rests at its initial limit'}>
+              <input type="checkbox" bind:checked={basketChase}
+                     disabled={basketPlacing} />
+              <span class="chain-chase-label" class:on={basketChase}>CHASE</span>
+            </label>
+            {#if basketChase}
+              <div class="chain-chase-agg" role="group" aria-label="Chase aggressiveness">
+                <button type="button" class="chain-chase-agg-pill chain-chase-agg-low"
+                        class:on={basketChaseAgg === 'low'}
+                        disabled={basketPlacing}
+                        title="Low — patient. SELL pegs to ASK, BUY pegs to BID. Sit on your own side; fills only if the market lifts it."
+                        onclick={() => basketChaseAgg = 'low'}>L</button>
+                <button type="button" class="chain-chase-agg-pill chain-chase-agg-med"
+                        class:on={basketChaseAgg === 'med'}
+                        disabled={basketPlacing}
+                        title="Medium — peg to midpoint of bid+ask. Fills when the inside moves halfway in your favour."
+                        onclick={() => basketChaseAgg = 'med'}>M</button>
+                <button type="button" class="chain-chase-agg-pill chain-chase-agg-high"
+                        class:on={basketChaseAgg === 'high'}
+                        disabled={basketPlacing}
+                        title="High — urgent. SELL pegs to BID, BUY pegs to ASK. Crosses the spread to take liquidity on the next tick."
+                        onclick={() => basketChaseAgg = 'high'}>H</button>
+              </div>
+            {/if}
             <button type="button" class="chain-basket-clear"
                     disabled={basketPlacing}
                     onclick={clearBasket}>Clear</button>
@@ -2870,56 +2934,44 @@
     flex-direction: column;
     gap: 0.15rem;
   }
-  /* Futures quick-add row above the strike grid. Same general look as
-     the chain CE/PE buttons but tagged sky-blue so it's visually
-     distinct from the green/red option buttons below. */
+  /* Futures section above the strike grid. One row per future,
+     same `+ − i` button cluster as the strike grid. Sky-blue
+     accent on the panel border so the section reads as the
+     futures-specific block without competing with the green/red
+     option buttons inside. */
   .chain-futures {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.2rem;
     margin-bottom: 0.4rem;
-    padding: 0.3rem 0.5rem;
-    background: rgba(125,211,252,0.05);
+    padding: 0.35rem 0.5rem;
+    background: rgba(125,211,252,0.04);
     border: 1px solid rgba(125,211,252,0.20);
     border-radius: 3px;
   }
-  .chain-futures-label {
+  .chain-fut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1px 0;
     font-family: monospace;
     font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #a3b9d0;
-    margin-right: 0.25rem;
   }
-  .chain-fut-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: monospace;
-    font-size: 0.6rem;
+  .chain-fut-sym {
+    color: #c8d8f0;
     font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 2px;
-    border: 1px solid rgba(125,211,252,0.45);
-    background: rgba(125,211,252,0.08);
-    color: #7dd3fc;
-    cursor: pointer;
-    letter-spacing: 0.03em;
-    transition: background 0.12s;
-  }
-  .chain-fut-pill:hover {
-    background: rgba(125,211,252,0.18);
-    border-color: rgba(125,211,252,0.65);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
   .chain-fut-meta {
-    color: #a3b9d0;
+    margin-left: 0.4rem;
     font-weight: 400;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
+    color: #a3b9d0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-
   .chain-grid-wrap {
     max-height: 18rem;
     overflow-y: auto;
@@ -3085,19 +3137,6 @@
     padding: 1px 5px;
   }
   .chain-btn-info:hover { background: rgba(125,211,252,0.10); }
-  /* Futures-row info pill — same role as .chain-btn-info but
-     scoped to the futures `.chain-fut-pair` so its borders /
-     background match the surrounding pills. */
-  .chain-fut-pill-info {
-    color: #7dd3fc;
-    border-color: rgba(125,211,252,0.45);
-    font-style: italic;
-  }
-  .chain-fut-pill-info:hover {
-    background: rgba(125,211,252,0.12);
-    border-color: rgba(125,211,252,0.75);
-  }
-
   /* Brief "✓ added" toast that flashes alongside a strike row's
      button cluster (or a futures pill) the moment the operator's
      click landed in the basket. Auto-fades. */
@@ -3234,12 +3273,101 @@
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
   }
+  /* Inline limit-price input at the end of each basket pill. `@`
+     glyph + tight numeric input. Empty placeholder reads "MKT" so
+     the operator knows a 0/blank limit means market-priced. */
+  .chain-basket-limit-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    cursor: text;
+  }
+  .chain-basket-at {
+    color: #a3b9d0;
+    font-size: 0.55rem;
+    opacity: 0.7;
+  }
+  .chain-basket-limit {
+    width: 4.4rem;
+    padding: 0 4px;
+    height: 1.05rem;
+    border-radius: 2px;
+    border: 1px solid rgba(126,151,184,0.35);
+    background: rgba(13,21,38,0.6);
+    color: #c8d8f0;
+    font-family: monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
+  }
+  .chain-basket-limit:focus {
+    outline: none;
+    border-color: rgba(251,191,36,0.65);
+    background: rgba(13,21,38,0.85);
+  }
+  .chain-basket-limit::placeholder {
+    color: rgba(163,185,208,0.55);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
   .chain-basket-actions {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     margin-left: auto;
+    flex-wrap: wrap;
   }
+  /* CHASE checkbox + L/M/H pills near the Place button — same
+     vocabulary + colour palette as OrderTicket's adaptive-algo
+     block. CHASE label flips amber when on; the L/M/H pair
+     mirrors the strike-row colour split (low=sky / med=amber /
+     high=green) so the operator reads "patience → urgency" left
+     to right at a glance. */
+  .chain-chase-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: monospace;
+    font-size: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chain-chase-toggle input { margin: 0; cursor: pointer; }
+  .chain-chase-label {
+    color: #a3b9d0;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .chain-chase-label.on { color: #fbbf24; }
+  .chain-chase-agg {
+    display: inline-flex;
+    border-radius: 2px;
+    border: 1px solid rgba(126,151,184,0.35);
+    overflow: hidden;
+  }
+  .chain-chase-agg-pill {
+    height: 1.4rem;
+    min-width: 1.4rem;
+    padding: 0 5px;
+    border: 0;
+    background: transparent;
+    color: #a3b9d0;
+    font-family: monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .chain-chase-agg-pill + .chain-chase-agg-pill {
+    border-left: 1px solid rgba(126,151,184,0.30);
+  }
+  .chain-chase-agg-pill:hover:not(:disabled):not(.on) {
+    background: rgba(255,255,255,0.05);
+  }
+  .chain-chase-agg-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chain-chase-agg-low.on  { background: rgba(125,211,252,0.18); color: #7dd3fc; }
+  .chain-chase-agg-med.on  { background: rgba(251,191,36,0.18); color: #fbbf24; }
+  .chain-chase-agg-high.on { background: rgba(74,222,128,0.18); color: #4ade80; }
   .chain-basket-clear,
   .chain-basket-place {
     height: 1.5rem;
@@ -3303,16 +3431,6 @@
     border-color: rgba(251,191,36,0.55);
     background: rgba(13,21,38,0.8);
   }
-  /* Paired BUY/SELL futures pills sit as one inline group with a
-     1px gap so they read as a single contract control. */
-  .chain-fut-pair {
-    display: inline-flex;
-    gap: 1px;
-  }
-  .chain-fut-pill-buy  { color: #4ade80; border-color: rgba(74,222,128,0.45); }
-  .chain-fut-pill-sell { color: #f87171; border-color: rgba(248,113,113,0.45); }
-  .chain-fut-pill-buy:hover  { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.75); }
-  .chain-fut-pill-sell:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.75); }
   /* "chain" source pill on legs added via the chain picker — sky-blue
      to distinguish from manual / live / sim. */
   .leg-source-chain { color: #c084fc; }
