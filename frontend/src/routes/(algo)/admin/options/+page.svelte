@@ -418,6 +418,13 @@
   let instrumentsReady = $state(false);
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
+  // Kind multi-select — operator picks any combination of Options
+  // and Futures. Both selected by default so the panel surfaces both
+  // contract types out of the box; deselecting one collapses that
+  // section. Empty → both auto-restored on next mount (kind picker
+  // is a filter, not a kill switch).
+  /** @type {Array<'opt'|'fut'>} */
+  let chainKinds       = $state(/** @type {Array<'opt'|'fut'>} */ (['opt', 'fut']));
 
   // chainSide stays as the (i) launcher's default leg side (long).
   // Per-row +/− buttons override on a per-pick basis (each button
@@ -831,13 +838,18 @@
   const chainFutures = $derived.by(() => {
     if (!instrumentsReady || !chainUnderlying) return [];
     const all = listFutures(chainUnderlying.toUpperCase()) || [];
-    if (chainExpiry) {
-      const exact = all.filter(f => f.x === chainExpiry);
-      if (exact.length) return exact;
-    }
-    // Return up to 3 nearest futures so the operator can see what's
-    // available without a separate "show all expiries" toggle.
-    return all.slice(0, 3);
+    if (!chainExpiry) return all.slice(0, 3);
+    // Exact expiry match first — futures + options sometimes share
+    // the same Thursday (the monthly-options + monthly-future date).
+    const exact = all.filter(f => f.x === chainExpiry);
+    if (exact.length) return exact;
+    // Fallback: month-of match. Indian weekly options expire on
+    // Thursdays; their natural pairing is the monthly future for
+    // the same calendar month, which expires on the LAST Thursday
+    // of that month. Picking by year-month captures this without
+    // hard-coding the last-Thursday rule.
+    const ym = String(chainExpiry).slice(0, 7);   // 'YYYY-MM'
+    return all.filter(f => String(f.x || '').slice(0, 7) === ym);
   });
 
   // Default the chain underlying to the top of the priority list
@@ -1540,8 +1552,18 @@
             options={chainExpiries.map(e => ({ value: e, label: e }))}
             placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
         </div>
+        <div class="chain-field">
+          <label class="field-label" for="chain-kind">Kind</label>
+          <MultiSelect id="chain-kind"
+            bind:value={chainKinds}
+            options={[
+              { value: 'opt', label: 'Options'  },
+              { value: 'fut', label: 'Futures'  },
+            ]}
+            placeholder="Both" />
+        </div>
       </div>
-      {#if chainFutures.length}
+      {#if chainKinds.includes('fut') && chainFutures.length}
         <!-- Futures quick-add row — paired BUY (+) / SELL (−) pills
              open the inline lots-picker; (i) opens the full
              OrderTicket modal pre-filled. Same fast/slow split as
@@ -1576,7 +1598,7 @@
           {/each}
         </div>
       {/if}
-      {#if chainStrikes.length}
+      {#if chainKinds.includes('opt') && chainStrikes.length}
         <div class="chain-grid-wrap">
           <table class="chain-grid">
             <colgroup>
@@ -1768,7 +1790,7 @@
                         title="Increase lots"
                         disabled={basketPlacing}
                         onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
-                <span class="chain-basket-qty">{leg.lots * leg.lotSize}</span>
+                <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
               </span>
             {/each}
           </div>
@@ -2816,19 +2838,31 @@
      scroll into oblivion when an underlying has 100+ strikes. */
   .chain-controls {
     display: grid;
-    /* Underlying + Expiry occupy equal space on the same line; Kind
-       toggle takes only the room it needs (compact 2-pill segmented
-       control). Operator request: equal-width Underlying / Expiry. */
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    /* Underlying gets the most room (long names like CRUDEOIL),
+       Expiry mid, Kind compact (2-option multi-select). All three
+       on a single row on every viewport — operator wanted them
+       squeezed onto one line on mobile rather than wrapping. */
+    grid-template-columns:
+      minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr);
     gap: 0.4rem 0.5rem;
     margin-bottom: 0.5rem;
     align-items: end;
   }
   @media (max-width: 600px) {
-    /* Mobile: keep Underlying + Expiry on the SAME line. */
+    /* Mobile: still all three on one line — squeeze gap + drop the
+       Underlying weighting so equal thirds maximise width per cell. */
     .chain-controls {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 0.35rem 0.4rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0.25rem 0.3rem;
+    }
+    .chain-controls .field-label {
+      font-size: 0.55rem;
+    }
+    .chain-controls :global(.rbq-select-trigger),
+    .chain-controls :global(.rbq-multi-trigger) {
+      font-size: 0.62rem;
+      padding-left: 0.4rem;
+      padding-right: 0.4rem;
     }
   }
   .chain-field {
