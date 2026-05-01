@@ -656,7 +656,7 @@
         {#if _accountFunds.account === 'TOTAL'}
           <span class="ot-funds-k">Total</span>
         {/if}
-        <span class="ot-funds-k">Avail margin</span>
+        <span class="ot-funds-k">Margin</span>
         <span class="ot-funds-v">
           {_accountFunds.avail_margin < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.avail_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
         </span>
