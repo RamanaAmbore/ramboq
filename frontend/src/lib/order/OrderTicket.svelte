@@ -255,12 +255,34 @@
   /** @type {Array<{account:string, cash:number, avail_margin:number,
    *                used_margin:number, collateral:number}>} */
   let _funds = $state([]);
-  // Match the row for the currently-picked account. Falls through to
-  // null when funds haven't loaded yet OR the account isn't in the
-  // funds payload (rare — usually a 401 / 403 / sim discrepancy).
+  // Pick the funds row to surface in the pill. Order:
+  //   1. exact match on the currently-picked account (most useful)
+  //   2. summed totals across every loaded fund row (fallback when
+  //      the operator hasn't picked an account yet, or when /accounts
+  //      hasn't resolved so the picker is empty)
+  //   3. null — funds payload empty (401 / 403 / fetch failure)
+  // The earlier "exact match only" rule made the pill silently
+  // disappear whenever the account picker collapsed (single-acct
+  // case OR demo session before sign-in), even though we already
+  // had per-account funds in memory. Falling back to the summed
+  // view keeps the operator informed in those edge cases.
   const _accountFunds = $derived.by(() => {
-    if (!_account || !_funds.length) return null;
-    return _funds.find(r => r.account === _account) || null;
+    if (!_funds.length) return null;
+    if (_account) {
+      const match = _funds.find(r => r.account === _account);
+      if (match) return match;
+    }
+    let cash = 0, am = 0, um = 0, col = 0;
+    for (const f of _funds) {
+      cash += Number(f?.cash || 0);
+      am   += Number(f?.avail_margin || 0);
+      um   += Number(f?.used_margin  || 0);
+      col  += Number(f?.collateral   || 0);
+    }
+    return {
+      account:      'TOTAL',
+      cash, avail_margin: am, used_margin: um, collateral: col,
+    };
   });
 
   // Account list shown by the picker — caller's `accounts` prop
@@ -585,33 +607,41 @@
               {/each}
             </select>
           {/if}
-          <!-- Per-account funds pill — sits beneath the Account input
-               so the operator can see Avail margin / Cash for the
-               account they just picked, without leaving the modal.
-               Available margin is the headline (it's the bound on
-               place-ability); Cash is the secondary readout. Negative
-               margin (margin debt) flips the pill red. -->
-          {#if _accountFunds}
-            <div class="ot-funds" class:ot-funds-low={_accountFunds.avail_margin < 0}>
-              <span class="ot-funds-k">Avail margin</span>
-              <span class="ot-funds-v">
-                {_accountFunds.avail_margin < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.avail_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              <span class="ot-funds-sep">·</span>
-              <span class="ot-funds-k">Cash</span>
-              <span class="ot-funds-v">
-                {_accountFunds.cash < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.cash || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-              {#if _accountFunds.used_margin > 0}
-                <span class="ot-funds-sep">·</span>
-                <span class="ot-funds-k">Used</span>
-                <span class="ot-funds-v">
-                  ₹{Math.abs(Number(_accountFunds.used_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                </span>
-              {/if}
-            </div>
-          {/if}
         </div>
+      </div>
+    {/if}
+
+    <!-- Per-account funds pill — sits ABOVE the Type/Product row so
+         the operator always sees Avail margin + Cash before picking
+         a side. Lifted out of the account-list gate so it surfaces
+         even when the picker is empty (single-account scenarios, or
+         a delayed /accounts fetch); falls back to the summed totals
+         across every loaded fund row when no specific account is
+         selected. Negative margin (margin debt) flips the pill red. -->
+    {#if _accountFunds}
+      <div class="ot-funds" class:ot-funds-low={_accountFunds.avail_margin < 0}
+           title={_accountFunds.account === 'TOTAL'
+             ? 'Sum across every loaded broker account'
+             : `Funds for ${_accountFunds.account}`}>
+        {#if _accountFunds.account === 'TOTAL'}
+          <span class="ot-funds-k">Total</span>
+        {/if}
+        <span class="ot-funds-k">Avail margin</span>
+        <span class="ot-funds-v">
+          {_accountFunds.avail_margin < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.avail_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+        </span>
+        <span class="ot-funds-sep">·</span>
+        <span class="ot-funds-k">Cash</span>
+        <span class="ot-funds-v">
+          {_accountFunds.cash < 0 ? '−' : ''}₹{Math.abs(Number(_accountFunds.cash || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+        </span>
+        {#if _accountFunds.used_margin > 0}
+          <span class="ot-funds-sep">·</span>
+          <span class="ot-funds-k">Used</span>
+          <span class="ot-funds-v">
+            ₹{Math.abs(Number(_accountFunds.used_margin || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          </span>
+        {/if}
       </div>
     {/if}
 

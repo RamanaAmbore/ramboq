@@ -18,7 +18,7 @@
 
   import { onMount, onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, visibleInterval } from '$lib/stores';
+  import { authStore, clientTimestamp, visibleInterval, marketAwareInterval } from '$lib/stores';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
     fetchAccounts, fetchOptionsSpot, fetchChainQuotes,
@@ -417,12 +417,6 @@
   let instrumentsReady = $state(false);
   let chainUnderlying  = $state('');
   let chainExpiry      = $state('');
-  // OChain kind toggle — 'opt' shows the CE/PE strike grid (default,
-  // matches the existing options-trader workflow); 'fut' shows the
-  // futures contracts only. Operator request: hide the futures pills
-  // by default, surface them via an explicit checkbox so they don't
-  // crowd the strike grid.
-  let chainKind        = $state(/** @type {'opt'|'fut'} */ ('opt'));
 
   // chainSide stays as the (i) launcher's default leg side (long).
   // Per-row +/− buttons override on a per-pick basis (each button
@@ -1345,8 +1339,13 @@
     // Historical refreshes only on symbol change (daily candles don't
     // change intra-day).
     loadSimStatus();
-    teardown    = visibleInterval(loadStrategy,  5000);
-    posTeardown = visibleInterval(loadPositions, 30000);
+    // Market-hours gated — outside NSE + MCX windows the polls pause.
+    // Strategy + positions don't need to refresh overnight (broker
+    // values are static when both segments are closed). Sim status
+    // stays on visibleInterval so an operator-triggered sim run while
+    // markets are closed still surfaces in real time.
+    teardown    = marketAwareInterval(loadStrategy,  5000);
+    posTeardown = marketAwareInterval(loadPositions, 30000);
     simTeardown = visibleInterval(loadSimStatus,  5000);
   });
   onDestroy(() => { teardown?.(); posTeardown?.(); simTeardown?.(); });
@@ -1535,27 +1534,8 @@
             options={chainExpiries.map(e => ({ value: e, label: e }))}
             placeholder={chainExpiries.length ? 'Pick expiry' : '—'} />
         </div>
-        <!-- Options / Futures toggle — radio-style. Default lands on
-             Options (the strike grid); flip to Futures to hide the
-             grid and expose the futures pills. Operator preference:
-             futures shouldn't crowd the strike grid by default. -->
-        <div class="chain-field chain-kind-field">
-          <span class="field-label">Kind</span>
-          <div class="chain-kind-toggle" role="radiogroup" aria-label="Chain kind">
-            <label class="chain-kind-pill" class:on={chainKind === 'opt'}>
-              <input type="radio" name="chain-kind" value="opt"
-                     bind:group={chainKind} class="chain-kind-radio"/>
-              Options
-            </label>
-            <label class="chain-kind-pill" class:on={chainKind === 'fut'}>
-              <input type="radio" name="chain-kind" value="fut"
-                     bind:group={chainKind} class="chain-kind-radio"/>
-              Futures
-            </label>
-          </div>
-        </div>
       </div>
-      {#if chainKind === 'fut' && chainFutures.length}
+      {#if chainFutures.length}
         <!-- Futures quick-add row — paired BUY (+) / SELL (−) pills
              open the inline lots-picker; (i) opens the full
              OrderTicket modal pre-filled. Same fast/slow split as
@@ -1590,7 +1570,7 @@
           {/each}
         </div>
       {/if}
-      {#if chainKind === 'opt' && chainStrikes.length}
+      {#if chainStrikes.length}
         <div class="chain-grid-wrap">
           <table class="chain-grid">
             <colgroup>
@@ -1743,14 +1723,10 @@
             </tbody>
           </table>
         </div>
-      {:else if chainKind === 'opt'}
+      {:else}
         <div class="text-[0.6rem] text-[#a3b9d0] italic mt-2">
           No strikes for {chainUnderlying} expiring {chainExpiry || '(pick expiry)'}.
           Try a different underlying or expiry.
-        </div>
-      {:else if chainKind === 'fut' && !chainFutures.length}
-        <div class="text-[0.6rem] text-[#a3b9d0] italic mt-2">
-          No futures contracts for {chainUnderlying}.
         </div>
       {/if}
 
@@ -1763,23 +1739,30 @@
         <div class="chain-basket">
           <div class="chain-basket-legs">
             {#each chainBasket as leg (leg.key)}
-              <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'}">
+              <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'} chain-basket-leg-type-{/CE$/.test(leg.sym) ? 'ce' : /PE$/.test(leg.sym) ? 'pe' : 'fut'}"
+                    class:is-disabled={basketPlacing}
+                    role="button" tabindex="0"
+                    title="Click to remove from basket"
+                    onclick={() => { if (!basketPlacing) removeFromBasket(leg.key); }}
+                    onkeydown={(e) => {
+                      if (basketPlacing) return;
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
+                        e.preventDefault();
+                        removeFromBasket(leg.key);
+                      }
+                    }}>
                 <span class="chain-basket-side">{leg.side === 'BUY' ? 'B' : 'S'}</span>
                 <span class="chain-basket-sym">{leg.sym}</span>
                 <button type="button" class="chain-basket-step"
                         title="Decrease lots"
                         disabled={basketPlacing || leg.lots <= 1}
-                        onclick={() => basketStepLots(leg.key, -1)}>−</button>
+                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, -1); }}>−</button>
                 <span class="chain-basket-lots">{leg.lots}</span>
                 <button type="button" class="chain-basket-step"
                         title="Increase lots"
                         disabled={basketPlacing}
-                        onclick={() => basketStepLots(leg.key, +1)}>+</button>
-                <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
-                <button type="button" class="chain-basket-rm"
-                        title="Remove from basket"
-                        disabled={basketPlacing}
-                        onclick={() => removeFromBasket(leg.key)}>×</button>
+                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
+                <span class="chain-basket-qty">{leg.lots * leg.lotSize}</span>
               </span>
             {/each}
           </div>
@@ -2836,71 +2819,16 @@
     align-items: end;
   }
   @media (max-width: 600px) {
-    /* Mobile: keep Underlying + Expiry on the SAME line (operator
-       request: "squeeze them on mobile"). Kind toggle spans the
-       full second row so the two Selects don't lose width to it.
-       Tighter gap + a shrunken Select min-width let both fit
-       comfortably on a phone in portrait. */
+    /* Mobile: keep Underlying + Expiry on the SAME line. */
     .chain-controls {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 0.35rem 0.4rem;
-    }
-    .chain-controls .chain-kind-field {
-      grid-column: 1 / -1;     /* span both columns on row 2 */
     }
   }
   .chain-field {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-  }
-
-  /* Options / Futures toggle — radio-style pill pair. The native
-     <input type="radio"> is visually hidden; the wrapping <label>
-     carries the rendered pill. Active state inverts to filled
-     amber to match the OChain button + other selected affordances
-     across the algo theme. */
-  .chain-kind-toggle {
-    display: inline-flex;
-    border-radius: 3px;
-    border: 1px solid rgba(126,151,184,0.35);
-    overflow: hidden;
-    align-self: flex-start;
-  }
-  .chain-kind-pill {
-    flex: 0 0 auto;
-    padding: 0 0.55rem;
-    height: 1.55rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #a3b9d0;
-    background: transparent;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-  }
-  .chain-kind-pill:hover {
-    background: rgba(251,191,36,0.10);
-    color: #fbbf24;
-  }
-  .chain-kind-pill.on {
-    background: rgba(251,191,36,0.18);
-    color: #fbbf24;
-  }
-  .chain-kind-pill + .chain-kind-pill {
-    border-left: 1px solid rgba(126,151,184,0.30);
-  }
-  .chain-kind-radio {
-    /* Native radio hidden; the surrounding pill is the visual. */
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-    width: 0;
-    height: 0;
   }
   /* Futures quick-add row above the strike grid. Same general look as
      the chain CE/PE buttons but tagged sky-blue so it's visually
@@ -3167,19 +3095,57 @@
     flex: 1 1 60%;
     min-width: 0;
   }
+  /* Each chip is the leg's full action surface — click anywhere on
+     the chip (except the inline lot stepper) to remove the leg from
+     the basket. The chip is colour-coded by SIDE on the OUTLINE
+     (BUY=green / SELL=red, matching the strike-row +/- buttons and
+     the OrderTicket's Add/Close pills) and by OPTION TYPE via a
+     subtle inner left-border accent (CE green / PE red / FUT sky)
+     so the operator reads "what side am I taking?" + "is this a
+     call / put / future?" at a glance without a separate text tag. */
   .chain-basket-leg {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 1px 5px 1px 4px;
-    border-radius: 2px;
+    padding: 1px 6px 1px 4px;
+    border-radius: 3px;
     border: 1px solid currentColor;
+    border-left-width: 4px;
     font-family: monospace;
     font-size: 0.6rem;
-    line-height: 1.4;
+    line-height: 1.5;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, transform 0.05s;
   }
+  .chain-basket-leg:focus-visible {
+    outline: 2px solid #fbbf24;
+    outline-offset: 1px;
+  }
+  .chain-basket-leg:hover:not(.is-disabled) {
+    background: rgba(248,113,113,0.10);
+    transform: translateY(-1px);
+  }
+  .chain-basket-leg:hover:not(.is-disabled) .chain-basket-sym::after {
+    content: ' ✕';
+    color: #f87171;
+    margin-left: 0.15rem;
+    font-weight: 700;
+  }
+  .chain-basket-leg.is-disabled {
+    cursor: progress;
+    opacity: 0.55;
+  }
+  /* Outline + side text colour by SIDE (chain-btn-buy / -sell green /
+     red, same as the strike-row buttons). */
   .chain-basket-leg-buy  { color: #4ade80; background: rgba(74,222,128,0.06); }
   .chain-basket-leg-sell { color: #f87171; background: rgba(248,113,113,0.06); }
+  /* Left-border accent by TYPE (CE green / PE red / FUT sky-blue,
+     matching the strike header palette + OrderTicket option-type
+     pills). */
+  .chain-basket-leg-type-ce  { border-left-color: #4ade80; }
+  .chain-basket-leg-type-pe  { border-left-color: #f87171; }
+  .chain-basket-leg-type-fut { border-left-color: #7dd3fc; }
   .chain-basket-side {
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -3190,8 +3156,9 @@
   }
   .chain-basket-qty {
     color: #a3b9d0;
-    font-size: 0.55rem;
+    font-size: 0.58rem;
     opacity: 0.85;
+    font-variant-numeric: tabular-nums;
   }
   /* In-pill lot stepper. Same family as `.chain-btn` but slightly
      smaller (basket-pill is itself compact). Coloured with the
@@ -3227,17 +3194,6 @@
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
   }
-  .chain-basket-rm {
-    background: transparent;
-    border: 0;
-    color: currentColor;
-    cursor: pointer;
-    padding: 0 2px;
-    font-size: 0.7rem;
-    line-height: 1;
-    opacity: 0.7;
-  }
-  .chain-basket-rm:hover { opacity: 1; }
   .chain-basket-actions {
     display: inline-flex;
     align-items: center;
