@@ -77,20 +77,22 @@ def _live_chase_config(aggressiveness: str):
 
     Engine-side defaults still come from /admin/settings (algo.*)
     when the request doesn't carry an aggressiveness override.
+    Default: 'low' — the operator's standing instruction is "be
+    patient on entry"; callers explicitly bump to med/high when
+    they want more fill speed at the cost of slippage.
     """
     from backend.api.algo.chase import ChaseConfig
-    a = (aggressiveness or "high").lower()
-    if a == "low":
-        return ChaseConfig(interval_seconds=30, aggression_step=0.05,
-                           max_attempts=30)
+    a = (aggressiveness or "low").lower()
+    if a == "high":
+        return ChaseConfig(interval_seconds=10, aggression_step=0.25,
+                           max_attempts=10)
     if a == "med":
         return ChaseConfig(interval_seconds=20, aggression_step=0.10,
                            max_attempts=20)
-    # high (default — same as the existing /place-direct path that
-    # previously had no chase at all, so this is a strict upgrade
-    # in execution quality rather than a behaviour change).
-    return ChaseConfig(interval_seconds=10, aggression_step=0.25,
-                       max_attempts=10)
+    # low (default) — patient: peg passively, ease into the
+    # spread only after enough ticks pass.
+    return ChaseConfig(interval_seconds=30, aggression_step=0.05,
+                       max_attempts=30)
 
 
 async def _start_live_chase(account: str, symbol: str, exchange: str,
@@ -490,9 +492,9 @@ class OrdersController(Controller):
                         exchange=(data.exchange or "NFO"),
                         transaction_type=side,
                         quantity=qty,
-                        aggressiveness=(data.chase_aggressiveness or "high"),
+                        aggressiveness=(data.chase_aggressiveness or "low"),
                     )
-                    chase_tag = f" CHASE[{(data.chase_aggressiveness or 'high').lower()}]"
+                    chase_tag = f" CHASE[{(data.chase_aggressiveness or 'low').lower()}]"
                 else:
                     # Single-shot — preserves the existing path for
                     # MARKET / SL-M and explicit chase=False tickets.
@@ -521,7 +523,7 @@ class OrdersController(Controller):
                     mode="live",
                     status="OPEN",
                     detail=(f"Live broker order #{order_id} placed at {account}"
-                            + (f" — chasing [{(data.chase_aggressiveness or 'high').lower()}]"
+                            + (f" — chasing [{(data.chase_aggressiveness or 'low').lower()}]"
                                if chase_eligible else "")
                             + "."),
                 )
@@ -562,11 +564,12 @@ class OrdersController(Controller):
         if data.price is not None and qty > 0 and data.chase:
             try:
                 # Validate + normalise aggressiveness so an out-of-
-                # band value silently downgrades to 'high' (the
-                # safe default) rather than blowing up the engine.
-                agg = (data.chase_aggressiveness or "high").lower()
+                # band value silently downgrades to 'low' (the
+                # operator's standing default) rather than blowing
+                # up the engine.
+                agg = (data.chase_aggressiveness or "low").lower()
                 if agg not in ("low", "med", "high"):
-                    agg = "high"
+                    agg = "low"
                 engine = get_prod_paper_engine()
                 engine.register_open_order({
                     "algo_order_id": algo_order_id,

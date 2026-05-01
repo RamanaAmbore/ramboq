@@ -173,10 +173,11 @@
   // ignore the toggle (no limit to chase).
   let _chase    = $state(true);
   // Chase aggressiveness — analogous to IBKR Adaptive Algo's
-  // Patient / Normal / Urgent. 'high' = cross the spread (current
-  // default behaviour); 'med' = midpoint peg; 'low' = passive,
-  // sit on your own side and wait. Ignored when chase is off.
-  let _chaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('high'));
+  // Patient / Normal / Urgent. Defaults to 'low' (passive — pegs
+  // to your own side, waits for the market) so a plain Submit
+  // doesn't accidentally cross the spread. Operator can promote
+  // to 'med' / 'high' inline before submit.
+  let _chaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('low'));
 
   // Auto-fill plumbing — the OrderDepth child polls the quote
   // every 1.2 s and bubbles each fresh response here via
@@ -431,7 +432,7 @@
       // SL-M ignore it on the backend, but we still ship the flag
       // so the AlgoOrder row records the intent for replay.
       chase:               showLimit ? _chase : false,
-      chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'high',
+      chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'low',
     };
     submitting = true; submitErr = ''; submitOk = '';
     try {
@@ -451,7 +452,7 @@
           trigger_price:    showTrigger ? _roundToTick(_trigger) : null,
           account:          _account,
           chase:                showLimit ? _chase : false,
-          chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'high',
+          chase_aggressiveness: showLimit && _chase ? _chaseAgg : 'low',
         });
         // Show inline confirmation so the operator sees the order
         // landed before the modal closes. Backend returns

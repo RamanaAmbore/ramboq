@@ -38,7 +38,7 @@
     if (txn !== 'BUY' && txn !== 'SELL') return null;
     return {
       transaction_type: txn, account: parts[1], tradingsymbol: parts[2],
-      quantity: parseInt(parts[3]) || 0, order_type: (parts[4] || 'MARKET').toUpperCase(),
+      quantity: parseInt(parts[3]) || 0, order_type: (parts[4] || 'LIMIT').toUpperCase(),
       price: parseFloat(parts[5]) || 0, exchange: 'NFO', product: 'NRML',
       variety: 'regular', validity: 'DAY',
     };

@@ -543,7 +543,7 @@
   // pills (Patient / Balanced / Urgent) — same vocabulary across
   // every order surface so the operator's mental model is one.
   let basketChase    = $state(true);
-  let basketChaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('high'));
+  let basketChaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('low'));
   let basketJustDone = $state(false);
   function removeFromBasket(/** @type {string} */ key) {
     chainBasket = chainBasket.filter(b => b.key !== key);
@@ -580,7 +580,7 @@
           // Chase params apply only to limit-bearing legs; MARKET
           // legs ignore them on the backend.
           chase:                hasLimit ? basketChase : false,
-          chase_aggressiveness: hasLimit && basketChase ? basketChaseAgg : 'high',
+          chase_aggressiveness: hasLimit && basketChase ? basketChaseAgg : 'low',
         });
       } catch (e) {
         const msg = String(/** @type {any} */ (e)?.message || e || 'failed');

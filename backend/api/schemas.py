@@ -224,10 +224,11 @@ class TicketOrderRequest(msgspec.Struct):
     #            on your own side, wait for the market to come)
     #   "med"  → midpoint: (bid + ask) / 2
     #   "high" → aggressive: SELL pegs to BID, BUY pegs to ASK
-    #            (cross the spread to take liquidity — current
-    #            default behaviour)
-    # Default `high` keeps existing tickets behaving identically.
-    chase_aggressiveness: str = "high"
+    #            (cross the spread to take liquidity)
+    # Default `low` — operator's standing instruction is "be
+    # patient on entry"; callers explicitly bump to med/high when
+    # they want fill speed at the cost of slippage.
+    chase_aggressiveness: str = "low"
 
 
 class TicketOrderResponse(msgspec.Struct):

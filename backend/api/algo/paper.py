@@ -178,13 +178,13 @@ class PaperTradeEngine:
                 self._record_event(order, kind="unfilled",
                                    note=f"gave up after {max_attempts} chase attempts")
                 continue
-            agg = str(order.get("chase_agg") or "high").lower()
-            if agg == "low":
-                new_limit = ask if side == "SELL" else bid
+            agg = str(order.get("chase_agg") or "low").lower()
+            if agg == "high":
+                new_limit = bid if side == "SELL" else ask
             elif agg == "med":
                 new_limit = (bid + ask) / 2.0
-            else:  # 'high' — current default
-                new_limit = bid if side == "SELL" else ask
+            else:  # 'low' — patient (default): peg to your own side
+                new_limit = ask if side == "SELL" else bid
             prev_limit = limit
             order["limit_price"] = new_limit
             order["attempts"]    = int(order.get("attempts", 0)) + 1
