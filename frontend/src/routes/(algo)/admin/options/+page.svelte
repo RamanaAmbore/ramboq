@@ -451,10 +451,11 @@
   let quickPicker      = $state(null);
   let quickPlacing     = $state(false);
   let quickError       = $state('');
-  // Key of the cell that just placed successfully — drives the
-  // brief inline "✓ placed" toast. Auto-clears after ~1.5 s.
-  /** @type {string|null} */
-  let quickJustPlaced  = $state(null);
+  // Cell that just succeeded — drives the brief inline toast. Two
+  // success modes: `✓ placed` (immediate-fire path) and `✓ added`
+  // (basket-stage path). Auto-clears after ~1.2-1.5 s.
+  /** @type {{ key: string, msg: string }|null} */
+  let quickToast       = $state(null);
 
   function _quickKeyOpt(strike, optType) { return `o:${strike}:${optType}`; }
   function _quickKeyFut(sym)             { return `f:${sym}`; }
@@ -485,7 +486,7 @@
       lots: 1, isFuture: false, sym: null, lotSize: lot,
     };
     quickError      = '';
-    quickJustPlaced = null;
+    quickToast      = null;
   }
   function openQuickPickerFut(sym, lotSize, side) {
     quickPicker = {
@@ -493,7 +494,7 @@
       lots: 1, isFuture: true, sym, lotSize,
     };
     quickError      = '';
-    quickJustPlaced = null;
+    quickToast      = null;
   }
   function cancelQuickPicker() {
     quickPicker = null;
@@ -521,13 +522,12 @@
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  /** Submit a paper MARKET order directly. No price field needed —
-   *  the broker's market routing fills at the opposing top-of-book.
-   *  Keeps the fast path truly one-click + lots; advanced limit /
-   *  chase / mode / qty edits live on the (i) modal path. */
-  async function quickPlace() {
-    if (!quickPicker || quickPlacing) return;
-
+  /** Resolve the inline picker's contract + meta. Shared by both the
+   *  immediate-fire path (`quickPlace`) and the stage-to-basket path
+   *  (`quickAddToBasket`); returns null + sets `quickError` on a
+   *  cache-miss / lookup failure. */
+  function _quickResolve() {
+    if (!quickPicker) return null;
     let sym, exchange, lot;
     if (quickPicker.isFuture) {
       sym = String(quickPicker.sym || '');
@@ -541,43 +541,143 @@
         quickPicker.strike,
         chainExpiry,
       );
-      if (!inst) { quickError = 'Symbol not in instruments cache.'; return; }
+      if (!inst) { quickError = 'Symbol not in instruments cache.'; return null; }
       sym       = inst.s;
       exchange  = inst.e || 'NFO';
       lot       = Number(inst.ls || 1);
     }
-
     const lots = Math.max(1, Math.floor(Number(quickPicker.lots) || 1));
-    const acct = _ticketAccountDefault();
-    if (!acct) { quickError = 'No routable account selected.'; return; }
-
-    const key = quickPicker.isFuture
+    /** @type {'BUY'|'SELL'} */
+    const side = quickPicker.side === 'long' ? 'BUY' : 'SELL';
+    const cellKey = quickPicker.isFuture
       ? _quickKeyFut(sym)
       : _quickKeyOpt(quickPicker.strike, quickPicker.optType);
+    return { sym, exchange, lot, lots, side, cellKey };
+  }
 
+  /** Immediate-fire path — submit a paper MARKET order directly. No
+   *  basket round-trip. Operators use this for one-click single-leg
+   *  fills; multi-leg strategies should use `quickAddToBasket` + the
+   *  Place button instead. */
+  async function quickPlace() {
+    if (!quickPicker || quickPlacing) return;
+    const r = _quickResolve();
+    if (!r) return;
+    const acct = _ticketAccountDefault();
+    if (!acct) { quickError = 'No routable account selected.'; return; }
     quickPlacing = true;
     quickError   = '';
     try {
       await placeTicketOrder({
         mode:          'paper',
-        side:          quickPicker.side === 'long' ? 'BUY' : 'SELL',
-        tradingsymbol: sym,
-        quantity:      lot * lots,
-        exchange,
+        side:          r.side,
+        tradingsymbol: r.sym,
+        quantity:      r.lot * r.lots,
+        exchange:      r.exchange,
         product:       'NRML',
         order_type:    'MARKET',
         variety:       'regular',
         account:       acct,
       });
-      quickJustPlaced = key;
-      quickPicker     = null;
+      quickToast  = { key: r.cellKey, msg: '✓ placed' };
+      quickPicker = null;
       setTimeout(() => {
-        if (quickJustPlaced === key) quickJustPlaced = null;
+        if (quickToast?.key === r.cellKey) quickToast = null;
       }, 1500);
     } catch (e) {
-      quickError = String(e?.message || e || 'Place failed');
+      quickError = String(/** @type {any} */ (e)?.message || e || 'Place failed');
     } finally {
       quickPlacing = false;
+    }
+  }
+
+  /** Stage a leg into the chain basket. ✕ on the picker still
+   *  cancels; this button (rendered alongside ✓) pushes the leg into
+   *  `chainBasket` so the operator can build a multi-leg strategy
+   *  before hitting Place. */
+  function quickAddToBasket() {
+    if (!quickPicker || quickPlacing) return;
+    const r = _quickResolve();
+    if (!r) return;
+    chainBasket = [...chainBasket, {
+      key:      `${r.side}|${r.cellKey}|${Date.now()}`,
+      side:     r.side,
+      sym:      r.sym,
+      exchange: r.exchange,
+      lots:     r.lots,
+      lotSize:  r.lot,
+      product:  'NRML',
+    }];
+    basketError = '';
+    quickToast  = { key: r.cellKey, msg: '✓ added' };
+    quickPicker = null;
+    setTimeout(() => {
+      if (quickToast?.key === r.cellKey) quickToast = null;
+    }, 1200);
+  }
+
+  // ── Chain basket — staged legs awaiting one-shot submit ───────────
+  /** @type {Array<{
+   *   key: string,
+   *   side: 'BUY'|'SELL',
+   *   sym: string,
+   *   exchange: string,
+   *   lots: number,
+   *   lotSize: number,
+   *   product: string,
+   * }>} */
+  let chainBasket    = $state([]);
+  let basketPlacing  = $state(false);
+  let basketError    = $state('');
+  let basketProgress = $state(0);
+  let basketJustDone = $state(false);
+  function removeFromBasket(/** @type {string} */ key) {
+    chainBasket = chainBasket.filter(b => b.key !== key);
+  }
+  function clearBasket() { chainBasket = []; basketError = ''; }
+  /** Submit every basket leg sequentially as a paper MARKET order via
+   *  the same `placeTicketOrder` path used by the OrderTicket modal.
+   *  Sequential (not Promise.all) so the broker isn't hammered with
+   *  parallel writes that could trip rate-limits — matters more in
+   *  prod where these resolve to live broker calls. */
+  async function placeBasket() {
+    if (basketPlacing || !chainBasket.length) return;
+    const acct = _ticketAccountDefault();
+    if (!acct) { basketError = 'No routable account selected.'; return; }
+
+    basketPlacing  = true;
+    basketError    = '';
+    basketProgress = 0;
+    /** @type {string[]} */ const failures = [];
+    for (const leg of chainBasket) {
+      try {
+        await placeTicketOrder({
+          mode:          'paper',
+          side:          leg.side,
+          tradingsymbol: leg.sym,
+          quantity:      leg.lots * leg.lotSize,
+          exchange:      leg.exchange,
+          product:       leg.product || 'NRML',
+          order_type:    'MARKET',
+          variety:       'regular',
+          account:       acct,
+        });
+      } catch (e) {
+        const msg = String(/** @type {any} */ (e)?.message || e || 'failed');
+        failures.push(`${leg.side} ${leg.sym}: ${msg}`);
+      }
+      basketProgress += 1;
+    }
+    basketPlacing = false;
+    if (failures.length === chainBasket.length) {
+      basketError = failures[0] || 'All legs failed';
+    } else if (failures.length) {
+      basketError = `${failures.length}/${chainBasket.length} failed: ${failures[0]}`;
+      chainBasket = [];
+    } else {
+      chainBasket    = [];
+      basketJustDone = true;
+      setTimeout(() => { basketJustDone = false; }, 2200);
     }
   }
 
@@ -1284,6 +1384,36 @@
     } catch (_) { return false; }
   }
 
+  // Auth transition watcher — when the operator signs in (demo →
+  // admin) or out, the cached `positions` array carries account
+  // identifiers from the previous session: masked (Z#####) for demo,
+  // unmasked for signed-in admin. Without invalidation, the 30-s
+  // poll eventually replaces them but the operator briefly sees the
+  // wrong shape. On every user-id transition, drop the sessionStorage
+  // cache + refire the loaders so the page reflects the active
+  // identity immediately.
+  let _lastAuthUserId = /** @type {string|null} */ (null);
+  $effect(() => {
+    const uid = String($authStore?.user?.id ?? $authStore?.user?.email ?? '');
+    if (uid === _lastAuthUserId) return;
+    const wasInitial = _lastAuthUserId === null;
+    _lastAuthUserId = uid;
+    if (wasInitial) return;            // first run — onMount handles the load
+    untrack(() => {
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem(_CACHE_KEY);
+        }
+      } catch (_) { /* private mode / quota — ignore */ }
+      // Wipe in-memory rows whose account values came from the
+      // previous session. The fetches below repopulate from the
+      // backend within one tick.
+      positions = [];
+      loadPositions();
+      loadRealAccounts();
+    });
+  });
+
   onMount(async () => {
     // Auth/redirect handled by the algo layout; demo visitors view
     // this page read-only.
@@ -1556,15 +1686,19 @@
                   <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                 {/if}
                 <button type="button" class="chain-quick-ok"
-                        disabled={quickPlacing}
-                        title="Place paper MARKET order"
+                        disabled={basketPlacing}
+                        title="Place paper MARKET order now"
                         onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                <button type="button" class="chain-quick-basket"
+                        disabled={basketPlacing || quickPlacing}
+                        title="Add to basket (place all together later)"
+                        onclick={quickAddToBasket}>+B</button>
                 <button type="button" class="chain-quick-cancel"
                         title="Cancel" onclick={cancelQuickPicker}>✕</button>
               </span>
               {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-            {:else if quickJustPlaced === futKey}
-              <span class="chain-quick-toast">✓ {f.s} placed</span>
+            {:else if quickToast?.key === futKey}
+              <span class="chain-quick-toast">{quickToast?.msg} {f.s}</span>
             {:else}
               <span class="chain-fut-pair">
                 <button type="button"
@@ -1648,15 +1782,19 @@
                             <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
-                                  disabled={quickPlacing}
-                                  title="Place paper MARKET order"
+                                  disabled={basketPlacing}
+                                  title="Place paper MARKET order now"
                                   onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-basket"
+                                  disabled={basketPlacing || quickPlacing}
+                                  title="Add to basket (place all together later)"
+                                  onclick={quickAddToBasket}>+B</button>
                           <button type="button" class="chain-quick-cancel"
                                   title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
                         {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickJustPlaced === ceKey}
-                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else if quickToast?.key === ceKey}
+                        <span class="chain-quick-toast">{quickToast.msg}</span>
                       {:else}
                         <span class="chain-btn-pair">
                           <button type="button" class="chain-btn chain-btn-buy"
@@ -1705,15 +1843,19 @@
                             <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
-                                  disabled={quickPlacing}
-                                  title="Place paper MARKET order"
+                                  disabled={basketPlacing}
+                                  title="Place paper MARKET order now"
                                   onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-basket"
+                                  disabled={basketPlacing || quickPlacing}
+                                  title="Add to basket (place all together later)"
+                                  onclick={quickAddToBasket}>+B</button>
                           <button type="button" class="chain-quick-cancel"
                                   title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
                         {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickJustPlaced === peKey}
-                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else if quickToast?.key === peKey}
+                        <span class="chain-quick-toast">{quickToast.msg}</span>
                       {:else}
                         <span class="chain-btn-pair">
                           <button type="button" class="chain-btn chain-btn-buy"
@@ -1752,15 +1894,19 @@
                             <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
-                                  disabled={quickPlacing}
-                                  title="Place paper MARKET order"
+                                  disabled={basketPlacing}
+                                  title="Place paper MARKET order now"
                                   onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-basket"
+                                  disabled={basketPlacing || quickPlacing}
+                                  title="Add to basket (place all together later)"
+                                  onclick={quickAddToBasket}>+B</button>
                           <button type="button" class="chain-quick-cancel"
                                   title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
                         {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickJustPlaced === ceKey}
-                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else if quickToast?.key === ceKey}
+                        <span class="chain-quick-toast">{quickToast.msg}</span>
                       {:else}
                         <span class="chain-btn-pair">
                           <button type="button" class="chain-btn chain-btn-buy"
@@ -1807,15 +1953,19 @@
                             <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
                           {/if}
                           <button type="button" class="chain-quick-ok"
-                                  disabled={quickPlacing}
-                                  title="Place paper MARKET order"
+                                  disabled={basketPlacing}
+                                  title="Place paper MARKET order now"
                                   onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
+                          <button type="button" class="chain-quick-basket"
+                                  disabled={basketPlacing || quickPlacing}
+                                  title="Add to basket (place all together later)"
+                                  onclick={quickAddToBasket}>+B</button>
                           <button type="button" class="chain-quick-cancel"
                                   title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
                         {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickJustPlaced === peKey}
-                        <span class="chain-quick-toast">✓ placed</span>
+                      {:else if quickToast?.key === peKey}
+                        <span class="chain-quick-toast">{quickToast.msg}</span>
                       {:else}
                         <span class="chain-btn-pair">
                           <button type="button" class="chain-btn chain-btn-buy"
@@ -1847,6 +1997,48 @@
         <div class="text-[0.6rem] text-[#a3b9d0] italic mt-2">
           No futures contracts for {chainUnderlying}.
         </div>
+      {/if}
+
+      <!-- Basket bar — shows up the moment the operator stages their
+           first leg via ✓ in the inline picker. One-leg or many,
+           pressing Place fires every leg sequentially as a paper
+           MARKET order through the same /api/orders/ticket path the
+           OrderTicket modal uses. -->
+      {#if chainBasket.length}
+        <div class="chain-basket">
+          <div class="chain-basket-legs">
+            {#each chainBasket as leg (leg.key)}
+              <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'}">
+                <span class="chain-basket-side">{leg.side === 'BUY' ? 'B' : 'S'}</span>
+                <span class="chain-basket-sym">{leg.sym}</span>
+                <span class="chain-basket-qty">{leg.lots}× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
+                <button type="button" class="chain-basket-rm"
+                        title="Remove from basket"
+                        disabled={basketPlacing}
+                        onclick={() => removeFromBasket(leg.key)}>×</button>
+              </span>
+            {/each}
+          </div>
+          <div class="chain-basket-actions">
+            <button type="button" class="chain-basket-clear"
+                    disabled={basketPlacing}
+                    onclick={clearBasket}>Clear</button>
+            <button type="button" class="chain-basket-place"
+                    disabled={basketPlacing}
+                    onclick={placeBasket}>
+              {#if basketPlacing}
+                Placing… ({basketProgress}/{chainBasket.length})
+              {:else}
+                Place {chainBasket.length} leg{chainBasket.length === 1 ? '' : 's'}
+              {/if}
+            </button>
+          </div>
+          {#if basketError}
+            <div class="chain-basket-err">{basketError}</div>
+          {/if}
+        </div>
+      {:else if basketJustDone}
+        <div class="chain-basket-toast">✓ basket placed</div>
       {/if}
     </div>
   {/if}
@@ -3264,6 +3456,7 @@
     padding: 0 3px;
   }
   .chain-quick-ok,
+  .chain-quick-basket,
   .chain-quick-cancel {
     height: 1.25rem;
     min-width: 1.25rem;
@@ -3280,10 +3473,13 @@
     justify-content: center;
   }
   .chain-quick-ok      { color: #4ade80; }
+  .chain-quick-basket  { color: #fbbf24; font-size: 0.6rem; padding: 0 5px; }
   .chain-quick-cancel  { color: #f87171; }
   .chain-quick-ok:hover     { background: rgba(74,222,128,0.10); }
+  .chain-quick-basket:hover { background: rgba(251,191,36,0.10); }
   .chain-quick-cancel:hover { background: rgba(248,113,113,0.10); }
-  .chain-quick-ok:disabled  { opacity: 0.55; cursor: progress; }
+  .chain-quick-ok:disabled,
+  .chain-quick-basket:disabled { opacity: 0.55; cursor: progress; }
   /* Inline error / success messages — kept outside the picker so
      the picker itself stays the same width while the ✓ toast or
      ✕ message renders alongside (or replaces it, in the toast
@@ -3311,6 +3507,109 @@
     letter-spacing: 0.04em;
     animation: chain-quick-fade 1.5s ease-out forwards;
   }
+  /* Basket bar — pinned below the chain table. Compact; one row of
+     leg pills + a Clear / Place pair on the right. Pills wrap on a
+     second line if the operator stages more than fits on one row. */
+  .chain-basket {
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid rgba(251,191,36,0.32);
+    border-radius: 3px;
+    background: rgba(251,191,36,0.06);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+  }
+  .chain-basket-legs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    flex: 1 1 60%;
+    min-width: 0;
+  }
+  .chain-basket-leg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 1px 5px 1px 4px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    font-family: monospace;
+    font-size: 0.6rem;
+    line-height: 1.4;
+  }
+  .chain-basket-leg-buy  { color: #4ade80; background: rgba(74,222,128,0.06); }
+  .chain-basket-leg-sell { color: #f87171; background: rgba(248,113,113,0.06); }
+  .chain-basket-side {
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .chain-basket-sym {
+    color: #c8d8f0;
+    font-weight: 600;
+  }
+  .chain-basket-qty {
+    color: #a3b9d0;
+    font-size: 0.55rem;
+    opacity: 0.85;
+  }
+  .chain-basket-rm {
+    background: transparent;
+    border: 0;
+    color: currentColor;
+    cursor: pointer;
+    padding: 0 2px;
+    font-size: 0.7rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+  .chain-basket-rm:hover { opacity: 1; }
+  .chain-basket-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+  }
+  .chain-basket-clear,
+  .chain-basket-place {
+    height: 1.5rem;
+    padding: 0 0.7rem;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    background: transparent;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .chain-basket-clear { color: #a3b9d0; }
+  .chain-basket-clear:hover { background: rgba(163,185,208,0.08); }
+  .chain-basket-place { color: #fbbf24; background: rgba(251,191,36,0.10); }
+  .chain-basket-place:hover    { background: rgba(251,191,36,0.20); }
+  .chain-basket-place:disabled,
+  .chain-basket-clear:disabled { opacity: 0.55; cursor: progress; }
+  .chain-basket-err {
+    flex: 1 1 100%;
+    color: #f87171;
+    font-family: monospace;
+    font-size: 0.6rem;
+    margin-top: 0.2rem;
+  }
+  .chain-basket-toast {
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 2px;
+    background: rgba(74,222,128,0.14);
+    color: #4ade80;
+    font-family: monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-align: center;
+    animation: chain-quick-fade 2.2s ease-out forwards;
+  }
+
   @keyframes chain-quick-fade {
     0%   { opacity: 1; }
     70%  { opacity: 1; }
