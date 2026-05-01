@@ -48,6 +48,7 @@
    *   currentQty?: number,
    *   onSubmit:  (payload: any) => void | Promise<void>,
    *   onClose:   () => void,
+   *   onAddToBasket?: ((payload: any) => void) | null,
    * }} */
   let {
     symbol,
@@ -90,6 +91,11 @@
     currentQty = 0,
     onSubmit,
     onClose,
+    // Optional "+ Basket" callback — when set, the ticket renders
+    // an "Add to basket" action alongside the primary Submit. The
+    // caller pushes the leg into its own basket panel (same pill
+    // shape as a quick-add). Set to null/undefined to hide.
+    onAddToBasket = /** @type {((payload: any) => void) | null} */ (null),
   } = $props();
 
   // Derived label map for the side toggle. Keeps the actual _side
@@ -350,6 +356,29 @@
     }
     return '';
   });
+
+  /** Build a basket-leg payload from the modal's current state.
+   *  Caller (admin/options) folds this into chainBasket so the leg
+   *  renders as a regular basket pill alongside quick-adds. */
+  function _basketPayload() {
+    return {
+      side:     _side,
+      sym:      symbol,
+      exchange: exchange || 'NFO',
+      lots:     Math.max(1, Number(_lots) || 1),
+      lotSize:  Number(lotSize) || 1,
+      product:  _product,
+      limit:    showLimit ? Number(_roundToTick(_price)) || 0 : 0,
+      chaseAgg: showLimit && _chase ? _chaseAgg : 'low',
+    };
+  }
+
+  function addToBasket() {
+    if (!onAddToBasket) return;
+    if (validationErr) return;
+    onAddToBasket(_basketPayload());
+    onClose();
+  }
 
   let submitting = $state(false);
   /** @type {string} */ let submitErr = $state('');
@@ -802,6 +831,17 @@
 
     <div class="ot-footer">
       <button type="button" class="ot-cancel" onclick={onClose}>Cancel</button>
+      {#if onAddToBasket && action === 'open'}
+        <!-- "+ Basket" — stages the leg into the caller's basket
+             panel instead of placing now. Shown only when the
+             caller wired onAddToBasket (currently /admin/options
+             chain `(i)` flow); other callers see just Cancel +
+             Place. -->
+        <button type="button" class="ot-basket"
+                disabled={!!validationErr || submitting}
+                title="Add this leg to the basket — place every leg together later"
+                onclick={addToBasket}>+ Basket</button>
+      {/if}
       <button type="button" class="ot-submit"
               class:ot-submit-buy={_side === 'BUY'}
               class:ot-submit-sell={_side === 'SELL'}
@@ -1268,6 +1308,7 @@
     border-top: 1px solid rgba(255,255,255,0.08);
   }
   .ot-cancel,
+  .ot-basket,
   .ot-submit {
     padding: 0.45rem 1rem;
     border-radius: 3px;
@@ -1282,6 +1323,19 @@
     color: #c8d8f0;
   }
   .ot-cancel:hover { border-color: rgba(255,255,255,0.35); }
+  /* Stage-into-basket — outlined amber, distinct from the filled
+     green/red Submit. Reads as a secondary action: the operator
+     can stack legs before placing the whole basket together. */
+  .ot-basket {
+    background: rgba(251,191,36,0.10);
+    border-color: rgba(251,191,36,0.55);
+    color: #fbbf24;
+  }
+  .ot-basket:hover:not(:disabled) {
+    background: rgba(251,191,36,0.20);
+    border-color: rgba(251,191,36,0.85);
+  }
+  .ot-basket:disabled { opacity: 0.45; cursor: not-allowed; }
   .ot-submit {
     background: #fbbf24;
     color: #0c1830;

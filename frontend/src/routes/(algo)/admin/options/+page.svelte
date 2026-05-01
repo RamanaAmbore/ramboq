@@ -484,6 +484,7 @@
       lotSize:  Number(inst.ls || 1),
       product:  'NRML',
       limit:    Number(limit) || 0,
+      chaseAgg: /** @type {'low'} */ ('low'),
     }];
     basketError = '';
     _flashToast(_quickKeyOpt(strike, optType), '✓ added');
@@ -506,9 +507,18 @@
       lotSize:  Number(lotSize || inst?.ls || 1),
       product:  'NRML',
       limit:    0,
+      chaseAgg: /** @type {'low'} */ ('low'),
     }];
     basketError = '';
     _flashToast(_quickKeyFut(sym), '✓ added');
+  }
+
+  /** Set the chase aggressiveness on a single basket leg. */
+  function setBasketChaseAgg(/** @type {string} */ key,
+                              /** @type {'low'|'med'|'high'} */ agg) {
+    chainBasket = chainBasket.map(b =>
+      b.key === key ? { ...b, chaseAgg: agg } : b
+    );
   }
 
   /** Step the lots count on a single basket leg. Floored at 1; no
@@ -522,6 +532,9 @@
   }
 
   // ── Chain basket — staged legs awaiting one-shot submit ───────────
+  // Each leg carries its OWN chase aggressiveness, surfaced on the
+  // pill as C[L|M|H]. Defaults to 'low' for quick-adds; OrderTicket
+  // submissions through "+ Basket" pass the operator's picked agg.
   /** @type {Array<{
    *   key: string,
    *   side: 'BUY'|'SELL',
@@ -531,19 +544,12 @@
    *   lotSize: number,
    *   product: string,
    *   limit: number,
+   *   chaseAgg: 'low'|'med'|'high',
    * }>} */
   let chainBasket    = $state([]);
   let basketPlacing  = $state(false);
   let basketError    = $state('');
   let basketProgress = $state(0);
-  // Chase + aggressiveness applied to every leg in placeBasket.
-  // CHASE on → submit as LIMIT with chase=true so the backend
-  // re-quotes until filled; OFF → static LIMIT (or MARKET when the
-  // leg's limit is 0). L / M / H mirror OrderTicket's adaptive-algo
-  // pills (Patient / Balanced / Urgent) — same vocabulary across
-  // every order surface so the operator's mental model is one.
-  let basketChase    = $state(true);
-  let basketChaseAgg = $state(/** @type {'low'|'med'|'high'} */ ('low'));
   let basketJustDone = $state(false);
   function removeFromBasket(/** @type {string} */ key) {
     chainBasket = chainBasket.filter(b => b.key !== key);
@@ -577,10 +583,12 @@
           price:         hasLimit ? Number(leg.limit) : 0,
           variety:       'regular',
           account:       acct,
-          // Chase params apply only to limit-bearing legs; MARKET
-          // legs ignore them on the backend.
-          chase:                hasLimit ? basketChase : false,
-          chase_aggressiveness: hasLimit && basketChase ? basketChaseAgg : 'low',
+          // Chase is ON for every limit-bearing leg; per-leg
+          // aggressiveness comes from the pill's C[L|M|H] picker
+          // (defaults to 'low' on quick-add). MARKET legs ignore
+          // these on the backend.
+          chase:                hasLimit,
+          chase_aggressiveness: hasLimit ? (leg.chaseAgg || 'low') : 'low',
         });
       } catch (e) {
         const msg = String(/** @type {any} */ (e)?.message || e || 'failed');
@@ -1809,56 +1817,36 @@
                         disabled={basketPlacing}
                         onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
                 <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
-                <label class="chain-basket-limit-wrap">
-                  <span class="chain-basket-at">@</span>
-                  <input type="number" class="chain-basket-limit" min="0" step="0.05"
-                         disabled={basketPlacing}
-                         placeholder="MKT"
-                         value={leg.limit || ''}
-                         onclick={(e) => e.stopPropagation()}
-                         onkeydown={(e) => e.stopPropagation()}
-                         oninput={(e) => {
-                           const v = Number(/** @type {HTMLInputElement} */ (e.currentTarget).value);
-                           chainBasket = chainBasket.map(b =>
-                             b.key === leg.key ? { ...b, limit: Number.isFinite(v) ? v : 0 } : b
-                           );
-                         }} />
-                </label>
+                <span class="chain-basket-limit-static"
+                      title={leg.limit > 0
+                        ? 'Algo-selected limit price (auto-seeded from chain bid/ask). Chase re-quotes from here per the C[L|M|H] setting.'
+                        : 'No quote available — leg routes as MARKET.'}>
+                  @{leg.limit > 0
+                    ? leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+                    : 'MKT'}
+                </span>
+                <span class="chain-basket-chase" title="Chase aggressiveness. L = patient (peg to your side), M = midpoint, H = urgent (cross the spread).">
+                  <span class="chain-basket-chase-label">C</span>
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-low"
+                          class:on={(leg.chaseAgg || 'low') === 'low'}
+                          disabled={basketPlacing}
+                          title="Low — patient. SELL pegs to ASK, BUY pegs to BID."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'low'); }}>L</button>
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-med"
+                          class:on={leg.chaseAgg === 'med'}
+                          disabled={basketPlacing}
+                          title="Medium — peg to midpoint of bid+ask."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'med'); }}>M</button>
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-high"
+                          class:on={leg.chaseAgg === 'high'}
+                          disabled={basketPlacing}
+                          title="High — urgent. SELL pegs to BID, BUY pegs to ASK."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'high'); }}>H</button>
+                </span>
               </span>
             {/each}
           </div>
           <div class="chain-basket-actions">
-            <!-- Chase + L/M/H — same vocabulary as OrderTicket's
-                 adaptive-algo pills (Patient / Balanced / Urgent).
-                 Applied to every limit-bearing leg in the basket
-                 on Place; market-priced legs ignore it. -->
-            <label class="chain-chase-toggle"
-                   title={basketChase
-                     ? 'CHASE on — re-quote each leg until filled'
-                     : 'CHASE off — leg rests at its initial limit'}>
-              <input type="checkbox" bind:checked={basketChase}
-                     disabled={basketPlacing} />
-              <span class="chain-chase-label" class:on={basketChase}>CHASE</span>
-            </label>
-            {#if basketChase}
-              <div class="chain-chase-agg" role="group" aria-label="Chase aggressiveness">
-                <button type="button" class="chain-chase-agg-pill chain-chase-agg-low"
-                        class:on={basketChaseAgg === 'low'}
-                        disabled={basketPlacing}
-                        title="Low — patient. SELL pegs to ASK, BUY pegs to BID. Sit on your own side; fills only if the market lifts it."
-                        onclick={() => basketChaseAgg = 'low'}>L</button>
-                <button type="button" class="chain-chase-agg-pill chain-chase-agg-med"
-                        class:on={basketChaseAgg === 'med'}
-                        disabled={basketPlacing}
-                        title="Medium — peg to midpoint of bid+ask. Fills when the inside moves halfway in your favour."
-                        onclick={() => basketChaseAgg = 'med'}>M</button>
-                <button type="button" class="chain-chase-agg-pill chain-chase-agg-high"
-                        class:on={basketChaseAgg === 'high'}
-                        disabled={basketPlacing}
-                        title="High — urgent. SELL pegs to BID, BUY pegs to ASK. Crosses the spread to take liquidity on the next tick."
-                        onclick={() => basketChaseAgg = 'high'}>H</button>
-              </div>
-            {/if}
             <button type="button" class="chain-basket-clear"
                     disabled={basketPlacing}
                     onclick={clearBasket}>Clear</button>
@@ -2183,7 +2171,30 @@
   <OrderTicket
     {...ticketProps}
     onSubmit={onTicketSubmit}
-    onClose={closeTicket} />
+    onClose={closeTicket}
+    onAddToBasket={(payload) => {
+      // Same shape as a quick-add chain leg so the basket pill
+      // renders identically. Symbol's CE/PE/FUT suffix decides
+      // the type accent on the pill.
+      const sym = String(payload.sym || '').toUpperCase();
+      const sideTag = payload.side === 'BUY' ? 'BUY' : 'SELL';
+      const cellKey = /(CE|PE)$/.test(sym)
+        ? _quickKeyOpt(0, /CE$/.test(sym) ? 'CE' : 'PE') + ':' + sym
+        : _quickKeyFut(sym);
+      chainBasket = [...chainBasket, {
+        key:      `${sideTag}|${cellKey}|${Date.now()}`,
+        side:     sideTag,
+        sym,
+        exchange: payload.exchange || 'NFO',
+        lots:     Number(payload.lots) || 1,
+        lotSize:  Number(payload.lotSize) || 1,
+        product:  payload.product || 'NRML',
+        limit:    Number(payload.limit) || 0,
+        chaseAgg: /** @type {'low'|'med'|'high'} */
+                   (payload.chaseAgg || 'low'),
+      }];
+      basketError = '';
+    }} />
 {/if}
 
 <style>
@@ -3273,44 +3284,59 @@
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
   }
-  /* Inline limit-price input at the end of each basket pill. `@`
-     glyph + tight numeric input. Empty placeholder reads "MKT" so
-     the operator knows a 0/blank limit means market-priced. */
-  .chain-basket-limit-wrap {
+  /* Algo-selected limit price — static, not editable. Auto-seeded
+     from chain bid/ask at add-time; shows "@MKT" when no quote was
+     available so the operator knows that leg routes as MARKET. */
+  .chain-basket-limit-static {
+    color: #fbbf24;
+    font-family: monospace;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+  /* Per-leg chase aggressiveness pill cluster — `C[L|M|H]` lives
+     INSIDE each basket leg pill so every leg carries its own
+     aggressiveness. Quick-adds default to L; the operator can flip
+     individual legs to M/H without touching siblings. Mirrors the
+     OrderTicket / chase L/M/H palette (sky / amber / green). */
+  .chain-basket-chase {
     display: inline-flex;
     align-items: center;
     gap: 0.15rem;
-    cursor: text;
+    margin-left: 0.15rem;
   }
-  .chain-basket-at {
+  .chain-basket-chase-label {
     color: #a3b9d0;
-    font-size: 0.55rem;
-    opacity: 0.7;
-  }
-  .chain-basket-limit {
-    width: 4.4rem;
-    padding: 0 4px;
-    height: 1.05rem;
-    border-radius: 2px;
-    border: 1px solid rgba(126,151,184,0.35);
-    background: rgba(13,21,38,0.6);
-    color: #c8d8f0;
     font-family: monospace;
-    font-size: 0.6rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    box-sizing: border-box;
-  }
-  .chain-basket-limit:focus {
-    outline: none;
-    border-color: rgba(251,191,36,0.65);
-    background: rgba(13,21,38,0.85);
-  }
-  .chain-basket-limit::placeholder {
-    color: rgba(163,185,208,0.55);
+    font-size: 0.55rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
   }
+  .chain-basket-chase-pill {
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    border: 1px solid rgba(126,151,184,0.35);
+    border-radius: 2px;
+    background: transparent;
+    color: #a3b9d0;
+    font-family: monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chain-basket-chase-pill:hover:not(:disabled):not(.on) {
+    background: rgba(255,255,255,0.05);
+  }
+  .chain-basket-chase-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chain-basket-chase-pill-low.on  { background: rgba(125,211,252,0.20); color: #7dd3fc; border-color: rgba(125,211,252,0.55); }
+  .chain-basket-chase-pill-med.on  { background: rgba(251,191,36,0.20); color: #fbbf24; border-color: rgba(251,191,36,0.55); }
+  .chain-basket-chase-pill-high.on { background: rgba(74,222,128,0.20); color: #4ade80; border-color: rgba(74,222,128,0.55); }
   .chain-basket-actions {
     display: inline-flex;
     align-items: center;
@@ -3318,56 +3344,6 @@
     margin-left: auto;
     flex-wrap: wrap;
   }
-  /* CHASE checkbox + L/M/H pills near the Place button — same
-     vocabulary + colour palette as OrderTicket's adaptive-algo
-     block. CHASE label flips amber when on; the L/M/H pair
-     mirrors the strike-row colour split (low=sky / med=amber /
-     high=green) so the operator reads "patience → urgency" left
-     to right at a glance. */
-  .chain-chase-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-family: monospace;
-    font-size: 0.6rem;
-    cursor: pointer;
-    user-select: none;
-  }
-  .chain-chase-toggle input { margin: 0; cursor: pointer; }
-  .chain-chase-label {
-    color: #a3b9d0;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-  }
-  .chain-chase-label.on { color: #fbbf24; }
-  .chain-chase-agg {
-    display: inline-flex;
-    border-radius: 2px;
-    border: 1px solid rgba(126,151,184,0.35);
-    overflow: hidden;
-  }
-  .chain-chase-agg-pill {
-    height: 1.4rem;
-    min-width: 1.4rem;
-    padding: 0 5px;
-    border: 0;
-    background: transparent;
-    color: #a3b9d0;
-    font-family: monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .chain-chase-agg-pill + .chain-chase-agg-pill {
-    border-left: 1px solid rgba(126,151,184,0.30);
-  }
-  .chain-chase-agg-pill:hover:not(:disabled):not(.on) {
-    background: rgba(255,255,255,0.05);
-  }
-  .chain-chase-agg-pill:disabled { opacity: 0.4; cursor: not-allowed; }
-  .chain-chase-agg-low.on  { background: rgba(125,211,252,0.18); color: #7dd3fc; }
-  .chain-chase-agg-med.on  { background: rgba(251,191,36,0.18); color: #fbbf24; }
-  .chain-chase-agg-high.on { background: rgba(74,222,128,0.18); color: #4ade80; }
   .chain-basket-clear,
   .chain-basket-place {
     height: 1.5rem;
