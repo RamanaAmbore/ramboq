@@ -1576,99 +1576,20 @@
   {#if instrumentsReady && underlyingChoices.length}
     <div class="algo-status-card cmd-surface p-3 mb-3" data-status="inactive">
       <div class="opt-section-h" style="padding-bottom: 0.5rem;">
-        O Chain
+        Option chain
         {#if chainSpot != null}
           <span class="chain-spot-pill" title="Underlying spot — ATM strike highlighted in the grid below">
             SPOT ₹{chainSpot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            {#if chainAtmStrike != null}
+              · ATM {chainAtmStrike.toFixed(0)}
+            {/if}
           </span>
         {/if}
+        <!-- The trailing "click CE / PE next to a strike to add a leg
+             · quantity defaults to 1 lot" hint was dropped per
+             operator request: with it gone, Option chain + SPOT/ATM
+             pill fit on a single line at narrow widths. -->
       </div>
-
-      <!-- Basket bar — sits on the FIRST row after the SPOT pill so
-           the operator's staged legs are visible at the top of the
-           chain panel (they were previously stashed below the strike
-           grid + scrolled out of view on a long chain). One-leg or
-           many, pressing Place fires every leg sequentially through
-           /api/orders/ticket. -->
-      {#if chainBasket.length}
-        <div class="chain-basket">
-          <div class="chain-basket-legs">
-            {#each chainBasket as leg (leg.key)}
-              <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'} chain-basket-leg-type-{/CE$/.test(leg.sym) ? 'ce' : /PE$/.test(leg.sym) ? 'pe' : 'fut'}"
-                    class:is-disabled={basketPlacing}
-                    role="button" tabindex="0"
-                    title="Click to remove from basket"
-                    onclick={() => { if (!basketPlacing) removeFromBasket(leg.key); }}
-                    onkeydown={(e) => {
-                      if (basketPlacing) return;
-                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
-                        e.preventDefault();
-                        removeFromBasket(leg.key);
-                      }
-                    }}>
-                <span class="chain-basket-side">{leg.side === 'BUY' ? 'B' : 'S'}</span>
-                <span class="chain-basket-sym">{leg.sym}</span>
-                <button type="button" class="chain-basket-step"
-                        title="Decrease lots"
-                        disabled={basketPlacing || leg.lots <= 1}
-                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, -1); }}>−</button>
-                <span class="chain-basket-lots">{leg.lots}</span>
-                <button type="button" class="chain-basket-step"
-                        title="Increase lots"
-                        disabled={basketPlacing}
-                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
-                <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
-                <span class="chain-basket-limit-static"
-                      title={leg.limit > 0
-                        ? `Algo-selected limit (₹${leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })} from the chain bid/ask at add-time). Chase re-quotes per the L/M/H pill.`
-                        : 'No quote available — leg routes as MARKET.'}>
-                  {#if leg.limit > 0}
-                    algo @{leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  {:else}
-                    @MKT
-                  {/if}
-                </span>
-                <span class="chain-basket-chase" title="Chase aggressiveness. L = patient (peg to your side), M = midpoint, H = urgent (cross the spread).">
-                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-low"
-                          class:on={(leg.chaseAgg || 'low') === 'low'}
-                          disabled={basketPlacing}
-                          title="Low — patient. SELL pegs to ASK, BUY pegs to BID."
-                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'low'); }}>L</button>
-                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-med"
-                          class:on={leg.chaseAgg === 'med'}
-                          disabled={basketPlacing}
-                          title="Medium — peg to midpoint of bid+ask."
-                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'med'); }}>M</button>
-                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-high"
-                          class:on={leg.chaseAgg === 'high'}
-                          disabled={basketPlacing}
-                          title="High — urgent. SELL pegs to BID, BUY pegs to ASK."
-                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'high'); }}>H</button>
-                </span>
-              </span>
-            {/each}
-          </div>
-          <div class="chain-basket-actions">
-            <button type="button" class="chain-basket-clear"
-                    disabled={basketPlacing}
-                    onclick={clearBasket}>Clear</button>
-            <button type="button" class="chain-basket-place"
-                    disabled={basketPlacing}
-                    onclick={placeBasket}>
-              {#if basketPlacing}
-                Placing… ({basketProgress}/{chainBasket.length})
-              {:else}
-                Place {chainBasket.length} leg{chainBasket.length === 1 ? '' : 's'}
-              {/if}
-            </button>
-          </div>
-          {#if basketError}
-            <div class="chain-basket-err">{basketError}</div>
-          {/if}
-        </div>
-      {:else if basketJustDone}
-        <div class="chain-basket-toast">✓ basket placed</div>
-      {/if}
       <div class="chain-controls">
         <div class="chain-field">
           <label class="field-label" for="chain-und">Underlying</label>
@@ -1887,6 +1808,90 @@
         </div>
       {/if}
 
+      <!-- Basket bar — shows up the moment the operator stages their
+           first leg via ✓ in the inline picker. One-leg or many,
+           pressing Place fires every leg sequentially as a paper
+           MARKET order through the same /api/orders/ticket path the
+           OrderTicket modal uses. -->
+      {#if chainBasket.length}
+        <div class="chain-basket">
+          <div class="chain-basket-legs">
+            {#each chainBasket as leg (leg.key)}
+              <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'} chain-basket-leg-type-{/CE$/.test(leg.sym) ? 'ce' : /PE$/.test(leg.sym) ? 'pe' : 'fut'}"
+                    class:is-disabled={basketPlacing}
+                    role="button" tabindex="0"
+                    title="Click to remove from basket"
+                    onclick={() => { if (!basketPlacing) removeFromBasket(leg.key); }}
+                    onkeydown={(e) => {
+                      if (basketPlacing) return;
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
+                        e.preventDefault();
+                        removeFromBasket(leg.key);
+                      }
+                    }}>
+                <span class="chain-basket-side">{leg.side === 'BUY' ? 'B' : 'S'}</span>
+                <span class="chain-basket-sym">{leg.sym}</span>
+                <button type="button" class="chain-basket-step"
+                        title="Decrease lots"
+                        disabled={basketPlacing || leg.lots <= 1}
+                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, -1); }}>−</button>
+                <span class="chain-basket-lots">{leg.lots}</span>
+                <button type="button" class="chain-basket-step"
+                        title="Increase lots"
+                        disabled={basketPlacing}
+                        onclick={(e) => { e.stopPropagation(); basketStepLots(leg.key, +1); }}>+</button>
+                <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
+                <span class="chain-basket-limit-static"
+                      title={leg.limit > 0
+                        ? `Algo-selected limit (₹${leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })} from the chain bid/ask at add-time). Chase re-quotes per the L/M/H pill.`
+                        : 'No quote available — leg routes as MARKET.'}>
+                  {#if leg.limit > 0}
+                    algo @{leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  {:else}
+                    @MKT
+                  {/if}
+                </span>
+                <span class="chain-basket-chase" title="Chase aggressiveness. L = patient (peg to your side), M = midpoint, H = urgent (cross the spread).">
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-low"
+                          class:on={(leg.chaseAgg || 'low') === 'low'}
+                          disabled={basketPlacing}
+                          title="Low — patient. SELL pegs to ASK, BUY pegs to BID."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'low'); }}>L</button>
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-med"
+                          class:on={leg.chaseAgg === 'med'}
+                          disabled={basketPlacing}
+                          title="Medium — peg to midpoint of bid+ask."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'med'); }}>M</button>
+                  <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-high"
+                          class:on={leg.chaseAgg === 'high'}
+                          disabled={basketPlacing}
+                          title="High — urgent. SELL pegs to BID, BUY pegs to ASK."
+                          onclick={(e) => { e.stopPropagation(); setBasketChaseAgg(leg.key, 'high'); }}>H</button>
+                </span>
+              </span>
+            {/each}
+          </div>
+          <div class="chain-basket-actions">
+            <button type="button" class="chain-basket-clear"
+                    disabled={basketPlacing}
+                    onclick={clearBasket}>Clear</button>
+            <button type="button" class="chain-basket-place"
+                    disabled={basketPlacing}
+                    onclick={placeBasket}>
+              {#if basketPlacing}
+                Placing… ({basketProgress}/{chainBasket.length})
+              {:else}
+                Place {chainBasket.length} leg{chainBasket.length === 1 ? '' : 's'}
+              {/if}
+            </button>
+          </div>
+          {#if basketError}
+            <div class="chain-basket-err">{basketError}</div>
+          {/if}
+        </div>
+      {:else if basketJustDone}
+        <div class="chain-basket-toast">✓ basket placed</div>
+      {/if}
     </div>
   {/if}
 {/if}
@@ -3232,36 +3237,7 @@
     line-height: 1.5;
     cursor: pointer;
     user-select: none;
-    /* Single-line layout on mobile — every chip child stays on
-       one row; if a long symbol pushes past the row, the chip
-       itself wraps to the next line via .chain-basket-legs flex
-       wrap rather than breaking internally. */
-    white-space: nowrap;
-    flex-wrap: nowrap;
     transition: background 0.12s, transform 0.05s;
-  }
-  /* Tighter spacing on phone — drop gaps + font a notch so the
-     full chip (B/S sym − N + ×ls=qty algo @price L M H) still
-     reads on one line without horizontal scroll. */
-  @media (max-width: 600px) {
-    .chain-basket-leg {
-      gap: 0.2rem;
-      font-size: 0.55rem;
-      padding: 1px 4px 1px 3px;
-    }
-    .chain-basket-leg .chain-basket-step {
-      width: 0.95rem;
-      height: 0.95rem;
-    }
-    .chain-basket-leg .chain-basket-chase-pill {
-      width: 0.9rem;
-      height: 0.9rem;
-      font-size: 0.5rem;
-    }
-    .chain-basket-leg .chain-basket-qty,
-    .chain-basket-leg .chain-basket-limit-static {
-      font-size: 0.55rem;
-    }
   }
   .chain-basket-leg:focus-visible {
     outline: 2px solid #fbbf24;
