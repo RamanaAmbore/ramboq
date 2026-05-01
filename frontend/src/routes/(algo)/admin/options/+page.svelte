@@ -18,7 +18,8 @@
 
   import { onMount, onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore, clientTimestamp, visibleInterval, marketAwareInterval } from '$lib/stores';
+  import { authStore, clientTimestamp, marketAwareInterval } from '$lib/stores';
+  import { isMarketOpen } from '$lib/marketHours';
   import {
     fetchPositions, fetchSimStatus, fetchStrategyAnalytics,
     fetchAccounts, fetchOptionsSpot, fetchChainQuotes,
@@ -685,6 +686,11 @@
   let chainQuotesPoll = /** @type {any} */ (null);
   function _refreshChainQuotes() {
     if (!showAddPanel || !chainUnderlying || !chainExpiry) return;
+    // Bid/ask quotes are static when both NSE + MCX are closed —
+    // skip the poll outside market hours so the chain panel doesn't
+    // hammer /api/options/chain-quotes overnight. The first call on
+    // panel-open still runs (good for end-of-day book inspection).
+    if (!isMarketOpen()) return;
     const u = chainUnderlying.toUpperCase();
     const e = chainExpiry;
     fetchChainQuotes(u, e).then((r) => {
@@ -1339,14 +1345,14 @@
     // Historical refreshes only on symbol change (daily candles don't
     // change intra-day).
     loadSimStatus();
-    // Market-hours gated — outside NSE + MCX windows the polls pause.
-    // Strategy + positions don't need to refresh overnight (broker
-    // values are static when both segments are closed). Sim status
-    // stays on visibleInterval so an operator-triggered sim run while
-    // markets are closed still surfaces in real time.
+    // Market-hours gated — outside NSE + MCX windows every poll
+    // pauses. Sim status is included: when both segments are closed
+    // AND no sim is running, there's nothing to refresh. Starting a
+    // sim re-enters /admin/simulator (which polls on its own); the
+    // status here picks up on the next mount or manual refresh.
     teardown    = marketAwareInterval(loadStrategy,  5000);
     posTeardown = marketAwareInterval(loadPositions, 30000);
-    simTeardown = visibleInterval(loadSimStatus,  5000);
+    simTeardown = marketAwareInterval(loadSimStatus,  5000);
   });
   onDestroy(() => { teardown?.(); posTeardown?.(); simTeardown?.(); });
 
