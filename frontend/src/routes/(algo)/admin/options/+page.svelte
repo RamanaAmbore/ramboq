@@ -434,186 +434,82 @@
   // owns its own per-click lots state via quickPicker below.
   let chainLots        = $state(1);
 
-  // ── Inline quick-place picker ─────────────────────────────────────
-  // Click +/− on a strike (or a futures pill) → cell collapses to an
-  // inline `[B/S] [Lots#] [✓] [✕]` mini-form. Press ✓ → submits a
-  // PAPER MARKET order via /api/orders/ticket directly, no modal.
-  // Press ✕ or Escape → cancel; Enter → place. The (i) button is
-  // the slow path (still opens the full OrderTicket).
-  /** @type {null | {
-   *   strike: number, optType: 'CE'|'PE'|'',
-   *   side: 'long'|'short',
-   *   lots: number,
-   *   isFuture: boolean,
-   *   sym: string|null,
-   *   lotSize: number,
-   * }} */
-  let quickPicker      = $state(null);
-  let quickPlacing     = $state(false);
-  let quickError       = $state('');
-  // Cell that just succeeded — drives the brief inline toast. Two
-  // success modes: `✓ placed` (immediate-fire path) and `✓ added`
-  // (basket-stage path). Auto-clears after ~1.2-1.5 s.
+  // ── Direct-to-basket quick buttons ────────────────────────────────
+  // Click + or − on a strike (or a futures pill) → leg lands in
+  // `chainBasket` immediately at 1 lot (default). Lot adjustments
+  // happen on the basket pill itself (inline − / + stepper). The
+  // OrderTicket modal (i button) is still the slow path for limit
+  // / mode / qty edits before placing. Replaces the previous inline
+  // ✓ / ✕ / +B picker — operator wanted a single, predictable path
+  // through the basket bar.
+  // Brief toast tracking the cell that just got "+ added" so the
+  // operator can see their click registered. Auto-clears in ~1 s.
   /** @type {{ key: string, msg: string }|null} */
-  let quickToast       = $state(null);
+  let quickToast = $state(null);
 
   function _quickKeyOpt(strike, optType) { return `o:${strike}:${optType}`; }
   function _quickKeyFut(sym)             { return `f:${sym}`; }
-  function isQuickActive(strike, optType) {
-    return !!quickPicker
-      && !quickPicker.isFuture
-      && quickPicker.strike === strike
-      && quickPicker.optType === optType;
-  }
-  function isQuickActiveFut(sym) {
-    return !!quickPicker && quickPicker.isFuture && quickPicker.sym === sym;
-  }
-  function openQuickPicker(strike, optType, side) {
-    // Look up the contract's lot size up-front so the picker can
-    // surface the `(× lot N)` meta tag alongside the stepper. Falls
-    // back to 0 on cache miss — the meta tag hides in that case.
-    let lot = 0;
-    try {
-      if (chainUnderlying && chainExpiry) {
-        const inst = findOption(
-          chainUnderlying.toUpperCase(), optType, strike, chainExpiry,
-        );
-        lot = Number(inst?.ls || 0) || 0;
-      }
-    } catch (_) { lot = 0; }
-    quickPicker = {
-      strike, optType, side,
-      lots: 1, isFuture: false, sym: null, lotSize: lot,
-    };
-    quickError      = '';
-    quickToast      = null;
-  }
-  function openQuickPickerFut(sym, lotSize, side) {
-    quickPicker = {
-      strike: 0, optType: '', side,
-      lots: 1, isFuture: true, sym, lotSize,
-    };
-    quickError      = '';
-    quickToast      = null;
-  }
-  function cancelQuickPicker() {
-    quickPicker = null;
-    quickError  = '';
-  }
-  /** +/− stepper actions on the inline lots input. Floored at 1 lot
-   *  (zero / negative would post a no-op order). No upper cap —
-   *  operator can size as large as their margin allows; the
-   *  basket_margin pre-flight on the backend rejects anything that
-   *  blows the avail margin. */
-  function quickStepLots(delta) {
-    if (!quickPicker) return;
-    const cur = Math.max(1, Math.floor(Number(quickPicker.lots) || 1));
-    quickPicker.lots = Math.max(1, cur + delta);
-  }
-  // Esc-to-cancel for the inline quick-picker. The +/− stepper
-  // buttons replaced the number input that previously hosted the
-  // keydown handler; this $effect is the global equivalent so Esc
-  // still bails out of an open picker even when no field has focus.
-  $effect(() => {
-    if (!quickPicker) return;
-    const onKey = (/** @type {KeyboardEvent} */ e) => {
-      if (e.key === 'Escape') { e.preventDefault(); cancelQuickPicker(); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-  /** Resolve the inline picker's contract + meta. Shared by both the
-   *  immediate-fire path (`quickPlace`) and the stage-to-basket path
-   *  (`quickAddToBasket`); returns null + sets `quickError` on a
-   *  cache-miss / lookup failure. */
-  function _quickResolve() {
-    if (!quickPicker) return null;
-    let sym, exchange, lot;
-    if (quickPicker.isFuture) {
-      sym = String(quickPicker.sym || '');
-      const inst = getInstrument(sym.toUpperCase());
-      exchange = inst?.e || 'NFO';
-      lot      = Number(quickPicker.lotSize || inst?.ls || 1);
-    } else {
-      const inst = findOption(
-        chainUnderlying.toUpperCase(),
-        quickPicker.optType,
-        quickPicker.strike,
-        chainExpiry,
-      );
-      if (!inst) { quickError = 'Symbol not in instruments cache.'; return null; }
-      sym       = inst.s;
-      exchange  = inst.e || 'NFO';
-      lot       = Number(inst.ls || 1);
-    }
-    const lots = Math.max(1, Math.floor(Number(quickPicker.lots) || 1));
-    /** @type {'BUY'|'SELL'} */
-    const side = quickPicker.side === 'long' ? 'BUY' : 'SELL';
-    const cellKey = quickPicker.isFuture
-      ? _quickKeyFut(sym)
-      : _quickKeyOpt(quickPicker.strike, quickPicker.optType);
-    return { sym, exchange, lot, lots, side, cellKey };
+
+  function _flashToast(/** @type {string} */ key, /** @type {string} */ msg) {
+    quickToast = { key, msg };
+    setTimeout(() => {
+      if (quickToast?.key === key) quickToast = null;
+    }, 900);
   }
 
-  /** Immediate-fire path — submit a paper MARKET order directly. No
-   *  basket round-trip. Operators use this for one-click single-leg
-   *  fills; multi-leg strategies should use `quickAddToBasket` + the
-   *  Place button instead. */
-  async function quickPlace() {
-    if (!quickPicker || quickPlacing) return;
-    const r = _quickResolve();
-    if (!r) return;
-    const acct = _ticketAccountDefault();
-    if (!acct) { quickError = 'No routable account selected.'; return; }
-    quickPlacing = true;
-    quickError   = '';
-    try {
-      await placeTicketOrder({
-        mode:          'paper',
-        side:          r.side,
-        tradingsymbol: r.sym,
-        quantity:      r.lot * r.lots,
-        exchange:      r.exchange,
-        product:       'NRML',
-        order_type:    'MARKET',
-        variety:       'regular',
-        account:       acct,
-      });
-      quickToast  = { key: r.cellKey, msg: '✓ placed' };
-      quickPicker = null;
-      setTimeout(() => {
-        if (quickToast?.key === r.cellKey) quickToast = null;
-      }, 1500);
-    } catch (e) {
-      quickError = String(/** @type {any} */ (e)?.message || e || 'Place failed');
-    } finally {
-      quickPlacing = false;
-    }
-  }
-
-  /** Stage a leg into the chain basket. ✕ on the picker still
-   *  cancels; this button (rendered alongside ✓) pushes the leg into
-   *  `chainBasket` so the operator can build a multi-leg strategy
-   *  before hitting Place. */
-  function quickAddToBasket() {
-    if (!quickPicker || quickPlacing) return;
-    const r = _quickResolve();
-    if (!r) return;
+  /** Add an option leg to the basket. Resolves symbol + lot size from
+   *  the instruments cache for the (underlying, expiry, strike, type)
+   *  tuple. No-op when the cache miss (chain shouldn't render the row
+   *  in that case anyway). */
+  function addOptionToBasket(/** @type {number} */ strike,
+                              /** @type {'CE'|'PE'} */ optType,
+                              /** @type {'long'|'short'} */ side) {
+    if (!chainUnderlying || !chainExpiry) return;
+    const inst = findOption(
+      chainUnderlying.toUpperCase(), optType, strike, chainExpiry,
+    );
+    if (!inst) { basketError = 'Symbol not in instruments cache.'; return; }
+    const sideTag = /** @type {'BUY'|'SELL'} */ (side === 'long' ? 'BUY' : 'SELL');
     chainBasket = [...chainBasket, {
-      key:      `${r.side}|${r.cellKey}|${Date.now()}`,
-      side:     r.side,
-      sym:      r.sym,
-      exchange: r.exchange,
-      lots:     r.lots,
-      lotSize:  r.lot,
+      key:      `${sideTag}|${_quickKeyOpt(strike, optType)}|${Date.now()}`,
+      side:     sideTag,
+      sym:      String(inst.s),
+      exchange: inst.e || 'NFO',
+      lots:     1,
+      lotSize:  Number(inst.ls || 1),
       product:  'NRML',
     }];
     basketError = '';
-    quickToast  = { key: r.cellKey, msg: '✓ added' };
-    quickPicker = null;
-    setTimeout(() => {
-      if (quickToast?.key === r.cellKey) quickToast = null;
-    }, 1200);
+    _flashToast(_quickKeyOpt(strike, optType), '✓ added');
+  }
+
+  /** Add a futures leg to the basket. */
+  function addFuturesToBasket(/** @type {string} */ sym,
+                               /** @type {number} */ lotSize,
+                               /** @type {'long'|'short'} */ side) {
+    const inst = getInstrument(String(sym || '').toUpperCase());
+    const sideTag = /** @type {'BUY'|'SELL'} */ (side === 'long' ? 'BUY' : 'SELL');
+    chainBasket = [...chainBasket, {
+      key:      `${sideTag}|${_quickKeyFut(sym)}|${Date.now()}`,
+      side:     sideTag,
+      sym:      String(sym),
+      exchange: inst?.e || 'NFO',
+      lots:     1,
+      lotSize:  Number(lotSize || inst?.ls || 1),
+      product:  'NRML',
+    }];
+    basketError = '';
+    _flashToast(_quickKeyFut(sym), '✓ added');
+  }
+
+  /** Step the lots count on a single basket leg. Floored at 1; no
+   *  upper cap (margin pre-flight catches over-sizing on submit). */
+  function basketStepLots(/** @type {string} */ key,
+                           /** @type {number} */ delta) {
+    chainBasket = chainBasket.map(b => {
+      if (b.key !== key) return b;
+      return { ...b, lots: Math.max(1, Math.floor((b.lots || 1) + delta)) };
+    });
   }
 
   // ── Chain basket — staged legs awaiting one-shot submit ───────────
@@ -1669,57 +1565,28 @@
           <span class="chain-futures-label">Futures:</span>
           {#each chainFutures as f (f.s)}
             {@const futKey = _quickKeyFut(f.s)}
-            {#if isQuickActiveFut(f.s)}
-              <span class="chain-quick chain-quick-{quickPicker.side}">
-                <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                <span class="chain-quick-sym">{f.s}</span>
-                <button type="button" class="chain-quick-step"
-                        onclick={() => quickStepLots(-1)}
-                        aria-label="Decrease lots"
-                        disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                <span class="chain-quick-lots-val"
-                      aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
-                <button type="button" class="chain-quick-step"
-                        onclick={() => quickStepLots(1)}
-                        aria-label="Increase lots">+</button>
-                {#if quickPicker.lotSize > 0}
-                  <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
-                {/if}
-                <button type="button" class="chain-quick-ok"
-                        disabled={basketPlacing}
-                        title="Place paper MARKET order now"
-                        onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
-                <button type="button" class="chain-quick-basket"
-                        disabled={basketPlacing || quickPlacing}
-                        title="Add to basket (place all together later)"
-                        onclick={quickAddToBasket}>+B</button>
-                <button type="button" class="chain-quick-cancel"
-                        title="Cancel" onclick={cancelQuickPicker}>✕</button>
-              </span>
-              {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-            {:else if quickToast?.key === futKey}
-              <span class="chain-quick-toast">{quickToast?.msg} {f.s}</span>
-            {:else}
-              <span class="chain-fut-pair">
-                <button type="button"
-                        class="chain-fut-pill chain-fut-pill-buy"
-                        title="BUY {f.s} — pick lots inline ({f.ls} per lot)"
-                        onclick={() => openQuickPickerFut(f.s, f.ls, 'long')}>
-                  + {f.s}
-                  <span class="chain-fut-meta">lot {f.ls}</span>
-                </button>
-                <button type="button"
-                        class="chain-fut-pill chain-fut-pill-sell"
-                        title="SELL {f.s} — pick lots inline"
-                        onclick={() => openQuickPickerFut(f.s, f.ls, 'short')}>
-                  − {f.s}
-                </button>
-                <button type="button"
-                        class="chain-fut-pill chain-fut-pill-info"
-                        title="Open full ticket for {f.s} (edit qty / price / mode)"
-                        onclick={() => addFutureDraft(f.s, f.ls, 'long')}>i</button>
-              </span>
-            {/if}
+            <span class="chain-fut-pair">
+              <button type="button"
+                      class="chain-fut-pill chain-fut-pill-buy"
+                      title="BUY {f.s} — adds 1 lot ({f.ls}) to basket"
+                      onclick={() => addFuturesToBasket(f.s, f.ls, 'long')}>
+                + {f.s}
+                <span class="chain-fut-meta">lot {f.ls}</span>
+              </button>
+              <button type="button"
+                      class="chain-fut-pill chain-fut-pill-sell"
+                      title="SELL {f.s} — adds 1 lot to basket"
+                      onclick={() => addFuturesToBasket(f.s, f.ls, 'short')}>
+                − {f.s}
+              </button>
+              <button type="button"
+                      class="chain-fut-pill chain-fut-pill-info"
+                      title="Open full ticket for {f.s} (edit qty / price / mode)"
+                      onclick={() => addFutureDraft(f.s, f.ls, 'long')}>i</button>
+              {#if quickToast?.key === futKey}
+                <span class="chain-quick-toast">{quickToast?.msg}</span>
+              {/if}
+            </span>
           {/each}
         </div>
       {/if}
@@ -1765,55 +1632,27 @@
                   <tr use:chainAtmRow class="chain-row chain-row-{dir} chain-row-atm">
                     <td class="chain-td-ce">
                       <span class="chain-cell-row chain-cell-row-ce">
-                      <span class="chain-side-action">
-                      {#if isQuickActive(k, 'CE')}
-                        <span class="chain-quick chain-quick-{quickPicker.side}">
-                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(-1)}
-                                  aria-label="Decrease lots"
-                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(1)}
-                                  aria-label="Increase lots">+</button>
-                          {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
+                        <span class="chain-side-action">
+                          <span class="chain-btn-pair">
+                            <button type="button" class="chain-btn chain-btn-buy"
+                                    title="BUY {k} CE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'CE', 'long')}>+</button>
+                            <button type="button" class="chain-btn chain-btn-sell"
+                                    title="SELL {k} CE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'CE', 'short')}>−</button>
+                            <button type="button" class="chain-btn chain-btn-info"
+                                    title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                    onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                          </span>
+                          {#if quickToast?.key === ceKey}
+                            <span class="chain-quick-toast">{quickToast.msg}</span>
                           {/if}
-                          <button type="button" class="chain-quick-ok"
-                                  disabled={basketPlacing}
-                                  title="Place paper MARKET order now"
-                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
-                          <button type="button" class="chain-quick-basket"
-                                  disabled={basketPlacing || quickPlacing}
-                                  title="Add to basket (place all together later)"
-                                  onclick={quickAddToBasket}>+B</button>
-                          <button type="button" class="chain-quick-cancel"
-                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
-                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickToast?.key === ceKey}
-                        <span class="chain-quick-toast">{quickToast.msg}</span>
-                      {:else}
-                        <span class="chain-btn-pair">
-                          <button type="button" class="chain-btn chain-btn-buy"
-                                  title="BUY {k} CE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'CE', 'long')}>+</button>
-                          <button type="button" class="chain-btn chain-btn-sell"
-                                  title="SELL {k} CE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'CE', 'short')}>−</button>
-                          <button type="button" class="chain-btn chain-btn-info"
-                                  title="Open full ticket for {k} CE (edit qty / price / mode)"
-                                  onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                        <span class="chain-cell-quote">
+                          <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
+                                class="chain-cell-sep">-</span><span
+                                class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
                         </span>
-                      {/if}
-                      </span>
-                      <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
-                              class="chain-cell-sep">-</span><span
-                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
-                      </span>
                       </span>
                     </td>
                     <td class="chain-td-strike chain-td-strike-atm">
@@ -1821,55 +1660,27 @@
                     </td>
                     <td class="chain-td-pe">
                       <span class="chain-cell-row chain-cell-row-pe">
-                      <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
-                              class="chain-cell-sep">-</span><span
-                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
-                      </span>
-                      <span class="chain-side-action">
-                      {#if isQuickActive(k, 'PE')}
-                        <span class="chain-quick chain-quick-{quickPicker.side}">
-                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(-1)}
-                                  aria-label="Decrease lots"
-                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(1)}
-                                  aria-label="Increase lots">+</button>
-                          {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
+                        <span class="chain-cell-quote">
+                          <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
+                                class="chain-cell-sep">-</span><span
+                                class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                        </span>
+                        <span class="chain-side-action">
+                          <span class="chain-btn-pair">
+                            <button type="button" class="chain-btn chain-btn-buy"
+                                    title="BUY {k} PE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'PE', 'long')}>+</button>
+                            <button type="button" class="chain-btn chain-btn-sell"
+                                    title="SELL {k} PE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'PE', 'short')}>−</button>
+                            <button type="button" class="chain-btn chain-btn-info"
+                                    title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                    onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
+                          </span>
+                          {#if quickToast?.key === peKey}
+                            <span class="chain-quick-toast">{quickToast.msg}</span>
                           {/if}
-                          <button type="button" class="chain-quick-ok"
-                                  disabled={basketPlacing}
-                                  title="Place paper MARKET order now"
-                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
-                          <button type="button" class="chain-quick-basket"
-                                  disabled={basketPlacing || quickPlacing}
-                                  title="Add to basket (place all together later)"
-                                  onclick={quickAddToBasket}>+B</button>
-                          <button type="button" class="chain-quick-cancel"
-                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
-                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickToast?.key === peKey}
-                        <span class="chain-quick-toast">{quickToast.msg}</span>
-                      {:else}
-                        <span class="chain-btn-pair">
-                          <button type="button" class="chain-btn chain-btn-buy"
-                                  title="BUY {k} PE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'PE', 'long')}>+</button>
-                          <button type="button" class="chain-btn chain-btn-sell"
-                                  title="SELL {k} PE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'PE', 'short')}>−</button>
-                          <button type="button" class="chain-btn chain-btn-info"
-                                  title="Open full ticket for {k} PE (edit qty / price / mode)"
-                                  onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
-                        </span>
-                      {/if}
-                      </span>
                       </span>
                     </td>
                   </tr>
@@ -1877,109 +1688,53 @@
                   <tr class="chain-row chain-row-{dir}">
                     <td class="chain-td-ce">
                       <span class="chain-cell-row chain-cell-row-ce">
-                      <span class="chain-side-action">
-                      {#if isQuickActive(k, 'CE')}
-                        <span class="chain-quick chain-quick-{quickPicker.side}">
-                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(-1)}
-                                  aria-label="Decrease lots"
-                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(1)}
-                                  aria-label="Increase lots">+</button>
-                          {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
+                        <span class="chain-side-action">
+                          <span class="chain-btn-pair">
+                            <button type="button" class="chain-btn chain-btn-buy"
+                                    title="BUY {k} CE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'CE', 'long')}>+</button>
+                            <button type="button" class="chain-btn chain-btn-sell"
+                                    title="SELL {k} CE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'CE', 'short')}>−</button>
+                            <button type="button" class="chain-btn chain-btn-info"
+                                    title="Open full ticket for {k} CE (edit qty / price / mode)"
+                                    onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                          </span>
+                          {#if quickToast?.key === ceKey}
+                            <span class="chain-quick-toast">{quickToast.msg}</span>
                           {/if}
-                          <button type="button" class="chain-quick-ok"
-                                  disabled={basketPlacing}
-                                  title="Place paper MARKET order now"
-                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
-                          <button type="button" class="chain-quick-basket"
-                                  disabled={basketPlacing || quickPlacing}
-                                  title="Add to basket (place all together later)"
-                                  onclick={quickAddToBasket}>+B</button>
-                          <button type="button" class="chain-quick-cancel"
-                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
-                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickToast?.key === ceKey}
-                        <span class="chain-quick-toast">{quickToast.msg}</span>
-                      {:else}
-                        <span class="chain-btn-pair">
-                          <button type="button" class="chain-btn chain-btn-buy"
-                                  title="BUY {k} CE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'CE', 'long')}>+</button>
-                          <button type="button" class="chain-btn chain-btn-sell"
-                                  title="SELL {k} CE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'CE', 'short')}>−</button>
-                          <button type="button" class="chain-btn chain-btn-info"
-                                  title="Open full ticket for {k} CE (edit qty / price / mode)"
-                                  onclick={() => addChainDraft(k, 'CE', 'long')}>i</button>
+                        <span class="chain-cell-quote">
+                          <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
+                                class="chain-cell-sep">-</span><span
+                                class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
                         </span>
-                      {/if}
-                      </span>
-                      <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.bid)}</span><span
-                              class="chain-cell-sep">-</span><span
-                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.ce?.ask)}</span>
-                      </span>
                       </span>
                     </td>
                     <td class="chain-td-strike">{k.toFixed(0)}</td>
                     <td class="chain-td-pe">
                       <span class="chain-cell-row chain-cell-row-pe">
-                      <span class="chain-cell-quote">
-                        <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
-                              class="chain-cell-sep">-</span><span
-                              class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
-                      </span>
-                      <span class="chain-side-action">
-                      {#if isQuickActive(k, 'PE')}
-                        <span class="chain-quick chain-quick-{quickPicker.side}">
-                          <span class="chain-quick-tag">{quickPicker.side === 'long' ? 'B' : 'S'}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(-1)}
-                                  aria-label="Decrease lots"
-                                  disabled={(quickPicker.lots || 1) <= 1}>−</button>
-                          <span class="chain-quick-lots-val"
-                                aria-label="Lots: {quickPicker.lots}">{quickPicker.lots}</span>
-                          <button type="button" class="chain-quick-step"
-                                  onclick={() => quickStepLots(1)}
-                                  aria-label="Increase lots">+</button>
-                          {#if quickPicker.lotSize > 0}
-                            <span class="chain-quick-meta">(× {quickPicker.lotSize} = {(quickPicker.lots || 1) * quickPicker.lotSize})</span>
+                        <span class="chain-cell-quote">
+                          <span class="chain-cell-bid">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.bid)}</span><span
+                                class="chain-cell-sep">-</span><span
+                                class="chain-cell-ask">{_fmtLtp(chainQuotesMap?.[String(k)]?.pe?.ask)}</span>
+                        </span>
+                        <span class="chain-side-action">
+                          <span class="chain-btn-pair">
+                            <button type="button" class="chain-btn chain-btn-buy"
+                                    title="BUY {k} PE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'PE', 'long')}>+</button>
+                            <button type="button" class="chain-btn chain-btn-sell"
+                                    title="SELL {k} PE — adds 1 lot to basket"
+                                    onclick={() => addOptionToBasket(k, 'PE', 'short')}>−</button>
+                            <button type="button" class="chain-btn chain-btn-info"
+                                    title="Open full ticket for {k} PE (edit qty / price / mode)"
+                                    onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
+                          </span>
+                          {#if quickToast?.key === peKey}
+                            <span class="chain-quick-toast">{quickToast.msg}</span>
                           {/if}
-                          <button type="button" class="chain-quick-ok"
-                                  disabled={basketPlacing}
-                                  title="Place paper MARKET order now"
-                                  onclick={quickPlace}>{quickPlacing ? '…' : '✓'}</button>
-                          <button type="button" class="chain-quick-basket"
-                                  disabled={basketPlacing || quickPlacing}
-                                  title="Add to basket (place all together later)"
-                                  onclick={quickAddToBasket}>+B</button>
-                          <button type="button" class="chain-quick-cancel"
-                                  title="Cancel" onclick={cancelQuickPicker}>✕</button>
                         </span>
-                        {#if quickError}<span class="chain-quick-err">{quickError}</span>{/if}
-                      {:else if quickToast?.key === peKey}
-                        <span class="chain-quick-toast">{quickToast.msg}</span>
-                      {:else}
-                        <span class="chain-btn-pair">
-                          <button type="button" class="chain-btn chain-btn-buy"
-                                  title="BUY {k} PE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'PE', 'long')}>+</button>
-                          <button type="button" class="chain-btn chain-btn-sell"
-                                  title="SELL {k} PE — pick lots inline"
-                                  onclick={() => openQuickPicker(k, 'PE', 'short')}>−</button>
-                          <button type="button" class="chain-btn chain-btn-info"
-                                  title="Open full ticket for {k} PE (edit qty / price / mode)"
-                                  onclick={() => addChainDraft(k, 'PE', 'long')}>i</button>
-                        </span>
-                      {/if}
-                      </span>
                       </span>
                     </td>
                   </tr>
@@ -2011,7 +1766,16 @@
               <span class="chain-basket-leg chain-basket-leg-{leg.side === 'BUY' ? 'buy' : 'sell'}">
                 <span class="chain-basket-side">{leg.side === 'BUY' ? 'B' : 'S'}</span>
                 <span class="chain-basket-sym">{leg.sym}</span>
-                <span class="chain-basket-qty">{leg.lots}× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
+                <button type="button" class="chain-basket-step"
+                        title="Decrease lots"
+                        disabled={basketPlacing || leg.lots <= 1}
+                        onclick={() => basketStepLots(leg.key, -1)}>−</button>
+                <span class="chain-basket-lots">{leg.lots}</span>
+                <button type="button" class="chain-basket-step"
+                        title="Increase lots"
+                        disabled={basketPlacing}
+                        onclick={() => basketStepLots(leg.key, +1)}>+</button>
+                <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
                 <button type="button" class="chain-basket-rm"
                         title="Remove from basket"
                         disabled={basketPlacing}
@@ -3366,135 +3130,9 @@
     border-color: rgba(125,211,252,0.75);
   }
 
-  /* ── Inline lots quick-picker ────────────────────────────────────
-     Replaces the [+ − i] cell while a + or − is active. Layout:
-       [B/S]  [Lots]  [✓]  [✕]
-     Side tag colour-coded by long/short. Compact enough to fit in
-     the same column footprint as the 3-button row.            */
-  .chain-quick {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 1px 2px;
-    border-radius: 3px;
-    border: 1px solid rgba(126,151,184,0.35);
-    background: rgba(13,21,38,0.75);
-  }
-  .chain-quick-long  { border-color: rgba(74,222,128,0.55); }
-  .chain-quick-short { border-color: rgba(248,113,113,0.55); }
-  .chain-quick-tag {
-    font-family: monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0 4px;
-    border-radius: 2px;
-  }
-  .chain-quick-long  .chain-quick-tag { color: #4ade80; background: rgba(74,222,128,0.15); }
-  .chain-quick-short .chain-quick-tag { color: #f87171; background: rgba(248,113,113,0.15); }
-  .chain-quick-sym {
-    font-family: monospace;
-    font-size: 0.65rem;
-    color: #c8d8f0;
-    padding: 0 3px;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-  /* +/− stepper around the lots count — same shape + size + colours
-     as the OrderTicket Qty stepper (.ot-lots-step / .ot-lots-val /
-     .ot-meta) so the two surfaces read as one consistent control.
-     Operator request: "lot format in OChain and open/close should
-     look similar". */
-  .chain-quick-step {
-    width: 1.4rem;
-    height: 1.4rem;
-    padding: 0;
-    border-radius: 3px;
-    border: 1px solid rgba(251,191,36,0.45);
-    background: rgba(251,191,36,0.10);
-    color: #fbbf24;
-    font-family: monospace;
-    font-size: 0.9rem;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .chain-quick-step:hover:not(:disabled) {
-    background: rgba(251,191,36,0.22);
-    border-color: rgba(251,191,36,0.75);
-  }
-  .chain-quick-step:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-  .chain-quick-lots-val {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.8rem;
-    padding: 0 0.35rem;
-    height: 1.4rem;
-    flex: 0 0 auto;
-    text-align: center;
-    color: #fbbf24;
-    font-family: monospace;
-    font-weight: 700;
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-  }
-  /* `(× lot = qty)` tag — sky-blue muted at 0.65rem to match
-     the OrderTicket .ot-meta size + colour. */
-  .chain-quick-meta {
-    color: #a3b9d0;
-    font-family: monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    padding: 0 3px;
-  }
-  .chain-quick-ok,
-  .chain-quick-basket,
-  .chain-quick-cancel {
-    height: 1.25rem;
-    min-width: 1.25rem;
-    padding: 0 4px;
-    border-radius: 2px;
-    border: 1px solid currentColor;
-    background: transparent;
-    cursor: pointer;
-    font-family: monospace;
-    font-size: 0.7rem;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .chain-quick-ok      { color: #4ade80; }
-  .chain-quick-basket  { color: #fbbf24; font-size: 0.6rem; padding: 0 5px; }
-  .chain-quick-cancel  { color: #f87171; }
-  .chain-quick-ok:hover     { background: rgba(74,222,128,0.10); }
-  .chain-quick-basket:hover { background: rgba(251,191,36,0.10); }
-  .chain-quick-cancel:hover { background: rgba(248,113,113,0.10); }
-  .chain-quick-ok:disabled,
-  .chain-quick-basket:disabled { opacity: 0.55; cursor: progress; }
-  /* Inline error / success messages — kept outside the picker so
-     the picker itself stays the same width while the ✓ toast or
-     ✕ message renders alongside (or replaces it, in the toast
-     case). */
-  .chain-quick-err {
-    display: inline-block;
-    margin-left: 4px;
-    padding: 1px 5px;
-    border-radius: 2px;
-    background: rgba(248,113,113,0.12);
-    color: #f87171;
-    font-family: monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.02em;
-  }
+  /* Brief "✓ added" toast that flashes alongside a strike row's
+     button cluster (or a futures pill) the moment the operator's
+     click landed in the basket. Auto-fades. */
   .chain-quick-toast {
     display: inline-block;
     padding: 2px 8px;
@@ -3502,10 +3140,11 @@
     background: rgba(74,222,128,0.18);
     color: #4ade80;
     font-family: monospace;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    animation: chain-quick-fade 1.5s ease-out forwards;
+    margin-left: 0.3rem;
+    animation: chain-quick-fade 0.9s ease-out forwards;
   }
   /* Basket bar — pinned below the chain table. Compact; one row of
      leg pills + a Clear / Place pair on the right. Pills wrap on a
@@ -3553,6 +3192,40 @@
     color: #a3b9d0;
     font-size: 0.55rem;
     opacity: 0.85;
+  }
+  /* In-pill lot stepper. Same family as `.chain-btn` but slightly
+     smaller (basket-pill is itself compact). Coloured with the
+     pill's own side-tinted text colour so it reads as part of the
+     pill, not a foreign control. */
+  .chain-basket-step {
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: currentColor;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chain-basket-step:hover:not(:disabled) {
+    background: rgba(255,255,255,0.05);
+  }
+  .chain-basket-step:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chain-basket-lots {
+    min-width: 1.1rem;
+    text-align: center;
+    color: #fbbf24;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
   }
   .chain-basket-rm {
     background: transparent;
