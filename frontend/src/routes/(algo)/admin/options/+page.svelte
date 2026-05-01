@@ -457,11 +457,25 @@
     }, 900);
   }
 
+  /** Merge an incoming leg into the existing basket if a leg with
+   *  the same symbol AND same side already exists — bump its lots
+   *  rather than appending a duplicate pill. Returns true when a
+   *  merge happened (caller flashes the dedupe toast on the
+   *  existing cell), false otherwise. */
+  function _mergeIntoBasket(/** @type {{sym:string, side:'BUY'|'SELL', lots:number}} */ incoming) {
+    const idx = chainBasket.findIndex(b =>
+      b.sym === incoming.sym && b.side === incoming.side);
+    if (idx < 0) return false;
+    chainBasket = chainBasket.map((b, i) =>
+      i === idx ? { ...b, lots: (b.lots || 0) + (incoming.lots || 1) } : b);
+    return true;
+  }
+
   /** Add an option leg to the basket. Resolves symbol + lot size from
    *  the instruments cache and seeds the limit price from chain
    *  quotes (BUY → ask, SELL → bid) so the basket goes out as a
-   *  LIMIT order with a real price. Operator can edit the limit
-   *  inline on the pill. */
+   *  LIMIT order. Adding the same (strike, type, side) again bumps
+   *  the existing pill's lots count instead of duplicating. */
   function addOptionToBasket(/** @type {number} */ strike,
                               /** @type {'CE'|'PE'} */ optType,
                               /** @type {'long'|'short'} */ side) {
@@ -471,6 +485,11 @@
     );
     if (!inst) { basketError = 'Symbol not in instruments cache.'; return; }
     const sideTag = /** @type {'BUY'|'SELL'} */ (side === 'long' ? 'BUY' : 'SELL');
+    if (_mergeIntoBasket({ sym: String(inst.s), side: sideTag, lots: 1 })) {
+      basketError = '';
+      _flashToast(_quickKeyOpt(strike, optType), '+1 lot');
+      return;
+    }
     const q = chainQuotesMap?.[String(strike)]?.[optType.toLowerCase()];
     const limit = sideTag === 'BUY'
       ? (q?.ask ?? q?.bid ?? 0)
@@ -490,14 +509,19 @@
     _flashToast(_quickKeyOpt(strike, optType), '✓ added');
   }
 
-  /** Add a futures leg to the basket. Limit is left at 0 (the
-   *  Place handler routes 0-priced legs as MARKET); operator can
-   *  set a limit inline on the pill if they want. */
+  /** Add a futures leg to the basket. Same dedupe rule — same sym
+   *  + same side bumps lots on the existing leg. Limit defaults to
+   *  0 (the Place handler routes 0-priced legs as MARKET). */
   function addFuturesToBasket(/** @type {string} */ sym,
                                /** @type {number} */ lotSize,
                                /** @type {'long'|'short'} */ side) {
     const inst = getInstrument(String(sym || '').toUpperCase());
     const sideTag = /** @type {'BUY'|'SELL'} */ (side === 'long' ? 'BUY' : 'SELL');
+    if (_mergeIntoBasket({ sym: String(sym), side: sideTag, lots: 1 })) {
+      basketError = '';
+      _flashToast(_quickKeyFut(sym), '+1 lot');
+      return;
+    }
     chainBasket = [...chainBasket, {
       key:      `${sideTag}|${_quickKeyFut(sym)}|${Date.now()}`,
       side:     sideTag,
@@ -1819,14 +1843,15 @@
                 <span class="chain-basket-qty">× {leg.lotSize} = {leg.lots * leg.lotSize}</span>
                 <span class="chain-basket-limit-static"
                       title={leg.limit > 0
-                        ? 'Algo-selected limit price (auto-seeded from chain bid/ask). Chase re-quotes from here per the C[L|M|H] setting.'
+                        ? `Algo-selected limit (₹${leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })} from the chain bid/ask at add-time). Chase re-quotes per the L/M/H pill.`
                         : 'No quote available — leg routes as MARKET.'}>
-                  @{leg.limit > 0
-                    ? leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })
-                    : 'MKT'}
+                  {#if leg.limit > 0}
+                    algo @{leg.limit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                  {:else}
+                    @MKT
+                  {/if}
                 </span>
                 <span class="chain-basket-chase" title="Chase aggressiveness. L = patient (peg to your side), M = midpoint, H = urgent (cross the spread).">
-                  <span class="chain-basket-chase-label">C</span>
                   <button type="button" class="chain-basket-chase-pill chain-basket-chase-pill-low"
                           class:on={(leg.chaseAgg || 'low') === 'low'}
                           disabled={basketPlacing}
@@ -2175,9 +2200,15 @@
     onAddToBasket={(payload) => {
       // Same shape as a quick-add chain leg so the basket pill
       // renders identically. Symbol's CE/PE/FUT suffix decides
-      // the type accent on the pill.
+      // the type accent on the pill. Same-sym + same-side
+      // adds bump lots on the existing leg (dedupe).
       const sym = String(payload.sym || '').toUpperCase();
       const sideTag = payload.side === 'BUY' ? 'BUY' : 'SELL';
+      const lots = Number(payload.lots) || 1;
+      if (_mergeIntoBasket({ sym, side: sideTag, lots })) {
+        basketError = '';
+        return;
+      }
       const cellKey = /(CE|PE)$/.test(sym)
         ? _quickKeyOpt(0, /CE$/.test(sym) ? 'CE' : 'PE') + ':' + sym
         : _quickKeyFut(sym);
@@ -2186,7 +2217,7 @@
         side:     sideTag,
         sym,
         exchange: payload.exchange || 'NFO',
-        lots:     Number(payload.lots) || 1,
+        lots,
         lotSize:  Number(payload.lotSize) || 1,
         product:  payload.product || 'NRML',
         limit:    Number(payload.limit) || 0,
