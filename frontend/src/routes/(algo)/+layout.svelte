@@ -187,7 +187,7 @@
         <!-- Site label -->
         <button onclick={() => goto('/about')} class="algo-brand">
           <img src={bullSrc} alt="" class="algo-brand-bull" />
-          <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+          <span class="algo-brand-name">Rambo Quant</span>
         </button>
 
         <nav class="flex items-center gap-0.5 flex-1">
@@ -246,7 +246,7 @@
           <span class="algo-vert algo-vert-sm" aria-hidden="true">ALGO</span>
           <button onclick={() => goto('/about')} class="algo-brand">
             <img src={bullSrc} alt="" class="algo-brand-bull algo-brand-bull-sm" />
-            <span class="algo-brand-name">RAMBO QUANT ANALYTICS LLP</span>
+            <span class="algo-brand-name">Rambo Quant</span>
           </button>
         </div>
         {#if isDemo}
