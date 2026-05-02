@@ -228,6 +228,23 @@ SEEDS: list[tuple] = [
      "Allow `close_position` to hit the broker.", None, None),
     ("execution",   "execution.live.chase_close_positions","bool", False,
      "Allow `chase_close_positions` to hit the broker.", None, None),
+
+    # Shadow mode — logs the exact Kite payload without executing
+    ("execution",   "execution.shadow_mode", "bool", False,
+     "PROD ONLY. When ON, broker-hitting actions log the exact Kite payload "
+     "and validate via basket_margin without executing. Previews real orders "
+     "before promoting to live.", None, None),
+
+    # ── Replay / Backtest ────────────────────────────────────────��─────
+    ("replay",      "replay.max_days",           "int",  60,
+     "Maximum date range (days) for a single replay run.",
+     "days", {"min": 1, "max": 365, "step": 1}),
+    ("replay",      "replay.auto_stop_minutes",  "int",  30,
+     "Auto-stop a replay after this many wall-clock minutes.",
+     "min", {"min": 1, "max": 120, "step": 1}),
+    ("replay",      "replay.default_interval",   "enum", "5minute",
+     "Default candle interval for replay runs.",
+     None, {"enum": ["minute", "5minute", "15minute", "day"]}),
 ]
 
 

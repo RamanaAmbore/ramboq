@@ -454,3 +454,20 @@ export async function fetchChainQuotes(underlying, expiry) {
   return _get(`/options/chain-quotes?underlying=${u}&expiry=${e}`,
               { auth: true });
 }
+
+// ── Replay / Backtest ─────────────────────────────────────────────────
+export const fetchReplayStatus  = () => _get('/replay/status', { auth: true });
+export const startReplay        = (payload) => _post('/replay/start', payload, { auth: true });
+export const stopReplay         = () => _post('/replay/stop', {}, { auth: true });
+export const fetchReplayResults = () => _get('/replay/results', { auth: true });
+export const fetchReplayOrders  = (n = 50) => _get(`/replay/orders/recent?limit=${n}`, { auth: true });
+export const clearReplayData    = () => _post('/replay/clear', {}, { auth: true });
+
+// ── Shadow ────────────────────────────────────────────────────────────
+export const fetchShadowStatus  = () => _get('/shadow/status', { auth: true });
+export const fetchShadowOrders  = (n = 50) => _get(`/shadow/orders?limit=${n}`, { auth: true });
+export const promoteShadowToLive = () => _post('/shadow/promote', {}, { auth: true });
+export const clearShadowData    = () => _post('/shadow/clear', {}, { auth: true });
+
+// ── Live ──────────────────────────────────────────────────────────────
+export const fetchLiveStatus    = () => _get('/live/status', { auth: true });

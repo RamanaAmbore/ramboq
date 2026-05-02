@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0f1d35"/>
+      <stop offset="100%" stop-color="#080f1c"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="outerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+      <feFlood flood-color="#fbbf24" flood-opacity="0.35" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Navy background circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <!-- Subtle amber ring -->
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#fbbf24" stroke-width="2" stroke-opacity="0.2"/>
+  <!-- Bull silhouette — gold with glow, centered and scaled -->
+  <g transform="translate(96, 96) scale(1.25)" filter="url(#outerGlow)">
+    <!-- Bull body — simplified stylized shape matching the existing bull.png -->
+    <path d="M200,60 C195,55 185,40 175,30 C170,25 165,25 162,28 C158,32 160,38 165,45 C170,52 178,62 182,68
+             C178,65 170,58 155,55 C140,52 120,55 108,65 C95,76 88,92 85,110
+             C82,128 85,148 95,165 C100,173 108,180 115,185
+             L75,240 C72,246 70,252 72,258 C74,264 80,268 86,268
+             L105,268 C110,268 115,265 118,260 L140,220
+             C148,225 158,228 168,228
+             L155,258 C152,264 152,270 156,274 C160,278 166,280 172,278
+             L188,272 C194,270 198,264 198,258 L205,225
+             C215,222 225,215 232,205 C240,194 245,180 248,168
+             C252,155 255,140 255,130
+             C255,115 250,100 240,88
+             C230,76 215,68 200,60 Z"
+          fill="#fbbf24" fill-opacity="0.95"/>
+    <!-- Horn accent -->
+    <path d="M175,30 C172,22 175,12 182,8 C186,5 190,8 188,14 C186,20 180,28 175,30 Z"
+          fill="#f59e0b" fill-opacity="0.9"/>
+    <!-- Eye -->
+    <circle cx="195" cy="82" r="5" fill="#0f1d35"/>
+    <!-- Body line details for depth -->
+    <path d="M140,120 C155,115 175,118 190,130 C200,138 205,150 202,165"
+          fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-opacity="0.5" stroke-linecap="round"/>
+    <path d="M110,160 C125,148 145,145 165,155"
+          fill="none" stroke="#f59e0b" stroke-width="2" stroke-opacity="0.4" stroke-linecap="round"/>
+  </g>
+</svg>

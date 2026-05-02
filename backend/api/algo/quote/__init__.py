@@ -10,8 +10,9 @@ Public API:
     from backend.api.algo.quote import QuoteSource, SimQuoteSource, LiveQuoteSource
 """
 
-from backend.api.algo.quote.base import QuoteSource
-from backend.api.algo.quote.sim  import SimQuoteSource
-from backend.api.algo.quote.live import LiveQuoteSource
+from backend.api.algo.quote.base       import QuoteSource
+from backend.api.algo.quote.sim        import SimQuoteSource
+from backend.api.algo.quote.live       import LiveQuoteSource
+from backend.api.algo.quote.historical import HistoricalQuoteSource
 
-__all__ = ["QuoteSource", "SimQuoteSource", "LiveQuoteSource"]
+__all__ = ["QuoteSource", "SimQuoteSource", "LiveQuoteSource", "HistoricalQuoteSource"]

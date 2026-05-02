@@ -3,7 +3,10 @@
   import { page } from '$app/state';
   import { onMount, onDestroy } from 'svelte';
   import { authStore, visibleInterval } from '$lib/stores';
-  import { fetchSimStatus, fetchPaperStatus } from '$lib/api';
+  import {
+    fetchSimStatus, fetchPaperStatus,
+    fetchReplayStatus, fetchShadowStatus, fetchLiveStatus,
+  } from '$lib/api';
   import PositionStrip from '$lib/PositionStrip.svelte';
 
   const { children } = $props();
@@ -13,8 +16,11 @@
   // ── Activity polling state ─────────────────────────────────────────
   // Declared early so the demo derivation + nav filter below can
   // read `paperStatus.branch`. Pollers themselves run from onMount.
-  let simStatus   = $state(/** @type {any} */ ({ active: false }));
-  let paperStatus = $state(/** @type {any} */ ({ enabled: false, open_order_count: 0 }));
+  let simStatus    = $state(/** @type {any} */ ({ active: false }));
+  let paperStatus  = $state(/** @type {any} */ ({ enabled: false, open_order_count: 0 }));
+  let replayStatus = $state(/** @type {any} */ ({ active: false }));
+  let shadowStatus = $state(/** @type {any} */ ({ shadow_active: false }));
+  let liveStatus   = $state(/** @type {any} */ ({ live_count: 0 }));
 
   // Demo mode == anonymous visitor on the prod (main) branch. The
   // `paperStatus.branch` flag arrives via the poll; before the
@@ -43,36 +49,49 @@
     goto('/about');
   }
 
-  // Grouped by what the operator's actually doing on a given visit:
-  //   1. Live monitoring  — Dashboard, Agents, Orders. Touched daily.
-  //   2. Analysis         — Options, Paper, Simulator. Research +
-  //      what-if surfaces; the Options analytics page is here (not
-  //      under "monitoring") because it's used pre-trade, not live.
-  //   3. Build / extend   — Terminal (ad-hoc commands), Tokens (agent
-  //      grammar catalog).
-  //   4. Configuration    — Settings, Brokers. Touched per quarter,
-  //      not per session.
-  //   5. User admin       — partner / KYC management. Last.
+  // Grouped by operator activity + branch-aware mode entries.
+  //
+  //   Monitor  — Dashboard, Agents, Orders. Touched daily.
+  //   Analyze  — Options.
+  //   Modes    — branch-filtered: dev gets Simulator + Replay;
+  //              prod gets Paper + Shadow + Live + Replay.
+  //   Build    — Terminal, Tokens.
+  //   Config   — Settings, Brokers, Users.
+  //
+  // The `branches` field controls visibility:
+  //   'dev'  = non-main branch only
+  //   'main' = prod only
+  //   absent = always shown
   const _algoLinksAll = [
     { href: '/dashboard',        label: 'Dashboard' },
     { href: '/agents',           label: 'Agents'    },
     { href: '/orders',           label: 'Orders'    },
     { href: '/admin/options',    label: 'Options'   },
-    { href: '/admin/paper',      label: 'Paper'     },
-    { href: '/admin/simulator',  label: 'Simulator' },
+    // ── Modes (branch-filtered) ──
+    { href: '/admin/simulator',  label: 'Simulator', branches: ['dev'],  group: 'modes' },
+    { href: '/admin/replay',     label: 'Replay',                        group: 'modes' },
+    { href: '/admin/paper',      label: 'Paper',     branches: ['main'], group: 'modes' },
+    { href: '/admin/shadow',     label: 'Shadow',    branches: ['main'], group: 'modes' },
+    { href: '/admin/live',       label: 'Live',      branches: ['main'], group: 'modes' },
+    // ── Build / extend ──
     { href: '/console',          label: 'Terminal'  },
     { href: '/admin/tokens',     label: 'Tokens'    },
+    // ── Config ──
     { href: '/admin/settings',   label: 'Settings', adminOnly: true },
     { href: '/admin/brokers',    label: 'Brokers',  adminOnly: true },
     { href: '/admin',            label: 'Users',    adminOnly: true },
   ];
-  // Demo visitors see the analytics surface but not the ops surface
-  // (Settings / Brokers / Users). Each adminOnly entry drops out of
-  // the nav when we're in demo mode; the corresponding endpoints
-  // already 401 on backend admin_guard, so the guard is duplicated
-  // (UI hide + backend refuse) by design.
+  // Branch-aware + demo-aware filter.
   const algoLinks = $derived(
-    _algoLinksAll.filter(l => !l.adminOnly || !isDemo)
+    _algoLinksAll.filter(l => {
+      if (l.adminOnly && isDemo) return false;
+      if (l.branches) {
+        const branch = paperStatus?.branch || 'dev';
+        const key = branch === 'main' ? 'main' : 'dev';
+        return l.branches.includes(key);
+      }
+      return true;
+    })
   );
 
   /** Footer label that tracks the current page. Earlier the footer
@@ -99,8 +118,7 @@
   // The state vars are declared at the top of the script so the
   // `isDemo` derivation + nav filter can read them; the actual
   // pollers + lifecycle live here.
-  let simTeardown;
-  let paperTeardown;
+  let simTeardown, paperTeardown, replayTeardown, shadowTeardown, liveTeardown;
   async function pollSim() {
     try { simStatus = await fetchSimStatus(); }
     catch (_) { /* cap flag off or auth gone — treat as idle */ }
@@ -109,11 +127,29 @@
     try { paperStatus = await fetchPaperStatus(); }
     catch (_) { /* cap flag off, dev branch, or auth gone — treat as idle */ }
   }
+  async function pollReplay() {
+    try { replayStatus = await fetchReplayStatus(); }
+    catch (_) { /* treat as idle */ }
+  }
+  async function pollShadow() {
+    try { shadowStatus = await fetchShadowStatus(); }
+    catch (_) { /* treat as idle */ }
+  }
+  async function pollLive() {
+    try { liveStatus = await fetchLiveStatus(); }
+    catch (_) { /* treat as idle */ }
+  }
   onMount(() => {
-    pollSim();   simTeardown   = visibleInterval(pollSim,   4000);
-    pollPaper(); paperTeardown = visibleInterval(pollPaper, 4000);
+    pollSim();    simTeardown    = visibleInterval(pollSim,    4000);
+    pollPaper();  paperTeardown  = visibleInterval(pollPaper,  4000);
+    pollReplay(); replayTeardown = visibleInterval(pollReplay, 5000);
+    pollShadow(); shadowTeardown = visibleInterval(pollShadow, 5000);
+    pollLive();   liveTeardown   = visibleInterval(pollLive,   5000);
   });
-  onDestroy(() => { simTeardown?.(); paperTeardown?.(); });
+  onDestroy(() => {
+    simTeardown?.(); paperTeardown?.(); replayTeardown?.();
+    shadowTeardown?.(); liveTeardown?.();
+  });
 
   // ── Demo / signin redirect ─────────────────────────────────────────
   //   - Logged-in admin       → free pass.
@@ -176,9 +212,21 @@
           <span class="algo-mode-badge algo-mode-sim"
                 title="Simulator is running — fabricated market data">SIM</span>
         {/if}
+        {#if replayStatus?.active}
+          <span class="algo-mode-badge algo-mode-replay"
+                title="Replay running — tick {replayStatus.tick_index}/{replayStatus.total_ticks}">REPLAY</span>
+        {/if}
         {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
           <span class="algo-mode-badge algo-mode-paper"
                 title="Paper engine has {paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}">PAPER</span>
+        {/if}
+        {#if shadowStatus?.shadow_active}
+          <span class="algo-mode-badge algo-mode-shadow"
+                title="Shadow mode — orders logged, not executed">SHADOW</span>
+        {/if}
+        {#if liveStatus?.live_count > 0}
+          <span class="algo-mode-badge algo-mode-live"
+                title="{liveStatus.live_count}/{liveStatus.total_flags} actions are LIVE">LIVE</span>
         {/if}
         {#if $authStore.user}
           <span class="algo-user-pill">
@@ -207,8 +255,17 @@
         {#if paperStatus?.branch !== 'main' && simStatus?.active}
           <span class="algo-mode-badge algo-mode-sim" title="Simulator running">SIM</span>
         {/if}
+        {#if replayStatus?.active}
+          <span class="algo-mode-badge algo-mode-replay" title="Replay running">REPLAY</span>
+        {/if}
         {#if paperStatus?.enabled && paperStatus.open_order_count > 0}
           <span class="algo-mode-badge algo-mode-paper" title="Paper engine has open chase orders">PAPER</span>
+        {/if}
+        {#if shadowStatus?.shadow_active}
+          <span class="algo-mode-badge algo-mode-shadow" title="Shadow mode active">SHADOW</span>
+        {/if}
+        {#if liveStatus?.live_count > 0}
+          <span class="algo-mode-badge algo-mode-live" title="Live actions enabled">LIVE</span>
         {/if}
         {#if $authStore.user}
           <span class="algo-user-pill">
@@ -285,6 +342,23 @@
         <span>{paperStatus.open_order_count} open chase order{paperStatus.open_order_count === 1 ? '' : 's'}</span>
         <span class="paper-banner-sep">·</span>
         <span class="paper-banner-meta">fake fills against live quotes</span>
+      </div>
+    {/if}
+
+    {#if replayStatus?.active}
+      <div class="replay-banner" role="status" aria-live="polite">
+        <span class="replay-banner-dot"></span>
+        <span class="replay-banner-label">REPLAY</span>
+        <span class="replay-banner-sep">·</span>
+        <span>tick {replayStatus.tick_index}/{replayStatus.total_ticks}</span>
+        {#if replayStatus.date_from && replayStatus.date_to}
+          <span class="replay-banner-sep">·</span>
+          <span>{replayStatus.date_from} → {replayStatus.date_to}</span>
+        {/if}
+        {#if replayStatus.interval}
+          <span class="replay-banner-sep">·</span>
+          <span>{replayStatus.interval}</span>
+        {/if}
       </div>
     {/if}
 
@@ -493,9 +567,12 @@
     box-shadow: 0 0 6px currentColor;
     animation: algo-mode-dot 2s ease-in-out infinite;
   }
-  .algo-mode-demo  { color: #c084fc; background: rgba(192,132,252,0.10); }
-  .algo-mode-sim   { color: #fb7185; background: rgba(251,113,133,0.10); }
-  .algo-mode-paper { color: #38bdf8; background: rgba(56,189,248,0.10); }
+  .algo-mode-demo   { color: #c084fc; background: rgba(192,132,252,0.10); }
+  .algo-mode-sim    { color: #fb7185; background: rgba(251,113,133,0.10); }
+  .algo-mode-replay { color: #4ade80; background: rgba(74,222,128,0.10); }
+  .algo-mode-paper  { color: #38bdf8; background: rgba(56,189,248,0.10); }
+  .algo-mode-shadow { color: #fb923c; background: rgba(251,146,60,0.10); }
+  .algo-mode-live   { color: #ef4444; background: rgba(239,68,68,0.10); }
   @keyframes algo-mode-dot {
     0%, 100% { opacity: 1;   transform: scale(1); }
     50%      { opacity: 0.4; transform: scale(0.8); }
@@ -693,6 +770,34 @@
   }
   .paper-banner-sep  { color: rgba(125,211,252,0.5); }
   .paper-banner-meta { color: #bae6fd; opacity: 0.8; }
+
+  /* ── Replay banner ───────────────────────────────────────────────────── */
+  .replay-banner {
+    position: sticky;
+    top: 3rem;
+    z-index: 39;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #86efac;
+    background: rgba(22,101,52,0.25);
+    border-bottom: 1px solid rgba(74,222,128,0.2);
+  }
+  .replay-banner-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #4ade80;
+    animation: algo-mode-dot 2s ease-in-out infinite;
+  }
+  .replay-banner-label {
+    color: #4ade80;
+    letter-spacing: 0.1em;
+    font-size: 0.6rem;
+    font-weight: 800;
+  }
+  .replay-banner-sep { color: rgba(74,222,128,0.5); }
 
   /* ── Content ─────────────────────────────────────────────────────────────── */
   .algo-content {

@@ -1,0 +1,17 @@
+{
+  "name": "RamboQuant Analytics",
+  "short_name": "RamboQuant",
+  "description": "Portfolio performance tracking, market updates, and algo trading",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080f1c",
+  "theme_color": "#0a1020",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

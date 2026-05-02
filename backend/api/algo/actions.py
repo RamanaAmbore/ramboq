@@ -27,25 +27,35 @@ BROKER_ACTIONS = {
 def _resolve_mode(action_type: str, context: dict) -> str:
     """
     Decide how this action should be executed:
-      * 'sim'   — agent was fired by the simulator → route to the sim
-                  paper-trade writer (SimDriver owns the lifecycle)
-      * 'paper' — mode 2: real data, paper order. On non-main (dev) this
-                  is the only path for broker actions. On main (prod),
-                  it's the default when the per-action
-                  `execution.live.<action>` DB flag is still False
-      * 'live'  — mode 3: real data, real order. Only reachable on
-                  main AND the per-action flag is True
-      * 'noop'  — non-broker action (no gate); the existing handler
-                  (send_summary, emit_log, …) runs as-is
+      * 'sim'    — agent was fired by the simulator → route to the sim
+                   paper-trade writer (SimDriver owns the lifecycle)
+      * 'replay' — agent was fired by the replay engine → route to replay
+                   paper-trade writer (informational only)
+      * 'shadow' — real data, log-only: captures exact Kite payload +
+                   basket_margin validation without executing. Prod only.
+      * 'paper'  — mode 2: real data, paper order. On non-main (dev) this
+                   is the only path for broker actions. On main (prod),
+                   it's the default when shadow is off and the per-action
+                   `execution.live.<action>` DB flag is still False
+      * 'live'   — mode 3: real data, real order. Only reachable on
+                   main AND the per-action flag is True
+      * 'noop'   — non-broker action (no gate); the existing handler
+                   (send_summary, emit_log, …) runs as-is
+
+    Precedence: sim > replay > (prod branch check) > shadow > live > paper
     """
     if context.get("sim_mode"):
         return "sim"
+    if context.get("replay_mode"):
+        return "replay"
     if action_type not in BROKER_ACTIONS:
         return "noop"
     from backend.shared.helpers.utils    import is_prod_branch
     from backend.shared.helpers.settings import get_bool
     if not is_prod_branch():
         return "paper"                         # dev never hits broker
+    if get_bool("execution.shadow_mode", False):
+        return "shadow"
     if get_bool(f"execution.live.{action_type}", False):
         return "live"
     return "paper"
@@ -69,11 +79,16 @@ async def execute(agent, actions: list, context: dict):
         action_type = action.get("type", "")
         params = action.get("params", {})
         mode = _resolve_mode(action_type, context)
-        tag  = {"sim": "[SIM] ", "paper": "[PAPER] ", "live": "", "noop": ""}[mode]
+        tag  = {"sim": "[SIM] ", "replay": "[REPLAY] ", "shadow": "[SHADOW] ",
+                "paper": "[PAPER] ", "live": "", "noop": ""}.get(mode, "")
 
         try:
             if mode == "sim":
                 await _sim_paper_trade(agent, action_type, params, context)
+            elif mode == "replay":
+                await _replay_paper_trade(agent, action_type, params, context)
+            elif mode == "shadow":
+                await _shadow_trade(agent, action_type, params, context)
             elif mode == "paper":
                 await _paper_trade(agent, action_type, params, context)
             elif mode == "live":
@@ -343,6 +358,80 @@ async def _sim_paper_trade(agent, action_type: str, params: dict, context: dict)
 
     # Non-order action — no paper row. The log_event call in execute()
     # already captures the action_success event.
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Mode-4 replay paper trade — informational order log for backtest results
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _replay_paper_trade(agent, action_type: str, params: dict, context: dict):
+    """
+    Replay-mode dispatcher — writes AlgoOrder(mode='replay') rows as a
+    record of what the agent would have done at each historical tick.
+    No fill lifecycle — replay orders are purely informational.
+    """
+    from backend.api.database import async_session
+    from backend.api.models import AlgoOrder
+
+    account = str(params.get("account") or "REPLAY")
+    symbol = str(params.get("symbol") or f"{agent.slug}-{action_type}")
+    side = params.get("side") or params.get("transaction_type") or "SELL"
+    qty = int(params.get("quantity") or 0)
+    price = params.get("price")
+
+    price_str = f"@₹{price:,.2f}" if price is not None else "@MARKET"
+    pretty = (f"[REPLAY] {agent.slug} → {action_type}: {side} {qty} "
+              f"{symbol} {price_str}")
+    logger.warning(pretty)
+
+    try:
+        async with async_session() as s:
+            row = AlgoOrder(
+                account=account, symbol=symbol,
+                exchange=str(params.get("exchange") or "NFO"),
+                transaction_type=side, quantity=qty,
+                initial_price=(float(price) if price is not None else None),
+                status="REPLAY", engine="replay", mode="replay",
+                detail=pretty,
+            )
+            s.add(row)
+            await s.commit()
+    except Exception as e:
+        logger.error(f"[REPLAY] paper-trade write failed: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Mode-5 shadow trade — logs exact Kite payload, validates via basket_margin
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _shadow_trade(agent, action_type: str, params: dict, context: dict):
+    """
+    Shadow-mode dispatcher — captures the exact Kite payload and validates
+    via basket_margin, but never calls the broker.
+    """
+    from backend.api.algo.shadow import get_shadow_engine
+
+    account = str(params.get("account") or "")
+    symbol = str(params.get("symbol") or f"{agent.slug}-{action_type}")
+    side = params.get("side") or params.get("transaction_type") or "SELL"
+    qty = int(params.get("quantity") or 0)
+    price = params.get("price")
+
+    result = await get_shadow_engine().capture_order(
+        agent=agent,
+        action_type=action_type,
+        resolved={
+            "account": account,
+            "symbol": symbol,
+            "side": side,
+            "qty": qty,
+            "price": price,
+            "exchange": str(params.get("exchange") or "NFO"),
+            "product": str(params.get("product") or "NRML"),
+        },
+    )
+    if not result.get("ok"):
+        logger.warning(f"[SHADOW] {agent.slug}: basket_margin rejected — {result.get('margin_info')}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

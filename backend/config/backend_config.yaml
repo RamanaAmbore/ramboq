@@ -35,10 +35,13 @@ cap_in_dev:
   notify_on_deploy: True   # Send test Telegram+email on each deploy
   market_feed:      False  # Market news feed (Google News RSS)
   simulator:        True   # /api/simulator market simulator (dev default: on)
+  replay:           True   # /api/replay backtest engine (dev default: on)
 
 cap_in_prod:
   simulator:        False  # /api/simulator market simulator (prod default: off — never run
                            # fabricated market data in production)
+  replay:           True   # /api/replay backtest engine (prod: on — uses historical data, no risk)
+  shadow:           True   # /api/shadow shadow mode (prod: on — logs without executing)
 
 # `genai_thinking_budget` moved to DB (`genai.thinking_budget`).
 
